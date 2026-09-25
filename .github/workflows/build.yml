@@ -1,0 +1,55 @@
+name: Build APK from zip
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip the project
+        run: |
+          ZIP=$(ls *.zip | head -1)
+          echo "Using $ZIP"
+          unzip -q "$ZIP" -d src
+          DIR=$(dirname "$(find src -name capacitor.config.json | head -1)")
+          echo "PROJ=$GITHUB_WORKSPACE/$DIR" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and sync
+        run: |
+          cd "$PROJ"
+          npm ci
+          npx cap sync android
+
+      - name: Build APK
+        run: |
+          cd "$PROJ/android"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Amplify.apk"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Amplify.apk \
+            --target "${{ github.sha }}" \
+            --title "Amplify build ${{ github.run_number }}" \
+            --notes "Open this page on the phone and tap Amplify.apk to install or update."
