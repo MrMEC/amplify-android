@@ -1,4 +1,4 @@
-name: Build APK from zip
+name: Build APK
 
 on:
   push:
@@ -8,19 +8,15 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Unzip the project
-        run: |
-          ZIP=$(ls *.zip | head -1)
-          echo "Using $ZIP"
-          unzip -q "$ZIP" -d src
-          DIR=$(dirname "$(find src -name capacitor.config.json | head -1)")
-          echo "PROJ=$GITHUB_WORKSPACE/$DIR" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -31,25 +27,48 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install and sync
-        run: |
-          cd "$PROJ"
-          npm ci
-          npx cap sync android
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install
+        run: npm ci
+
+      - name: Copy the web app into the Android project
+        run: npx cap sync android
 
       - name: Build APK
+        id: build
+        working-directory: android
         run: |
-          cd "$PROJ/android"
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
-          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Amplify.apk"
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../build.log
+
+      - name: Publish result to the build-output branch
+        if: always()
+        env:
+          RESULT: ${{ steps.build.outcome }}
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          if [ -f build.log ]; then cp build.log out/build.log; tail -c 80000 build.log > out/build-tail.log; else echo "no build log" > out/build.log; fi
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          if [ -f "$APK" ]; then cp "$APK" out/Amplify.apk; fi
+          echo "run=${{ github.run_number }} sha=${{ github.sha }} result=$RESULT" > out/status.txt
+          cd out
+          git init -q -b build-output
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "Build ${{ github.run_number }}: $RESULT"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" build-output
 
       - name: Publish release
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest Amplify.apk \
+          gh release create latest out/Amplify.apk \
             --target "${{ github.sha }}" \
             --title "Amplify build ${{ github.run_number }}" \
             --notes "Open this page on the phone and tap Amplify.apk to install or update."

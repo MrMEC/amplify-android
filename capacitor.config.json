@@ -1,0 +1,14 @@
+{
+  "appId": "com.markcoleman.amplify",
+  "appName": "Amplify",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "backgroundColor": "#0e1013",
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK"
+    }
+  }
+}
