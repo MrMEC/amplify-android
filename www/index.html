@@ -17557,6 +17557,170 @@
   loadArtistStations().then(function(){ renderLibraryList(); })['catch'](function(){});
   // Cached biographies and portraits only; this never touches the network.
   loadArtistMetaCache().then(function(){ refreshLibraryView(); })['catch'](function(){});
+  // ---------- Android Auto menu (Android app only) ----------
+  // The car can't see this page, so every list its menu needs is worked out here and saved
+  // to the native side as one snapshot (see CarLibrary.java). It is re-sent whenever the
+  // lists change, when the app goes to the background (usually right before a drive), and
+  // every so often; the few lists that come from the network (Top Stations, For You) are
+  // refetched at most every half hour. Episodes played in the car report their progress
+  // back through takeCarProgress, folded into this page's own progress the next time it runs.
+  (function(){
+    var Cap = window.Capacitor;
+    if(!Cap || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform()) return;
+    var P = (Cap.Plugins && Cap.Plugins.AmplifyPlayer) || Cap.registerPlugin('AmplifyPlayer');
+    if(!P || !P.setCarCatalog) return;
+    var CAR_NET_MS = 30 * 60 * 1000;
+    var carNet = { at: 0, top: null, forYou: {} };
+    var carTimer = null, carBusy = false, carAgain = false;
+
+    function carStation(s){
+      if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album') return null;
+      if(!s.urlToResolve || isBlacklisted(s)) return null;
+      var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || s.country || '';
+      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, art: s.favicon || '', url: s.urlToResolve };
+    }
+    function carEpisode(ep, prog, group){
+      if(!ep || !ep.episodeUrl || ep.isVideo) return null;
+      var rec = prog && prog[ep.guid];
+      var o = {
+        t: 'episode', k: favKey(ep), guid: ep.guid, title: ep.name || 'Episode',
+        sub: ep.collectionName || '', art: ep.favicon || '', url: ep.episodeUrl,
+        dur: ep.duration || (rec && rec.durationSec) || 0,
+        rec: podcastRecordFromEpisode(ep)
+      };
+      if(rec){ o.pos = rec.positionSec || 0; o.done = !!rec.completed; }
+      if(group) o.g = group;
+      return o;
+    }
+    function carShow(sh){
+      if(!sh || sh.collectionId == null) return null;
+      return { t: 'show', cid: String(sh.collectionId), title: sh.collectionName || 'Podcast', sub: sh.artistName || '', art: sh.artworkUrl || '' };
+    }
+    function compact(list){ return list.filter(Boolean); }
+    function stationCards(data){
+      return dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+    }
+
+    // Top Stations and every For You search, from the station directory.
+    function refreshNetLists(){
+      if(Date.now() - carNet.at < CAR_NET_MS && carNet.top) return Promise.resolve();
+      var jobs = [apiFetch('/json/stations/search?limit=48&hidebroken=true&order=clickcount&reverse=true')
+        .then(function(data){ carNet.top = stationCards(data); })['catch'](function(){})];
+      customSearches.forEach(function(item){
+        jobs.push(apiFetch('/json/stations/search?name=' + encodeURIComponent(item.query) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
+          .then(function(data){ carNet.forYou[item.id] = sortAlphaWithFavoritesFirst(stationCards(data)); })['catch'](function(){}));
+      });
+      return Promise.all(jobs).then(function(){ carNet.at = Date.now(); });
+    }
+
+    function latestOf(subs, prog){
+      var list = subs.filter(function(sub){ return sub.latestEpisode && sub.latestEpisode.releaseDate; });
+      list.sort(function(a, b){ return new Date(b.latestEpisode.releaseDate).getTime() - new Date(a.latestEpisode.releaseDate).getTime(); });
+      return compact(list.map(function(sub){
+        return carEpisode(sub.latestEpisode, prog, podcastDateHeadingLabel(sub.latestEpisode.releaseDate));
+      }));
+    }
+
+    function buildCatalog(){
+      return Promise.all([
+        getAllPodcastProgress()['catch'](function(){ return []; }),
+        loadContinueListening(20)['catch'](function(){ return []; }),
+        refreshNetLists()
+      ]).then(function(r){
+        var prog = {};
+        (r[0] || []).forEach(function(rec){ if(rec && rec.guid) prog[rec.guid] = rec; });
+        var lists = {};
+        lists.favorites = compact(favorites.map(function(f){
+          return isPodcastTrack(f) ? carEpisode(f, prog) : carStation(f);
+        }));
+        lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
+          .slice(0, RECENT_LIMIT).map(carStation));
+        lists.topStations = compact((carNet.top || []).map(carStation));
+        lists['continue'] = compact((r[1] || []).map(function(rec){ return carEpisode(podcastTrackFromProgress(rec), prog); }));
+        lists.podLatest = latestOf(podcastSubs, prog);
+        podcastCategories.forEach(function(cat){
+          lists['cat:' + cat.id] = latestOf(podcastSubs.filter(function(sub){ return isShowInPodcastCategory(cat, sub.collectionId); }), prog);
+        });
+        lists.shows = compact(getSortedPodcastSubs('az').map(carShow));
+        var pop = readPopularCache();
+        lists.popular = compact(((pop && pop.shows) || []).map(carShow));
+        var forYou = customSearches.map(function(item){
+          lists['fy:' + item.id] = compact((carNet.forYou[item.id] || []).map(carStation));
+          return { id: String(item.id), label: item.label };
+        });
+        return {
+          v: 1, at: Date.now(), podcastSpeed: loadPodcastSpeed(),
+          forYou: forYou,
+          categories: podcastCategories.map(function(c){ return { id: String(c.id), name: c.name }; }),
+          lists: lists
+        };
+      });
+    }
+
+    function publishCarCatalog(){
+      if(carBusy){ carAgain = true; return; }
+      carBusy = true;
+      buildCatalog().then(function(cat){
+        return P.setCarCatalog({ json: JSON.stringify(cat) });
+      })['catch'](function(err){ console.warn('Car menu not saved', err); }).then(function(){
+        carBusy = false;
+        if(carAgain){ carAgain = false; scheduleCarCatalog(); }
+      });
+    }
+    function scheduleCarCatalog(){
+      clearTimeout(carTimer);
+      carTimer = setTimeout(publishCarCatalog, 1500);
+    }
+    window.AmplifyPublishCarMenu = publishCarCatalog;
+
+    // Anything that changes a list the car shows re-sends the menu shortly after.
+    var _saveFavorites = saveFavorites;
+    saveFavorites = function(){ _saveFavorites.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveRecent = saveRecent;
+    saveRecent = function(){ _saveRecent.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveCustomSearches = saveCustomSearches;
+    saveCustomSearches = function(){ _saveCustomSearches.apply(this, arguments); carNet.at = 0; scheduleCarCatalog(); };
+    var _savePodcastSubs = savePodcastSubs;
+    savePodcastSubs = function(){ _savePodcastSubs.apply(this, arguments); scheduleCarCatalog(); };
+    var _savePodcastCategories = savePodcastCategories;
+    savePodcastCategories = function(){ _savePodcastCategories.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveBlacklist = saveBlacklist;
+    saveBlacklist = function(){ _saveBlacklist.apply(this, arguments); scheduleCarCatalog(); };
+    var _removePodcastProgress = removePodcastProgress;
+    removePodcastProgress = function(){
+      return _removePodcastProgress.apply(this, arguments).then(function(v){ scheduleCarCatalog(); return v; });
+    };
+
+    // Episodes played in the car: fold their progress into this page's own.
+    function takeCarProgress(){
+      if(!P.takeCarProgress) return Promise.resolve();
+      return P.takeCarProgress().then(function(res){
+        var all = (res && res.progress) || {};
+        var guids = Object.keys(all);
+        return Promise.all(guids.map(function(guid){
+          var p = all[guid] || {};
+          var rec = p.record || {};
+          rec.guid = guid;
+          return savePodcastProgress(podcastTrackFromProgress(rec), p.positionSec || 0, p.durationSec || 0);
+        })).then(function(){ return guids.length; });
+      })['catch'](function(){ return 0; });
+    }
+
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'hidden') publishCarCatalog();
+      else takeCarProgress().then(function(n){ if(n) scheduleCarCatalog(); });
+    });
+    setInterval(function(){ carNet.at = 0; publishCarCatalog(); }, CAR_NET_MS);
+    setTimeout(function(){
+      takeCarProgress().then(publishCarCatalog);
+      // Popular comes from Apple's directory and is cached for a day; loading it here means the
+      // car has it without Podcasts > Popular being opened first.
+      setTimeout(function(){
+        getPopularPodcasts().then(function(){ scheduleCarCatalog(); })['catch'](function(){});
+      }, 20000);
+    }, 4000);
+  })();
+
   if(!storageWorks) setStatus('Heads up: this browser is blocking local storage, so Favorites / Recent / volume won\'t be remembered next time you open this file.', true);
 })();
 </script>
