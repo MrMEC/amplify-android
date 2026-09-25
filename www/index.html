@@ -11895,7 +11895,18 @@
       if(quotaHit || importCancelled || next >= files.length) return Promise.resolve();
       var file = files[next++];
       currentName = file.name;
-      return importOneFile(file, folderArtIndex, reserved).then(function(res){
+      var job;
+      if(file.amplifyLoad){
+        // A song picked in the Android app is fetched only now; one already in the library
+        // is recognised from its listing and never read at all.
+        var preId = makeLocalTrackId(relPathOf(file), file.size, file.lastModified);
+        job = (libraryById[preId] || reserved.ids[preId])
+          ? Promise.resolve({ skipped: true })
+          : file.amplifyLoad().then(function(real){ return importOneFile(real, folderArtIndex, reserved); });
+      } else {
+        job = importOneFile(file, folderArtIndex, reserved);
+      }
+      return job.then(function(res){
         if(res && res.added) added++;
         else if(res && res.skipped) skipped++;
       })['catch'](function(err){
@@ -15209,10 +15220,70 @@
   // Firefox and Safari all support it; Android WebView does not, which is why the dialog
   // feature-detects rather than assuming, and why dragging a folder stays available as the
   // universal path. On Android the native shell will use the Storage Access Framework.
-  var HAS_FOLDER_PICKER = ('webkitdirectory' in document.createElement('input'));
+  var NATIVE_APP = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' &&
+    window.Capacitor.isNativePlatform());
+  var HAS_FOLDER_PICKER = NATIVE_APP || ('webkitdirectory' in document.createElement('input'));
 
   function promptForLocalFiles(){ localFilesInput.click(); }
-  function promptForLocalFolder(){ localFolderInput.click(); }
+  function promptForLocalFolder(){
+    if(NATIVE_APP){ pickNativeMusicFolder(); return; }
+    localFolderInput.click();
+  }
+
+  // In the Android app the folder comes from the system picker (see AmplifyPlayerPlugin
+  // pickMusicFolder). Each song is a content:// uri, served to the page by Capacitor's local
+  // server; songs are fetched one at a time as the import reaches them (amplifyLoad) so a
+  // big library never has to sit in memory all at once. Folder art is small and needed up
+  // front, so the chosen cover per directory is fetched before the import starts.
+  function nativeFileFromEntry(f){
+    var url = window.Capacitor.convertFileSrc(f.uri);
+    var relPath = normalizeRelPath(f.relPath || f.name);
+    var lastModified = f.lastModified || 0;
+    return fetch(url).then(function(r){
+      if(!r.ok) throw new Error('Could not read ' + f.name);
+      return r.blob();
+    }).then(function(b){
+      var file = new File([b], f.name, { type: f.type || b.type || '', lastModified: lastModified });
+      try{ Object.defineProperty(file, 'amplifyRelPath', { value: relPath, configurable: true }); }catch(e){}
+      return file;
+    });
+  }
+  function pickNativeMusicFolder(){
+    var Cap = window.Capacitor;
+    var P = (Cap.Plugins && Cap.Plugins.AmplifyPlayer) || Cap.registerPlugin('AmplifyPlayer');
+    if(importInProgress){
+      setStatus('Still importing the last batch — give it a moment.', false);
+      return;
+    }
+    P.pickMusicFolder().then(function(res){
+      if(!res || res.cancelled) return;
+      setStatus('Reading ' + (res.folder || 'folder') + '…', false, true);
+      var stubs = (res.files || []).map(function(f){
+        return {
+          name: f.name, size: f.size || 0, type: f.type || '', lastModified: f.lastModified || 0,
+          amplifyRelPath: normalizeRelPath(f.relPath || f.name),
+          amplifyLoad: function(){ return nativeFileFromEntry(f); },
+          amplifyEntry: f
+        };
+      });
+      var artIndex = buildFolderArtIndex(stubs);
+      var artStubs = Object.keys(artIndex).map(function(d){ return artIndex[d]; });
+      var audio = stubs.filter(isAudioFile);
+      return Promise.all(artStubs.map(function(st){
+        return nativeFileFromEntry(st.amplifyEntry)['catch'](function(){ return null; });
+      })).then(function(artFiles){
+        var list = audio.concat(artFiles.filter(Boolean));
+        if(res.truncated){
+          setStatus('That folder is very large; the first ' + stubs.length + ' files are being added.', false);
+        }
+        return importLocalFiles(list, { fromFolder: true });
+      });
+    })['catch'](function(err){
+      var msg = (err && err.message) ? err.message : 'The folder could not be opened.';
+      setStatus(msg, true);
+      showImportPanel('error', { title: 'Import failed', count: 'Nothing was added', detail: msg });
+    });
+  }
 
   function openAddMusicDialog(){
     addMusicFolderBtn.disabled = !HAS_FOLDER_PICKER;

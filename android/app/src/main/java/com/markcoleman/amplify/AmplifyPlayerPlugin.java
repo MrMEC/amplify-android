@@ -1,6 +1,16 @@
 package com.markcoleman.amplify;
 
+import android.app.Activity;
 import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.Intent;
+import android.database.Cursor;
+import android.provider.DocumentsContract;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.JSArray;
+import com.getcapacitor.annotation.ActivityCallback;
+import java.util.ArrayDeque;
+import java.util.Locale;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -383,6 +393,133 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       total -= f.length();
       f.delete();
     }
+  }
+
+  // ---------------- music folder picker (Storage Access Framework) ----------------
+  // Android's WebView has no folder picker (webkitdirectory), so the page asks for one here.
+  // The folder is walked natively and each file comes back as a content:// uri the page
+  // fetches through Capacitor's local server and imports exactly like a picked folder.
+
+  private static final int FOLDER_MAX_FILES = 20000;
+  private static final int FOLDER_MAX_DEPTH = 12;
+  private static final List<String> FOLDER_EXTS =
+      Arrays.asList(
+          "mp3", "m4a", "m4b", "mp4", "aac", "flac", "ogg", "oga", "opus", "wav", "wma", "aiff",
+          "aif", "jpg", "jpeg", "png", "webp", "gif");
+
+  @PluginMethod
+  public void pickMusicFolder(PluginCall call) {
+    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+    i.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+    startActivityForResult(call, i, "onMusicFolderPicked");
+  }
+
+  @ActivityCallback
+  private void onMusicFolderPicked(PluginCall call, ActivityResult result) {
+    if (call == null) return;
+    Intent data = result.getData();
+    if (result.getResultCode() != Activity.RESULT_OK || data == null || data.getData() == null) {
+      JSObject o = new JSObject();
+      o.put("cancelled", true);
+      call.resolve(o);
+      return;
+    }
+    Uri tree = data.getData();
+    ContentResolver cr = getContext().getContentResolver();
+    try {
+      cr.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    } catch (Exception ignored) {
+      // A one-off grant is still enough to import from.
+    }
+    new Thread(
+            () -> {
+              try {
+                call.resolve(walkTree(cr, tree));
+              } catch (Exception e) {
+                call.reject("Could not read that folder: " + e.getMessage());
+              }
+            })
+        .start();
+  }
+
+  private static JSObject walkTree(ContentResolver cr, Uri tree) {
+    String rootId = DocumentsContract.getTreeDocumentId(tree);
+    String rootName = displayName(cr, DocumentsContract.buildDocumentUriUsingTree(tree, rootId));
+    if (rootName == null || rootName.isEmpty()) {
+      int c = rootId.lastIndexOf(':');
+      rootName = c >= 0 ? rootId.substring(c + 1) : rootId;
+      int s = rootName.lastIndexOf('/');
+      if (s >= 0) rootName = rootName.substring(s + 1);
+      if (rootName.isEmpty()) rootName = "Music";
+    }
+    JSArray files = new JSArray();
+    int count = 0;
+    boolean truncated = false;
+    String[] cols = {
+      DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+      DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+      DocumentsContract.Document.COLUMN_MIME_TYPE,
+      DocumentsContract.Document.COLUMN_SIZE,
+      DocumentsContract.Document.COLUMN_LAST_MODIFIED
+    };
+    ArrayDeque<String[]> queue = new ArrayDeque<>(); // {docId, relDir, depth}
+    queue.add(new String[] {rootId, rootName, "0"});
+    while (!queue.isEmpty() && !truncated) {
+      String[] dir = queue.poll();
+      int depth = Integer.parseInt(dir[2]);
+      Uri kids = DocumentsContract.buildChildDocumentsUriUsingTree(tree, dir[0]);
+      try (Cursor c = cr.query(kids, cols, null, null, null)) {
+        if (c == null) continue;
+        while (c.moveToNext()) {
+          String id = c.getString(0);
+          String name = c.getString(1);
+          String mime = c.getString(2);
+          if (id == null || name == null || name.startsWith(".")) continue;
+          if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+            if (depth < FOLDER_MAX_DEPTH) {
+              queue.add(new String[] {id, dir[1] + "/" + name, String.valueOf(depth + 1)});
+            }
+            continue;
+          }
+          String m = mime == null ? "" : mime;
+          int dot = name.lastIndexOf('.');
+          String ext = dot >= 0 ? name.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
+          if (!m.startsWith("audio/") && !m.startsWith("image/") && !FOLDER_EXTS.contains(ext)) {
+            continue;
+          }
+          JSObject f = new JSObject();
+          f.put("uri", DocumentsContract.buildDocumentUriUsingTree(tree, id).toString());
+          f.put("name", name);
+          f.put("relPath", dir[1] + "/" + name);
+          f.put("type", m);
+          f.put("size", c.isNull(3) ? 0 : c.getLong(3));
+          f.put("lastModified", c.isNull(4) ? 0 : c.getLong(4));
+          files.put(f);
+          if (++count >= FOLDER_MAX_FILES) {
+            truncated = true;
+            break;
+          }
+        }
+      } catch (Exception ignored) {
+        // An unreadable subfolder is skipped rather than failing the whole import.
+      }
+    }
+    JSObject o = new JSObject();
+    o.put("folder", rootName);
+    o.put("files", files);
+    o.put("truncated", truncated);
+    return o;
+  }
+
+  @Nullable
+  private static String displayName(ContentResolver cr, Uri doc) {
+    try (Cursor c =
+        cr.query(doc, new String[] {DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
+      if (c != null && c.moveToFirst()) return c.getString(0);
+    } catch (Exception ignored) {
+    }
+    return null;
   }
 
   // ---------------- events to the page ----------------
