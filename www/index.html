@@ -11582,6 +11582,7 @@
       size: file.size,
       lastModified: file.lastModified || 0,
       mime: file.type || '',
+      srcUri: file.amplifySrcUri || '',
       hasArt: !!((t.art && t.art.length) || folderArtBlob)
     };
   }
@@ -11876,7 +11877,7 @@
     // Stored once per directory, regardless of whether any track ends up using it as its
     // own art -- the artist page reads these back later.
     if(folderArtIndex) persistFolderArt(folderArtIndex);
-    var added = 0, skipped = 0, failed = 0, quotaHit = false, doneCount = 0;
+    var added = 0, skipped = 0, failed = 0, quotaHit = false, doneCount = 0, linked = 0;
     var next = 0;
     var total = files.length;
 
@@ -11900,15 +11901,26 @@
         // A song picked in the Android app is fetched only now; one already in the library
         // is recognised from its listing and never read at all.
         var preId = makeLocalTrackId(relPathOf(file), file.size, file.lastModified);
-        job = (libraryById[preId] || reserved.ids[preId])
-          ? Promise.resolve({ skipped: true })
-          : file.amplifyLoad().then(function(real){ return importOneFile(real, folderArtIndex, reserved); });
+        var existing = libraryById[preId];
+        if(existing && !existing.srcUri && file.amplifyEntry && file.amplifyEntry.uri){
+          // Already in the library from an earlier import: just note where it lives on the
+          // phone so the car can play it. Nothing is read or copied again.
+          existing.srcUri = file.amplifyEntry.uri;
+          job = idbDo([LIB_STORE_TRACKS], 'readwrite', function(tx){
+            return tx.objectStore(LIB_STORE_TRACKS).put(existing);
+          }).then(function(){ return { skipped: true, linked: true }; });
+        } else {
+          job = (existing || reserved.ids[preId])
+            ? Promise.resolve({ skipped: true })
+            : file.amplifyLoad().then(function(real){ return importOneFile(real, folderArtIndex, reserved); });
+        }
       } else {
         job = importOneFile(file, folderArtIndex, reserved);
       }
       return job.then(function(res){
         if(res && res.added) added++;
         else if(res && res.skipped) skipped++;
+        if(res && res.linked) linked++;
       })['catch'](function(err){
         if(isQuotaError(err)) quotaHit = true;
         else failed++;
@@ -11939,6 +11951,7 @@
       var bits = [];
       if(added) bits.push(added + (added === 1 ? ' track added' : ' tracks added'));
       if(skipped) bits.push(skipped + ' already in your library');
+      if(linked) bits.push(linked + ' now playable in Android Auto');
       if(failed) bits.push(failed + ' could not be read');
       var summary = bits.join(', ') || 'Nothing added';
       if(importCancelled){
@@ -15245,6 +15258,9 @@
     }).then(function(b){
       var file = new File([b], f.name, { type: f.type || b.type || '', lastModified: lastModified });
       try{ Object.defineProperty(file, 'amplifyRelPath', { value: relPath, configurable: true }); }catch(e){}
+      // Where the song sits on the phone, which is what lets Android Auto play it without
+      // this page (see CarLibrary). Only a folder picked in the app has one.
+      try{ Object.defineProperty(file, 'amplifySrcUri', { value: f.uri || '', configurable: true }); }catch(e){}
       return file;
     });
   }
@@ -17592,6 +17608,12 @@
       if(group) o.g = group;
       return o;
     }
+    // A library song is referred to by id; its details and where it lives are in the library
+    // snapshot (buildCarLibrary), and one without a place on the phone is left out there.
+    function carSong(t){
+      if(!t || !isLocalTrack(t) || isBlacklisted(t)) return null;
+      return { t: 'song', id: favKey(t) };
+    }
     function carShow(sh){
       if(!sh || sh.collectionId == null) return null;
       return { t: 'show', cid: String(sh.collectionId), title: sh.collectionName || 'Podcast', sub: sh.artistName || '', art: sh.artworkUrl || '' };
@@ -17631,8 +17653,23 @@
         (r[0] || []).forEach(function(rec){ if(rec && rec.guid) prog[rec.guid] = rec; });
         var lists = {};
         lists.favorites = compact(favorites.map(function(f){
-          return isPodcastTrack(f) ? carEpisode(f, prog) : carStation(f);
+          if(isPodcastTrack(f)) return carEpisode(f, prog);
+          if(isLocalTrack(f)) return carSong(f);
+          if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
+          if(f && f.type === 'album') return { t: 'album', key: f.albumKey || '', title: f.name || f.album || '' };
+          return carStation(f);
         }));
+        lists.recentSongs = compact(recentStations.filter(isLocalTrack).map(carSong));
+        lists.topArtists = compact(topArtistList().map(function(e){
+          return e && e.key ? { t: 'artist', key: e.key, title: e.name || '' } : null;
+        }));
+        stationPlaylists.forEach(function(pl){
+          lists['pl:' + pl.id] = compact((pl.stations || []).map(function(it){
+            if(isPodcastTrack(it)) return carEpisode(it, prog);
+            if(isLocalTrack(it)) return carSong(it);
+            return carStation(it);
+          }));
+        });
         lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
           .slice(0, RECENT_LIMIT).map(carStation));
         lists.topStations = compact((carNet.top || []).map(carStation));
@@ -17652,6 +17689,10 @@
           v: 1, at: Date.now(), podcastSpeed: loadPodcastSpeed(),
           forYou: forYou,
           categories: podcastCategories.map(function(c){ return { id: String(c.id), name: c.name }; }),
+          playlists: stationPlaylists.map(function(pl){ return { id: String(pl.id), label: pl.label || 'Playlist' }; }),
+          genres: genreOrder.slice(),
+          blacklist: blacklist.slice(),
+          apiHosts: API_HOSTS.slice(),
           lists: lists
         };
       });
@@ -17686,6 +17727,14 @@
     savePodcastCategories = function(){ _savePodcastCategories.apply(this, arguments); scheduleCarCatalog(); };
     var _saveBlacklist = saveBlacklist;
     saveBlacklist = function(){ _saveBlacklist.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveArtistPlays = saveArtistPlays;
+    saveArtistPlays = function(){ _saveArtistPlays.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveStationPlaylists = saveStationPlaylists;
+    saveStationPlaylists = function(){ _saveStationPlaylists.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveGenreOrder = saveGenreOrder;
+    saveGenreOrder = function(){ _saveGenreOrder.apply(this, arguments); scheduleCarCatalog(); };
+    var _renderLibraryList = renderLibraryList;
+    renderLibraryList = function(){ var r = _renderLibraryList.apply(this, arguments); scheduleCarLibrary(); return r; };
     var _removePodcastProgress = removePodcastProgress;
     removePodcastProgress = function(){
       return _removePodcastProgress.apply(this, arguments).then(function(v){ scheduleCarCatalog(); return v; });
@@ -17706,13 +17755,153 @@
       })['catch'](function(){ return 0; });
     }
 
+    // ---- the library: songs the car can play straight from the phone ----
+    function carArtKey(albumKey){
+      var h1 = 0x811c9dc5, h2 = 0x01000193, s = String(albumKey || '');
+      for(var i = 0; i < s.length; i++){
+        var c = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+        h2 = Math.imul(h2 + c, 2246822519) >>> 0;
+      }
+      return 'a' + h1.toString(16) + h2.toString(16);
+    }
+    var carArtWanted = {}; // art key -> the track whose picture it is
+    function buildCarLibrary(){
+      var playable = libraryTracks.filter(function(t){ return t.srcUri && !isBlacklisted(t); });
+      var albums = buildAlbumIndex(playable);
+      var albumArt = {};
+      carArtWanted = {};
+      albums.forEach(function(al){
+        var src = artSourceForTracks(al.tracks);
+        if(src && src.hasArt){
+          var k = carArtKey(al.key);
+          albumArt[al.key] = 'local:' + k;
+          carArtWanted[k] = src.localId;
+        }
+      });
+      var tracks = {};
+      playable.forEach(function(t){
+        tracks[favKey(t)] = {
+          title: t.name || t.fileName || 'Song', artist: t.artist || '', album: t.album || '',
+          genre: t.genre || '', dur: t.duration || 0, uri: t.srcUri,
+          art: albumArt[albumKeyFor(t)] || ''
+        };
+      });
+      var songs = playable.slice().sort(byNameAsc).map(favKey);
+      var artists = buildArtistIndex().map(function(entry){
+        var mine = entry.tracks.filter(function(t){ return t.srcUri; });
+        var own = buildAlbumIndex(mine);
+        var stations = compact((entry.stations || []).map(carStation));
+        if(!own.length && !stations.length) return null;
+        return {
+          key: entry.key, name: entry.name,
+          art: own.length ? (albumArt[own[0].key] || '') : ((stations[0] && stations[0].art) || ''),
+          albums: own.map(function(al){ return al.key; }),
+          stations: stations
+        };
+      }).filter(Boolean);
+      return {
+        v: 1,
+        tracks: tracks,
+        songs: songs,
+        albums: albums.map(function(al){
+          return { key: al.key, title: al.album, artist: al.artist, art: albumArt[al.key] || '',
+            tracks: al.tracks.map(favKey) };
+        }),
+        artists: artists
+      };
+    }
+    var carLibTimer = null, carLibLast = '', carLibBusy = false;
+    function scheduleCarLibrary(){
+      if(!P.setCarLibrary) return;
+      clearTimeout(carLibTimer);
+      carLibTimer = setTimeout(publishCarLibrary, 3000);
+    }
+    function publishCarLibrary(){
+      if(carLibBusy || !libraryTracks) return;
+      var json;
+      try{ json = JSON.stringify(buildCarLibrary()); }catch(e){ console.warn('Car library not built', e); return; }
+      if(json === carLibLast){ return; }
+      carLibBusy = true;
+      P.setCarLibrary({ json: json }).then(function(){
+        carLibLast = json;
+        return uploadCarArt();
+      })['catch'](function(err){ console.warn('Car library not saved', err); }).then(function(){ carLibBusy = false; });
+    }
+    // One small cover per album, copied to the phone's own storage once so the car can show
+    // it (the pictures otherwise live only inside this page's database).
+    function artThumbBase64(blob){
+      return createImageBitmap(blob).then(function(bmp){
+        var max = 320, sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bmp.width * sc));
+        c.height = Math.max(1, Math.round(bmp.height * sc));
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        var url = c.toDataURL('image/jpeg', 0.82);
+        return url.slice(url.indexOf(',') + 1);
+      });
+    }
+    function uploadCarArt(){
+      if(!P.carArtKeys || !P.putCarArt) return Promise.resolve();
+      return P.carArtKeys().then(function(res){
+        var have = {};
+        ((res && res.keys) || []).forEach(function(k){ have[k] = true; });
+        var todo = Object.keys(carArtWanted).filter(function(k){ return !have[k]; });
+        function next(){
+          if(!todo.length) return Promise.resolve();
+          var k = todo.shift();
+          return idbDo([LIB_STORE_ART], 'readonly', function(tx){
+            return tx.objectStore(LIB_STORE_ART).get(carArtWanted[k]);
+          }).then(function(blob){
+            if(!blob) return null;
+            return artThumbBase64(blob).then(function(b64){ return P.putCarArt({ key: k, data: b64 }); });
+          })['catch'](function(){}).then(function(){
+            return new Promise(function(r){ setTimeout(r, 30); }).then(next);
+          });
+        }
+        return next();
+      })['catch'](function(){});
+    }
+
+    // What was played in the car goes into Recent and Top Artists here too.
+    function takeCarHistory(){
+      if(!P.takeCarHistory) return Promise.resolve(0);
+      return P.takeCarHistory().then(function(res){
+        var list = (res && res.history) || [];
+        list.forEach(function(h){
+          var it = h && h.item;
+          if(!it) return;
+          var obj = null;
+          if(it.t === 'song') obj = libraryById[it.id] || null;
+          else if(it.t === 'station'){
+            var pools = [favorites, recentStations, carNet.top || []];
+            Object.keys(carNet.forYou).forEach(function(k){ pools.push(carNet.forYou[k]); });
+            for(var i = 0; i < pools.length && !obj; i++){
+              for(var j = 0; j < pools[i].length; j++){
+                if(favKey(pools[i][j]) === it.k){ obj = pools[i][j]; break; }
+              }
+            }
+            if(!obj) obj = { name: it.title || 'Station', urlToResolve: it.url, favicon: it.art || '' };
+          }
+          if(!obj) return;
+          try{ recordRecent(obj); }catch(e){}
+          try{ recordArtistPlay(obj); }catch(e){}
+        });
+        return list.length;
+      })['catch'](function(){ return 0; });
+    }
+    function takeCarState(){
+      return Promise.all([takeCarProgress(), takeCarHistory()]).then(function(r){ return (r[0] || 0) + (r[1] || 0); });
+    }
+
     document.addEventListener('visibilitychange', function(){
       if(document.visibilityState === 'hidden') publishCarCatalog();
-      else takeCarProgress().then(function(n){ if(n) scheduleCarCatalog(); });
+      else takeCarState().then(function(n){ if(n) scheduleCarCatalog(); });
     });
     setInterval(function(){ carNet.at = 0; publishCarCatalog(); }, CAR_NET_MS);
     setTimeout(function(){
-      takeCarProgress().then(publishCarCatalog);
+      takeCarState().then(publishCarCatalog);
+      scheduleCarLibrary();
       // Popular comes from Apple's directory and is cached for a day; loading it here means the
       // car has it without Podcasts > Popular being opened first.
       setTimeout(function(){
