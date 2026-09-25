@@ -1,0 +1,61 @@
+name: Build Amplify APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the project
+        run: |
+          echo "Files in the repo:"; ls -la
+          if [ -f capacitor.config.json ]; then
+            echo "PROJ=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"; exit 0
+          fi
+          for f in *; do
+            [ -f "$f" ] || continue
+            if unzip -q -o "$f" -d src 2>/dev/null; then echo "Unzipped $f"; break; fi
+          done
+          CFG=$(find . -name capacitor.config.json -not -path '*/node_modules/*' | head -1)
+          if [ -z "$CFG" ]; then echo "::error::No Amplify project found in the repo (no zip or project files)"; exit 1; fi
+          echo "PROJ=$GITHUB_WORKSPACE/$(dirname "$CFG")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and sync
+        run: |
+          cd "$PROJ"
+          npm ci
+          npx cap sync android
+
+      - name: Build APK
+        run: |
+          cd "$PROJ/android"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Amplify.apk"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Amplify.apk \
+            --target "${{ github.sha }}" \
+            --title "Amplify build ${{ github.run_number }}" \
+            --notes "Open this page on the phone and tap Amplify.apk to install or update."
