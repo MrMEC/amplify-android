@@ -30,10 +30,21 @@
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
             <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Android Auto: this is a media app, and its artwork comes through ArtProvider. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <provider
+            android:name=".ArtProvider"
+            android:authorities="com.markcoleman.amplify.art"
+            android:exported="true" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

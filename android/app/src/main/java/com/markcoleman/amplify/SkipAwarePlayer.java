@@ -37,6 +37,11 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   private boolean prevEnabled;
   @Nullable private MediaMetadata override;
   private boolean live;
+  // Car mode: Android Auto picked something from its menu. The queue is then ExoPlayer's own
+  // (the list the item came from), so transport controls act on ExoPlayer directly instead
+  // of going to the page, and the title/art come from the item itself.
+  private boolean nativeMode;
+  @Nullable private Runnable onNativeModeStart;
 
   public SkipAwarePlayer(Player player) {
     super(player);
@@ -47,8 +52,83 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   }
 
   private boolean dispatch(String action) {
+    if (nativeMode) return false;
     Remote r = remote;
     return r != null && r.onRemote(action);
+  }
+
+  // ---------- car mode ----------
+
+  public boolean isNativeMode() {
+    return nativeMode;
+  }
+
+  public void setOnNativeModeStart(@Nullable Runnable r) {
+    onNativeModeStart = r;
+  }
+
+  /** The page took playback back (it loaded something itself). */
+  public void exitNativeMode() {
+    if (!nativeMode) return;
+    nativeMode = false;
+    notifyCommandsChanged();
+  }
+
+  private void enterNativeMode() {
+    boolean was = nativeMode;
+    nativeMode = true;
+    override = null;
+    live = false;
+    if (!was) {
+      Runnable r = onNativeModeStart;
+      if (r != null) r.run();
+      notifyCommandsChanged();
+    }
+  }
+
+  private void notifyCommandsChanged() {
+    Commands cmds = getAvailableCommands();
+    Events ev = new Events(new FlagSet.Builder().add(EVENT_AVAILABLE_COMMANDS_CHANGED).build());
+    for (SkipListener l : new ArrayList<>(wrapped.values())) {
+      l.listener.onAvailableCommandsChanged(cmds);
+      l.listener.onEvents(this, ev);
+    }
+  }
+
+  @Override
+  public void setMediaItems(List<MediaItem> mediaItems, boolean resetPosition) {
+    enterNativeMode();
+    super.setMediaItems(mediaItems, resetPosition);
+  }
+
+  @Override
+  public void setMediaItems(List<MediaItem> mediaItems, int startIndex, long startPositionMs) {
+    enterNativeMode();
+    super.setMediaItems(mediaItems, startIndex, startPositionMs);
+  }
+
+  @Override
+  public void setMediaItems(List<MediaItem> mediaItems) {
+    enterNativeMode();
+    super.setMediaItems(mediaItems);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem) {
+    enterNativeMode();
+    super.setMediaItem(mediaItem);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem, long startPositionMs) {
+    enterNativeMode();
+    super.setMediaItem(mediaItem, startPositionMs);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem, boolean resetPosition) {
+    enterNativeMode();
+    super.setMediaItem(mediaItem, resetPosition);
   }
 
   // ---------- skip availability ----------
@@ -66,6 +146,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   }
 
   Commands augment(Commands c) {
+    if (nativeMode) return c;
     Commands.Builder b = c.buildUpon();
     if (nextEnabled) b.addAll(COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM);
     else b.removeAll(COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM);
@@ -100,6 +181,18 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   @Override
   public MediaMetadata getMediaMetadata() {
     MediaMetadata base = super.getMediaMetadata();
+    if (nativeMode) {
+      MediaItem item = getCurrentMediaItem();
+      if (item == null) return base;
+      MediaMetadata own = item.mediaMetadata;
+      boolean isLive = own.extras != null && own.extras.getBoolean(CarLibrary.EXTRA_LIVE, false);
+      if (isLive && base.title != null && own.title != null
+          && !base.title.toString().trim().isEmpty()
+          && !base.title.toString().equals(own.title.toString())) {
+        return own.buildUpon().setArtist(base.title).build();
+      }
+      return own;
+    }
     if (override == null) return base;
     if (live && base.title != null && override.title != null
         && !base.title.toString().trim().isEmpty()
@@ -145,7 +238,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   @Override
   public void prepare() {
     // With the web app present, it decides how to (re)start; otherwise prepare as usual.
-    if (remote == null) super.prepare();
+    if (remote == null || nativeMode) super.prepare();
   }
 
   @Override
@@ -155,22 +248,26 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
 
   @Override
   public void seekToNext() {
-    dispatch("next");
+    if (nativeMode) super.seekToNext();
+    else dispatch("next");
   }
 
   @Override
   public void seekToNextMediaItem() {
-    dispatch("next");
+    if (nativeMode) super.seekToNextMediaItem();
+    else dispatch("next");
   }
 
   @Override
   public void seekToPrevious() {
-    dispatch("previous");
+    if (nativeMode) super.seekToPrevious();
+    else dispatch("previous");
   }
 
   @Override
   public void seekToPreviousMediaItem() {
-    dispatch("previous");
+    if (nativeMode) super.seekToPreviousMediaItem();
+    else dispatch("previous");
   }
 
   private static final class SkipListener implements Listener {

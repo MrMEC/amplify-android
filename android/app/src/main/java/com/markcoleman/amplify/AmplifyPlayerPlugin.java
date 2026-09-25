@@ -86,6 +86,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       return;
     }
     svc.player.setRemote(this);
+    svc.player.setOnNativeModeStart(this::onCarTookOver);
     svc.exo.addListener(exoListener);
     attached = true;
     List<Runnable> todo = new ArrayList<>(pending);
@@ -100,6 +101,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           PlaybackService svc = PlaybackService.instance;
           if (svc != null) {
             svc.player.setRemote(null);
+            svc.player.setOnNativeModeStart(null);
             svc.exo.removeListener(exoListener);
           }
           attached = false;
@@ -166,6 +168,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         call,
         () -> {
           ExoPlayer p = exo();
+          SkipAwarePlayer sp = sessionPlayer();
+          if (sp != null) sp.exitNativeMode();
           MediaItem.Builder b = new MediaItem.Builder().setUri(url).setMediaId(id);
           String lower = url.toLowerCase();
           if (lower.contains(".m3u8")) b.setMimeType(MimeTypes.APPLICATION_M3U8);
@@ -520,6 +524,64 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     } catch (Exception ignored) {
     }
     return null;
+  }
+
+  // ---------------- Android Auto ----------------
+
+  /**
+   * The car started something of its own. Called just before the car's queue replaces what
+   * the page was playing, so the snapshot still describes the page's item: the page hears it
+   * as an outside pause at the right position, and stops tracking the player until it next
+   * loads something itself.
+   */
+  private void onCarTookOver() {
+    if (currentId == null) return;
+    JSObject o = snapshot();
+    o.put("isPlaying", false);
+    o.put("playWhenReady", false);
+    o.put("external", true);
+    o.put("car", true);
+    notifyListeners("state", o);
+    currentId = null;
+    lastMeta = null;
+    main.removeCallbacks(progressTick);
+  }
+
+  /** The page's lists for the car menu (see CarLibrary for the shape). */
+  @PluginMethod
+  public void setCarCatalog(PluginCall call) {
+    String json = call.getString("json");
+    if (json == null || json.isEmpty()) {
+      call.reject("No catalog");
+      return;
+    }
+    new Thread(
+            () -> {
+              try {
+                CarLibrary.saveCatalog(getContext(), json);
+                main.post(
+                    () -> {
+                      PlaybackService svc = PlaybackService.instance;
+                      if (svc != null) svc.onCatalogChanged();
+                    });
+                call.resolve();
+              } catch (Exception e) {
+                call.reject(String.valueOf(e.getMessage()));
+              }
+            })
+        .start();
+  }
+
+  /** Episode progress made in the car since the page last looked; handed over once. */
+  @PluginMethod
+  public void takeCarProgress(PluginCall call) {
+    JSObject o = new JSObject();
+    try {
+      o.put("progress", new JSObject(CarProgress.takeAll(getContext()).toString()));
+    } catch (Exception e) {
+      o.put("progress", new JSObject());
+    }
+    call.resolve(o);
   }
 
   // ---------------- events to the page ----------------
