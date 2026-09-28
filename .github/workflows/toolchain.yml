@@ -1,0 +1,50 @@
+name: Toolchain export (temporary)
+
+on:
+  push:
+    branches: [toolchain]
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Compile
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileReleaseJavaWithJavac --no-daemon 2>&1 | tail -40
+          ./gradlew :app:dependencies --configuration releaseCompileClasspath --no-daemon > ../deps.txt 2>&1 || true
+      - name: Collect jars
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out/jars
+          cp "$ANDROID_HOME/platforms/android-36/android.jar" out/android.jar || ls "$ANDROID_HOME/platforms"
+          i=0
+          # every jar gradle resolved or transformed (AAR classes), plus built capacitor module jars
+          find ~/.gradle/caches -type f \( -path '*transformed*' -name '*.jar' -o -path '*files-2.1*' -name '*.jar' \) ! -name '*sources*' > list.txt
+          find node_modules/@capacitor/android android -path '*build/intermediates*' -name '*.jar' >> list.txt
+          while read f; do i=$((i+1)); cp "$f" "out/jars/$i-$(basename "$f")"; done < list.txt
+          cp list.txt deps.txt out/
+          du -sh out
+          cd out
+          git init -q -b toolchain-jars
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "toolchain jars"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" toolchain-jars
