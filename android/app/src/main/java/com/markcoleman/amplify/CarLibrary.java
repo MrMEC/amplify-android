@@ -1276,26 +1276,8 @@ final class CarLibrary {
       return arrayList;
     }
     synchronized (this) {
-      JSONArray jSONArrayOptJSONArray = this.library.optJSONArray("songs");
-      i = 0;
-      if (jSONArrayOptJSONArray != null) {
-        int i2 = 0;
-        for (int i3 = 0; i3 < jSONArrayOptJSONArray.length() && i2 < 25; i3++) {
-          JSONObject jSONObjectOptJSONObject =
-              this.tracks.optJSONObject(jSONArrayOptJSONArray.optString(i3));
-          if (jSONObjectOptJSONObject != null
-              && matchesAll(
-                  jSONObjectOptJSONObject.optString("title")
-                      + " "
-                      + jSONObjectOptJSONObject.optString("artist")
-                      + " "
-                      + jSONObjectOptJSONObject.optString("album"),
-                  strArrWords)) {
-            arrayList.add(songRef(jSONArrayOptJSONArray.optString(i3), "Songs"));
-            i2++;
-          }
-        }
-      }
+      // Artists and albums come first: a search is usually for who or what record, and
+      // the songs that match follow them.
       int i4 = 0;
       for (JSONObject jSONObject : arrayOf(this.library, "artists")) {
         if (i4 >= 10) {
@@ -1317,6 +1299,26 @@ final class CarLibrary {
           arrayList.add(
               ref("album", jSONObject2.optString("key"), jSONObject2.optString("title"), "Albums"));
           i5++;
+        }
+      }
+      JSONArray jSONArrayOptJSONArray = this.library.optJSONArray("songs");
+      i = 0;
+      if (jSONArrayOptJSONArray != null) {
+        int i2 = 0;
+        for (int i3 = 0; i3 < jSONArrayOptJSONArray.length() && i2 < 25; i3++) {
+          JSONObject jSONObjectOptJSONObject =
+              this.tracks.optJSONObject(jSONArrayOptJSONArray.optString(i3));
+          if (jSONObjectOptJSONObject != null
+              && matchesAll(
+                  jSONObjectOptJSONObject.optString("title")
+                      + " "
+                      + jSONObjectOptJSONObject.optString("artist")
+                      + " "
+                      + jSONObjectOptJSONObject.optString("album"),
+                  strArrWords)) {
+            arrayList.add(songRef(jSONArrayOptJSONArray.optString(i3), "Songs"));
+            i2++;
+          }
         }
       }
     }

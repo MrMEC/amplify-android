@@ -2817,8 +2817,11 @@
   .tile .ch-dead{ color:#e5534b; }
   /* My Channels' category headings: clear of the row under them (and of the ring round a
      playing tile), with a row's worth of air above each. */
-  .tile-grid > .grid-section-label.ch-row-label{ margin:10px 0 -8px; }
+  .tile-grid > .grid-section-label.ch-row-label{ margin:10px 0 -28px; }
   .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; }
+  @media (max-width: 900px){ .tile-grid > .grid-section-label.ch-row-label{ margin:-6px 0 -18px; } .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; } }
+  .tile.tile-row.ch-item .tile-art{ border-radius:8px; }
+  .tile.tile-row.ch-item.playing .tile-name{ color:var(--accent); }
   .ch-tools{ grid-column:1/-1; display:flex; flex-direction:column; gap:10px; margin:0 0 4px; }
   .ch-tools .home-tabs{ margin:0 0 4px; }
   .ch-tools-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -10168,11 +10171,11 @@
       });
       return;
     }
-    // Otherwise a sideways row per category (News, Sports, Movies...), the way Home lays out
-    // its sections. Rows come in the order their first channel has in My Channels, and each
-    // row keeps that order, so Reorder still decides what comes first. A channel is shown in
-    // its first category; channels with none (a pasted link, most of Free-TV) share one row
-    // at the end.
+    // Otherwise the channels stack as full-width rows under a heading per category (News,
+    // Sports, Movies...). Categories come in the order their first channel has in My
+    // Channels, and each keeps that order, so Reorder still decides what comes first. A
+    // channel is shown in its first category; channels with none (a pasted link, most of
+    // Free-TV) share one list at the end.
     var groups = [], byName = {};
     videoChannels.forEach(function(ch){
       var name = channelRowName(ch) || '';
@@ -10183,35 +10186,25 @@
     if(other){ groups.splice(groups.indexOf(other), 1); groups.push(other); }
     groups.forEach(function(g){
       appendGridSection(g.name || (groups.length > 1 ? 'Other' : 'My Channels'), g.list.length).classList.add('ch-row-label');
-      var row = document.createElement('div');
-      row.className = 'cl-row ch-cat-row';
-      g.list.forEach(function(ch){ row.appendChild(buildChannelTile(ch)); });
-      stationsGrid.appendChild(row);
+      g.list.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
     });
   }
-  function buildChannelTile(ch){
+  // One channel as a full-width row: logo, name (and "Not working" under it when it last
+  // failed), and the More button (Favorite, Play Next, Add to Queue, Remove) as its only icon.
+  // Tapping plays it and opens Now Playing, where the picture is.
+  function buildChannelRow(ch){
     var st = channelToStation(ch);
-    var tile = buildTile(st);
-    // A channel's heart becomes a More button (Favorite, Play Next, Add to Queue, Remove),
-    // the same as Continue Listening's tiles.
-    var old = tile.querySelector('.tile-fav');
-    var more = buildRowMoreBtn(st, { fav: true, className: 'tile-fav tile-more',
-      onRemove: function(){ removeVideoChannel(ch.url); } });
-    if(old) old.replaceWith(more); else tile.appendChild(more);
-    // Tapping plays it and opens Now Playing (where the picture is) instead of only playing
-    // it the way a station tile does -- caught before the tile's own handler. The More
-    // button keeps its menu.
-    tile.addEventListener('click', function(e){
-      if(e.target.closest('.tile-more, .tile-fav')) return;
-      e.stopImmediatePropagation();
-      playChannel(ch);
-    }, true);
-    if(ch.dead){
-      var dead = document.createElement('div');
-      dead.className = 'tile-sub ch-dead';
-      dead.textContent = 'Not working';
-      tile.appendChild(dead);
-    }
+    var tile = buildEntityTile({
+      key: favKey(st), entity: 'channel', name: ch.name, row: true,
+      sub: ch.dead ? 'Not working' : '', artFrom: st,
+      onClick: function(){ playChannel(ch); }
+    });
+    tile.classList.add('ch-item');
+    if(currentStation && favKey(currentStation) === favKey(st)) tile.classList.add('playing');
+    var sub = tile.querySelector('.tile-sub');
+    if(sub && ch.dead) sub.classList.add('ch-dead');
+    tile.appendChild(buildRowMoreBtn(st, { fav: true, className: 'row-more-btn',
+      onRemove: function(){ removeVideoChannel(ch.url); } }));
     return tile;
   }
   function reorderVideoChannelsFromGrid(){
