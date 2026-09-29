@@ -4168,12 +4168,21 @@
 
     <div class="sidebar-section">
       <div class="aside-heading-row">
-        <h2 id="forYouHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open Stations">
-          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="1.6"/><path d="M8.6 12.4a4.8 4.8 0 0 1 0-6.8"/><path d="M15.4 5.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 15.2a8.8 8.8 0 0 1 0-12.4"/><path d="M18.2 2.8a8.8 8.8 0 0 1 0 12.4"/><path d="M12 10.6 9 21"/><path d="M12 10.6 15 21"/><path d="M10 17.5h4"/></svg>Stations</span>
+        <h2 id="forYouHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open For You">
+          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.4 5.2 5.6.6-4.2 3.8 1.2 5.6L12 15.9l-5 2.8 1.2-5.6L4 9.3l5.6-.6z"/></svg>For You</span>
           <i class="fa-solid fa-chevron-right sidebar-row-chevron" aria-hidden="true"></i>
         </h2>
       </div>
       <div class="custom-search-list" id="customSearchList"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="aside-heading-row">
+        <h2 id="videoHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open Video">
+          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"/><path d="M16 10.3 21.5 7v10L16 13.7z"/></svg>Video</span>
+          <i class="fa-solid fa-chevron-right sidebar-row-chevron" aria-hidden="true"></i>
+        </h2>
+      </div>
     </div>
 
     <div class="sidebar-section">
@@ -4286,6 +4295,15 @@
             <div class="tile-grid grid-songs" id="recentSongsGrid"></div>
           </section>
         </div>
+      </div>
+      <!-- For You: the listener's saved searches, as a row of covers under Continue Listening
+           (it used to live on the Stations page, now gone). The heading opens the For You page,
+           where searches are added and reordered. -->
+      <div class="home-section for-you-section" id="forYouSection" style="display:none;">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="forYouHomeHeading" role="button" tabindex="0">For You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid" id="forYouGrid"></div>
       </div>
       <!-- Only on a stacked home: the tab used to name this panel, and with the tabs gone
            it needs a heading of its own. -->
@@ -4741,9 +4759,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="3.5" height="16" rx="1"/><rect x="9" y="4" width="3.5" height="16" rx="1"/><path d="m15.2 5.3 3.3-1 3 15.1-3.3 1z"/></svg>
     <span>Library</span>
   </button>
-  <button type="button" class="mobile-nav-btn" data-nav="stations" aria-label="Stations">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="1.6"/><path d="M8.6 12.4a4.8 4.8 0 0 1 0-6.8"/><path d="M15.4 5.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 15.2a8.8 8.8 0 0 1 0-12.4"/><path d="M18.2 2.8a8.8 8.8 0 0 1 0 12.4"/><path d="M12 10.6 9 21"/><path d="M12 10.6 15 21"/><path d="M10 17.5h4"/></svg>
-    <span>Stations</span>
+  <button type="button" class="mobile-nav-btn" data-nav="video" aria-label="Video">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"/><path d="M16 10.3 21.5 7v10L16 13.7z"/></svg>
+    <span>Video</span>
   </button>
   <button type="button" class="mobile-nav-btn" data-nav="podcasts" aria-label="Podcasts">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v4"/><path d="M8.5 21.5h7"/></svg>
@@ -5977,11 +5995,7 @@
   // snapshotView() so the back button returns to whichever of these is open.
   var onMyLibraryHomeView = false;
   var onStationsHomeView = false;
-  // Cache + race-guard for the Stations page's own Top Stations section (see
-  // renderStationsPageTopSection) -- fetched once per visit rather than on every in-place
-  // refresh of the page's For You section.
-  var stationsPageTopStations = null;
-  var stationsPageTopToken = 0;
+  var onVideoView = false;   // the Video page (bottom nav / sidebar); empty for now
   var onPlaylistsHomeView = false;
   var onGenresHomeView = false;
   // Which home section's own "see all" page the centre grid is showing --
@@ -6355,7 +6369,7 @@
     renderStationArt(art, { name: name, favicon: sub.artworkUrl || '' });
     b.title = name;
     b.setAttribute('aria-label', name);
-    b.onclick = function(){ closeDrawer(); openShowPage(sub.collectionId); };
+    b.onclick = function(){ closeDrawer(); pushView(); openShowPage(sub.collectionId); };
     return b;
   }
   function renderDrawerShortcuts(){
@@ -8883,6 +8897,7 @@
       makeHomeRow(topArtistsGrid);
       makeHomeRow(recentGrid);
       makeHomeRow(latestPodcastsGrid);
+      makeHomeRow(forYouGrid);
       makeHomeRow(recentSongsGrid);
       makeHomeRow(stationsGrid);
       homeTabs.style.display = 'none';
@@ -8892,6 +8907,7 @@
       topArtistsSection.style.display = topArtistsShown ? '' : 'none';
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
       recentSection.style.display = '';
+      forYouSection.style.display = '';
       stationsGrid.style.display = '';
       syncFavReorderView();
       syncHomeRows();
@@ -8906,6 +8922,7 @@
       favoritesSection.style.display = 'none';
       topArtistsSection.style.display = 'none';
       latestPodcastsSection.style.display = 'none';
+      forYouSection.style.display = 'none';
       stationsGrid.style.display = '';
       return;
     }
@@ -8922,6 +8939,7 @@
     favoritesSection.style.display = homeTab === 'favorites' ? '' : 'none';
     topArtistsSection.style.display = 'none';
     latestPodcastsSection.style.display = 'none';
+    forYouSection.style.display = 'none';
     syncFavReorderView();
     syncHomeRows();
   }
@@ -8961,6 +8979,38 @@
   // One list is kept, split at render time by what each entry is. Storing them apart would
   // mean two limits, two migrations and two places for a rename to go wrong; splitting here
   // costs one pass over at most RECENT_LIMIT entries.
+  // ---------- For You (home) ----------
+  // The saved searches, as covers, in the listener's own order. Tapping one runs it (and its
+  // back button comes back here); the heading opens the For You page for adding / reordering.
+  var forYouSection = document.getElementById('forYouSection');
+  var forYouGrid = document.getElementById('forYouGrid');
+  function renderForYouHomeSection(){
+    if(!forYouGrid) return;
+    forYouGrid.innerHTML = '';
+    if(!customSearches.length){
+      forYouGrid.innerHTML = '<div class="empty-state">Save a search from its results to see it here.</div>';
+      return;
+    }
+    customSearches.forEach(function(item){
+      forYouGrid.appendChild(buildEntityTile({
+        key: 'foryou-home-' + item.id,
+        entity: 'custom-search',
+        name: item.label,
+        renderArt: function(art){ renderCustomSearchCoverArt(art, item); },
+        onClick: function(){ pushView(); searchInput.value = ''; runCustomSearch(item); }
+      }));
+    });
+  }
+  (function(){
+    var h = document.getElementById('forYouHomeHeading');
+    if(!h) return;
+    function go(){ pushView(); openStationsHome(); }
+    h.addEventListener('click', go);
+    h.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); go(); }
+    });
+  })();
+
   // ---------- Latest Podcasts (home) ----------
   // Each followed show's newest episode (sub.latestEpisode, kept current by
   // backfillPodcastShowMeta -- forced on every page load, see the startup block), newest
@@ -9022,6 +9072,7 @@
   function renderRecentSection(){
     renderTopArtistsSection();
     renderLatestPodcastsSection();
+    renderForYouHomeSection();
     // One list, in the order things were played: songs, stations and podcast episodes
     // together (Recent Songs used to be a list of its own).
     recentGrid.innerHTML = '';
@@ -9305,6 +9356,7 @@
 
   // ---------- "Your Stations" custom searches ----------
   function renderCustomSearchList(){
+    renderForYouHomeSection();
     customSearchList.innerHTML = '';
     if(!customSearches.length){
       customSearchList.innerHTML = '<div class="aside-empty">Add a search to pin it here.</div>';
@@ -9359,6 +9411,7 @@
       row.appendChild(label);
 
       row.addEventListener('click', function(){
+        pushView();
         searchInput.value = '';
         runCustomSearch(item);
       });
@@ -9978,16 +10031,39 @@
     openStationsHome();
   });
 
-  // "Stations" landing page -- the new root-level destination that replaces For You as a
-  // sidebar entry. For You isn't a page of its own any more: its custom searches are listed
-  // right here, under a "For You" subheading, the same way Artists/Albums/Songs are laid out
-  // as labelled subsections within a single page elsewhere in the app.
+  // ---------- Video ----------
+  // A section of its own in the bottom navigation (where Stations was) and the sidebar.
+  // Empty for now: just its heading.
+  function openVideoHome(){
+    enterLibraryChrome();
+    onVideoView = true;
+    setDetailBack(null);
+    stationsHeading.textContent = 'Video';
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    resetStationsGrid();
+  }
+  var videoHeading = document.getElementById('videoHeading');
+  if(videoHeading){
+    videoHeading.addEventListener('click', function(){ pushView(); openVideoHome(); });
+    videoHeading.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); pushView(); openVideoHome(); }
+    });
+  }
+
+  // The For You page: the saved searches as a list, with Add Search and Reorder. (It was the
+  // Stations page, which also repeated Recent and Top Stations; that page is gone, and For You
+  // itself now sits on Home under Continue Listening -- its heading, and the sidebar entry,
+  // lead here.) Reached from somewhere, so its back button goes back there.
+  // onStationsHomeView still names this page's state (a lot of code keys off it).
   function openStationsHome(){
     enterLibraryChrome();
     onStationsHomeView = true;
-    setDetailBack(null);
+    setDetailBackToHistory(function(){ loadTopStations(); }, 'Home');
     renderCustomSearchList();
-    stationsHeading.textContent = 'Stations';
+    stationsHeading.textContent = 'For You';
     pageTitle.style.display = 'none';
     albumPlayBtn.style.display = 'none';
     libraryShuffleBtn.style.display = 'none';
@@ -9997,10 +10073,6 @@
     forYouReorderHeaderBtn.style.display = customSearches.length ? '' : 'none';
     updateReorderHeaderBtn(forYouReorderHeaderBtn, customSearchesEditing);
     forYouReorderHeaderBtn.classList.toggle('editing', customSearchesEditing);
-    // A fresh visit to the page gets a fresh Top Stations fetch, same as tapping Home does --
-    // renderStationsGrid() below reuses whatever's cached here instead of refetching every
-    // time it reruns in place (toggling Reorder, saving a search).
-    stationsPageTopStations = null;
     renderStationsGrid();
   }
 
@@ -10009,7 +10081,7 @@
   // this page is already open, without redoing the rest of the page setup).
   function renderStationsGrid(){
     resetStationsGrid();
-    appendGridSection('For You', customSearches.length);
+    appendGridSection('Saved Searches', customSearches.length);
     if(!customSearches.length){
       var emptyForYou = document.createElement('div');
       emptyForYou.className = 'empty-state';
@@ -10026,91 +10098,11 @@
           renderArt: function(art){ renderCustomSearchCoverArt(art, item); },
           draggable: customSearchesEditing,
           onReorder: function(){ reorderCustomSearchesFromGrid(); renderCustomSearchList(); },
-          onClick: function(){ searchInput.value = ''; runCustomSearch(item); }
+          onClick: function(){ pushView(); searchInput.value = ''; runCustomSearch(item); }
         }));
       });
     }
 
-    // Same "Recent Stations" list the homepage shows (see renderRecentSection's recentGrid) --
-    // a sideways-scrolling row, same as that one and Continue Listening (.cl-row) rather than
-    // a wrapping grid.
-    // Extra room above: the For You rows end flush on a divider, so the default label spacing
-    // read as this heading being tucked under the last search. A zero-height full-width spacer
-    // adds one grid row-gap of air above the heading without touching the heading's own
-    // margins -- those are what set its (unchanged) distance to the row below it.
-    var recentSpacer = document.createElement('div');
-    recentSpacer.className = 'grid-section-spacer';
-    recentSpacer.setAttribute('aria-hidden', 'true');
-    stationsGrid.appendChild(recentSpacer);
-    appendGridSection('Recent Stations');
-    var recentStationsOnly = recentStations.filter(function(s){ return !isLocalTrack(s); });
-    if(!recentStationsOnly.length){
-      var emptyRecent = document.createElement('div');
-      emptyRecent.className = 'empty-state';
-      emptyRecent.textContent = 'Stations you play will show up here.';
-      stationsGrid.appendChild(emptyRecent);
-    } else {
-      var recentRow = document.createElement('div');
-      recentRow.className = 'cl-row';
-      recentStationsOnly.slice(0, RECENT_LIMIT).forEach(function(s){ recentRow.appendChild(buildTile(s)); });
-      stationsGrid.appendChild(recentRow);
-    }
-
-    // Same "Top Stations" list the homepage shows by default (see loadTopStations).
-    // appendGridSection's default spacing above a label assumes a normal tile before it; right
-    // after a .cl-row (Recent Stations' own row, just above) a shared rule tuned for the
-    // Podcasts page instead gives it extra breathing room, which here just reads as this label
-    // sitting noticeably further from its row than "Recent Stations" sits from the section
-    // before it. Pulling it back to the same -8px the rest of the labels get keeps every
-    // subheader on this page evenly spaced.
-    appendGridSection('Top Stations').style.marginTop = '-8px';
-    renderStationsPageTopSection();
-  }
-
-  // Top Stations for the Stations page: fetched once per visit and cached in
-  // stationsPageTopStations (cleared by openStationsHome on a fresh visit), so calling
-  // renderStationsGrid() again to refresh the For You section in place doesn't refetch or
-  // flash this section too.
-  function renderStationsPageTopSection(){
-    if(stationsPageTopStations){
-      appendStationsPageTopTiles(stationsPageTopStations);
-      return;
-    }
-    var spin = document.createElement('div');
-    spin.className = 'loading-state';
-    spin.innerHTML = '<div class="spinner"></div>';
-    stationsGrid.appendChild(spin);
-    var token = ++stationsPageTopToken;
-    apiFetch('/json/stations/search?limit=48&hidebroken=true&order=clickcount&reverse=true')
-      .then(function(data){
-        if(token !== stationsPageTopToken || !onStationsHomeView) return;
-        spin.remove();
-        var cards = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
-        stationsPageTopStations = cards;
-        appendStationsPageTopTiles(cards);
-      })
-      .catch(function(){
-        if(token !== stationsPageTopToken || !onStationsHomeView) return;
-        spin.remove();
-        var err = document.createElement('div');
-        err.className = 'empty-state';
-        err.textContent = 'Couldn\'t load Top Stations.';
-        stationsGrid.appendChild(err);
-      });
-  }
-
-  function appendStationsPageTopTiles(cards){
-    if(!cards.length){
-      var empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.textContent = 'No stations found.';
-      stationsGrid.appendChild(empty);
-      return;
-    }
-    var topRow = document.createElement('div');
-    topRow.className = 'cl-row';
-    cards.forEach(function(s){ topRow.appendChild(buildTile(s)); });
-    stationsGrid.appendChild(topRow);
   }
 
   // Same split as renderStationsGrid(), for Playlists.
@@ -10216,10 +10208,10 @@
     genresReorderHeaderBtn.style.display = 'none';
     libraryShuffleBtn.style.display = 'none';
     setResultCount(null);
-    // Unlike the other detail pages, a show's back button always returns to the Podcasts
-    // page itself rather than wherever it was actually reached from (setDetailBackToHistory's
-    // usual history-based behaviour) -- Podcasts is the one place every show belongs to.
-    setDetailBack('Podcasts', function(){ openPodcastsHome(); });
+    // A true back button: back to wherever the show was opened from -- search results, the
+    // Podcasts page, Home, Now Playing. Every place that opens a show records where it was
+    // first (pushView). With nothing behind it (a fresh start), it goes to Podcasts.
+    setDetailBackToHistory(function(){ openPodcastsHome(); }, 'Podcasts');
     resetStationsGrid();
     stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
 
@@ -10626,7 +10618,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false;
+    onStationsHomeView = false; onVideoView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A playlist is Playlists' own item, so its back button always returns there -- same
@@ -11222,13 +11214,13 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false;
+    onStationsHomeView = false; onVideoView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    // A custom search is For You's own item, so its back button always returns there -- same
-    // fixed-destination treatment as My Library's and Playlists' equivalents above, rather
-    // than a history-based one.
-    setDetailBack('Stations', function(){ openStationsHome(); });
+    // A true back button: it returns to wherever the search was opened from (Home's For You
+    // row, the For You page, the sidebar...). Every place that opens one records where it was
+    // first (pushView); re-running it in place (a new result limit, an edit) doesn't.
+    setDetailBackToHistory(function(){ loadTopStations(); }, 'Home');
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
@@ -15026,7 +15018,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false;
+    onStationsHomeView = false; onVideoView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     onHomeView = false;
@@ -15112,14 +15104,20 @@
     }
     if(onPodcastsView) return entry('Podcasts', function(){ openPodcastsHome(); });
     if(onMyLibraryHomeView) return entry('My Library', function(){ openMyLibraryHome(); });
-    if(onStationsHomeView) return entry('Stations', function(){ openStationsHome(); });
+    if(onStationsHomeView) return entry('For You', function(){ openStationsHome(); });
+    if(onVideoView) return entry('Video', function(){ openVideoHome(); });
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
     if(section) return entry(sectionLabel(section), function(){ runLibrarySection(section); });
     if(homeSection) return entry(HOME_SECTION_TITLES[homeSection] || 'Back', function(){ openHomeSectionPage(homeSection); });
     if(query && String(query).trim()){
       var q = String(query);
-      return entry('Results', function(){ searchInput.value = q; searchByName(q); });
+      // Back to the same results tab (a podcast opened from the Podcasts tab comes back there).
+      var tab = (searchState && searchState.q === q) ? searchState.tab : null;
+      return entry('Results', function(){
+        searchInput.value = q; searchByName(q);
+        if(tab && searchState && searchState.q === q){ searchState.tab = tab; applySearchResults(); }
+      });
     }
     return entry('Home', function(){ loadTopStations(); });
   }
@@ -16559,7 +16557,7 @@
     if(isPodcastTrack(st)){
       npSub.classList.add('np-sub-linked');
       if(st.collectionName && st.collectionId != null){
-        npSub.appendChild(npLink(st.collectionName, function(){ openShowPage(st.collectionId); }));
+        npSub.appendChild(npLink(st.collectionName, function(){ pushView(); openShowPage(st.collectionId); }));
       } else {
         npSub.appendChild(document.createTextNode(st.collectionName || 'Podcast'));
       }
@@ -17806,7 +17804,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false;
+    onStationsHomeView = false; onVideoView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -17868,7 +17866,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false;
+    onStationsHomeView = false; onVideoView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -18234,7 +18232,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false;
+    onStationsHomeView = false; onVideoView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A genre's station list is Genres' own category, so its back button always returns
@@ -18386,8 +18384,9 @@
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
-    if(onStationsHomeView || activeCustomSearchId) return 'stations';
-    if(onHomeView || activeHomeSection) return 'home';
+    if(onVideoView) return 'video';
+    // For You (and its searches) lives on Home now.
+    if(onHomeView || activeHomeSection || onStationsHomeView || activeCustomSearchId) return 'home';
     return null;
   }
   function updateMobileNav(){
@@ -18415,7 +18414,7 @@
       if(searchSheet.classList.contains('open')) closeSearchSheet(true);
       if(dest === 'home') brandHomeLink.click();
       else if(dest === 'library'){ pushView(); openMyLibraryHome(); }
-      else if(dest === 'stations') forYouHeading.click();
+      else if(dest === 'video'){ pushView(); openVideoHome(); }
       else if(dest === 'podcasts') podcastsHeading.click();
       updateMobileNav();
     });
