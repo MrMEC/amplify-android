@@ -17851,7 +17851,9 @@
       .catch(function(err){ if(!onHomeView) return; setStatus(err.message, true); resetStationsGrid(); });
   }
 
-  function searchByName(q){
+  // reuse: show the kept last search when it is this query (see showLastSearchResults)
+  // instead of asking the directories again.
+  function searchByName(q, reuse){
     cancelPlaylistStationsEditing();
     closeNowPlaying();
     window.scrollTo(0, 0);
@@ -17900,9 +17902,26 @@
     renderRecentSection();
     // A search that already carries its own quotes is shown as typed, rather than wrapped in a
     // second pair (Results for ""all night long"").
+    if(!q){
+      // The yellow button with nothing searched yet: the results page, empty.
+      stationsHeading.textContent = 'Search';
+      setClearSearchVisible(false);
+      setResultCount(null);
+      resetStationsGrid();
+      stationsGrid.innerHTML = '<div class="empty-state">Search for stations, podcasts, artists or songs, or paste a stream link.</div>';
+      return;
+    }
     stationsHeading.textContent = 'Results for ' + (/["\u201C\u201D]/.test(q) ? q : '"' + q + '"');
     setClearSearchVisible(true);
     setResultCount(null);
+    if(reuse && lastSearch && lastSearch.q === q){
+      searchState = lastSearch;
+      searchState.artists = searchArtists(q);
+      searchState.albums = searchAlbums(q);
+      searchState.songs = searchLocalTracks(q);
+      applySearchResults();
+      return;
+    }
     runSearch(q);
   }
 
@@ -17922,6 +17941,46 @@
     { id: 'songs', label: 'Songs', noun: 'song' }
   ];
   var searchState = null;
+
+  // ---------- the last search, kept ----------
+  // Other pages drop searchState when they open (hideSearchTabs), which is what made the
+  // results vanish the moment you went anywhere else. The most recent search is kept apart
+  // from that, and saved, so the yellow search button can always bring its results back --
+  // until a new search replaces them (a pasted stream URL isn't a search and doesn't).
+  // Library matches (artists, albums, songs) are worked out again on the way back in, since
+  // the library may have changed; stations and podcasts are kept as they came back.
+  var LAST_SEARCH_KEY = 'radioPlayerLastSearch';
+  var lastSearch = null;
+  try{
+    var savedSearch = JSON.parse(localStorage.getItem(LAST_SEARCH_KEY) || 'null');
+    if(savedSearch && typeof savedSearch.q === 'string' && savedSearch.q){
+      lastSearch = { q: savedSearch.q, stations: savedSearch.stations || [], podcasts: savedSearch.podcasts || [],
+        artists: [], albums: [], songs: [], tab: savedSearch.tab || null, pending: false, podcastsPending: false, restored: true };
+    }
+  }catch(e){}
+  var lastSearchSaveTimer = null;
+  function saveLastSearch(){
+    if(lastSearchSaveTimer) clearTimeout(lastSearchSaveTimer);
+    lastSearchSaveTimer = setTimeout(function(){
+      lastSearchSaveTimer = null;
+      var ls = lastSearch;
+      if(!ls || ls.pending || ls.podcastsPending) return;
+      try{
+        localStorage.setItem(LAST_SEARCH_KEY, JSON.stringify({ q: ls.q, stations: ls.stations, podcasts: ls.podcasts, tab: ls.tab }));
+      }catch(e){}
+    }, 300);
+  }
+  // Open the results page on the last search, exactly as it was left (same tab), without
+  // asking the directories again. With no search yet, the page says so.
+  function showLastSearchResults(){
+    if(!lastSearch){
+      searchByName('', true);
+      return;
+    }
+    searchInput.value = lastSearch.q;
+    if(searchSheetInput) searchSheetInput.value = lastSearch.q;
+    searchByName(lastSearch.q, true);
+  }
 
   function hideSearchTabs(){
     searchTabs.style.display = 'none';
@@ -18053,6 +18112,7 @@
       pending: true,
       podcastsPending: true
     };
+    lastSearch = searchState;
 
     // The two remote directories know nothing about quotes, so they get the words alone and
     // the quoted phrases are enforced here, on what comes back.
@@ -18106,6 +18166,7 @@
 
   function applySearchResults(){
     if(!searchState) return;
+    if(searchState === lastSearch) saveLastSearch();
     var available = SEARCH_GROUPS.filter(function(g){ return searchGroupHasContent(g.id); });
 
     if(!available.length){
@@ -18142,6 +18203,7 @@
       btn.addEventListener('click', function(){
         if(!searchState) return;
         searchState.tab = g.id;
+        if(searchState === lastSearch) saveLastSearch();
         applySearchResults();
         window.scrollTo(0, 0);
       });
@@ -18291,7 +18353,10 @@
     // the Now Playing screen with nothing to show for the search.
     closeNowPlaying();
     var v = searchInput.value.trim();
-    if(!v){ loadTopStations(); return; }
+    // Nothing typed: the results page, on the last search (or empty if there hasn't been one).
+    if(!v){ showLastSearchResults(); return; }
+    // The same words as the kept search: bring those results back rather than searching again.
+    if(lastSearch && v === lastSearch.q){ showLastSearchResults(); return; }
     if(isUrlLike(v)){
       var station = {
         name: v.length > 50 ? v.slice(0,47) + '…' : v,
