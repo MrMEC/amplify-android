@@ -136,7 +136,10 @@ async def main():
 
         await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(700)
         t = await my_tiles(pg)
-        check([x['name'] for x in t] == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'back to Video: My Channels in the order added {[x["name"] for x in t]}')
+        labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;})")
+        rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row').length")
+        check(labels == ['News2', 'Other3'] and rows_ok == 2, f'back to Video: a sideways row per category, uncategorised last {labels} rows={rows_ok}')
+        check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'PBS', 'Link One', 'Link Three'], f'each row keeps the order added {[x["name"] for x in t]}')
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='BBC News';}).click()"); await pg.wait_for_timeout(900)
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         t = {x['name']: x for x in await my_tiles(pg)}
