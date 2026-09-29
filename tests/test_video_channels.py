@@ -94,6 +94,7 @@ async def main():
         await pg.evaluate("document.querySelector('.ch-row .ch-add').click()"); await pg.wait_for_timeout(200)
         check((await rows(pg))[0]['added'], '+ adds PBS (button turns into a check)')
         await pg.screenshot(path=f'{SHOTS}/ch-recommended.png')
+        check(not await pg.evaluate("!!document.querySelector('.ch-tools-note')"), 'no instructions under the tabs (Recommended)')
 
         await tab(pg, 'All')
         r = await rows(pg)
@@ -115,11 +116,20 @@ async def main():
             await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent===n;}).querySelector('.ch-add').click()", n)
         await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'{SHOTS}/ch-all.png')
+        check(not await pg.evaluate("!!document.querySelector('.ch-tools-note')"), 'no instructions under the tabs (All)')
         # tap a row = try it (plays + Now Playing) without adding
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent==='Weather Nation';}).click()"); await pg.wait_for_timeout(700)
         np = await pg.evaluate("document.getElementById('nowPlayingScreen').style.display")
         last = await pg.evaluate("window.__calls.filter(function(c){return c[0]==='load';}).slice(-1)[0]")
         check(np == 'flex' and last and last[1] == 'https://wx.example/live.m3u8', f'tapping a row tries the channel: plays it, Now Playing opens {last}')
+        lk = "(()=>{var l=document.getElementById('npChannelLink');return l.hidden?null:l.textContent;})()"
+        mine = "JSON.parse(localStorage.getItem('radioPlayerVideoChannels')||'[]').map(function(c){return c.name;})"
+        check(await pg.evaluate(lk) == 'Add to My Channels', f'Now Playing for a channel not saved: Add to My Channels ({await pg.evaluate(lk)})')
+        await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(300)
+        check('Weather Nation' in await pg.evaluate(mine) and await pg.evaluate(lk) == 'Remove from My Channels', 'tapping it adds the channel, link turns into Remove from My Channels')
+        await pg.screenshot(path=f'{SHOTS}/ch-np-link.png')
+        await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(300)
+        check('Weather Nation' not in await pg.evaluate(mine) and await pg.evaluate(lk) == 'Add to My Channels', 'tapping Remove takes it back out')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
 
         await tab(pg, 'Link')
@@ -130,6 +140,7 @@ async def main():
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid button'),function(b){return /^Add all/.test(b.textContent);}).click()"); await pg.wait_for_timeout(300)
         check(all(x['added'] for x in await rows(pg)), 'Add all adds them')
         await pg.screenshot(path=f'{SHOTS}/ch-link.png')
+        check(not await pg.evaluate("!!document.querySelector('.ch-tools-note')"), 'no instructions under the tabs (Link)')
         await pg.evaluate("(()=>{var i=document.querySelector('.ch-tools input');i.value='https://tv.example/live/news24/index.m3u8';i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));})()"); await pg.wait_for_timeout(900)
         r = await rows(pg)
         check(len(r) == 1 and r[0]['name'] == 'news24', f'a single stream link becomes one channel named from its address {r}')
@@ -147,6 +158,8 @@ async def main():
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='PBS';}).click()"); await pg.wait_for_timeout(900)
         np = await pg.evaluate("document.getElementById('nowPlayingScreen').style.display")
         check(np == 'flex', 'tapping a channel tile plays it and opens Now Playing')
+        lk2 = await pg.evaluate("(()=>{var l=document.getElementById('npChannelLink');return l.hidden?null:l.textContent;})()")
+        check(lk2 == 'Remove from My Channels', f'a saved channel offers Remove from My Channels ({lk2})')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')
 

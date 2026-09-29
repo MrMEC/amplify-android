@@ -2777,6 +2777,15 @@
     color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer;
   }
   .np-video-toggle[hidden]{ display:none; }
+  /* Add to / Remove from My Channels on a channel's Now Playing: a quiet link under the details. */
+  .np-channel-link{
+    display:inline-flex; align-items:center; gap:6px; margin:-12px auto 16px; padding:4px 8px;
+    background:none; border:none; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer;
+    color:rgba(255,255,255,.88); text-shadow:0 1px 10px rgba(0,0,0,.5);
+  }
+  .np-channel-link:hover, .np-channel-link:focus-visible{ color:#fff; text-decoration:underline; }
+  .np-channel-link[hidden]{ display:none; }
+  .np-channel-link svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .np-video-toggle svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   /* The video takes the artwork's place: full width near the top of the hero, over the
      artwork's blurred wash (the crisp cover is hidden while it plays). */
@@ -2827,7 +2836,6 @@
   .ch-tools-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .ch-tools-row .cs-field-input{ flex:1 1 220px; width:auto; }
   .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
-  .ch-tools-note{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
   .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
   .ch-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; min-width:0; }
   .ch-logo{ width:52px; height:52px; flex:none; border-radius:10px; overflow:hidden; background:var(--panel-2);
@@ -4634,6 +4642,8 @@
             <!-- What a live station is playing, when its stream names it. Hidden otherwise. -->
             <div class="np-onair" id="npOnAir" hidden></div>
             <div class="np-sub" id="npSub"></div>
+            <!-- A TV channel (or a pasted stream showing video): add it to My Channels, or take it off. -->
+            <button type="button" class="np-channel-link" id="npChannelLink" hidden></button>
             <!-- Play in the middle, larger and solid; everything else is a small translucent
                  disc around it. Local files have a real duration and are seekable; a live
                  stream has neither, so the seek block is hidden for stream tracks. -->
@@ -6860,7 +6870,41 @@
     return !!(st && isPodcastTrack(st) && st.isVideo && st.episodeUrl && audio && typeof audio.attachVideo === 'function') ||
       streamVideoCapable(st);
   }
+  // Now Playing's "Add to My Channels" / "Remove from My Channels" link: for a channel
+  // (played from My Channels or Add Channels), one already in My Channels, or a pasted
+  // stream that turns out to carry video.
+  var npChannelLink = document.getElementById('npChannelLink');
+  var CH_ADD_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>';
+  var CH_REMOVE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>';
+  function npChannelUrl(st){ return st ? (st.urlToResolve || st.url_resolved || st.url || '') : ''; }
+  function syncNpChannelLink(){
+    if(!npChannelLink) return;
+    var st = npTarget();
+    var url = npChannelUrl(st);
+    var saved = !!(url && findVideoChannel(url));
+    var show = !!(url && isLiveStream(st) && (st.videoChannel || saved || streamVideoCapable(st)));
+    npChannelLink.hidden = !show;
+    if(!show) return;
+    npChannelLink.innerHTML = (saved ? CH_REMOVE_SVG : CH_ADD_SVG) +
+      '<span>' + (saved ? 'Remove from My Channels' : 'Add to My Channels') + '</span>';
+    npChannelLink.dataset.saved = saved ? '1' : '';
+  }
+  npChannelLink.addEventListener('click', function(){
+    var st = npTarget();
+    var url = npChannelUrl(st);
+    if(!url) return;
+    if(findVideoChannel(url)){
+      removeVideoChannel(url);
+    } else {
+      var c = st.channel || {};
+      addVideoChannel({ id: c.id, name: c.name || st.name, url: url, logo: c.logo || st.favicon || '',
+        country: c.country || st.countrycode || st.country || '', cats: c.cats || [], src: c.src || 'link' });
+      if(onVideoView) renderVideoHome();
+    }
+    syncNpChannelLink();
+  });
   function syncNpVideoToggle(st){
+    syncNpChannelLink();
     var show = videoCapable(st) && currentStation && favKey(st) === favKey(currentStation);
     npVideoToggle.hidden = !show;
     npVideoToggleLabel.textContent = npVideoOn ? 'Turn Off Video' : 'Turn On Video';
@@ -10079,6 +10123,7 @@
   if(!Array.isArray(videoChannels)) videoChannels = [];
   function saveVideoChannels(){
     try{ localStorage.setItem(VIDEO_CHANNELS_KEY, JSON.stringify(videoChannels)); }catch(e){}
+    if(typeof syncNpChannelLink === 'function') syncNpChannelLink();
   }
   var videoAddHeaderBtnEl = document.getElementById('videoAddHeaderBtn');
   var videoReorderHeaderBtnEl = document.getElementById('videoReorderHeaderBtn');
@@ -10093,7 +10138,9 @@
   function channelToStation(ch){
     return {
       name: ch.name, urlToResolve: ch.url, favicon: ch.logo || '', tags: (ch.cats || []).join(','),
-      country: ch.country || '', codec: '', bitrate: '', stationuuid: null, videoChannel: true
+      country: ch.country || '', codec: '', bitrate: '', stationuuid: null, videoChannel: true,
+      channel: { id: ch.id || '', name: ch.name || '', url: ch.url, logo: ch.logo || '',
+        country: ch.country || '', cats: ch.cats || [], src: ch.src || 'link' }
     };
   }
   function playChannel(ch){
@@ -10525,12 +10572,6 @@
     });
   }
   function buildBrowseTools(tools){
-    var note = document.createElement('div');
-    note.className = 'ch-tools-note';
-    note.textContent = addChannelsTab === 'all'
-      ? 'Publicly available channels from the iptv-org directory. Tap a channel to try it; + adds it to My Channels. Some may not work outside their country.'
-      : 'Free, legal channels hand-picked by Free-TV. Tap a channel to try it; + adds it to My Channels.';
-    tools.appendChild(note);
     var row = document.createElement('div');
     row.className = 'ch-tools-row';
     var input = document.createElement('input');
@@ -10581,10 +10622,6 @@
     }
   }
   function buildLinkTools(tools){
-    var note = document.createElement('div');
-    note.className = 'ch-tools-note';
-    note.textContent = 'Paste a playlist link (.m3u / .m3u8) to pick channels from it, or a single stream link to add that one channel.';
-    tools.appendChild(note);
     var row = document.createElement('div');
     row.className = 'ch-tools-row';
     var input = document.createElement('input');
