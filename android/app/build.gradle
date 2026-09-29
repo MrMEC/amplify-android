@@ -1,6 +1,6 @@
 apply plugin: 'com.android.application'
 
-def BUILD_OFFSET = 33
+def BUILD_OFFSET = 40
 ext.amplifyBuild = { ->
     def run = System.getenv("GITHUB_RUN_NUMBER")
     return run ? (run as Integer) + BUILD_OFFSET : 1
@@ -13,8 +13,8 @@ android {
         applicationId "com.markcoleman.amplify"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // Build number = GitHub run number + BUILD_OFFSET. Builds 7-39 were made outside this repo,
-        // so the offset keeps new builds numbered above 39 and able to install over them.
+        // Build number = GitHub run number + BUILD_OFFSET. Builds 7-48 were made outside this repo (the phone had 1.0.48),
+        // so the offset keeps new builds numbered above 48 and able to install over them.
         versionCode amplifyBuild()
         versionName "1.0." + amplifyBuild()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
