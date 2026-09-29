@@ -112,14 +112,11 @@ async def main():
         await pg.evaluate("(()=>{var s=document.querySelectorAll('.ch-tools select')[1];s.value='weather';s.dispatchEvent(new Event('change'));})()"); await pg.wait_for_timeout(500)
         check([x['name'] for x in await rows(pg)] == ['Weather Nation'], 'category filter')
         await pg.evaluate("(()=>{var s=document.querySelectorAll('.ch-tools select')[1];s.value='';s.dispatchEvent(new Event('change'));})()"); await pg.wait_for_timeout(500)
-        setadult = "(v)=>{var s=document.getElementById('adultChannelsSelect');s.value=v;s.dispatchEvent(new Event('change'));}"
         catopts = "Array.prototype.map.call(document.querySelectorAll('.ch-tools select')[1].options,function(o){return o.textContent;})"
-        await pg.evaluate(setadult, 'show'); await pg.wait_for_timeout(700)
         names = [x['name'] for x in await rows(pg)]
-        check('Hidden Adult' in names and 'Adult' in await pg.evaluate(catopts), f'Settings > Adult channels: Show lists them and the Adult category {names}')
-        await pg.evaluate(setadult, 'hide'); await pg.wait_for_timeout(700)
-        names = [x['name'] for x in await rows(pg)]
-        check('Hidden Adult' not in names and 'Adult' not in await pg.evaluate(catopts), f'Hide takes them and the category away again {names}')
+        cats = await pg.evaluate(catopts)
+        noset = await pg.evaluate("!document.getElementById('adultChannelsSelect') && !/Adult channels/.test(document.getElementById('settingsPanel').textContent)")
+        check('Hidden Adult' not in names and not any(c in ('Adult', 'XXX', 'xxx') for c in cats) and noset, f'no adult channels, no Adult category, no setting {names} {cats}')
         for n in ('ABC News Live', 'BBC News'):
             await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent===n;}).querySelector('.ch-add').click()", n)
         await pg.wait_for_timeout(200)
@@ -130,12 +127,16 @@ async def main():
         np = await pg.evaluate("document.getElementById('nowPlayingScreen').style.display")
         last = await pg.evaluate("window.__calls.filter(function(c){return c[0]==='load';}).slice(-1)[0]")
         check(np == 'flex' and last and last[1] == 'https://wx.example/live.m3u8', f'tapping a row tries the channel: plays it, Now Playing opens {last}')
-        lk = "(()=>{var l=document.getElementById('npChannelLink');return l.hidden?null:l.textContent;})()"
+        lk = "(()=>{var l=document.getElementById('npChannelLink');return l.style.display==='none'?null:l.textContent;})()"
         mine = "JSON.parse(localStorage.getItem('radioPlayerVideoChannels')||'[]').map(function(c){return c.name;})"
         check(await pg.evaluate(lk) == 'Add to My Channels', f'Now Playing for a channel not saved: Add to My Channels ({await pg.evaluate(lk)})')
         await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(300)
         check('Weather Nation' in await pg.evaluate(mine) and await pg.evaluate(lk) == 'Remove from My Channels', 'tapping it adds the channel, link turns into Remove from My Channels')
+        inmenu = await pg.evaluate("!!document.getElementById('npChannelLink').closest('#npMenu')")
+        check(inmenu, 'the option lives in the More (3-dot) menu')
+        await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{SHOTS}/ch-np-link.png')
+        await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(200)
         await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(300)
         check('Weather Nation' not in await pg.evaluate(mine) and await pg.evaluate(lk) == 'Add to My Channels', 'tapping Remove takes it back out')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
@@ -166,7 +167,7 @@ async def main():
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='PBS';}).click()"); await pg.wait_for_timeout(900)
         np = await pg.evaluate("document.getElementById('nowPlayingScreen').style.display")
         check(np == 'flex', 'tapping a channel tile plays it and opens Now Playing')
-        lk2 = await pg.evaluate("(()=>{var l=document.getElementById('npChannelLink');return l.hidden?null:l.textContent;})()")
+        lk2 = await pg.evaluate("(()=>{var l=document.getElementById('npChannelLink');return l.style.display==='none'?null:l.textContent;})()")
         check(lk2 == 'Remove from My Channels', f'a saved channel offers Remove from My Channels ({lk2})')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')

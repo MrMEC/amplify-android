@@ -2331,6 +2331,7 @@
     background:none; border:none; color:var(--text);
   }
   .np-menu-item:hover{ background:var(--panel-2); }
+  #npChannelLink span{ white-space:nowrap; }
   .np-menu-item.danger{ color:var(--danger); }
   .np-menu-item.confirming{ background:var(--panel-2); }
   .np-menu-item i{ width:14px; text-align:center; flex-shrink:0; }
@@ -2777,15 +2778,6 @@
     color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer;
   }
   .np-video-toggle[hidden]{ display:none; }
-  /* Add to / Remove from My Channels on a channel's Now Playing: a quiet link under the details. */
-  .np-channel-link{
-    display:inline-flex; align-items:center; gap:6px; margin:-12px auto 16px; padding:4px 8px;
-    background:none; border:none; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer;
-    color:rgba(255,255,255,.88); text-shadow:0 1px 10px rgba(0,0,0,.5);
-  }
-  .np-channel-link:hover, .np-channel-link:focus-visible{ color:#fff; text-decoration:underline; }
-  .np-channel-link[hidden]{ display:none; }
-  .np-channel-link svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .np-video-toggle svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   /* The video takes the artwork's place: full width near the top of the hero, over the
      artwork's blurred wash (the crisp cover is hidden while it plays). */
@@ -4647,8 +4639,6 @@
             <!-- What a live station is playing, when its stream names it. Hidden otherwise. -->
             <div class="np-onair" id="npOnAir" hidden></div>
             <div class="np-sub" id="npSub"></div>
-            <!-- A TV channel (or a pasted stream showing video): add it to My Channels, or take it off. -->
-            <button type="button" class="np-channel-link" id="npChannelLink" hidden></button>
             <!-- Play in the middle, larger and solid; everything else is a small translucent
                  disc around it. Local files have a real duration and are seekable; a live
                  stream has neither, so the seek block is hidden for stream tracks. -->
@@ -4690,6 +4680,8 @@
                     <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
                     <span class="np-playlist-tip" id="npPlaylistTip">Added!</span>
                   </button>
+                  <!-- A TV channel (or a pasted stream showing video): add it to My Channels, or take it off. -->
+                  <button type="button" class="np-menu-item" id="npChannelLink" role="menuitem" style="display:none;"></button>
                   <button type="button" class="np-menu-item" id="npArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit cover art</span>
                   </button>
@@ -4855,13 +4847,6 @@
         <option value="300">300</option>
         <option value="400">400</option>
         <option value="500">500</option>
-      </select>
-    </div>
-    <div class="settings-row">
-      <span class="settings-label">Adult channels</span>
-      <select class="settings-select" id="adultChannelsSelect" title="Show or hide the Adult category in Video" aria-label="Adult channels">
-        <option value="hide">Hide</option>
-        <option value="show">Show</option>
       </select>
     </div>
     <div class="settings-row settings-row--stack">
@@ -6172,16 +6157,6 @@
     return DEFAULT_RESULT_LIMIT;
   }
   var resultLimit = loadResultLimit();
-  var adultChannelsSelect = document.getElementById('adultChannelsSelect');
-  if(adultChannelsSelect){
-    try{ adultChannelsSelect.value = localStorage.getItem('radioPlayerAdultChannels') === 'show' ? 'show' : 'hide'; }catch(e){}
-    adultChannelsSelect.addEventListener('change', function(){
-      allowAdultChannels = adultChannelsSelect.value === 'show';
-      try{ localStorage.setItem(ADULT_CHANNELS_KEY, allowAdultChannels ? 'show' : 'hide'); }catch(e){}
-      if(onVideoView) renderVideoHome();
-      if(onAddChannelsView){ addChannelsState.cat = ''; addChannelsState.shown = 60; renderAddChannels(); }
-    });
-  }
   resultLimitSelect.value = String(resultLimit);
   resultLimitSelect.addEventListener('change', function(){
     var n = parseInt(resultLimitSelect.value, 10);
@@ -6892,12 +6867,10 @@
     return !!(st && isPodcastTrack(st) && st.isVideo && st.episodeUrl && audio && typeof audio.attachVideo === 'function') ||
       streamVideoCapable(st);
   }
-  // Now Playing's "Add to My Channels" / "Remove from My Channels" link: for a channel
+  // Now Playing's More menu item "Add to My Channels" / "Remove from My Channels": for a channel
   // (played from My Channels or Add Channels), one already in My Channels, or a pasted
   // stream that turns out to carry video.
   var npChannelLink = document.getElementById('npChannelLink');
-  var CH_ADD_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>';
-  var CH_REMOVE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>';
   function npChannelUrl(st){ return st ? (st.urlToResolve || st.url_resolved || st.url || '') : ''; }
   function syncNpChannelLink(){
     if(!npChannelLink) return;
@@ -6905,10 +6878,12 @@
     var url = npChannelUrl(st);
     var saved = !!(url && findVideoChannel(url));
     var show = !!(url && isLiveStream(st) && (st.videoChannel || saved || streamVideoCapable(st)));
-    npChannelLink.hidden = !show;
+    npChannelLink.style.display = show ? '' : 'none';
     if(!show) return;
-    npChannelLink.innerHTML = (saved ? CH_REMOVE_SVG : CH_ADD_SVG) +
-      '<span>' + (saved ? 'Remove from My Channels' : 'Add to My Channels') + '</span>';
+    npChannelLink.innerHTML = '<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8.5 20.5h7"/>' +
+      (saved ? '<path d="M9 11h6"/>' : '<path d="M12 8v6M9 11h6"/>') + '</svg><span>' +
+      (saved ? 'Remove from My Channels' : 'Add to My Channels') + '</span>';
     npChannelLink.dataset.saved = saved ? '1' : '';
   }
   npChannelLink.addEventListener('click', function(){
@@ -6924,6 +6899,7 @@
       if(onVideoView) renderVideoHome();
     }
     syncNpChannelLink();
+    closeNpMenu();
   });
   function syncNpVideoToggle(st){
     syncNpChannelLink();
@@ -10143,11 +10119,9 @@
   var videoChannels = [];
   try{ videoChannels = JSON.parse(localStorage.getItem(VIDEO_CHANNELS_KEY) || '[]') || []; }catch(e){ videoChannels = []; }
   if(!Array.isArray(videoChannels)) videoChannels = [];
-  // Adult channels (iptv-org's "XXX" category, or a playlist group named that way) are hidden
-  // everywhere in Video -- Add Channels and My Channels -- unless Settings says to show them.
-  var ADULT_CHANNELS_KEY = 'radioPlayerAdultChannels';
-  var allowAdultChannels = false;
-  try{ allowAdultChannels = localStorage.getItem(ADULT_CHANNELS_KEY) === 'show'; }catch(e){}
+  // Adult channels (iptv-org's "XXX" category, or a playlist group named that way) are never
+  // shown in Video: not in Add Channels, its category list, or My Channels.
+  try{ localStorage.removeItem('radioPlayerAdultChannels'); }catch(e){}
   var ADULT_GROUP_RE = /^(xxx|adult|adults|18\+|porn|nsfw)$/i;
   function isAdultChannel(e){
     if(!e) return false;
@@ -10155,7 +10129,7 @@
     return (e.cats || []).some(function(c){ return c === 'xxx' || ADULT_GROUP_RE.test(String(c)); }) ||
       ADULT_GROUP_RE.test(String(e.group || ''));
   }
-  function channelVisible(e){ return allowAdultChannels || !isAdultChannel(e); }
+  function channelVisible(e){ return !isAdultChannel(e); }
   function visibleVideoChannels(){ return videoChannels.filter(channelVisible); }
   // My Channels: grouped by category, or one list in your own order.
   var CHANNEL_SORT_KEY = 'radioPlayerChannelSort';
@@ -10199,7 +10173,6 @@
   // A category's display name: the directory's own name when it's loaded, else the id
   // tidied up ("news" -> "News", "kids" -> "Kids").
   function categoryName(id){
-    if(id === 'xxx') return 'Adult';
     if(iptvIndex && iptvIndex.cats && iptvIndex.cats[id]) return iptvIndex.cats[id];
     return String(id || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
   }
@@ -10390,8 +10363,12 @@
 
   // ---- the iptv-org directory, reduced to what the browser needs, kept for a day
   var IPTV_API = 'https://iptv-org.github.io/api/';
-  var IPTV_CACHE = 'amplify-iptv-v2';
+  var IPTV_CACHE = 'amplify-iptv-v3';
   var iptvIndex = null, iptvIndexPromise = null;
+  // Older copies of the directory (one kept adult channels) are thrown away.
+  if(typeof caches !== 'undefined'){
+    ['amplify-iptv-v1', 'amplify-iptv-v2'].forEach(function(n){ try{ caches['delete'](n)['catch'](function(){}); }catch(e){} });
+  }
   function loadIptvIndex(){
     if(iptvIndex) return Promise.resolve(iptvIndex);
     if(iptvIndexPromise) return iptvIndexPromise;
@@ -10421,15 +10398,11 @@
       j('countries.json'), j('blocklist.json')['catch'](function(){ return []; })]).then(function(r){
       var channels = r[0], streams = r[1], logos = r[2], cats = r[3], countries = r[4], block = r[5];
       var blocked = {};
-      var nsfw = {};
-      // Blocked for a legal reason: left out. Blocked only for being adult: kept, flagged adult.
-      block.forEach(function(b){
-        if(!b || !b.channel) return;
-        if(b.reason === 'nsfw') nsfw[b.channel] = true; else blocked[b.channel] = true;
-      });
+      block.forEach(function(b){ if(b && b.channel) blocked[b.channel] = true; });
       var byId = {};
       channels.forEach(function(c){
-        if(!c || !c.id || c.closed || blocked[c.id]) return;
+        if(!c || !c.id || c.is_nsfw || c.closed || blocked[c.id]) return;
+        if((c.categories || []).indexOf('xxx') !== -1) return;
         byId[c.id] = c;
       });
       var logoFor = {};
@@ -10449,16 +10422,12 @@
       var list = [];
       Object.keys(best).forEach(function(id){
         var c = byId[id], st = best[id];
-        var adult = !!(c.is_nsfw || nsfw[id]);
-        var cs = (c.categories || []).slice();
-        if(adult && cs.indexOf('xxx') === -1) cs.push('xxx');
-        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: cs,
-          url: st.url, logo: logoFor[id] ? logoFor[id].url : '', adult: adult || undefined });
+        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: c.categories || [],
+          url: st.url, logo: logoFor[id] ? logoFor[id].url : '' });
       });
       list.sort(function(a, b){ return a.name.localeCompare(b.name); });
       var catNames = {};
       cats.forEach(function(c){ if(c && c.id) catNames[c.id] = c.name; });
-      catNames.xxx = 'Adult';
       var countryNames = {};
       countries.forEach(function(c){ if(c && c.code) countryNames[c.code] = c.name; });
       return { at: Date.now(), list: list, cats: catNames, countries: countryNames };
