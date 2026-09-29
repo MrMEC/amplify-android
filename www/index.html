@@ -2813,6 +2813,27 @@
   .tile-video{ display:flex; align-items:center; margin-top:3px; color:var(--text-dim); line-height:0; }
   .tile-video svg{ width:15px; height:15px; fill:currentColor; }
   .cs-video{ display:inline-flex; align-items:center; flex:none; color:var(--text-dim); line-height:0; }
+  /* ---------- Video: channels ---------- */
+  .tile .ch-dead{ color:#e5534b; }
+  .ch-tools{ grid-column:1/-1; display:flex; flex-direction:column; gap:10px; margin:0 0 4px; }
+  .ch-tools .home-tabs{ margin:0 0 4px; }
+  .ch-tools-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .ch-tools-row .cs-field-input{ flex:1 1 220px; width:auto; }
+  .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
+  .ch-tools-note{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
+  .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
+  .ch-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; min-width:0; }
+  .ch-logo{ width:52px; height:52px; flex:none; border-radius:10px; overflow:hidden; background:var(--panel-2);
+    display:flex; align-items:center; justify-content:center; color:var(--text-faint); }
+  .ch-logo img{ width:100%; height:100%; object-fit:contain; padding:5px; box-sizing:border-box; }
+  .ch-logo svg{ width:24px; height:24px; fill:currentColor; }
+  .ch-text{ flex:1 1 auto; min-width:0; }
+  .ch-name{ font-size:14px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ch-sub{ margin-top:2px; font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ch-add{ flex:none; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; padding:0; }
+  .ch-add.added{ background:var(--accent); border-color:var(--accent); color:var(--accent-text); }
+  .ch-more{ align-self:center; margin:14px 0 4px; }
   /* A station with video, in the search results: the camera to the right of the name, level
      with its first line. The name keeps its two-line clamp and gives way to the icon. */
   .tile-name-row{ display:flex; align-items:flex-start; gap:5px; margin-top:9px; min-width:0; }
@@ -4395,6 +4416,12 @@
             <i class="fa-solid fa-plus"></i><span class="btn-text">Add Search</span>
           </button>
           <button type="button" class="clear-search-btn" id="forYouReorderHeaderBtn" style="display:none;" title="Reorder">
+            <i class="fa-solid fa-pen"></i><span class="btn-text">Reorder</span>
+          </button>
+          <button type="button" class="clear-search-btn" id="videoAddHeaderBtn" style="display:none;" title="Add channels">
+            <i class="fa-solid fa-plus"></i><span class="btn-text">Add Channels</span>
+          </button>
+          <button type="button" class="clear-search-btn" id="videoReorderHeaderBtn" style="display:none;" title="Reorder">
             <i class="fa-solid fa-pen"></i><span class="btn-text">Reorder</span>
           </button>
           <button type="button" class="clear-search-btn" id="playlistsAddHeaderBtn" style="display:none;" title="Add a playlist">
@@ -5995,7 +6022,8 @@
   // snapshotView() so the back button returns to whichever of these is open.
   var onMyLibraryHomeView = false;
   var onStationsHomeView = false;
-  var onVideoView = false;   // the Video page (bottom nav / sidebar); empty for now
+  var onVideoView = false;   // the Video page (bottom nav / sidebar)
+  var onAddChannelsView = false; // Video > Add Channels
   var onPlaylistsHomeView = false;
   var onGenresHomeView = false;
   // Which home section's own "see all" page the centre grid is showing --
@@ -10031,9 +10059,63 @@
     openStationsHome();
   });
 
-  // ---------- Video ----------
-  // A section of its own in the bottom navigation (where Stations was) and the sidebar.
-  // Empty for now: just its heading.
+  // ---------- Video: channels (phase 1) ----------
+  // The Video section is where TV channels live: My Channels (the ones added, in the
+  // listener's order) and Add Channels, which browses free, legal sources -- Free-TV's curated
+  // list ("Recommended"), the iptv-org directory ("All Channels"), or any playlist / stream link.
+  // A channel plays like any other stream (so the sound, lock screen and car all work) and opens
+  // Now Playing, where its picture shows (live stream video); tap the picture for full screen.
+  // A channel that fails to play is marked "Not working" until it plays again.
+  var VIDEO_CHANNELS_KEY = 'radioPlayerVideoChannels';
+  var videoChannels = [];
+  try{ videoChannels = JSON.parse(localStorage.getItem(VIDEO_CHANNELS_KEY) || '[]') || []; }catch(e){ videoChannels = []; }
+  if(!Array.isArray(videoChannels)) videoChannels = [];
+  function saveVideoChannels(){
+    try{ localStorage.setItem(VIDEO_CHANNELS_KEY, JSON.stringify(videoChannels)); }catch(e){}
+  }
+  var videoAddHeaderBtnEl = document.getElementById('videoAddHeaderBtn');
+  var videoReorderHeaderBtnEl = document.getElementById('videoReorderHeaderBtn');
+  window.videoAddHeaderBtnEl = videoAddHeaderBtnEl;
+  window.videoReorderHeaderBtnEl = videoReorderHeaderBtnEl;
+  var videoChannelsEditing = false;
+
+  function findVideoChannel(url){
+    for(var i = 0; i < videoChannels.length; i++) if(videoChannels[i].url === url) return videoChannels[i];
+    return null;
+  }
+  function channelToStation(ch){
+    return {
+      name: ch.name, urlToResolve: ch.url, favicon: ch.logo || '', tags: (ch.cats || []).join(','),
+      country: ch.country || '', codec: '', bitrate: '', stationuuid: null, videoChannel: true
+    };
+  }
+  function playChannel(ch){
+    var st = channelToStation(ch);
+    playStation(st);
+    openNowPlaying(st, true);
+  }
+  function addVideoChannel(ch){
+    if(!ch || !ch.url || findVideoChannel(ch.url)) return false;
+    videoChannels.push({ id: ch.id || ('link:' + ch.url), name: ch.name || 'Channel', url: ch.url, logo: ch.logo || '',
+      country: ch.country || '', cats: ch.cats || [], src: ch.src || 'link', addedAt: Date.now() });
+    saveVideoChannels();
+    return true;
+  }
+  function removeVideoChannel(url){
+    videoChannels = videoChannels.filter(function(c){ return c.url !== url; });
+    saveVideoChannels();
+    if(onVideoView) renderVideoHome();
+  }
+  // Called from the playback outcome: a channel that failed is marked, one that played is cleared.
+  function markChannelWorking(station, ok){
+    if(!station || !station.urlToResolve) return;
+    var ch = findVideoChannel(station.urlToResolve);
+    if(!ch || !!ch.dead === !ok) return;
+    ch.dead = !ok;
+    saveVideoChannels();
+    if(onVideoView) renderVideoHome();
+  }
+
   function openVideoHome(){
     enterLibraryChrome();
     onVideoView = true;
@@ -10043,8 +10125,525 @@
     albumPlayBtn.style.display = 'none';
     libraryShuffleBtn.style.display = 'none';
     setResultCount(null);
-    resetStationsGrid();
+    videoAddHeaderBtnEl.style.display = '';
+    renderVideoHome();
   }
+  function renderVideoHome(){
+    resetStationsGrid();
+    videoReorderHeaderBtnEl.style.display = videoChannels.length > 1 ? '' : 'none';
+    updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing);
+    videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
+    appendGridSection('My Channels', videoChannels.length);
+    if(!videoChannels.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No channels yet. Tap “Add Channels” to find free TV channels.';
+      stationsGrid.appendChild(empty);
+      return;
+    }
+    videoChannels.forEach(function(ch){
+      var st = channelToStation(ch);
+      var tile;
+      if(videoChannelsEditing){
+        tile = buildEntityTile({
+          key: 'channel:' + ch.url, reorderId: ch.url, entity: 'video-channel', name: ch.name,
+          artFrom: st, draggable: true, onReorder: reorderVideoChannelsFromGrid
+        });
+      } else {
+        tile = buildTile(st);
+        // A channel's heart becomes a More button (Favorite, Play Next, Add to Queue, Remove),
+        // the same as Continue Listening's tiles.
+        var old = tile.querySelector('.tile-fav');
+        var more = buildRowMoreBtn(st, { fav: true, className: 'tile-fav tile-more',
+          onRemove: function(){ removeVideoChannel(ch.url); } });
+        if(old) old.replaceWith(more); else tile.appendChild(more);
+        // Tapping plays it and opens Now Playing (where the picture is) instead of only playing
+        // it the way a station tile does -- caught before the tile's own handler. The More
+        // button keeps its menu.
+        tile.addEventListener('click', function(e){
+          if(e.target.closest('.tile-more, .tile-fav')) return;
+          e.stopImmediatePropagation();
+          playChannel(ch);
+        }, true);
+      }
+      if(ch.dead){
+        var dead = document.createElement('div');
+        dead.className = 'tile-sub ch-dead';
+        dead.textContent = 'Not working';
+        tile.appendChild(dead);
+      }
+      stationsGrid.appendChild(tile);
+    });
+  }
+  function reorderVideoChannelsFromGrid(){
+    var order = Array.prototype.map.call(stationsGrid.querySelectorAll('.tile[data-entity="video-channel"]'), function(el){ return el.dataset.reorderId; });
+    var byUrl = {};
+    videoChannels.forEach(function(c){ byUrl[c.url] = c; });
+    var re = order.map(function(u){ return byUrl[u]; }).filter(Boolean);
+    if(re.length === videoChannels.length){ videoChannels = re; saveVideoChannels(); }
+  }
+  videoReorderHeaderBtnEl.addEventListener('click', function(){
+    videoChannelsEditing = !videoChannelsEditing;
+    if(!videoChannelsEditing) reorderVideoChannelsFromGrid();
+    renderVideoHome();
+  });
+  videoAddHeaderBtnEl.addEventListener('click', function(){ pushView(); openAddChannelsPage(); });
+
+  // ---- fetching: the page first (GitHub serves these openly), the app's native fetch when a
+  // host won't let a page read it (most playlist hosts) or the address is plain http.
+  function nativePluginOrNull(){
+    var cap = window.Capacitor;
+    return (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer) || null;
+  }
+  function fetchTextAny(url){
+    var nat = nativePluginOrNull();
+    return fetch(url).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })['catch'](function(e){
+      if(nat && nat.fetchText) return nat.fetchText({ url: url }).then(function(r){ return r.text; });
+      throw e;
+    });
+  }
+
+  // ---- playlists (M3U)
+  function parseM3uChannels(text, base){
+    var out = [], pending = null, needsHeaders = false;
+    String(text || '').split(/\r?\n/).forEach(function(raw){
+      var line = raw.trim();
+      if(!line) return;
+      if(/^#EXTINF/i.test(line)){
+        var attrs = {}, m, re = /([\w-]+)="([^"]*)"/g;
+        while((m = re.exec(line))) attrs[m[1].toLowerCase()] = m[2];
+        var comma = line.lastIndexOf(',');
+        var name = (comma >= 0 ? line.slice(comma + 1) : '').trim() || attrs['tvg-name'] || 'Channel';
+        pending = { name: name, logo: attrs['tvg-logo'] || '', group: attrs['group-title'] || '',
+          country: attrs['tvg-country'] || '', tvgId: attrs['tvg-id'] || '' };
+        needsHeaders = false;
+        return;
+      }
+      if(/^#EXTVLCOPT:\s*http-(referrer|user-agent)/i.test(line)){ needsHeaders = true; return; }
+      if(line.charAt(0) === '#') return;
+      if(!pending) return;
+      var url = line;
+      try{ url = new URL(line, base).toString(); }catch(e){}
+      // Streams that only play with a particular referrer / user agent can't be played yet.
+      if(!needsHeaders && /^https?:/i.test(url)){
+        pending.url = url;
+        out.push(pending);
+      }
+      pending = null;
+    });
+    return out;
+  }
+
+  // ---- the iptv-org directory, reduced to what the browser needs, kept for a day
+  var IPTV_API = 'https://iptv-org.github.io/api/';
+  var IPTV_CACHE = 'amplify-iptv-v1';
+  var iptvIndex = null, iptvIndexPromise = null;
+  function loadIptvIndex(){
+    if(iptvIndex) return Promise.resolve(iptvIndex);
+    if(iptvIndexPromise) return iptvIndexPromise;
+    var cacheKey = new Request(IPTV_API + 'amplify-index.json');
+    var cachesOk = typeof caches !== 'undefined';
+    iptvIndexPromise = (cachesOk ? caches.open(IPTV_CACHE).then(function(c){ return c.match(cacheKey); }) : Promise.resolve(null))
+      .then(function(hit){ return hit ? hit.json() : null; })
+      ['catch'](function(){ return null; })
+      .then(function(cached){
+        if(cached && cached.at && Date.now() - cached.at < 24 * 3600 * 1000) return cached;
+        return buildIptvIndex().then(function(idx){
+          if(cachesOk){
+            caches.open(IPTV_CACHE).then(function(c){
+              return c.put(cacheKey, new Response(JSON.stringify(idx), { headers: { 'Content-Type': 'application/json' } }));
+            })['catch'](function(){});
+          }
+          return idx;
+        })['catch'](function(e){ if(cached) return cached; throw e; });
+      })
+      .then(function(idx){ iptvIndex = idx; iptvIndexPromise = null; return idx; },
+            function(e){ iptvIndexPromise = null; throw e; });
+    return iptvIndexPromise;
+  }
+  function buildIptvIndex(){
+    function j(name){ return fetchTextAny(IPTV_API + name).then(function(t){ return JSON.parse(t); }); }
+    return Promise.all([j('channels.json'), j('streams.json'), j('logos.json'), j('categories.json'),
+      j('countries.json'), j('blocklist.json')['catch'](function(){ return []; })]).then(function(r){
+      var channels = r[0], streams = r[1], logos = r[2], cats = r[3], countries = r[4], block = r[5];
+      var blocked = {};
+      block.forEach(function(b){ if(b && b.channel) blocked[b.channel] = true; });
+      var byId = {};
+      channels.forEach(function(c){
+        if(!c || !c.id || c.is_nsfw || c.closed || blocked[c.id]) return;
+        byId[c.id] = c;
+      });
+      var logoFor = {};
+      logos.forEach(function(l){
+        if(!l || !l.channel || !l.url || !byId[l.channel]) return;
+        // The channel's own logo (no feed) wins over a feed's.
+        if(!logoFor[l.channel] || (!l.feed && logoFor[l.channel].feed)) logoFor[l.channel] = l;
+      });
+      function q(v){ var m = /(\d+)/.exec(v || ''); return m ? parseInt(m[1], 10) : 0; }
+      var best = {};
+      streams.forEach(function(st){
+        if(!st || !st.url || !st.channel || !byId[st.channel]) return;
+        if(st.referrer || st.user_agent) return; // can't be played yet (needs special headers)
+        var cur = best[st.channel];
+        if(!cur || q(st.quality) > q(cur.quality)) best[st.channel] = st;
+      });
+      var list = [];
+      Object.keys(best).forEach(function(id){
+        var c = byId[id], st = best[id];
+        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: c.categories || [],
+          url: st.url, logo: logoFor[id] ? logoFor[id].url : '' });
+      });
+      list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+      var catNames = {};
+      cats.forEach(function(c){ if(c && c.id) catNames[c.id] = c.name; });
+      var countryNames = {};
+      countries.forEach(function(c){ if(c && c.code) countryNames[c.code] = c.name; });
+      return { at: Date.now(), list: list, cats: catNames, countries: countryNames };
+    });
+  }
+
+  // ---- Free-TV's curated playlist
+  var FREE_TV_URL = 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8';
+  var freeTvList = null;
+  function loadFreeTv(){
+    if(freeTvList) return Promise.resolve(freeTvList);
+    return fetchTextAny(FREE_TV_URL).then(function(t){
+      freeTvList = parseM3uChannels(t, FREE_TV_URL).map(function(c){
+        return { id: 'freetv:' + c.url, name: c.name, country: c.group || '', cats: [], url: c.url, logo: c.logo, src: 'freetv' };
+      });
+      return freeTvList;
+    });
+  }
+
+  // ---- the Add Channels page
+  var addChannelsTab = 'recommended';
+  var addChannelsState = { q: '', country: '', cat: '', shown: 60, linkUrl: '', linkList: null };
+  // Each list names countries its own way (iptv-org: "US"; Free-TV: "USA"), so each tab keeps
+  // its own country choice, starting from the phone's region.
+  var localRegion = (function(){
+    var m = /[-_]([A-Za-z]{2})$/.exec(navigator.language || '');
+    return m ? m[1].toUpperCase() : 'US';
+  })();
+  var countryByTab = { all: localRegion, recommended: null };
+  function regionGroupName(groups){
+    var names = { US: /^(usa|us|united states)$/i, GB: /^(uk|united kingdom|great britain)$/i, UK: /^(uk|united kingdom)$/i,
+      CA: /^canada$/i, AU: /^australia$/i, DE: /^germany$/i, FR: /^france$/i, ES: /^spain$/i, IT: /^italy$/i };
+    var re = names[localRegion];
+    if(!re) return '';
+    for(var i = 0; i < groups.length; i++) if(re.test(groups[i])) return groups[i];
+    return '';
+  }
+  var LOGO_FALLBACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zm4.5-4 3.5 3.5L15.5 3l1 1-2.8 3h-3.4L7.5 4z"/></svg>';
+
+  function openAddChannelsPage(){
+    enterLibraryChrome();
+    if(addChannelsTab !== 'link'){
+      addChannelsState.country = countryByTab[addChannelsTab] == null ? '' : countryByTab[addChannelsTab];
+      addChannelsState.pickDefault = addChannelsTab === 'recommended' && countryByTab.recommended == null;
+    }
+    onAddChannelsView = true;
+    setDetailBackToHistory(function(){ openVideoHome(); }, 'Video');
+    stationsHeading.textContent = 'Add Channels';
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    renderAddChannels();
+  }
+  function channelRow(e){
+    var row = document.createElement('div');
+    row.className = 'ch-row';
+    var logo = document.createElement('div');
+    logo.className = 'ch-logo';
+    if(e.logo){
+      var img = document.createElement('img');
+      img.loading = 'lazy'; img.alt = ''; img.referrerPolicy = 'no-referrer';
+      img.src = secureUrl(e.logo);
+      img.onerror = function(){ logo.innerHTML = LOGO_FALLBACK; };
+      logo.appendChild(img);
+    } else logo.innerHTML = LOGO_FALLBACK;
+    row.appendChild(logo);
+    var text = document.createElement('div');
+    text.className = 'ch-text';
+    var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = e.name; text.appendChild(n);
+    var subBits = [];
+    if(e.country) subBits.push((iptvIndex && iptvIndex.countries[e.country]) || e.country);
+    if(e.cats && e.cats.length && iptvIndex) subBits.push(e.cats.map(function(c){ return iptvIndex.cats[c] || c; }).join(', '));
+    if(subBits.length){ var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = subBits.join(' · '); text.appendChild(sb); }
+    row.appendChild(text);
+    var add = document.createElement('button');
+    add.type = 'button';
+    function paint(){
+      var on = !!findVideoChannel(e.url);
+      add.className = 'ch-add' + (on ? ' added' : '');
+      add.innerHTML = on ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-plus"></i>';
+      add.title = on ? 'In My Channels (tap to remove)' : 'Add to My Channels';
+      add.setAttribute('aria-label', add.title);
+    }
+    paint();
+    add.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if(findVideoChannel(e.url)) removeVideoChannel(e.url); else addVideoChannel(e);
+      paint();
+    });
+    row.appendChild(add);
+    // Tapping the row itself tries the channel, without adding it.
+    row.addEventListener('click', function(){ playChannel(e); });
+    return row;
+  }
+  function renderChannelList(host, entries){
+    var list = document.createElement('div');
+    list.className = 'ch-list';
+    var shown = entries.slice(0, addChannelsState.shown);
+    shown.forEach(function(e){ list.appendChild(channelRow(e)); });
+    host.appendChild(list);
+    if(entries.length > shown.length){
+      var more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'settings-select ch-more';
+      more.textContent = 'Show more (' + (entries.length - shown.length) + ')';
+      more.addEventListener('click', function(){ addChannelsState.shown += 120; renderAddChannels(true); });
+      host.appendChild(more);
+    }
+    setResultCount(entries.length, 'channel');
+  }
+  function filterChannels(list, useCountry){
+    var words = addChannelsState.q.toLowerCase().split(/\s+/).filter(Boolean);
+    return list.filter(function(e){
+      if(useCountry && addChannelsState.country && e.country !== addChannelsState.country) return false;
+      if(addChannelsState.cat && (e.cats || []).indexOf(addChannelsState.cat) === -1) return false;
+      if(!words.length) return true;
+      var n = e.name.toLowerCase();
+      return words.every(function(w){ return n.indexOf(w) !== -1; });
+    });
+  }
+  function selectEl(options, value, onChange, label){
+    var sel = document.createElement('select');
+    sel.className = 'settings-select';
+    sel.setAttribute('aria-label', label);
+    options.forEach(function(o){
+      var op = document.createElement('option');
+      op.value = o[0]; op.textContent = o[1];
+      if(o[0] === value) op.selected = true;
+      sel.appendChild(op);
+    });
+    sel.addEventListener('change', function(){ onChange(sel.value); });
+    return sel;
+  }
+  var addChannelsSearchTimer = null;
+  // keepTools: redraw just the list (typing in the search box must not lose focus).
+  function renderAddChannels(keepTools){
+    if(!onAddChannelsView) return;
+    var tools = stationsGrid.querySelector('.ch-tools');
+    if(keepTools && tools){
+      Array.prototype.slice.call(stationsGrid.children).forEach(function(el){ if(el !== tools) el.remove(); });
+    } else {
+      resetStationsGrid();
+      tools = document.createElement('div');
+      tools.className = 'ch-tools';
+      var tabs = document.createElement('div');
+      tabs.className = 'home-tabs';
+      // Short labels: all three have to fit across a phone.
+      [['recommended', 'Recommended'], ['all', 'All'], ['link', 'Link']].forEach(function(t){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'home-tab' + (addChannelsTab === t[0] ? ' active' : '');
+        b.textContent = t[1];
+        b.addEventListener('click', function(){
+          if(addChannelsTab !== 'link') countryByTab[addChannelsTab] = addChannelsState.country;
+          addChannelsTab = t[0]; addChannelsState.shown = 60; addChannelsState.cat = '';
+          if(t[0] !== 'link') addChannelsState.country = countryByTab[t[0]] == null ? '' : countryByTab[t[0]];
+          addChannelsState.pickDefault = t[0] === 'recommended' && countryByTab.recommended == null;
+          renderAddChannels();
+        });
+        tabs.appendChild(b);
+      });
+      tools.appendChild(tabs);
+      stationsGrid.appendChild(tools);
+      if(addChannelsTab === 'link') buildLinkTools(tools);
+      else buildBrowseTools(tools);
+    }
+    var body = document.createElement('div');
+    body.className = 'ch-list';
+    stationsGrid.appendChild(body);
+    if(addChannelsTab === 'link'){ renderLinkResults(body); return; }
+    body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; }) : loadFreeTv();
+    var tab = addChannelsTab;
+    loader.then(function(list){
+      if(!onAddChannelsView || addChannelsTab !== tab) return;
+      if(!keepTools) fillBrowseSelects(list);
+      body.remove();
+      var host = document.createElement('div');
+      host.style.display = 'contents';
+      stationsGrid.appendChild(host);
+      var entries = filterChannels(list, true);
+      if(!entries.length){
+        host.innerHTML = '<div class="empty-state">No channels match. Try another country, category or name.</div>';
+        setResultCount(0, 'channel');
+        return;
+      }
+      renderChannelList(host, entries);
+    }, function(err){
+      if(!onAddChannelsView || addChannelsTab !== tab) return;
+      body.innerHTML = '<div class="empty-state">Couldn’t load the channel list (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>';
+    });
+  }
+  function buildBrowseTools(tools){
+    var note = document.createElement('div');
+    note.className = 'ch-tools-note';
+    note.textContent = addChannelsTab === 'all'
+      ? 'Publicly available channels from the iptv-org directory. Tap a channel to try it; + adds it to My Channels. Some may not work outside their country.'
+      : 'Free, legal channels hand-picked by Free-TV. Tap a channel to try it; + adds it to My Channels.';
+    tools.appendChild(note);
+    var row = document.createElement('div');
+    row.className = 'ch-tools-row';
+    var input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'cs-field-input';
+    input.placeholder = 'Search channels';
+    input.value = addChannelsState.q;
+    input.setAttribute('aria-label', 'Search channels');
+    input.addEventListener('input', function(){
+      addChannelsState.q = input.value;
+      addChannelsState.shown = 60;
+      clearTimeout(addChannelsSearchTimer);
+      addChannelsSearchTimer = setTimeout(function(){ renderAddChannels(true); }, 250);
+    });
+    row.appendChild(input);
+    var selHost = document.createElement('div');
+    selHost.className = 'ch-select-host';
+    selHost.style.display = 'contents';
+    row.appendChild(selHost);
+    tools.appendChild(row);
+  }
+  function fillBrowseSelects(list){
+    var host = stationsGrid.querySelector('.ch-select-host');
+    if(!host) return;
+    host.innerHTML = '';
+    var countries = {}, cats = {};
+    list.forEach(function(e){
+      if(e.country) countries[e.country] = true;
+      (e.cats || []).forEach(function(c){ cats[c] = true; });
+    });
+    var cOpts = [['', 'All countries']].concat(Object.keys(countries).map(function(c){
+      return [c, (iptvIndex && addChannelsTab === 'all' && iptvIndex.countries[c]) || c];
+    }).sort(function(a, b){ return a[1].localeCompare(b[1]); }));
+    if(addChannelsState.pickDefault){
+      addChannelsState.pickDefault = false;
+      addChannelsState.country = regionGroupName(Object.keys(countries));
+      countryByTab.recommended = addChannelsState.country;
+    }
+    if(addChannelsState.country && !countries[addChannelsState.country]) addChannelsState.country = '';
+    host.appendChild(selectEl(cOpts, addChannelsState.country, function(v){ addChannelsState.country = v; countryByTab[addChannelsTab] = v; addChannelsState.shown = 60; renderAddChannels(true); }, 'Country'));
+    if(addChannelsTab === 'all' && Object.keys(cats).length){
+      var kOpts = [['', 'All categories']].concat(Object.keys(cats).map(function(c){
+        return [c, (iptvIndex && iptvIndex.cats[c]) || c];
+      }).sort(function(a, b){ return a[1].localeCompare(b[1]); }));
+      host.appendChild(selectEl(kOpts, addChannelsState.cat, function(v){ addChannelsState.cat = v; addChannelsState.shown = 60; renderAddChannels(true); }, 'Category'));
+    } else {
+      addChannelsState.cat = '';
+    }
+  }
+  function buildLinkTools(tools){
+    var note = document.createElement('div');
+    note.className = 'ch-tools-note';
+    note.textContent = 'Paste a playlist link (.m3u / .m3u8) to pick channels from it, or a single stream link to add that one channel.';
+    tools.appendChild(note);
+    var row = document.createElement('div');
+    row.className = 'ch-tools-row';
+    var input = document.createElement('input');
+    input.type = 'url';
+    input.className = 'cs-field-input';
+    input.placeholder = 'https://…';
+    input.value = addChannelsState.linkUrl;
+    input.setAttribute('aria-label', 'Playlist or stream link');
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'settings-select';
+    go.textContent = 'Load';
+    function load(){
+      var u = input.value.trim();
+      if(!/^https?:\/\//i.test(u)){ setStatus('Enter a link starting with http:// or https://', true); return; }
+      addChannelsState.linkUrl = u;
+      addChannelsState.linkList = 'loading';
+      renderAddChannels(true);
+      fetchTextAny(u).then(function(t){
+        var list = /#EXTINF/i.test(t) ? parseM3uChannels(t, u) : null;
+        if(list){
+          addChannelsState.linkList = list.map(function(c){
+            return { id: 'link:' + c.url, name: c.name, country: c.country || c.group || '', cats: [], url: c.url, logo: c.logo, src: 'link' };
+          });
+        } else {
+          addChannelsState.linkList = [singleStreamEntry(u)];
+        }
+        renderAddChannels(true);
+      }, function(){
+        // Not readable as a file (a live stream answers with endless video): add it as one channel.
+        addChannelsState.linkList = [singleStreamEntry(u)];
+        renderAddChannels(true);
+      });
+    }
+    go.addEventListener('click', load);
+    input.addEventListener('keydown', function(e){ if(e.key === 'Enter') load(); });
+    row.appendChild(input);
+    row.appendChild(go);
+    tools.appendChild(row);
+  }
+  function singleStreamEntry(u){
+    var name = u;
+    try{
+      var url = new URL(u);
+      // The last part of the address that says something: ".../news24/index.m3u8" -> "news24".
+      var seg = url.pathname.split('/').filter(Boolean).map(function(x){
+        try{ x = decodeURIComponent(x); }catch(e){}
+        return x.replace(/\.(m3u8?|ts|mp4|mpd|php)$/i, '');
+      }).filter(function(x){ return x && !/^(index|playlist|master|live|stream|streams|hls|chunklist|mono|tracks-v\d.*|\d+)$/i.test(x); });
+      name = seg.length ? seg[seg.length - 1] : url.hostname;
+    }catch(e){}
+    return { id: 'link:' + u, name: name, country: '', cats: [], url: u, logo: '', src: 'link' };
+  }
+  function renderLinkResults(body){
+    var l = addChannelsState.linkList;
+    if(!l){ body.remove(); setResultCount(null); return; }
+    if(l === 'loading'){ body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>'; return; }
+    body.remove();
+    var host = document.createElement('div');
+    host.style.display = 'contents';
+    stationsGrid.appendChild(host);
+    if(!l.length){
+      host.innerHTML = '<div class="empty-state">No playable channels in that playlist.</div>';
+      setResultCount(0, 'channel');
+      return;
+    }
+    if(l.length > 1){
+      var all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'settings-select ch-more';
+      all.style.gridColumn = '1 / -1';
+      all.style.justifySelf = 'start';
+      all.textContent = 'Add all ' + l.length;
+      all.addEventListener('click', function(){
+        var n = 0;
+        l.forEach(function(e){ if(addVideoChannel(e)) n++; });
+        setStatus(n ? 'Added ' + n + ' channel' + (n === 1 ? '' : 's') + ' to My Channels.' : 'They’re all in My Channels already.');
+        renderAddChannels(true);
+      });
+      host.appendChild(all);
+    }
+    renderChannelList(host, filterChannels(l, false));
+  }
+
+  // Backup: channels go into Export and come back with Import (matched by stream link).
+  function importVideoChannels(list){
+    var n = 0;
+    (Array.isArray(list) ? list : []).forEach(function(c){ if(c && c.url && addVideoChannel(c)) n++; });
+    return n;
+  }
+
   var videoHeading = document.getElementById('videoHeading');
   if(videoHeading){
     videoHeading.addEventListener('click', function(){ pushView(); openVideoHome(); });
@@ -10203,6 +10802,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -10618,7 +11218,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A playlist is Playlists' own item, so its back button always returns there -- same
@@ -10647,6 +11247,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -11214,7 +11815,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A true back button: it returns to wherever the search was opened from (Home's For You
@@ -11243,6 +11844,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -15018,7 +15620,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     onHomeView = false;
@@ -15043,6 +15645,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -15106,6 +15709,7 @@
     if(onMyLibraryHomeView) return entry('My Library', function(){ openMyLibraryHome(); });
     if(onStationsHomeView) return entry('For You', function(){ openStationsHome(); });
     if(onVideoView) return entry('Video', function(){ openVideoHome(); });
+    if(onAddChannelsView) return entry('Add Channels', function(){ openAddChannelsPage(); });
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
     if(section) return entry(sectionLabel(section), function(){ runLibrarySection(section); });
@@ -15652,6 +16256,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -16188,6 +16793,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -17804,7 +18410,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -17831,6 +18437,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -17868,7 +18475,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -17894,6 +18501,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -18294,7 +18902,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A genre's station list is Genres' own category, so its back button always returns
@@ -18323,6 +18931,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -18449,7 +19058,7 @@
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
-    if(onVideoView) return 'video';
+    if(onVideoView || onAddChannelsView) return 'video';
     // For You (and its searches) lives on Home now.
     if(onHomeView || activeHomeSection || onStationsHomeView || activeCustomSearchId) return 'home';
     return null;
@@ -19034,7 +19643,7 @@
 
   // ---------- export / import (favorites, recent stations, custom cover art, custom searches) ----------
   // What a backup holds, for the Export dialog.
-  var EXPORT_CONTENTS_NOTE = 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions & podcast categories are all in it.';
+  var EXPORT_CONTENTS_NOTE = 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions, podcast categories & video channels are all in it.';
   exportFavBtn.addEventListener('click', function(){
     var payload = {
       favorites: favorites,
@@ -19046,6 +19655,7 @@
       genreOrder: genreOrder,
       podcastSubscriptions: podcastSubs,
       podcastCategories: podcastCategories,
+      videoChannels: videoChannels,
       exportedAt: new Date().toISOString()
     };
     var text = JSON.stringify(payload, null, 2);
@@ -19186,6 +19796,7 @@
           carryCover('foryouart:', s.id, match.id);
         });
         if(searchAdded) saveCustomSearches();
+        var channelsAdded = importVideoChannels(data.videoChannels);
 
         // Playlists are matched by name (case-insensitive): a name that doesn't exist here
         // yet is created outright with its imported stations, while a name that already
@@ -19300,6 +19911,7 @@
         if(artAdded) parts.push(artAdded + ' custom cover(s)');
         if(artReplaced) parts.push(artReplaced + ' cover(s) that replaced existing ones');
         if(searchAdded) parts.push(searchAdded + ' custom search(es)');
+        if(channelsAdded) parts.push(channelsAdded + ' video channel(s)');
         if(playlistsAdded) parts.push(playlistsAdded + ' new playlist(s)');
         if(playlistStationsAdded) parts.push(playlistStationsAdded + ' playlist station(s) merged');
         if(blacklistAdded) parts.push(blacklistAdded + ' blocked station(s)');
@@ -19484,6 +20096,7 @@
 
   function onPlaybackSuccess(station, isReconnect){
     attemptInProgress = false;
+    markChannelWorking(station, true);
     if(isReconnect){
       reconnectState = null;
       playerSub.textContent = barSubFor(station);
@@ -19666,6 +20279,7 @@
   }
 
   function showPlaybackFailure(station, urlTried, err){
+    markChannelWorking(station, false);
     setPlayingUI(false);
     playPauseBtn.disabled = true;
     var reason = (err && err.message && err.name !== 'AbortError') ? err.message : 'no playable audio found';

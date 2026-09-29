@@ -80,8 +80,8 @@ async def main():
         # Video tab, and a saved search opened from the drawer while on Video comes back to Video
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(700)
         i = await info(pg)
-        grid = await pg.evaluate("document.getElementById('stationsGrid').children.length")
-        check(i['heading'] == 'Video' and i['back'] is None and i['nav'] == 'video' and grid == 0, f'Video page: empty, tab active {i} children={grid}')
+        grid = await pg.evaluate("(document.querySelector('#stationsGrid .grid-section-label')||{}).textContent||''")
+        check(i['heading'] == 'Video' and i['back'] is None and i['nav'] == 'video' and grid.startswith('My Channels'), f'Video page: My Channels, tab active {i} {grid}')
         await pg.screenshot(path=f'{SHOTS}/nav-video.png')
         await pg.evaluate("document.querySelector('#customSearchList .cs-row, #customSearchList [class*=cs]').click()"); await pg.wait_for_timeout(900)
         i = await info(pg)

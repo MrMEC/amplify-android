@@ -1049,6 +1049,69 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     this.main.postDelayed(this.progressTick, 500L);
   }
 
+  // ---------------- network ----------------
+
+  /**
+   * Fetches a text file (a channel playlist or directory) for the page. A page can only read other
+   * sites that allow it (CORS), and most IPTV playlist hosts don't, so the Video section's "Add
+   * Channels" goes through here: {url, max} -> {text, url (after redirects)}. Follows up to five
+   * redirects, including http <-> https, which plain Java does not.
+   */
+  @PluginMethod
+  public void fetchText(PluginCall call) {
+    String url = call.getString("url");
+    int max = call.getInt("max", 48 * 1024 * 1024);
+    if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) {
+      call.reject("Not a web address");
+      return;
+    }
+    new Thread(
+            () -> {
+              java.net.HttpURLConnection c = null;
+              try {
+                String current = url;
+                for (int hop = 0; hop < 6; hop++) {
+                  c = (java.net.HttpURLConnection) new java.net.URL(current).openConnection();
+                  c.setConnectTimeout(10000);
+                  c.setReadTimeout(20000);
+                  c.setInstanceFollowRedirects(false);
+                  c.setRequestProperty("User-Agent", "Amplify/1.0 (Android)");
+                  int code = c.getResponseCode();
+                  String loc = c.getHeaderField("Location");
+                  if (code >= 300 && code < 400 && loc != null) {
+                    current = new java.net.URL(new java.net.URL(current), loc).toString();
+                    c.disconnect();
+                    c = null;
+                    continue;
+                  }
+                  if (code != 200) throw new Exception("HTTP " + code);
+                  StringBuilder sb = new StringBuilder();
+                  try (java.io.Reader r =
+                      new java.io.InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8)) {
+                    char[] buf = new char[16384];
+                    int n;
+                    while ((n = r.read(buf)) > 0) {
+                      sb.append(buf, 0, n);
+                      if (sb.length() > max) throw new Exception("File is too large");
+                    }
+                  }
+                  JSObject o = new JSObject();
+                  o.put("text", sb.toString());
+                  o.put("url", current);
+                  call.resolve(o);
+                  return;
+                }
+                throw new Exception("Too many redirects");
+              } catch (Exception e) {
+                call.reject(String.valueOf(e.getMessage()));
+              } finally {
+                if (c != null) c.disconnect();
+              }
+            },
+            "amplify-fetch")
+        .start();
+  }
+
   // ---------------- files ----------------
 
   /** Export: writes {name, text, mime} into Downloads and says where it went (build 48). */
