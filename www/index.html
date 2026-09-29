@@ -2731,6 +2731,34 @@
   }
 
   .np-related{ width:100%; margin-top:40px; flex-shrink:0; }
+  /* ---------- Now Playing for a TV channel ----------
+     The picture is the headline: the top area is just the video's own box (16:9 under the
+     top buttons), the name sits right under it on one line, the controls follow, and the
+     list below is the channels to flip to (My Channels, or more from the same category).
+     Landscape (rotate-lock) and full screen keep their own layouts. */
+  body:not(.rotate-lock) .now-playing-screen.np-channel .np-art-wrap{
+    height:auto; aspect-ratio:auto; padding-top:calc(env(safe-area-inset-top, 0px) + 72px);
+    min-height:calc(env(safe-area-inset-top, 0px) + 72px + min(56.25vw, 52vh)); box-sizing:border-box;
+  }
+  body:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel .np-video-wrap{ position:relative; top:0; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel .np-art{
+    top:calc(env(safe-area-inset-top, 0px) + 72px); height:auto; bottom:0;
+    -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
+  }
+  body:not(.rotate-lock) .now-playing-screen.np-channel .np-art img{ object-fit:contain; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel .np-hero-foot{
+    position:relative; top:auto; margin-top:14px; padding:0 20px;
+  }
+  body:not(.rotate-lock) .now-playing-screen.np-channel .np-name{
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; overflow-wrap:normal; width:100%;
+  }
+  body:not(.rotate-lock) .now-playing-screen.np-channel .np-sub{ margin-bottom:12px; }
+  .now-playing-screen.np-channel .np-video-toggle{ display:none; }
+  #npVideoMenuBtn span{ white-space:nowrap; }
+  .now-playing-screen.np-channel #npCollection{ margin-top:22px; }
+  .now-playing-screen.np-channel #npRelated{ display:none !important; }
+  .np-related-grid.np-ch-list{ display:block; }
+  .np-related-grid.np-ch-list .tile.tile-row .tile-name{ overflow:hidden; text-overflow:ellipsis; }
   .np-related-heading{
     font-size:13px; letter-spacing:.01em; color:var(--text-dim); font-weight:700; margin:0 0 16px;
   }
@@ -4682,6 +4710,8 @@
                   </button>
                   <!-- A TV channel (or a pasted stream showing video): add it to My Channels, or take it off. -->
                   <button type="button" class="np-menu-item" id="npChannelLink" role="menuitem" style="display:none;"></button>
+                  <!-- A channel's video on/off lives here instead of the pill above the controls. -->
+                  <button type="button" class="np-menu-item" id="npVideoMenuBtn" role="menuitem" style="display:none;"></button>
                   <button type="button" class="np-menu-item" id="npArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit cover art</span>
                   </button>
@@ -6665,6 +6695,8 @@
     return list[0];
   }
   function renderNpCollection(station){
+    npCollectionGrid.classList.remove('np-ch-list');
+    if(isNpChannel(station)){ renderNpChannels(station); return; }
     var col = collectionForStation(station);
     npCollectionGrid.innerHTML = '';
     if(!col){ npCollection.style.display = 'none'; return; }
@@ -6900,6 +6932,8 @@
     }
     syncNpChannelLink();
     closeNpMenu();
+    // The list under the controls follows: My Channels once it's saved, its category once it isn't.
+    renderNpCollection(st);
   });
   function syncNpVideoToggle(st){
     syncNpChannelLink();
@@ -6908,6 +6942,12 @@
     npVideoToggleLabel.textContent = npVideoOn ? 'Turn Off Video' : 'Turn On Video';
     npVideoToggle.querySelector('.np-video-toggle-icon').innerHTML = npVideoOn ? VIDEO_OFF_SVG : VIDEO_ON_SVG;
     npVideoToggle.setAttribute('aria-pressed', npVideoOn ? 'true' : 'false');
+    var vm = document.getElementById('npVideoMenuBtn');
+    if(vm){
+      vm.style.display = show && isNpChannel(st) ? '' : 'none';
+      vm.innerHTML = (npVideoOn ? VIDEO_OFF_SVG : VIDEO_ON_SVG).replace('<svg ', '<svg class="menu-svg" ') +
+        '<span>' + (npVideoOn ? 'Turn Off Video' : 'Turn On Video') + '</span>';
+    }
   }
   function resetNpVideoUi(){
     if(npVideoFull) exitVideoFull();
@@ -6959,6 +6999,10 @@
     // A stream's picture keeps the screen on by itself, and only while it shows.
     nativeVideoUi({ fullscreen: false, landscape: false, awake: npVideoOn && !npVideoStream });
   }
+  document.getElementById('npVideoMenuBtn').addEventListener('click', function(){
+    closeNpMenu();
+    npVideoToggle.click();
+  });
   npVideoToggle.addEventListener('click', function(){
     // Turning a stream's video off by hand holds for that stream (it would otherwise come
     // straight back on); turning it on again clears that.
@@ -7112,6 +7156,7 @@
 
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
+    if(isNpChannel(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
     if(isLocalTrack(station)){
       renderNpLibraryRelated(station);
       return;
@@ -7458,6 +7503,7 @@
     renderNpOnAir(st);
     renderNpSub(st);
     renderNpGenres(st);
+    nowPlayingScreen.classList.toggle('np-channel', isNpChannel(st));
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
@@ -10282,7 +10328,60 @@
   // One channel as a full-width row: logo, name (and "Not working" under it when it last
   // failed), and the More button (Favorite, Play Next, Add to Queue, Remove) as its only icon.
   // Tapping plays it and opens Now Playing, where the picture is.
-  function buildChannelRow(ch){
+  // Now Playing is in channel mode for a TV channel: one played from Video, or one in My Channels.
+  function isNpChannel(st){
+    if(!st || !isLiveStream(st)) return false;
+    var url = st.urlToResolve || st.url_resolved || st.url || '';
+    return !!(st.videoChannel || (url && findVideoChannel(url)));
+  }
+  // The list under a channel's controls: all of My Channels when this one is in it; otherwise
+  // more channels from its category (iptv-org) or its country group (Free-TV).
+  var npChannelsRequest = 0;
+  function renderNpChannels(st){
+    var req = ++npChannelsRequest;
+    var url = st.urlToResolve || st.url_resolved || st.url || '';
+    npCollectionGrid.innerHTML = '';
+    npCollectionGrid.classList.remove('grid-songs');
+    npCollectionGrid.classList.add('np-ch-list');
+    function show(heading, list, saved){
+      if(req !== npChannelsRequest) return;
+      npCollectionGrid.innerHTML = '';
+      if(!list.length){ npCollection.style.display = 'none'; return; }
+      npCollection.style.display = '';
+      npCollectionHeading.innerHTML = '';
+      npCollectionHeading.appendChild(document.createTextNode(heading));
+      var c = document.createElement('span');
+      c.className = 'grid-section-count';
+      c.textContent = ' ' + list.length;
+      npCollectionHeading.appendChild(c);
+      list.forEach(function(ch){ npCollectionGrid.appendChild(buildChannelRow(ch, { saved: saved })); });
+    }
+    if(findVideoChannel(url)){ show('My Channels', visibleVideoChannels(), true); return; }
+    npCollection.style.display = 'none';
+    var c = st.channel || {};
+    function others(list){
+      return list.filter(function(e){ return e.url !== url && channelVisible(e) && !findVideoChannel(e.url); }).slice(0, 40);
+    }
+    var cat = (c.cats || []).filter(function(x){ return x && x !== 'xxx'; })[0];
+    if(cat){
+      loadIptvIndex().then(function(idx){
+        var list = others(idx.list.filter(function(e){ return (e.cats || []).indexOf(cat) !== -1; }));
+        // The channel's own country first.
+        if(c.country) list.sort(function(a, b){ return (b.country === c.country) - (a.country === c.country); });
+        show('More ' + categoryName(cat), list, false);
+      }, function(){ show('', [], false); });
+      return;
+    }
+    if(c.src === 'freetv' && c.country){
+      loadFreeTv().then(function(list){
+        show('More from ' + c.country, others(list.filter(function(e){ return e.country === c.country; })), false);
+      }, function(){ show('', [], false); });
+      return;
+    }
+    show('My Channels', visibleVideoChannels(), true);
+  }
+  function buildChannelRow(ch, opts){
+    var saved = !(opts && opts.saved === false);
     var st = channelToStation(ch);
     var tile = buildEntityTile({
       key: favKey(st), entity: 'channel', name: ch.name, row: true,
@@ -10294,7 +10393,7 @@
     var sub = tile.querySelector('.tile-sub');
     if(sub && ch.dead) sub.classList.add('ch-dead');
     tile.appendChild(buildRowMoreBtn(st, { fav: true, className: 'row-more-btn',
-      onRemove: function(){ removeVideoChannel(ch.url); } }));
+      onRemove: saved ? function(){ removeVideoChannel(ch.url); } : null }));
     return tile;
   }
   function reorderVideoChannelsFromGrid(){
