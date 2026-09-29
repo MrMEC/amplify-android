@@ -3474,6 +3474,26 @@
     body.np-open .player-bar,
     body.np-open .search-sheet{ display:none; }
     body.np-open .now-playing-screen, body.np-sheet .now-playing-screen{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
+    /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
+       controls still: only the channel list under them scrolls. (Not in landscape or full
+       screen, which have the whole screen to themselves.) */
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .mobile-nav{ display:flex; }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel{
+      bottom:var(--mnav-total); padding-bottom:0; overflow:hidden;
+    }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel .np-hero{ flex-shrink:0; }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel .np-backdrop-clip{ height:calc(100vh - var(--mnav-total)); }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel .np-below{
+      flex:1 1 auto; min-height:0; display:flex; flex-direction:column; padding-top:0;
+    }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection{
+      flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin-top:14px;
+    }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection .np-related-heading{ flex-shrink:0; margin-bottom:6px; }
+    body.np-open.np-channel-open:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollectionGrid{
+      flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+      padding:4px 6px 10px; margin:0 -6px;
+    }
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
     .mobile-nav, .search-sheet{ background:var(--panel); }
@@ -7504,6 +7524,7 @@
     renderNpSub(st);
     renderNpGenres(st);
     nowPlayingScreen.classList.toggle('np-channel', isNpChannel(st));
+    document.body.classList.toggle('np-channel-open', isNpChannel(st));
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
@@ -19298,6 +19319,8 @@
       var btn = e.target.closest('.mobile-nav-btn');
       if(!btn) return;
       var dest = btn.dataset.nav;
+      // The tab bar shows over a channel's Now Playing: any tab leaves it for that section.
+      if(document.body.classList.contains('np-open')) closeNowPlaying(false);
       if(dest === 'search'){
         // INTENDED, do not change: on a phone, choosing Search never puts focus in the box
         // (not on the first tap, not on a repeat tap). Focus summons the on-screen keyboard

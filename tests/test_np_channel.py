@@ -17,6 +17,7 @@ SEED = [
  {'id': 'freetv:pbs', 'name': 'PBS', 'url': 'https://pbs.example/live.m3u8', 'logo': '', 'country': 'USA', 'cats': [], 'catNames': [], 'src': 'freetv', 'addedAt': 2},
  {'id': 'link:x', 'name': 'Link One', 'url': 'http://one.example/1.m3u8', 'logo': '', 'country': '', 'cats': [], 'catNames': [], 'src': 'link', 'addedAt': 3},
 ]
+SEED += [{'id': 'link:%d' % i, 'name': 'Channel %02d' % i, 'url': 'http://ch%d.example/l.m3u8' % i, 'logo': '', 'country': '', 'cats': [], 'catNames': [], 'src': 'link', 'addedAt': 10 + i} for i in range(15)]
 async def geom(pg):
     return await pg.evaluate("""(()=>{
       var v=document.getElementById('npVideoWrap').getBoundingClientRect(), a=document.getElementById('npArtWrap').getBoundingClientRect(),
@@ -51,9 +52,22 @@ async def run(p, w, h, tag):
     check(g['videoShown'] and 0 <= g['nameTop'] - g['videoBottom'] <= 30, f'{tag}: the name sits right under the video ({g["nameTop"] - g["videoBottom"]:.0f}px)')
     check(g['nameH'] <= g['lh'] * 1.3, f'{tag}: the name is one line ({g["nameH"]:.0f} / {g["lh"]:.0f})')
     check(g['ctrlTop'] - g['nameTop'] < 80, f'{tag}: controls close under the name ({g["ctrlTop"] - g["nameTop"]:.0f}px)')
-    check(g['heading'] and g['heading'].startswith('My Channels') and len(g['rows']) == 3 and len(g['playing']) == 1 and g['related'] == 'none',
+    check(g['heading'] and g['heading'].startswith('My Channels') and len(g['rows']) == 18 and len(g['playing']) == 1 and g['related'] == 'none',
           f'{tag}: saved channel lists My Channels, current one highlighted, no Related Stations {g["heading"]} {g["rows"]} {g["playing"]}')
     await pg.screenshot(path=f'{SHOTS}/npch-{tag}-saved.png')
+    if mobile:
+        sc = await pg.evaluate("""(()=>{
+          var nav=document.getElementById('mobileNav'), scr=document.getElementById('nowPlayingScreen'), grid=document.getElementById('npCollectionGrid');
+          var v0=document.getElementById('npVideoWrap').getBoundingClientRect().top, c0=document.querySelector('.np-controls').getBoundingClientRect().top;
+          grid.scrollTop=400; scr.scrollTop=400;
+          var v1=document.getElementById('npVideoWrap').getBoundingClientRect().top, c1=document.querySelector('.np-controls').getBoundingClientRect().top;
+          var r={nav:getComputedStyle(nav).display, navTop:nav.getBoundingClientRect().top, scrBottom:scr.getBoundingClientRect().bottom,
+            gridScrolled:grid.scrollTop, gridBottom:grid.getBoundingClientRect().bottom, fixed:v0===v1 && c0===c1};
+          return r;})()""")
+        check(sc['nav'] == 'flex' and abs(sc['navTop'] - sc['scrBottom']) < 2, f'{tag}: bottom navigation shows under Now Playing {sc}')
+        check(sc['gridScrolled'] > 0 and sc['fixed'] and sc['gridBottom'] <= sc['navTop'] + 1, f'{tag}: only the channel list scrolls; header, video and controls stay put')
+        await pg.screenshot(path=f'{SHOTS}/npch-{tag}-scrolled.png')
+        await pg.evaluate("document.getElementById('npCollectionGrid').scrollTop=0")
     await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
     vm = await pg.evaluate("(()=>{var b=document.getElementById('npVideoMenuBtn');return b.style.display==='none'?null:b.textContent;})()")
     pill = await pg.evaluate("getComputedStyle(document.getElementById('npVideoToggle')).display")
@@ -84,6 +98,10 @@ async def run(p, w, h, tag):
     await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(500)
     g = await geom(pg)
     check(g['heading'] and g['heading'].startswith('My Channels') and 'BBC News' in g['rows'], f'{tag}: adding it from the menu switches the list to My Channels {g["heading"]} {g["rows"]}')
+    if mobile:
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
+        st = await pg.evaluate("[document.body.classList.contains('np-open'), getComputedStyle(document.getElementById('nowPlayingScreen')).display]")
+        check(not st[0] and st[1] == 'none', f'{tag}: tapping Home in the tab bar leaves Now Playing {st}')
     check(not errs, f'{tag}: no page errors {errs[:3]}')
     await b.close()
 
