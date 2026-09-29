@@ -1,4 +1,4 @@
-"""Stream video on Now Playing.
+"""Live stream video on Now Playing (uses the podcast video feature from build 45).
 
 App mode (mocked Capacitor): paste a stream URL, the native player reports video, and the page
 must tell the native side where the video box is -- and hide it when Now Playing closes, a
@@ -62,6 +62,12 @@ async def paste(pg, url):
     await pg.evaluate("""(u)=>{ var i=document.getElementById('searchInput'); i.value=u;
         document.getElementById('searchBtn').click(); }""", url)
 
+async def state(pg):
+    return await pg.evaluate("""(()=>{var w=document.getElementById('npVideoWrap'),v=document.getElementById('npVideo'),
+      t=document.getElementById('npVideoToggle'),r=v.getBoundingClientRect();
+      return {wrapHidden:w.hidden,toggleHidden:t.hidden,label:document.getElementById('npVideoToggleLabel').textContent,
+        full:document.body.classList.contains('np-video-full'),x:r.left,y:r.top,w:r.width,h:r.height,view:window.__view||null};})()""")
+
 async def app_mode(b, w, h, tag):
     ctx = await b.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2, is_mobile=True, has_touch=True)
     pg = await ctx.new_page()
@@ -75,66 +81,80 @@ async def app_mode(b, w, h, tag):
     check(bool(cur), f'[{tag}] pasted stream loaded natively')
     await pg.evaluate("document.getElementById('playerNowTrigger').click()")
     await pg.wait_for_timeout(900)
-    view = await pg.evaluate('window.__view')
-    check(not view or not view.get('show'), f'[{tag}] no video shown before the stream reports a picture')
-    hidden = await pg.evaluate("document.getElementById('npVideo').hidden")
-    check(hidden, f'[{tag}] video box hidden for a stream without video')
+    st = await state(pg)
+    check(st['wrapHidden'] and st['toggleHidden'] and not (st['view'] or {}).get('show'), f'[{tag}] no video UI before the stream reports a picture')
 
-    await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720,fullscreen:false})", cur)
+    await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})", cur)
     await pg.wait_for_timeout(500)
-    view = await pg.evaluate('window.__view')
-    check(view and view.get('show'), f'[{tag}] native told to show video: {view}')
-    box = await pg.evaluate("(()=>{var r=document.getElementById('npVideo').getBoundingClientRect();return {x:r.left,y:r.top,w:r.width,h:r.height};})()")
-    back = await pg.evaluate("(()=>{var r=document.getElementById('npBackBtn').getBoundingClientRect();return {b:r.bottom};})()")
-    name = await pg.evaluate("(()=>{var r=document.getElementById('npName').getBoundingClientRect();return {t:r.top};})()")
-    check(view and abs(view['x']-box['x'])<1 and abs(view['y']-box['y'])<1 and abs(view['width']-box['w'])<1, f'[{tag}] rect matches the box {box}')
-    check(box['y'] >= back['b'], f'[{tag}] box starts below the minimize button ({box["y"]:.0f} >= {back["b"]:.0f})')
-    check(box['y'] + box['h'] <= name['t'] - 8, f'[{tag}] box ends above the title ({box["y"]+box["h"]:.0f} < {name["t"]:.0f})')
-    check(abs(box['w'] / box['h'] - 16/9) < 0.02 or box['w'] < w - 1, f'[{tag}] box keeps the 16:9 shape (or is narrower than the screen)')
-    await pg.evaluate(STANDIN)
-    await pg.screenshot(path=f'{SHOTS}/{tag}-np-video.png')
+    st = await state(pg); v = st['view'] or {}
+    check(not st['wrapHidden'] and not st['toggleHidden'] and st['label'] == 'Turn Off Video', f'[{tag}] video comes on by itself, pill says Turn Off Video ({st["label"]})')
+    check(v.get('show') and abs(v['x']-st['x'])<1 and abs(v['y']-st['y'])<1 and abs(v['width']-st['w'])<1 and abs(v['height']-st['h'])<1, f'[{tag}] native picture placed on the video box {v}')
+    back = await pg.evaluate("(()=>{var b=document.querySelector('.np-float, #npBackBtn');if(!b)return null;var r=b.getBoundingClientRect();return {b:r.bottom};})()")
+    name = await pg.evaluate("document.getElementById('npName').getBoundingClientRect().top")
+    check(st['y'] + st['h'] <= name, f'[{tag}] picture ends above the title ({st["y"]+st["h"]:.0f} <= {name:.0f})')
+    await pg.evaluate(STANDIN); await pg.screenshot(path=f'{SHOTS}/{tag}-np-video.png')
 
-    # A menu over the box hides the picture; closing it brings it back.
+    # The ⋮ menu: hides the picture only if it overlaps it.
     await pg.evaluate("document.getElementById('npMenuBtn').click()")
     await pg.wait_for_timeout(300)
-    menu_open = await pg.evaluate("getComputedStyle(document.getElementById('npMenu')).display!=='none' && document.getElementById('npMenu').getBoundingClientRect().height>0")
-    view_menu = await pg.evaluate('window.__view')
-    mr = await pg.evaluate("(()=>{var r=document.getElementById('npMenu').getBoundingClientRect();return {t:r.top,b:r.bottom};})()")
-    overlaps = mr['t'] < box['y'] + box['h'] and mr['b'] > box['y']
-    if overlaps:
-        check(not view_menu.get('show'), f'[{tag}] menu covering the box hides the picture')
-    else:
-        check(view_menu.get('show'), f'[{tag}] menu clear of the box keeps the picture (menu {mr})')
-    await pg.evaluate(STANDIN)
-    await pg.screenshot(path=f'{SHOTS}/{tag}-np-menu.png')
-    await pg.mouse.click(5, h - 5)
-    await pg.keyboard.press('Escape')
-    await pg.wait_for_timeout(300)
+    mr = await pg.evaluate("(()=>{var r=document.getElementById('npMenu').getBoundingClientRect();return {t:r.top,b:r.bottom,l:r.left,r:r.right};})()")
+    vm = await pg.evaluate('window.__view')
+    overlaps = mr['t'] < st['y'] + st['h'] and mr['b'] > st['y'] and mr['r'] > st['x'] and mr['l'] < st['x'] + st['w']
+    check((not vm.get('show')) if overlaps else vm.get('show'), f'[{tag}] menu {"over" if overlaps else "clear of"} the picture -> shown={vm.get("show")}')
+    await pg.evaluate(STANDIN); await pg.screenshot(path=f'{SHOTS}/{tag}-np-menu.png')
+    await pg.keyboard.press('Escape'); await pg.mouse.click(w/2, h-40); await pg.wait_for_timeout(300)
+    if (await pg.evaluate("getComputedStyle(document.getElementById('npMenu')).display")) != 'none':
+        await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
+    check((await pg.evaluate('window.__view')).get('show'), f'[{tag}] picture back once the menu closes')
 
-    # Scrolling moves the picture with the box.
-    await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop=60")
-    await pg.wait_for_timeout(300)
-    v2 = await pg.evaluate('window.__view')
-    b2 = await pg.evaluate("document.getElementById('npVideo').getBoundingClientRect().top")
-    check(v2.get('show') is False or abs(v2['y'] - b2) < 1, f'[{tag}] picture follows scrolling (y {v2.get("y")} vs box {b2:.0f})')
-    await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop=0")
-    await pg.wait_for_timeout(300)
+    # A tap on the picture (native) -> full screen; the picture covers the whole screen.
+    await pg.evaluate("(id)=>window.__emit('videotap',{id:id})", cur)
+    await pg.wait_for_timeout(400)
+    st = await state(pg); v = st['view'] or {}
+    check(st['full'] and v.get('show') and v['width'] >= w - 1 and v['height'] >= h - 1, f'[{tag}] tap -> full screen, picture fills the screen {v}')
+    ui = await pg.evaluate("window.__calls.filter(function(c){return c[0]==='setVideoUi';}).slice(-1)[0]")
+    check(ui and ui[1].get('fullscreen'), f'[{tag}] system bars hidden via setVideoUi {ui}')
+    await pg.evaluate(STANDIN); await pg.screenshot(path=f'{SHOTS}/{tag}-full.png')
+    await pg.evaluate("(id)=>window.__emit('videotap',{id:id})", cur)
+    await pg.wait_for_timeout(400)
+    st = await state(pg)
+    check(not st['full'] and st['view'].get('show') and st['view']['height'] < h / 2, f'[{tag}] tap again -> back to the box')
 
-    # Closing Now Playing hides it.
+    # Pill: off by hand, then on.
+    await pg.evaluate("document.getElementById('npVideoToggle').click()")
+    await pg.wait_for_timeout(300)
+    st = await state(pg)
+    check(st['wrapHidden'] and not st['view'].get('show') and st['label'] == 'Turn On Video' and not st['toggleHidden'], f'[{tag}] Turn Off Video hides it, pill offers Turn On Video')
+    await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})", cur)
+    await pg.wait_for_timeout(300)
+    check((await state(pg))['wrapHidden'], f'[{tag}] stays off after turning it off by hand')
+    await pg.evaluate("document.getElementById('npVideoToggle').click()")
+    await pg.wait_for_timeout(300)
+    check((await state(pg))['view'].get('show'), f'[{tag}] Turn On Video brings it back')
+
+    # Closing Now Playing hides the picture; reopening shows it again.
     await pg.evaluate("document.getElementById('npBackBtn').click()")
     await pg.wait_for_timeout(900)
-    v3 = await pg.evaluate('window.__view')
-    check(not v3.get('show'), f'[{tag}] closing Now Playing hides the picture')
-    await pg.evaluate(STANDIN)
-    await pg.screenshot(path=f'{SHOTS}/{tag}-closed.png')
-
-    # Reopen; then the stream loses video -> hidden, box gone.
+    check(not (await pg.evaluate('window.__view')).get('show'), f'[{tag}] closing Now Playing hides the picture')
     await pg.evaluate("document.getElementById('playerNowTrigger').click()")
     await pg.wait_for_timeout(900)
     check((await pg.evaluate('window.__view')).get('show'), f'[{tag}] reopening shows it again')
-    await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:false,width:0,height:0})", cur)
+
+    # Another channel: video resets, then comes on for the new one when it reports a picture.
+    await paste(pg, 'http://iptv.example/live/channel2.m3u8')
+    await pg.wait_for_timeout(600)
+    cur2 = await pg.evaluate('window.__cur')
+    await pg.evaluate("document.getElementById('playerNowTrigger').click()")
+    await pg.wait_for_timeout(900)
+    st = await state(pg)
+    check(cur2 != cur and st['wrapHidden'] and not st['view'].get('show'), f'[{tag}] new channel starts without the old picture')
+    await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1920,height:1080})", cur2)
+    await pg.wait_for_timeout(500)
+    check((await state(pg))['view'].get('show'), f'[{tag}] new channel shows its picture')
+    await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:false})", cur2)
     await pg.wait_for_timeout(400)
-    check(not (await pg.evaluate('window.__view')).get('show') and await pg.evaluate("document.getElementById('npVideo').hidden"), f'[{tag}] no picture -> box hidden')
+    st = await state(pg)
+    check(st['wrapHidden'] and st['toggleHidden'] and not st['view'].get('show'), f'[{tag}] picture gone -> no video UI')
     check(not errs, f'[{tag}] no page errors {errs[:3]}')
     await ctx.close()
 
@@ -143,24 +163,12 @@ async def browser_mode(b):
     pg = await ctx.new_page()
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(BASE + 'index.html'); await pg.wait_for_timeout(2500)
-    await paste(pg, BASE + 'test.webm')
-    await pg.wait_for_timeout(2500)
-    await pg.evaluate("document.getElementById('playerNowTrigger').click()")
-    await pg.wait_for_timeout(1500)
-    st = await pg.evaluate("(()=>{var a=document.getElementById('audio');return {vw:a.videoWidth,inBox:a.parentNode&&a.parentNode.id,paused:a.paused,t:a.currentTime,hidden:document.getElementById('npVideo').hidden};})()")
-    check(st['vw'] == 640 and st['inBox'] == 'npVideo' and not st['hidden'], f'[browser] video plays in the box {st}')
-    await pg.screenshot(path=f'{SHOTS}/browser-np-video.png')
-    await pg.evaluate("document.getElementById('npBackBtn').click()")
-    await pg.wait_for_timeout(800)
-    st2 = await pg.evaluate("(()=>{var a=document.getElementById('audio');return {parent:a.parentNode===document.body,paused:a.paused,t:a.currentTime};})()")
-    check(st2['parent'] and not st2['paused'], f'[browser] leaving Now Playing keeps playing, element back out of the layout {st2}')
     await paste(pg, BASE + 'audio.webm')
     await pg.wait_for_timeout(2000)
     await pg.evaluate("document.getElementById('playerNowTrigger').click()")
     await pg.wait_for_timeout(1200)
-    st3 = await pg.evaluate("(()=>{var a=document.getElementById('audio');return {vw:a.videoWidth,parent:a.parentNode===document.body,paused:a.paused,hidden:document.getElementById('npVideo').hidden};})()")
-    check(st3['vw'] == 0 and st3['parent'] and st3['hidden'] and not st3['paused'], f'[browser] audio-only stream: no box, plays as before {st3}')
-    await pg.screenshot(path=f'{SHOTS}/browser-np-audio.png')
+    st = await pg.evaluate("(()=>{var a=document.getElementById('audio');return {paused:a.paused,t:a.currentTime,wrap:document.getElementById('npVideoWrap').hidden};})()")
+    check(not st['paused'] and st['t'] > 0 and st['wrap'], f'[browser] streams play as before, no video UI {st}')
     check(not errs, f'[browser] no page errors {errs[:3]}')
     await ctx.close()
 

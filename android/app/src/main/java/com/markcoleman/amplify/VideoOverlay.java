@@ -1,34 +1,30 @@
 package com.markcoleman.amplify;
 
 import android.app.Activity;
-import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.view.Gravity;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import androidx.activity.ComponentActivity;
-import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.OptIn;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 
 /**
- * The picture for a stream that carries video (an IPTV channel pasted into search, say). The page
- * plays everything through the native player, which has no screen of its own, so this puts a native
- * video view over the WebView, exactly on top of the video box the Now Playing screen lays out. The
- * page reports where that box is (CSS pixels, relative to the WebView) and whether anything covers
- * it; this only draws. Tapping the picture toggles full screen (landscape for a wide picture,
- * system bars hidden); Back or another tap returns.
+ * The picture of a live stream that carries video (an IPTV channel pasted into search, say). The
+ * page plays streams through the native player, which has no screen of its own, and the page's own
+ * <video> can't play most IPTV formats -- so this puts a native video view over the WebView,
+ * exactly on top of the Now Playing video box (the same box podcast video uses). The page reports
+ * where that box is (CSS pixels, relative to the WebView), including when it is full screen, and
+ * hides this whenever the box is covered or not showing; this only draws. A tap on the picture is
+ * passed back to the page (which toggles full screen), since the page's own buttons can't sit on
+ * top of a native view.
  */
 @OptIn(markerClass = UnstableApi.class)
 final class VideoOverlay {
   interface Listener {
-    void onFullscreenChanged(boolean fullscreen);
+    void onTap();
   }
 
   private final Activity activity;
@@ -39,12 +35,6 @@ final class VideoOverlay {
   private ExoPlayer boundTo;
   private int videoW, videoH;
   private float pixelRatio = 1f;
-  private boolean shown, fullscreen;
-  // Where the page wants the box, in CSS pixels relative to the WebView (kept while full screen
-  // so leaving full screen goes straight back to it).
-  private float cssX, cssY, cssW, cssH;
-  private int savedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
-  private OnBackPressedCallback back;
 
   VideoOverlay(Activity activity, View webView, Listener listener) {
     this.activity = activity;
@@ -52,16 +42,8 @@ final class VideoOverlay {
     this.listener = listener;
   }
 
-  boolean isFullscreen() {
-    return fullscreen;
-  }
-
   /** Show the picture over the page's box (CSS px, relative to the WebView). */
   void show(ExoPlayer player, float x, float y, float w, float h) {
-    cssX = x;
-    cssY = y;
-    cssW = w;
-    cssH = h;
     if (player == null || w < 2 || h < 2) {
       hide();
       return;
@@ -72,16 +54,13 @@ final class VideoOverlay {
       player.setVideoTextureView(texture);
       boundTo = player;
     }
-    shown = true;
-    if (!fullscreen) place();
+    place(x, y, w, h);
     box.setVisibility(View.VISIBLE);
     box.bringToFront();
   }
 
   /** Nothing to show (no video, Now Playing closed, or something on the page covers the box). */
   void hide() {
-    if (fullscreen) exitFullscreen();
-    shown = false;
     if (box != null) box.setVisibility(View.GONE);
     // No surface while hidden: the sound carries on, the phone stops drawing frames nobody sees.
     if (boundTo != null && texture != null) boundTo.clearVideoTextureView(texture);
@@ -113,7 +92,7 @@ final class VideoOverlay {
     box.setKeepScreenOn(true);
     box.setClickable(true);
     box.setContentDescription("Video. Tap for full screen.");
-    box.setOnClickListener(v -> toggleFullscreen());
+    box.setOnClickListener(v -> listener.onTap());
     box.setVisibility(View.GONE);
     texture = new TextureView(activity);
     box.addView(
@@ -128,8 +107,7 @@ final class VideoOverlay {
   }
 
   /** Size and position the box over the page's video box. */
-  private void place() {
-    if (box == null) return;
+  private void place(float cssX, float cssY, float cssW, float cssH) {
     ViewGroup parent = (ViewGroup) box.getParent();
     if (parent == null) return;
     float d = activity.getResources().getDisplayMetrics().density;
@@ -139,19 +117,15 @@ final class VideoOverlay {
     parent.getLocationInWindow(pl);
     int w = Math.max(1, Math.round(cssW * d));
     int h = Math.max(1, Math.round(cssH * d));
-    setSize(w, h);
-    // The box is laid out at the parent's padding corner; translation moves it onto the page box.
-    box.setTranslationX(wl[0] - pl[0] - parent.getPaddingLeft() + cssX * d);
-    box.setTranslationY(wl[1] - pl[1] - parent.getPaddingTop() + cssY * d);
-  }
-
-  private void setSize(int w, int h) {
     ViewGroup.LayoutParams lp = box.getLayoutParams();
     if (lp.width != w || lp.height != h) {
       lp.width = w;
       lp.height = h;
       box.setLayoutParams(lp);
     }
+    // The box is laid out at the parent's padding corner; translation moves it onto the page box.
+    box.setTranslationX(wl[0] - pl[0] - parent.getPaddingLeft() + cssX * d);
+    box.setTranslationY(wl[1] - pl[1] - parent.getPaddingTop() + cssY * d);
   }
 
   /** Letterbox the picture inside the box at its own shape. */
@@ -172,69 +146,5 @@ final class VideoOverlay {
       lp.gravity = Gravity.CENTER;
       texture.setLayoutParams(lp);
     }
-  }
-
-  private void toggleFullscreen() {
-    if (fullscreen) exitFullscreen();
-    else enterFullscreen();
-  }
-
-  private void enterFullscreen() {
-    if (box == null || !shown || fullscreen) return;
-    fullscreen = true;
-    ViewGroup parent = (ViewGroup) box.getParent();
-    setSize(parent.getWidth() + 2, parent.getHeight() + 2);
-    box.setTranslationX(-parent.getPaddingLeft() - 1);
-    box.setTranslationY(-parent.getPaddingTop() - 1);
-    box.bringToFront();
-    savedOrientation = activity.getRequestedOrientation();
-    boolean wide = videoW <= 0 || videoH <= 0 || videoW * pixelRatio >= videoH;
-    activity.setRequestedOrientation(
-        wide
-            ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            : ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-    WindowInsetsControllerCompat bars =
-        WindowCompat.getInsetsController(activity.getWindow(), activity.getWindow().getDecorView());
-    bars.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-    bars.hide(WindowInsetsCompat.Type.systemBars());
-    if (activity instanceof ComponentActivity) {
-      back =
-          new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-              exitFullscreen();
-            }
-          };
-      ((ComponentActivity) activity).getOnBackPressedDispatcher().addCallback(back);
-    }
-    // The parent is resized by the rotation; keep covering it.
-    parent.addOnLayoutChangeListener(followParent);
-    listener.onFullscreenChanged(true);
-  }
-
-  private final View.OnLayoutChangeListener followParent =
-      (v, l, t, r, b, ol, ot, or, ob) -> {
-        if (!fullscreen || box == null) return;
-        ViewGroup p = (ViewGroup) v;
-        setSize(p.getWidth() + 2, p.getHeight() + 2);
-        box.setTranslationX(-p.getPaddingLeft() - 1);
-        box.setTranslationY(-p.getPaddingTop() - 1);
-      };
-
-  private void exitFullscreen() {
-    if (!fullscreen) return;
-    fullscreen = false;
-    if (box != null && box.getParent() instanceof ViewGroup) {
-      ((ViewGroup) box.getParent()).removeOnLayoutChangeListener(followParent);
-    }
-    if (back != null) {
-      back.remove();
-      back = null;
-    }
-    WindowCompat.getInsetsController(activity.getWindow(), activity.getWindow().getDecorView())
-        .show(WindowInsetsCompat.Type.systemBars());
-    activity.setRequestedOrientation(savedOrientation);
-    if (shown) place();
-    listener.onFullscreenChanged(false);
   }
 }

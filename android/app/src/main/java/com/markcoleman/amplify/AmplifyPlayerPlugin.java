@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -13,10 +14,15 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.util.Base64;
+import android.view.Window;
+import android.view.WindowManager;
 import androidx.activity.result.ActivityResult;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
@@ -39,6 +45,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -220,6 +227,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
               mediaId.setMimeType("application/x-mpegURL");
             }
             this.currentId = string2;
+            // A new item: whether it has a picture is for its own tracks to say.
+            this.hasVideo = false;
+            this.videoW = this.videoH = 0;
+            this.videoRatio = 1f;
+            if (this.video != null) this.video.hide();
             exoPlayerExo.setMediaItem(mediaId.build(), (long) (dDoubleValue * 1000.0d));
             exoPlayerExo.setPlaybackSpeed(d.floatValue());
             exoPlayerExo.setVolume(d2.floatValue());
@@ -1037,6 +1049,66 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     this.main.postDelayed(this.progressTick, 500L);
   }
 
+  // ---------------- files ----------------
+
+  /** Export: writes {name, text, mime} into Downloads and says where it went (build 48). */
+  @PluginMethod
+  public void saveToDownloads(PluginCall call) {
+    String name = call.getString("name", "amplify-backup.json");
+    try {
+      DownloadsSaver.Result r =
+          DownloadsSaver.save(
+              getContext(),
+              name,
+              call.getString("text", "").getBytes(StandardCharsets.UTF_8),
+              call.getString("mime", "application/json"));
+      JSObject o = new JSObject();
+      o.put("name", r.name);
+      o.put("folder", r.folder);
+      o.put("uri", r.uri);
+      o.put("bytes", r.bytes);
+      call.resolve(o);
+    } catch (Exception e) {
+      call.reject("Could not save " + name + ": " + e.getMessage());
+    }
+  }
+
+  /**
+   * Podcast video, which plays in the page (build 45): full screen hides the system bars (and holds
+   * landscape when asked), and the screen stays on while a video shows.
+   */
+  @PluginMethod
+  public void setVideoUi(PluginCall call) {
+    boolean fullscreen = Boolean.TRUE.equals(call.getBoolean("fullscreen", false));
+    boolean landscape = Boolean.TRUE.equals(call.getBoolean("landscape", false));
+    boolean awake = Boolean.TRUE.equals(call.getBoolean("awake", false));
+    Activity activity = getActivity();
+    if (activity == null) {
+      call.resolve();
+      return;
+    }
+    activity.runOnUiThread(
+        () -> {
+          Window window = activity.getWindow();
+          WindowInsetsControllerCompat bars =
+              WindowCompat.getInsetsController(window, window.getDecorView());
+          if (fullscreen) {
+            bars.setSystemBarsBehavior(
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            bars.hide(WindowInsetsCompat.Type.systemBars());
+          } else {
+            bars.show(WindowInsetsCompat.Type.systemBars());
+          }
+          if (awake || fullscreen) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+          else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+          activity.setRequestedOrientation(
+              fullscreen && landscape
+                  ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                  : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+          call.resolve();
+        });
+  }
+
   // ---------------- video ----------------
 
   private JSObject videoJson() {
@@ -1045,7 +1117,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     o.put("hasVideo", hasVideo);
     o.put("width", Math.round(videoW * videoRatio));
     o.put("height", videoH);
-    o.put("fullscreen", video != null && video.isFullscreen());
     return o;
   }
 
@@ -1081,7 +1152,15 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
               call.resolve();
               return;
             }
-            video = new VideoOverlay(getActivity(), getBridge().getWebView(), fs -> emitVideo());
+            video =
+                new VideoOverlay(
+                    getActivity(),
+                    getBridge().getWebView(),
+                    () -> {
+                      JSObject o = new JSObject();
+                      o.put("id", currentId);
+                      notifyListeners("videotap", o);
+                    });
             video.setVideoSize(videoW, videoH, videoRatio);
           }
           if (show && hasVideo) video.show(exo(), x, y, w, h);

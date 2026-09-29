@@ -215,6 +215,56 @@
     align-items:center; justify-content:center; align-self:flex-end; margin-bottom:12px; flex-shrink:0;
   }
   .drawer-close-btn:hover{ color:var(--text); border-color:var(--accent-dim); }
+  /* Drawer tabs (build 41), phone only: the desktop sidebar has no close button to sit
+     beside and no room problem to solve. The tabs are a segmented pair right-aligned against
+     the close button; "Shortcuts" hides the navigation and shows favorites as covers. */
+  .drawer-head, .drawer-shortcuts{ display:none; }
+  @media (max-width: 900px){
+    /* Tabs on the left, the close button on the right (build 42). */
+    /* Pinned while the drawer scrolls (build 43). The header takes over the drawer's 16px top
+       padding (negative margin, matching padding) so it sticks exactly where it starts rather
+       than jumping up 16px, and its background runs edge to edge so rows and covers pass
+       cleanly underneath. The 16px to the first item is kept: 12px inside, 4px outside. A
+       hairline appears under it only while something is scrolled beneath. */
+    .drawer-head{
+      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0;
+      /* top:-16px, not 0: a sticky offset is measured inside the drawer's own 16px padding. */
+      position:sticky; top:-16px; z-index:5; background:var(--panel);
+      margin:-16px -16px 4px; padding:16px 16px 12px;
+      transition:box-shadow .15s ease;
+    }
+    .drawer-head.scrolled{ box-shadow:0 1px 0 var(--border), 0 6px 12px -8px rgba(0,0,0,.35); }
+    .drawer-head .drawer-close-btn{ margin:0; align-self:center; }
+    .drawer-tabs{ display:flex; gap:2px; padding:3px; border-radius:999px; background:var(--panel-2); border:1px solid var(--border); }
+    .drawer-tab{
+      font:inherit; font-size:13px; font-weight:600; padding:6px 13px; border-radius:999px; border:0;
+      background:none; color:var(--text-dim); cursor:pointer;
+    }
+    .drawer-tab:hover{ color:var(--text); }
+    .drawer-tab[aria-selected="true"]{ background:color-mix(in srgb, var(--accent) 20%, transparent); color:var(--accent); }
+    .sidebar-scroll.shortcuts-on > :not(.drawer-head):not(.drawer-shortcuts){ display:none !important; }
+    .sidebar-scroll.shortcuts-on > .drawer-shortcuts{ display:block; }
+    /* Four covers a row at the narrowest drawer (minmax(0,1fr) so the tracks can shrink);
+       cover art only, the name carried as the button's label for screen readers. */
+    .drawer-shortcuts-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; }
+    /* In this menu every cover is a plain square -- artists included, no rounding anywhere:
+       a tight grid of shortcuts reads best as one even mosaic (build 42). */
+    .shortcut{ position:relative; display:block; width:100%; aspect-ratio:1; padding:0; border:0; background:none; cursor:pointer; border-radius:0; }
+    .shortcut-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; background:var(--art-bg, var(--panel-2)); }
+    .shortcut-art img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:0; }
+    .shortcut-artist .shortcut-art img{ object-position:var(--portrait-crop, 50% 28%); }
+    /* One rhythm through the tab: 16px from the tabs to the first heading, 10px from a
+       heading to its covers, 24px from one section's covers to the next heading. */
+    .drawer-sub{ margin:0 0 10px; font-size:13px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); }
+    .drawer-shortcuts-grid + .drawer-shortcuts-empty{ margin-top:0; }
+    .drawer-shortcuts > .drawer-sub ~ .drawer-sub{ margin-top:24px; }
+    .drawer-sub[hidden], .drawer-shortcuts-grid:empty{ display:none; }
+    .shortcut.playing{ outline:2px solid var(--accent); outline-offset:2px; }
+    .shortcut:active{ transform:scale(.95); }
+    .shortcut:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+    .drawer-shortcuts-empty{ font-size:13px; color:var(--text-dim); line-height:1.5; margin:0; }
+    .drawer-shortcuts-empty[hidden]{ display:none; }
+  }
   @media (max-width: 900px){ .drawer-close-btn{ display:flex; } }
   .sidebar-backdrop{ display:none; }
   @media (max-width: 900px){
@@ -509,7 +559,7 @@
       flex-basis:auto; width:auto;
     }
     body:not(.album-open):not(.artist-open) .section-heading-row.has-back.has-side-link .heading-side-link{
-      order:4; margin-top:10px; margin-left:4px;
+      order:4; margin-top:10px; margin-left:auto; margin-right:0;   /* the far right of the title's line (the base rule's right margin is auto too, which centred it) */
     }
   }
   /* A search puts the query itself in the heading, and a long one used to wrap into a
@@ -897,6 +947,13 @@
      under a date heading and between two episode rows in the same date group. Pulling each
      row up with a negative margin closes most of that gap without changing the grid's gap
      value itself. */
+  /* On the Podcasts page an episode title may take two lines before it is cut off with an
+     ellipsis (build 48): episode titles run long, and one line cut most of them mid-thought.
+     Everywhere else a row keeps its single line. */
+  .podcast-date-row .song-row-title{
+    white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    line-clamp:2; overflow:hidden; line-height:1.3;
+  }
   .tile-grid > .podcast-date-heading + .podcast-date-row{ margin-top:-34px; }
   .tile-grid > .podcast-date-row + .podcast-date-row{ margin-top:-30px; }
   /* The grid's row gap shrinks to 24px on mobile (see .tile-grid's own media query below),
@@ -1998,24 +2055,6 @@
     transition:filter .08s linear, opacity .08s linear;
     will-change:filter, opacity, transform;
   }
-  /* The picture of a stream that carries video. A box at the top of the screen, under the
-     minimize button and clear of the title (which starts at the middle of the screen): as tall
-     as the width allows at the video's own shape, but never reaching that title. Centred when
-     that makes it narrower than the screen. Black, so letterboxing reads as part of the frame.
-     The cover art steps aside while it shows; its blurred twin stays as the backdrop. */
-  .np-video{
-    position:absolute; z-index:2; left:50%; transform:translateX(-50%);
-    top:calc(env(safe-area-inset-top, 0px) + 64px);
-    height:min(calc(100vw / var(--video-aspect, 1.7778)), calc(50vh - env(safe-area-inset-top, 0px) - 84px));
-    height:min(calc(100vw / var(--video-aspect, 1.7778)), calc(50dvh - env(safe-area-inset-top, 0px) - 84px));
-    aspect-ratio:var(--video-aspect, 1.7778); max-width:100%;
-    background:#000; overflow:hidden;
-  }
-  .np-video[hidden]{ display:none; }
-  .np-video video{ width:100%; height:100%; object-fit:contain; display:block; background:#000; }
-  .now-playing-screen.has-video .np-art{ visibility:hidden; }
-  /* The player element lives outside the layout until a picture needs it. */
-  body > #audio{ display:none; }
   .np-hero-fade{
     position:absolute; inset:0; pointer-events:none;
     /* Only the top darkening now, so the floating buttons read against a pale cover. */
@@ -2728,6 +2767,53 @@
   .artist-bio-credit[hidden]{ display:none; }
   button.artist-hero-bio-source{ background:none; border:0; border-bottom:1px solid var(--accent-dim); padding:0; font-family:inherit; cursor:pointer; }
   body.artist-open button.artist-hero-bio-source{ border-bottom-color:rgba(255,255,255,.5); }
+  /* The video icon on an episode row: its own line under the date, the date's colour. */
+  /* ---------- Podcast video (build 45) ---------- */
+  /* The toggle: a pill directly above the play controls, only for an episode with video. */
+  .np-video-toggle{
+    display:inline-flex; align-items:center; gap:8px; margin:2px auto 14px; padding:8px 16px;
+    border-radius:999px; border:1px solid rgba(255,255,255,.16); background:rgba(20,20,22,.42);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .np-video-toggle[hidden]{ display:none; }
+  .np-video-toggle svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  /* The video takes the artwork's place: full width near the top of the hero, over the
+     artwork's blurred wash (the crisp cover is hidden while it plays). */
+  .np-video-wrap{ position:absolute; left:0; right:0; top:calc(env(safe-area-inset-top, 0px) + 72px); z-index:2; }
+  .np-video-wrap[hidden]{ display:none; }
+  .np-video{ display:block; width:100%; aspect-ratio:16/9; max-height:52vh; object-fit:contain; background:#000; }
+  .now-playing-screen.np-video-on #npArt{ visibility:hidden; }
+  .np-video-full-btn{
+    position:absolute; right:10px; bottom:10px; width:38px; height:38px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+    background:rgba(20,20,22,.55); border:1px solid rgba(255,255,255,.2); color:#fff;
+  }
+  .np-video-full-btn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .np-video-full-btn .when-full{ display:none; }
+  /* A live stream's picture is drawn natively on top of this box, so nothing of the page can
+     sit on it: no button (a tap on the picture toggles full screen instead). */
+  .now-playing-screen.np-video-stream .np-video-full-btn{ display:none; }
+  /* Full screen: the video alone on black, edge to edge; the app's own chrome is hidden
+     (the system bars are hidden natively). The button moves to the top right to exit. */
+  /* The art box is its own stacking context (z-index:0), which would keep the video's z-index
+     inside it and let the title and controls paint over the "full screen" video: lift the box. */
+  body.np-video-full .np-art-wrap, body.np-video-full .np-hero{ position:relative; z-index:5000; }
+  body.np-video-full .np-video-wrap{ position:fixed; inset:0; top:0; z-index:5000; background:#000; display:flex; align-items:center; justify-content:center; }
+  body.np-video-full .np-video{ width:100%; height:100%; max-height:none; aspect-ratio:auto; }
+  body.np-video-full .np-video-full-btn{ top:calc(env(safe-area-inset-top, 0px) + 14px); right:calc(env(safe-area-inset-right, 0px) + 14px); bottom:auto; }
+  body.np-video-full .np-video-full-btn .when-full{ display:block; }
+  body.np-video-full .np-video-full-btn .when-small{ display:none; }
+  body.np-video-full .sidebar-top, body.np-video-full .np-float, body.np-video-full .player-bar,
+  body.np-video-full .bottom-nav, body.np-video-full .mobile-tabbar{ visibility:hidden; }
+  .song-row-video{ display:flex; align-items:center; margin-top:4px; color:var(--text-dim); line-height:0; }
+  .song-row-video svg{ width:15px; height:15px; fill:currentColor; }
+  /* The same camera on podcast search results: its own line under the show in Search's tiles,
+     beside the name in the Add Podcast list (build 47). */
+  .tile-video{ display:flex; align-items:center; margin-top:3px; color:var(--text-dim); line-height:0; }
+  .tile-video svg{ width:15px; height:15px; fill:currentColor; }
+  .cs-video{ display:inline-flex; align-items:center; flex:none; color:var(--text-dim); line-height:0; }
+  .cs-video svg{ width:15px; height:15px; fill:currentColor; }
   .podcast-description-artist{ font-size:13px; font-weight:600; color:var(--text-dim); margin-bottom:10px; }
   .podcast-description-text{
     font-size:14px; line-height:1.55; color:var(--text-dim); white-space:pre-line;
@@ -3592,12 +3678,6 @@
     -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
   }
   body.rotate-lock .np-art img{ border-radius:18px; }
-  /* Landscape: the picture takes the artwork's square, letterboxed. */
-  body.rotate-lock .np-video{
-    top:0 !important; left:0 !important; transform:none !important;
-    width:100% !important; height:100% !important; max-width:none !important;
-    border-radius:18px; overflow:hidden;
-  }
   /* margin-top:0 explicitly cancels the vertical-centring offset the plain (portrait) mobile
      rule above gives .np-hero-foot (calc(50vh - 100vw), meant to land the title on a tall
      phone screen's centre) -- rotate-lock is its own row layout, centred by .np-hero's own
@@ -3766,6 +3846,38 @@
     }
     body.album-open .sidebar-top .hamburger-btn span,
     body.artist-open .sidebar-top .hamburger-btn span{ width:24px; height:2.5px; background:#fff; }
+  }
+  /* ---------- Now Playing: the close button and the menu button, as discs ---------- */
+  /* Both corners carry the same glass disc (build 41). The close button floats in the top
+     left however far the screen is scrolled: a sticky, zero-height layer at the top of the
+     scroll region holds it, the pattern .np-backdrop uses -- position:fixed would be caught
+     by the sheet's transform and scroll away with it. It goes the instant a close starts
+     (the chevron, or a swipe down), rather than riding the sheet down the screen. */
+  .np-float{ position:sticky; top:0; height:0; flex:none; align-self:stretch; z-index:70; pointer-events:none; }
+  .np-float .np-back{
+    position:absolute; top:var(--np-float-top, 16px); left:var(--np-float-left, 16px); pointer-events:auto;
+    width:40px; height:40px; border-radius:50%;
+    background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    color:#fff; filter:none; font-size:16px;
+  }
+  .np-float .np-back:hover{ background:rgba(20,20,22,.62); border-color:rgba(255,255,255,.3); opacity:1; }
+  .np-float .np-back-chevron{ width:22px; height:22px; }
+  .now-playing-screen.np-float-off .np-float,
+  .now-playing-screen.np-sheet-closing .np-float{ visibility:hidden; }
+  @media (max-width: 900px){
+    /* The menu button keeps its disc on Now Playing even over an artist or album page,
+       whose own rule strips it (that is what made it come and go). */
+    body.np-open .sidebar-top .hamburger-btn,
+    body.np-open.album-open .sidebar-top .hamburger-btn,
+    body.np-open.artist-open .sidebar-top .hamburger-btn{
+      width:40px; height:40px; border-radius:50%; gap:4px; filter:none;
+      background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16);
+      backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    }
+    body.np-open .sidebar-top .hamburger-btn span,
+    body.np-open.album-open .sidebar-top .hamburger-btn span,
+    body.np-open.artist-open .sidebar-top .hamburger-btn span{ width:16px; height:2px; background:#fff; }
   }
 
   /* ---------- Now Playing: filled progress ---------- */
@@ -4000,7 +4112,24 @@
     </div>
 
     <div class="sidebar-scroll">
-    <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close menu" title="Close menu"><i class="fa-solid fa-xmark"></i></button>
+    <!-- Phone drawer only: two tabs beside the close button. "Menu" is the navigation below;
+         "Shortcuts" is favorites as a grid of covers. -->
+    <div class="drawer-head">
+      <div class="drawer-tabs" role="tablist" aria-label="Menu sections">
+        <button type="button" role="tab" class="drawer-tab" id="drawerTabMenu" aria-selected="true">Menu</button>
+        <button type="button" role="tab" class="drawer-tab" id="drawerTabShortcuts" aria-selected="false" aria-controls="drawerShortcuts">Shortcuts</button>
+      </div>
+      <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close menu" title="Close menu"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="drawer-shortcuts" id="drawerShortcuts" role="tabpanel" aria-labelledby="drawerTabShortcuts">
+      <h3 class="drawer-sub">Favorites</h3>
+      <div class="drawer-shortcuts-grid" id="drawerShortcutsGrid"></div>
+      <p class="drawer-shortcuts-empty" id="drawerShortcutsEmpty">Tap the heart on a station, song, album or artist and it appears here.</p>
+      <!-- Followed shows, most recently updated first (by each show's newest episode). -->
+      <h3 class="drawer-sub" id="drawerLatestPodHeading">Latest Podcasts</h3>
+      <div class="drawer-shortcuts-grid" id="drawerLatestPodGrid"></div>
+      <p class="drawer-shortcuts-empty" id="drawerLatestPodEmpty">Podcasts you follow appear here, newest episodes first.</p>
+    </div>
     <div class="sidebar-section">
       <div class="aside-heading-row">
         <h2 id="homeHeading" class="sidebar-row-link" role="button" tabindex="0" title="Go to Home">
@@ -4399,6 +4528,12 @@
     </div>
 
     <div class="now-playing-screen" id="nowPlayingScreen">
+      <!-- The close button floats: pinned to the top left of the screen however far it is
+           scrolled (a zero-height sticky layer, as .np-backdrop is -- position:fixed would
+           be caught by the sheet's own transform and scroll away). -->
+      <div class="np-float" id="npFloat">
+        <button class="np-back" id="npBackBtn" title="Minimize" aria-label="Minimize Now Playing"><svg class="np-back-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
       <!-- The background is the artwork itself, blown up and blurred. Reading a dominant
            colour needs the image's pixels, and a station logo comes from someone else's
            host without CORS headers, so those pixels cannot be read at all -- which is why
@@ -4418,15 +4553,19 @@
         <div class="np-art-wrap" id="npArtWrap">
           <div class="np-art-bleed" id="npArtBleed" aria-hidden="true"></div>
           <div class="np-art" id="npArt"></div>
+          <!-- A podcast episode's video, in the artwork's place while video is on. -->
+          <div class="np-video-wrap" id="npVideoWrap" hidden>
+            <video class="np-video" id="npVideo" playsinline preload="none"></video>
+            <button type="button" class="np-video-full-btn" id="npVideoFullBtn" aria-label="Full screen">
+              <svg class="when-small" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path></svg>
+              <svg class="when-full" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"></path></svg>
+            </button>
+          </div>
           <div class="np-hero-fade" aria-hidden="true"></div>
-          <!-- A stream that carries video (an IPTV channel pasted into search) shows its picture
-               here. In the Android app the native player draws it on top of this box (see
-               "stream video" in the script); in a browser the player element itself moves in. -->
-          <div class="np-video" id="npVideo" aria-label="Video" hidden></div>
         </div>
 
         <div class="np-hero-top">
-          <button class="np-back" id="npBackBtn" title="Minimize" aria-label="Minimize Now Playing"><svg class="np-back-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          
         </div>
 
         <!-- Title, then the controls under it, both sitting on the faded lower third of
@@ -4440,6 +4579,8 @@
             <!-- Play in the middle, larger and solid; everything else is a small translucent
                  disc around it. Local files have a real duration and are seekable; a live
                  stream has neither, so the seek block is hidden for stream tracks. -->
+            <!-- Video on/off for an episode that has video; directly above the play controls. -->
+            <button type="button" class="np-video-toggle" id="npVideoToggle" hidden aria-pressed="false"><span class="np-video-toggle-icon"></span><span id="npVideoToggleLabel">Turn On Video</span></button>
             <div class="np-controls">
               <button class="np-fav-btn" id="npFavBtn" title="Toggle favorite"><i class="fa-regular fa-heart"></i></button>
               <button class="np-step-btn" id="npPrevBtn" title="Previous track" aria-label="Previous track">
@@ -5052,9 +5193,7 @@
   </button>
 </div>
 
-<!-- A <video> rather than an <audio>, so a stream that carries a picture can show it (it moves
-     into the Now Playing video box). Everywhere else it is just the player, and stays hidden. -->
-<video id="audio" preload="none" playsinline></video>
+<audio id="audio" preload="none"></audio>
 
 <script>
 // ---------- Android app bridge ----------
@@ -5141,7 +5280,55 @@
     var list = this._pending; this._pending = [];
     list.forEach(function(p){ ok ? p.res() : p.rej(err); });
   };
+  // ---------- Video mode (podcasts with video) ----------
+  // While a <video> is attached it IS the player: everything the page reads or does (play,
+  // pause, paused, ended, duration, currentTime, rate, volume, and the events) goes to it,
+  // and the native player sits paused with its own events ignored. Attaching starts the video
+  // where the audio was; detaching hands its position back to the native player (so the lock
+  // screen, the car and background play carry on). Loading anything new detaches first.
+  var VIDEO_EVENTS = ['play', 'playing', 'pause', 'waiting', 'timeupdate', 'durationchange',
+    'loadedmetadata', 'seeking', 'seeked', 'ended', 'ratechange', 'volumechange'];
+  A.attachVideo = function(v, url){
+    if(this._video) return Promise.resolve();
+    var self = this, pos = this.currentTime, wasPlaying = !this._paused;
+    if(this._sent) P.pause()['catch'](function(){});
+    this._time = pos; this._t0 = now(); this._paused = true; this._playing = false;
+    this._video = v;
+    this._vfwd = function(e){ if(self._video === v) self._emit(e.type); };
+    VIDEO_EVENTS.forEach(function(t){ v.addEventListener(t, self._vfwd); });
+    v.playbackRate = this._rate; v.volume = this._vol; v.muted = this._muted;
+    // The element is preload="none" (nothing downloads until video is asked for), so load
+    // explicitly: without it no metadata arrives and the seek-and-play below never runs.
+    v.preload = 'auto';
+    v.src = url || this._src;
+    try{ v.load(); }catch(e){}
+    return new Promise(function(res, rej){
+      function done(){ v.removeEventListener('loadedmetadata', done); v.removeEventListener('error', bad);
+        try{ v.currentTime = pos; }catch(e){}
+        if(wasPlaying) v.play()['catch'](function(){});
+        res(); }
+      function bad(){ v.removeEventListener('loadedmetadata', done); v.removeEventListener('error', bad); rej(new Error('video failed')); }
+      v.addEventListener('loadedmetadata', done); v.addEventListener('error', bad);
+    });
+  };
+  // resume === false: just drop the video (something new is loading).
+  A.detachVideo = function(resume){
+    var v = this._video;
+    if(!v) return;
+    var pos = v.currentTime || 0, playing = !v.paused && !v.ended, self = this;
+    VIDEO_EVENTS.forEach(function(t){ v.removeEventListener(t, self._vfwd); });
+    this._video = null;
+    try{ v.pause(); v.removeAttribute('src'); v.load(); }catch(e){}
+    if(resume === false) return;
+    this.currentTime = pos;
+    if(playing) this.play()['catch'](function(){});
+    else this._emit('pause');
+    this._emit('timeupdate');
+  };
+  Object.defineProperty(A, 'videoActive', { get: function(){ return !!this._video; } });
+
   A._setSrc = function(u){
+    if(this._video) this.detachVideo(false);
     var self = this;
     this._settle(false, mkErr('AbortError', 'The play() request was interrupted by a new load request.'));
     var id = 'm' + (++seq);
@@ -5177,6 +5364,7 @@
   A.load = function(){ if(this._src) this._setSrc(this._src); else P.stop()['catch'](function(){}); };
   A.canPlayType = function(){ return 'maybe'; };
   A.play = function(){
+    if(this._video) return this._video.play();
     var self = this;
     var p = new Promise(function(res, rej){ self._pending.push({ res: res, rej: rej }); });
     if(!this._src){ this._settle(false, mkErr('NotSupportedError', 'No source')); return p; }
@@ -5187,6 +5375,7 @@
     return p;
   };
   A.pause = function(){
+    if(this._video){ this._video.pause(); return; }
     this._time = this.currentTime; this._t0 = now();
     if(!this._paused){
       this._paused = true;
@@ -5198,19 +5387,21 @@
   Object.defineProperties(A, {
     src: { get: function(){ return this._src; }, set: function(u){ this._setSrc(String(u || '')); } },
     currentSrc: { get: function(){ return this._src; } },
-    paused: { get: function(){ return this._paused; } },
-    ended: { get: function(){ return this._ended; } },
+    paused: { get: function(){ return this._video ? this._video.paused : this._paused; } },
+    ended: { get: function(){ return this._video ? this._video.ended : this._ended; } },
     error: { get: function(){ return this._err; } },
     readyState: { get: function(){ return this._ready; } },
-    duration: { get: function(){ return this._dur; } },
+    duration: { get: function(){ var v = this._video; return v && isFinite(v.duration) ? v.duration : this._dur; } },
     currentTime: {
       get: function(){
+        if(this._video) return this._video.currentTime || 0;
         var t = this._time;
         if(this._playing) t += (now() - this._t0) / 1000 * this._rate;
         return (isFinite(this._dur) && t > this._dur) ? this._dur : t;
       },
       set: function(v){
         v = Math.max(0, Number(v) || 0);
+        if(this._video){ try{ this._video.currentTime = v; }catch(e){} return; }
         this._time = v; this._t0 = now(); this._ended = false;
         if(this._sent) P.seek({ position: v })['catch'](function(){});
         else this._startAt = v;
@@ -5219,15 +5410,15 @@
     },
     volume: {
       get: function(){ return this._vol; },
-      set: function(v){ this._vol = Math.min(1, Math.max(0, Number(v) || 0)); P.setVolume({ volume: this._muted ? 0 : this._vol })['catch'](function(){}); this._emit('volumechange'); }
+      set: function(v){ this._vol = Math.min(1, Math.max(0, Number(v) || 0)); if(this._video) this._video.volume = this._muted ? 0 : this._vol; P.setVolume({ volume: this._muted ? 0 : this._vol })['catch'](function(){}); this._emit('volumechange'); }
     },
     muted: {
       get: function(){ return this._muted; },
-      set: function(m){ this._muted = !!m; P.setVolume({ volume: this._muted ? 0 : this._vol })['catch'](function(){}); this._emit('volumechange'); }
+      set: function(m){ this._muted = !!m; if(this._video) this._video.muted = this._muted; P.setVolume({ volume: this._muted ? 0 : this._vol })['catch'](function(){}); this._emit('volumechange'); }
     },
     playbackRate: {
       get: function(){ return this._rate; },
-      set: function(r){ this._time = this.currentTime; this._t0 = now(); this._rate = Number(r) || 1; P.setRate({ rate: this._rate })['catch'](function(){}); this._emit('ratechange'); }
+      set: function(r){ if(this._video) this._video.playbackRate = Number(r) || 1; this._time = this.currentTime; this._t0 = now(); this._rate = Number(r) || 1; P.setRate({ rate: this._rate })['catch'](function(){}); this._emit('ratechange'); }
     },
     defaultPlaybackRate: { get: function(){ return 1; }, set: function(){} }
   });
@@ -5283,7 +5474,7 @@
     return P.onAirNow().then(function(ev){ return ev && ev.id === id ? ev : null; })['catch'](function(){ return null; });
   };
   P.addListener('progress', function(ev){
-    if(!ev || ev.id !== audio._id) return;
+    if(!ev || ev.id !== audio._id || audio._video) return;
     syncOnAir(ev);
     audio._onTime(ev);
     audio._emit('timeupdate');
@@ -5291,6 +5482,18 @@
   P.addListener('state', function(ev){
     var a = audio;
     if(!ev || ev.id !== a._id) return;
+    if(a._video){
+      // Play pressed on the lock screen, notification or car while the video is showing:
+      // the native player carries on from where the video was, and the page drops the video.
+      if(ev.isPlaying){
+        var vpos = a._video.currentTime || 0;
+        a.detachVideo(false);
+        P.seek({ position: vpos })['catch'](function(){});
+        a._time = vpos; a._t0 = now(); a._paused = false; a._playing = true;
+        a._emit('videoexternal'); a._emit('play'); a._emit('playing');
+      }
+      return;
+    }
     syncOnAir(ev);
     a._onTime(ev);
     if(ev.state === 'ready' && a._ready < 4){
@@ -6089,7 +6292,95 @@
   });
 
   // ---------- mobile hamburger menu (off-canvas drawer for For You / Playlists / Genres) ----------
+  // ---- drawer tabs: Menu / Shortcuts ----
+  var drawerTabMenu = document.getElementById('drawerTabMenu');
+  var drawerTabShortcuts = document.getElementById('drawerTabShortcuts');
+  var drawerShortcutsGrid = document.getElementById('drawerShortcutsGrid');
+  var drawerShortcutsEmpty = document.getElementById('drawerShortcutsEmpty');
+  var drawerTab = 'menu';
+  function buildShortcut(fav){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'shortcut';
+    var art = document.createElement('div');
+    art.className = 'shortcut-art';
+    b.appendChild(art);
+    var name;
+    if(isArtistFav(fav)){
+      var ae = artistEntryForFav(fav);
+      name = ae.name;
+      b.classList.add('shortcut-artist');
+      renderArtistArt(art, ae);
+      b.onclick = function(){ closeDrawer(); openArtistPage(ae.key); };
+    } else if(isAlbumFav(fav)){
+      var al = albumEntryForFav(fav);
+      name = al.album || fav.name || 'Album';
+      renderStationArt(art, artSourceForTracks(al.tracks || []) || { name: name });
+      b.onclick = function(){ closeDrawer(); openAlbumPage(al.key); };
+    } else {
+      name = stripExclusively(fav.name || '');
+      renderStationArt(art, fav);
+      b.onclick = function(){ closeDrawer(); playEntity(fav); };
+      if(currentStation && favKey(currentStation) === favKey(fav)) b.classList.add('playing');
+    }
+    b.title = name;
+    b.setAttribute('aria-label', name);
+    return b;
+  }
+  // Latest Podcasts: the shows you follow, most recently updated first -- ordered by each
+  // show's newest episode (sub.latestEpisode, the date the Podcasts page's Latest list sorts
+  // by), up to 20. Shows whose newest episode isn't known yet go after the dated ones.
+  // Tapping one opens that show's page.
+  var DRAWER_LATEST_PODCASTS = 20;
+  var drawerLatestPodGrid = document.getElementById('drawerLatestPodGrid');
+  var drawerLatestPodEmpty = document.getElementById('drawerLatestPodEmpty');
+  function latestPodcastSubs(){
+    function t(sub){ return sub.latestEpisode && sub.latestEpisode.releaseDate ? (new Date(sub.latestEpisode.releaseDate).getTime() || 0) : 0; }
+    return podcastSubs.slice().sort(function(a, b){ return t(b) - t(a); }).slice(0, DRAWER_LATEST_PODCASTS);
+  }
+  function buildPodcastShortcut(sub){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'shortcut shortcut-podcast';
+    var art = document.createElement('div');
+    art.className = 'shortcut-art';
+    b.appendChild(art);
+    var name = sub.collectionName || 'Podcast';
+    renderStationArt(art, { name: name, favicon: sub.artworkUrl || '' });
+    b.title = name;
+    b.setAttribute('aria-label', name);
+    b.onclick = function(){ closeDrawer(); openShowPage(sub.collectionId); };
+    return b;
+  }
+  function renderDrawerShortcuts(){
+    drawerShortcutsGrid.innerHTML = '';
+    favorites.forEach(function(f){ drawerShortcutsGrid.appendChild(buildShortcut(f)); });
+    drawerShortcutsEmpty.hidden = favorites.length > 0;
+    drawerLatestPodGrid.innerHTML = '';
+    var subs = latestPodcastSubs();
+    subs.forEach(function(sub){ drawerLatestPodGrid.appendChild(buildPodcastShortcut(sub)); });
+    drawerLatestPodEmpty.hidden = subs.length > 0;
+  }
+  function setDrawerTab(tab){
+    drawerTab = tab;
+    var sc = tab === 'shortcuts';
+    drawerTabMenu.setAttribute('aria-selected', sc ? 'false' : 'true');
+    drawerTabShortcuts.setAttribute('aria-selected', sc ? 'true' : 'false');
+    sidebarScroll.classList.toggle('shortcuts-on', sc);
+    if(sc) renderDrawerShortcuts();
+    sidebarScroll.scrollTop = 0;
+    drawerHead.classList.remove('scrolled');
+  }
+  var drawerHead = document.querySelector('.drawer-head');
+  sidebarScroll.addEventListener('scroll', function(){
+    drawerHead.classList.toggle('scrolled', sidebarScroll.scrollTop > 0);
+  }, { passive: true });
+  drawerTabMenu.addEventListener('click', function(){ setDrawerTab('menu'); });
+  drawerTabShortcuts.addEventListener('click', function(){ setDrawerTab('shortcuts'); });
+
   function openDrawer(){
+    // Favorites may have changed since it was last open.
+    if(drawerTab === 'shortcuts') renderDrawerShortcuts();
     sidebarScroll.classList.add('open');
     sidebarBackdrop.classList.add('open');
     document.body.classList.add('drawer-open');
@@ -6125,6 +6416,7 @@
   function runNpSheet(down, done){
     npSheetDone = done;
     var el = nowPlayingScreen;
+    el.classList.toggle('np-float-off', !!down);
     if(down){
       el.classList.add('np-sheet-anim', 'np-sheet-closing');
       void el.offsetHeight;
@@ -6156,6 +6448,7 @@
     // Tapped again while it was dropping: bring it back up from where it is.
     if(closing){ clearTimeout(npSheetTimer); npSheetTimer = null; npSheetDone = null; }
     var already = nowPlayingScreen.style.display === 'flex' && !closing;
+    nowPlayingScreen.classList.remove('np-float-off');
     if(!already && npSheetDone) stopNpSheet(true);
     npStation = target;
     if(!closing) savedBrowseScrollY = window.scrollY;
@@ -6195,6 +6488,8 @@
   // wherever the previous screen happened to be scrolled.
   // animate: only the down-arrow button, which slides the screen back into the mini player.
   function closeNowPlaying(restoreScroll, animate){
+    if(npVideoOn && !npVideoStream) setNpVideo(false);
+    else if(npVideoFull) exitVideoFull();
     if(npClosing()){
       if(animate) return; // already on its way down
       stopNpSheet(false);
@@ -6452,10 +6747,279 @@
     return tagVocab().then(function(v){ return genresFromName(station.name, v); });
   }
 
+  // ---------- More Episodes (podcasts) ----------
+  // A podcast's Now Playing lists the rest of that show in place of Related Stations: its
+  // episodes newest first (the one playing left out), up to 20, as the same rows the
+  // podcast pages use. One lookup per show per session.
+  var npMoreEpisodesCache = {};
+  var NP_MORE_EPISODES = 20;
+  function showEpisodesFor(collectionId){
+    if(npMoreEpisodesCache[collectionId]) return npMoreEpisodesCache[collectionId];
+    var p = itunesLookupShow(collectionId, 40).then(function(res){
+      return (res.episodes || []).map(episodeFromItunes).filter(function(e){ return e.episodeUrl; });
+    });
+    npMoreEpisodesCache[collectionId] = p;
+    p['catch'](function(){ delete npMoreEpisodesCache[collectionId]; });
+    return p;
+  }
+  function renderNpMoreEpisodes(station, requestId){
+    var headingEl = npRelated.querySelector('.np-related-heading');
+    if(headingEl) headingEl.textContent = 'More Episodes';
+    npRelatedGrid.classList.add('grid-songs');
+    if(station.collectionId == null){ npRelated.style.display = 'none'; return; }
+    npRelated.style.display = '';
+    npRelatedGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    showEpisodesFor(station.collectionId).then(function(eps){
+      if(requestId !== npRelatedRequestId) return;
+      var others = eps.filter(function(e){ return e.guid !== station.guid; }).slice(0, NP_MORE_EPISODES);
+      npRelatedGrid.innerHTML = '';
+      if(!others.length){ npRelated.style.display = 'none'; return; }
+      others.forEach(function(e){ npRelatedGrid.appendChild(buildPodcastEpisodeRow(e)); });
+    }, function(){
+      if(requestId !== npRelatedRequestId) return;
+      npRelated.style.display = 'none';
+      npRelatedGrid.innerHTML = '';
+    });
+  }
+
+  // ---------- Podcast video (build 45) ----------
+  // An episode with video can be watched in place of its cover: the toggle hands playback
+  // from the native player to a <video> at the same position (audio.attachVideo), and back
+  // (detachVideo). Closing Now Playing, leaving the app, or pressing play on the lock screen
+  // hands it back too, so the sound carries on in the background where video can't.
+  var npVideo = document.getElementById('npVideo');
+  var npVideoWrap = document.getElementById('npVideoWrap');
+  var npVideoToggle = document.getElementById('npVideoToggle');
+  var npVideoToggleLabel = document.getElementById('npVideoToggleLabel');
+  var npVideoFullBtn = document.getElementById('npVideoFullBtn');
+  var npVideoOn = false, npVideoFull = false, npVideoFullLocked = false, npVideoNoAutoFull = false;
+  var VIDEO_ON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"></rect><path d="M8.5 20h7"></path></svg>';
+  var VIDEO_OFF_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"></rect><path d="M8.5 20h7M3.5 3.5l17 16"></path></svg>';
+  function nativeVideoUi(opts){
+    try{
+      var cap = window.Capacitor, P = cap && cap.Plugins && cap.Plugins.AmplifyPlayer;
+      if(P && P.setVideoUi) P.setVideoUi(opts)['catch'](function(){});
+    }catch(e){}
+  }
+  function videoCapable(st){
+    return !!(st && isPodcastTrack(st) && st.isVideo && st.episodeUrl && audio && typeof audio.attachVideo === 'function') ||
+      streamVideoCapable(st);
+  }
+  function syncNpVideoToggle(st){
+    var show = videoCapable(st) && currentStation && favKey(st) === favKey(currentStation);
+    npVideoToggle.hidden = !show;
+    npVideoToggleLabel.textContent = npVideoOn ? 'Turn Off Video' : 'Turn On Video';
+    npVideoToggle.querySelector('.np-video-toggle-icon').innerHTML = npVideoOn ? VIDEO_OFF_SVG : VIDEO_ON_SVG;
+    npVideoToggle.setAttribute('aria-pressed', npVideoOn ? 'true' : 'false');
+  }
+  function resetNpVideoUi(){
+    if(npVideoFull) exitVideoFull();
+    npVideoOn = false;
+    if(npVideoStream){ npVideoStream = false; nowPlayingScreen.classList.remove('np-video-stream'); syncStreamVideo(); }
+    nowPlayingScreen.classList.remove('np-video-on');
+    npVideoWrap.hidden = true;
+    nativeVideoUi({ fullscreen: false, landscape: false, awake: false });
+    if(currentStation) syncNpVideoToggle(currentStation);
+  }
+  function setNpVideo(on){
+    var st = currentStation;
+    if(on && streamVideoCapable(st)){ setStreamVideoOn(true); return; }
+    if(!on && npVideoStream){ setStreamVideoOn(false); return; }
+    if(on){
+      if(!videoCapable(st) || npVideoOn) return;
+      npVideoOn = true;
+      nowPlayingScreen.classList.add('np-video-on');
+      npVideoWrap.hidden = false;
+      syncNpVideoToggle(st);
+      nativeVideoUi({ fullscreen: false, landscape: false, awake: true });
+      audio.attachVideo(npVideo, st.episodeUrl)['catch'](function(){
+        if(audio.videoActive) audio.detachVideo();
+        resetNpVideoUi();
+        setStatus('This episode\u2019s video couldn\u2019t be loaded. Playing the audio.');
+      });
+      if(window.innerWidth > window.innerHeight) enterVideoFull(false);
+    } else {
+      if(!npVideoOn) return;
+      if(audio.videoActive) audio.detachVideo();
+      resetNpVideoUi();
+    }
+  }
+  function enterVideoFull(lockLandscape){
+    if(!npVideoOn || npVideoFull) return;
+    npVideoFull = true; npVideoFullLocked = !!lockLandscape;
+    document.body.classList.add('np-video-full');
+    npVideoFullBtn.setAttribute('aria-label', 'Exit full screen');
+    nativeVideoUi({ fullscreen: true, landscape: !!lockLandscape, awake: true });
+  }
+  function exitVideoFull(){
+    if(!npVideoFull) return;
+    npVideoFull = false;
+    // Leaving by hand while the phone is on its side: don't jump straight back in.
+    if(window.innerWidth > window.innerHeight) npVideoNoAutoFull = true;
+    npVideoFullLocked = false;
+    document.body.classList.remove('np-video-full');
+    npVideoFullBtn.setAttribute('aria-label', 'Full screen');
+    // A stream's picture keeps the screen on by itself, and only while it shows.
+    nativeVideoUi({ fullscreen: false, landscape: false, awake: npVideoOn && !npVideoStream });
+  }
+  npVideoToggle.addEventListener('click', function(){
+    // Turning a stream's video off by hand holds for that stream (it would otherwise come
+    // straight back on); turning it on again clears that.
+    if(npVideoStream || streamVideoCapable(currentStation)) streamVideoOffKey = npVideoOn ? favKey(currentStation) : null;
+    setNpVideo(!npVideoOn);
+  });
+  npVideoFullBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(npVideoFull) exitVideoFull(); else enterVideoFull(true);
+  });
+  // In full screen, a tap on the picture pauses or plays.
+  npVideo.addEventListener('click', function(){
+    if(!npVideoFull) return;
+    if(npVideo.paused) audio.play()['catch'](function(){}); else audio.pause();
+  });
+  // Turning the phone on its side while the video shows goes full screen; upright again
+  // comes back out (unless full screen was asked for with the button, which holds landscape).
+  window.addEventListener('resize', function(){
+    var landscape = window.innerWidth > window.innerHeight;
+    if(!landscape) npVideoNoAutoFull = false;
+    if(!npVideoOn) return;
+    if(landscape && !npVideoFull && !npVideoNoAutoFull) enterVideoFull(false);
+    else if(!landscape && npVideoFull && !npVideoFullLocked) exitVideoFull();
+  });
+  // Something new loaded (the shim has already dropped the video), or the lock screen /
+  // car took playback back: the page follows.
+  audio.addEventListener('loadstart', function(){ if(npVideoOn && !audio.videoActive) resetNpVideoUi(); });
+  audio.addEventListener('videoexternal', function(){ if(npVideoOn) resetNpVideoUi(); });
+  document.addEventListener('visibilitychange', function(){ if(document.hidden && npVideoOn && !npVideoStream) setNpVideo(false); });
+
+  // ---------- Live stream video ----------
+  // A live stream that carries a picture (an IPTV channel pasted into search, say) uses the
+  // same video feature as podcasts: the picture in the artwork's place, the Turn Off / Turn On
+  // Video pill, full screen when asked for or when the phone turns on its side. The difference
+  // is who draws it. The page's own <video> can't play most IPTV formats, and the native player
+  // is already playing the stream, so in the app the native player draws the picture itself,
+  // in a native view laid exactly over #npVideo; this keeps that view in place (every frame
+  // while it shows), hides it whenever the box is covered (a menu, the queue, a dialog) or
+  // Now Playing isn't showing, and turns a tap on the picture into full screen on / off.
+  // It comes on by itself when the stream turns out to have video (the picture is being
+  // downloaded anyway); the pill turns it off for that stream. The sound never moves, so
+  // closing Now Playing or leaving the app just stops drawing the picture.
+  var videoPlugin = (audio && audio.isNative && window.Capacitor && window.Capacitor.Plugins &&
+    window.Capacitor.Plugins.AmplifyPlayer) || null;
+  var streamVideo = { has: false, w: 0, h: 0 };
+  var npVideoStream = false;       // the video now on is a live stream's (drawn natively)
+  var streamVideoOffKey = null;    // the stream whose video was turned off by hand
+  var videoLastSent = '', videoRaf = 0;
+
+  function streamVideoCapable(st){
+    return !!(videoPlugin && streamVideo.has && st && isLiveStream(st) && currentStation &&
+      favKey(st) === favKey(currentStation));
+  }
+  function setStreamVideoOn(on){
+    if(on){
+      if(npVideoOn) return;
+      npVideoOn = true; npVideoStream = true;
+      nowPlayingScreen.classList.add('np-video-on', 'np-video-stream');
+      npVideoWrap.hidden = false;
+      syncNpVideoToggle(currentStation);
+      if(window.innerWidth > window.innerHeight && !npVideoNoAutoFull) enterVideoFull(false);
+    } else {
+      resetNpVideoUi();
+    }
+    syncStreamVideo();
+  }
+  function streamVideoShowing(){
+    return npVideoOn && npVideoStream && streamVideo.has && !document.hidden &&
+      nowPlayingScreen.style.display === 'flex' && !npClosing() &&
+      !!npStation && streamVideoCapable(npStation);
+  }
+  // Is the box on screen with nothing of the page on top of it? Samples a grid across it, with
+  // the outer rows and columns just inside its edges, so a menu that only tucks under an edge
+  // still counts. Points past the edge of the screen don't count (the picture is clipped there
+  // the same way the page is).
+  function videoBoxClear(r){
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if(r.width < 2 || r.height < 2 || r.bottom <= 0 || r.top >= vh || r.right <= 0 || r.left >= vw) return false;
+    var xs = [r.left + 2, r.left + r.width * .25, r.left + r.width / 2, r.left + r.width * .75, r.right - 2];
+    var ys = [r.top + 2, r.top + r.height / 3, r.top + r.height * 2 / 3, r.bottom - 2];
+    var seen = 0;
+    for(var i = 0; i < xs.length; i++){
+      for(var j = 0; j < ys.length; j++){
+        var x = xs[i], y = ys[j];
+        if(x < 0 || y < 0 || x >= vw || y >= vh) continue;
+        var el = document.elementFromPoint(x, y);
+        if(!el || !npVideoWrap.contains(el)) return false;
+        seen++;
+      }
+    }
+    return seen > 0;
+  }
+  function sendVideoView(show, r){
+    if(!videoPlugin) return;
+    var msg = show
+      ? { show: true, x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }
+      : { show: false };
+    var key = JSON.stringify(msg);
+    if(key === videoLastSent) return;
+    videoLastSent = key;
+    videoPlugin.setVideoView(msg)['catch'](function(){});
+  }
+  function videoFrame(){
+    videoRaf = 0;
+    if(!streamVideoShowing()){ sendVideoView(false); return; }
+    if(streamVideo.w > 0 && streamVideo.h > 0) npVideo.style.aspectRatio = streamVideo.w + ' / ' + streamVideo.h;
+    var r = npVideo.getBoundingClientRect();
+    sendVideoView(videoBoxClear(r), r);
+    videoRaf = requestAnimationFrame(videoFrame);
+  }
+  // While a stream's video is on, a slow poll catches Now Playing opening again (the frame
+  // loop itself only runs while the picture shows).
+  var videoPoll = 0;
+  function syncStreamVideo(){
+    var on = npVideoOn && npVideoStream;
+    if(on && !videoPoll) videoPoll = setInterval(function(){ if(!videoRaf) videoFrame(); }, 250);
+    else if(!on && videoPoll){ clearInterval(videoPoll); videoPoll = 0; }
+    if(!on) npVideo.style.aspectRatio = '';
+    if(!videoRaf) videoFrame();
+  }
+  if(videoPlugin){
+    var onStreamVideo = function(ev){
+      if(!ev || ev.id !== audio._id) return;
+      streamVideo.has = !!ev.hasVideo; streamVideo.w = ev.width || 0; streamVideo.h = ev.height || 0;
+      var st = currentStation;
+      if(streamVideo.has && streamVideoCapable(st) && !npVideoOn && streamVideoOffKey !== favKey(st)){
+        setStreamVideoOn(true);
+      } else if(!streamVideo.has && npVideoStream){
+        resetNpVideoUi();
+      } else if(st){
+        syncNpVideoToggle(st);
+      }
+      syncStreamVideo();
+    };
+    videoPlugin.addListener('video', onStreamVideo);
+    videoPlugin.addListener('videotap', function(){
+      if(!npVideoStream) return;
+      if(npVideoFull) exitVideoFull(); else enterVideoFull(true);
+    });
+    videoPlugin.videoState().then(onStreamVideo)['catch'](function(){});
+    // Something new is loading: its own tracks will say whether it has a picture. A stream's
+    // video turned off by hand stays off only while that stream is the one playing.
+    audio.addEventListener('loadstart', function(){
+      streamVideo.has = false;
+      if(!currentStation || favKey(currentStation) !== streamVideoOffKey) streamVideoOffKey = null;
+      syncStreamVideo();
+    });
+    document.addEventListener('visibilitychange', syncStreamVideo);
+  }
+
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
     if(isLocalTrack(station)){
       renderNpLibraryRelated(station);
+      return;
+    }
+    if(isPodcastTrack(station)){
+      renderNpMoreEpisodes(station, requestId);
       return;
     }
     var headingEl = npRelated.querySelector('.np-related-heading');
@@ -6798,6 +7362,7 @@
     renderNpGenres(st);
     renderNpCollection(st);
     renderNpRelated(st);
+    syncNpVideoToggle(st);
     updateNowPlayingFavState();
     updateNpPlayBtn();
     syncSeekBar();
@@ -8922,7 +9487,8 @@
         heading.textContent = podcastDateHeadingLabel(iso);
         stationsGrid.appendChild(heading);
       }
-      var row = buildPodcastEpisodeRow(sub.latestEpisode);
+      // The Podcasts page: no menu, and titles get two lines (build 48).
+      var row = buildPodcastEpisodeRow(sub.latestEpisode, { menu: false });
       row.classList.add('podcast-date-row');
       stationsGrid.appendChild(row);
     });
@@ -9877,6 +10443,11 @@
         label.className = 'cs-label';
         label.textContent = show.collectionName + (show.artistName ? ' — ' + show.artistName : '');
         row.appendChild(label);
+        (function(row, label){
+          watchShowVideo(row, show.collectionId, function(){
+            if(!row.querySelector('.cs-video')) row.insertBefore(videoMark('cs-video'), label.nextSibling);
+          });
+        })(row, label);
         var already = isSubscribed(show.collectionId);
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -11150,6 +11721,93 @@
     });
   }
 
+  // ---------- does a show publish video? ----------
+  // Asked only for search results actually on screen (IntersectionObserver), at most two at a
+  // time -- every lookup is a call against Apple's rate limit -- and remembered for a week, so a
+  // show seen again isn't asked about again. The rule is the episode lists' own: Apple's
+  // directory labels an episode "video" (or, lacking a label, it's an mp4/m4v/mov file).
+  var SHOW_VIDEO_KEY = 'amplifyShowVideo';
+  var SHOW_VIDEO_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  var SHOW_VIDEO_PARALLEL = 2;
+  var showVideoCache = null;
+  var showVideoPending = {};
+  var showVideoQueue = [];
+  var showVideoRunning = 0;
+  function showVideoStore(){
+    if(showVideoCache) return showVideoCache;
+    try{ showVideoCache = JSON.parse(localStorage.getItem(SHOW_VIDEO_KEY) || '{}') || {}; }catch(e){ showVideoCache = {}; }
+    return showVideoCache;
+  }
+  function episodeIsVideo(r){
+    var ct = String(r.episodeContentType || '');
+    return /^video$/i.test(ct) || (!ct && /^(mp4|m4v|mov)$/i.test(String(r.episodeFileExtension || '')));
+  }
+  function knownShowVideo(id){
+    var hit = showVideoStore()[id];
+    if(hit && (Date.now() - (hit.ts || 0)) < SHOW_VIDEO_TTL_MS) return hit.v;
+    // A followed show whose newest episode is already known answers for free.
+    var sub = podcastSubs.filter(function(s){ return String(s.collectionId) === String(id); })[0];
+    if(sub && sub.latestEpisode && sub.latestEpisode.isVideo) return true;
+    return undefined;
+  }
+  function pumpShowVideo(){
+    while(showVideoRunning < SHOW_VIDEO_PARALLEL && showVideoQueue.length){
+      var job = showVideoQueue.shift();
+      showVideoRunning++;
+      itunesJsonp(ITUNES_BASE + '/lookup?entity=podcastEpisode&limit=3&id=' + encodeURIComponent(job.id), 0, { background: true })
+        .then(function(data){
+          var eps = ((data && data.results) || []).filter(function(r){ return r.wrapperType === 'podcastEpisode'; });
+          return eps.some(episodeIsVideo);
+        }, function(){ return null; })   // unknown: don't remember a failure as "no video"
+        .then((function(j){ return function(v){
+          showVideoRunning--;
+          if(v !== null){
+            showVideoStore()[j.id] = { v: v, ts: Date.now() };
+            try{ localStorage.setItem(SHOW_VIDEO_KEY, JSON.stringify(showVideoCache)); }catch(e){}
+          }
+          delete showVideoPending[j.id];
+          j.resolve(!!v);
+          pumpShowVideo();
+        }; })(job));
+    }
+  }
+  function showHasVideo(id){
+    var known = knownShowVideo(id);
+    if(known !== undefined) return Promise.resolve(known);
+    if(showVideoPending[id]) return showVideoPending[id];
+    showVideoPending[id] = new Promise(function(resolve){ showVideoQueue.push({ id: id, resolve: resolve }); });
+    pumpShowVideo();
+    return showVideoPending[id];
+  }
+  var showVideoObserver = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(!e.isIntersecting) return;
+      showVideoObserver.unobserve(e.target);
+      var el = e.target;
+      showHasVideo(el.dataset.showVideoId).then(function(v){ if(v && el.isConnected) el._addVideoMark(); });
+    });
+  }, { rootMargin: '100px' }) : null;
+  // Watches a result; when it scrolls into view and the show turns out to publish video, calls
+  // addMark() once. Known answers are painted at once, with no lookup.
+  function watchShowVideo(el, id, addMark){
+    if(!id) return;
+    var known = knownShowVideo(id);
+    if(known === true){ addMark(); return; }
+    if(known === false) return;
+    el.dataset.showVideoId = id;
+    el._addVideoMark = addMark;
+    if(showVideoObserver) showVideoObserver.observe(el);
+    else showHasVideo(id).then(function(v){ if(v) addMark(); });
+  }
+  function videoMark(className){
+    var m = document.createElement('span');
+    m.className = className;
+    m.title = 'Video podcast';
+    m.setAttribute('aria-label', 'Video podcast');
+    m.innerHTML = VIDEO_ICON_SVG;
+    return m;
+  }
+
   function itunesSearchPodcasts(term, limit, opts){
     var url = ITUNES_BASE + '/search?media=podcast&entity=podcast&limit=' + (limit || 15)
       + '&term=' + encodeURIComponent(term);
@@ -11413,7 +12071,10 @@
       duration: r.trackTimeMillis ? Math.round(r.trackTimeMillis / 1000) : 0,
       episodeUrl: url,
       description: r.description || r.shortDescription || '',
-      isVideo: r.episodeContentType === 'Video'
+      // Apple sends "video" / "audio" in lowercase (the old check compared with "Video" and
+      // never matched). The file extension is only a fallback for records without a type.
+      isVideo: /^video$/i.test(String(r.episodeContentType || ''))
+        || (!r.episodeContentType && /^(mp4|m4v|mov)$/i.test(String(r.episodeFileExtension || '')))
     };
   }
 
@@ -11626,7 +12287,8 @@
       releaseDate: episode.releaseDate,
       durationSec: episode.duration || 0,
       episodeUrl: episode.episodeUrl,
-      description: episode.description
+      description: episode.description,
+      isVideo: !!episode.isVideo
     };
   }
   function getPodcastProgress(guid){
@@ -11674,7 +12336,8 @@
       type: 'podcast', guid: rec.guid, collectionId: rec.collectionId,
       collectionName: rec.collectionName, artistName: rec.artistName,
       name: rec.trackName, favicon: rec.artworkUrl, releaseDate: rec.releaseDate,
-      duration: rec.durationSec, episodeUrl: rec.episodeUrl, description: rec.description
+      duration: rec.durationSec, episodeUrl: rec.episodeUrl, description: rec.description,
+      isVideo: !!rec.isVideo
     };
   }
   function loadContinueListening(limit){
@@ -13771,7 +14434,23 @@
       flushArtistMetaFallback();
     }, 400);
   }
+  // Saved artist info loads asynchronously at startup. Until it has, no portrait lookup or
+  // request may run: a tile drawn first used to find nothing saved, and (a) remember "no
+  // picture" for the session, and (b) go to Wikipedia, where an empty answer -- no signal
+  // looks the same as no article -- overwrote the good saved record and deleted its photo.
+  // Everything that needs saved artist info waits on artistMetaReady instead.
+  var artistMetaLoaded = false;
+  var artistMetaReadyResolve;
+  var artistMetaReady = new Promise(function(r){ artistMetaReadyResolve = r; });
+  function markArtistMetaLoaded(){
+    if(artistMetaLoaded) return;
+    artistMetaLoaded = true;
+    artistMetaReadyResolve();
+  }
   function loadArtistMetaCache(){
+    return loadArtistMetaCacheRows().then(function(m){ markArtistMetaLoaded(); return m; });
+  }
+  function loadArtistMetaCacheRows(){
     return idbDo([LIB_STORE_ARTIST_META], 'readonly', function(tx){
       return tx.objectStore(LIB_STORE_ARTIST_META).getAll();
     }).then(function(rows){
@@ -13822,6 +14501,7 @@
    * it is fresh; otherwise fetches, stores and returns it. Never rejects.
    */
   function ensureArtistMeta(entry){
+    if(!artistMetaLoaded) return artistMetaReady.then(function(){ return ensureArtistMeta(entry); });
     var key = entry.key;
     var cached = artistMeta[key];
     if(artistMetaFresh(cached)) return Promise.resolve(cached);
@@ -13830,6 +14510,16 @@
     artistMetaPending[key] = queueArtistMetaFetch(function(){
       return fetchArtistMetadata(entry.name);
     }).then(function(found){
+      // The lookup can't tell "no article" from "no signal": both come back empty. Refreshing
+      // a good, saved record (a monthly refresh, often in the car) used to save "no portrait"
+      // and delete the photo on a failed request, leaving the artist blank for days. A good
+      // record is kept and retried in a few days; a wrong one (not about music) is still
+      // replaced, since that is what the refresh is for.
+      if(!found && cached && cached.ok && aboutMusic(cached)){
+        var kept = Object.assign({}, cached, { ts: Date.now() - (ARTIST_META_TTL_MS - ARTIST_META_MISS_TTL_MS) });
+        delete artistMetaPending[key];
+        return saveArtistMeta(kept).then(function(){ return kept; });
+      }
       var record = {
         key: key,
         query: entry.name,
@@ -13971,6 +14661,7 @@
     if(artistPortraitObserver) artistPortraitObserver.disconnect();
   }
   function requestArtistPortrait(entry, container){
+    if(!artistMetaLoaded){ artistMetaReady.then(function(){ requestArtistPortrait(entry, container); }); return; }
     var key = entry.key;
     if(artistPortraitAsked[key]) return;
     // A cached answer -- a portrait, or a confirmed absence of one -- needs no request.
@@ -14035,6 +14726,8 @@
    * music on this device.
    */
   function resolveArtistArtUrl(entry){
+    // Wait for saved portraits rather than answer "none" and have that remembered.
+    if(!artistMetaLoaded) return artistMetaReady.then(function(){ return resolveArtistArtUrl(entry); });
     var key = entry.key;
     if(Object.prototype.hasOwnProperty.call(artistArtResolved, key)){
       return Promise.resolve(artistArtResolved[key]);
@@ -14102,6 +14795,29 @@
     })['catch'](function(){});
   }
   // Repaints every visible copy of an artist's art after a custom URL is set or cleared.
+  // A "no picture" answer is only as good as what had loaded when it was given. Saved
+  // portraits (artist info in IndexedDB) and the station list both load asynchronously at
+  // startup, and a tile drawn before they arrived remembered "no picture" for the rest of
+  // the session: the redraw that followed trusted that answer, and the portrait request was
+  // skipped because the saved info now counted as fresh. Only opening the artist page forced
+  // a new lookup. So when either arrives, the premature answers are forgotten and every
+  // artist picture still blank on screen -- grid, Favorite Artists, home rows, the open
+  // artist page -- is drawn again from what is now known.
+  function refreshMissingArtistArt(){
+    Object.keys(artistArtResolved).forEach(function(k){ if(!artistArtResolved[k]) delete artistArtResolved[k]; });
+    document.querySelectorAll('.tile[data-entity="artist"]').forEach(function(el){
+      var art = el.querySelector('.tile-art');
+      if(!art || art.querySelector('img')) return;
+      var key = String(el.dataset.key || '').replace(/^artist:/, '');
+      if(!key) return;
+      var name = el.querySelector('.tile-name');
+      renderArtistArt(art, findArtistEntry(key) || { key: key, name: name ? name.textContent.trim() : key });
+    });
+    if(activeArtistKey && !artistHeroArt.querySelector('img')){
+      var open = findArtistEntry(activeArtistKey);
+      if(open) renderArtistArt(artistHeroArt, open);
+    }
+  }
   function refreshArtistArt(entry){
     delete artistArtResolved[entry.key];
     var key = artistArtKey(entry.key);
@@ -16477,6 +17193,7 @@
         if(dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.4 || el.scrollTop > 0){ mode = 'ignore'; return; }
         mode = 'drag';
         h = el.offsetHeight || window.innerHeight;
+        el.classList.add('np-float-off');   // the close button goes the moment a swipe starts
         closeNpMenu();
         // The page comes back underneath, where it was, so it shows as the screen moves.
         document.body.classList.add('np-sheet');
@@ -16500,6 +17217,7 @@
         return;
       }
       // Spring back up, then Now Playing owns the screen again.
+      el.classList.remove('np-float-off');
       el.classList.add('np-sheet-anim');
       void el.offsetHeight;
       el.style.transform = '';
@@ -17463,6 +18181,14 @@
           artFrom: { type: 'podcast', guid: 'show:' + item.collectionId, favicon: item.artworkUrl, name: item.collectionName },
           onClick: function(){ pushView(); openShowPage(item.collectionId); }
         }));
+        (function(tile){
+          watchShowVideo(tile, item.collectionId, function(){
+            if(tile.querySelector('.tile-video')) return;
+            var mark = videoMark('tile-video');
+            var sub = tile.querySelector('.tile-sub') || tile.querySelector('.tile-name');
+            if(sub && sub.parentNode) sub.parentNode.insertBefore(mark, sub.nextSibling); else tile.appendChild(mark);
+          });
+        })(stationsGrid.lastElementChild);
       } else if(group.id === 'albums'){
         stationsGrid.appendChild(buildEntityTile({
           key: 'album:' + item.key,
@@ -17835,7 +18561,10 @@
   // list episodes this way for a reason: an episode's title is often long enough on its own
   // to want the whole row's width, and there's no cover-art variety to make a grid worthwhile
   // when every row shares the same show art.
-  function buildPodcastEpisodeRow(ep){
+  // A small video camera, drawn (the icon font subset has no video glyph).
+  var VIDEO_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="6" width="13" height="12" rx="2.5"></rect><path d="M15.5 10.2 21 7v10l-5.5-3.2z"></path></svg>';
+  // opts.menu false: no Play Next / Add to Queue menu (the Podcasts page, build 48).
+  function buildPodcastEpisodeRow(ep, opts){
     var row = document.createElement('div');
     row.className = 'tile song-row';
     row.dataset.key = favKey(ep);
@@ -17866,12 +18595,21 @@
       sub.textContent = bits.join(' · ');
       body.appendChild(sub);
     }
+    if(ep.isVideo){
+      // A new line under the date: a small camera, labelled for screen readers.
+      var vid = document.createElement('div');
+      vid.className = 'song-row-video';
+      vid.title = 'Video available';
+      vid.setAttribute('aria-label', 'Video available');
+      vid.innerHTML = VIDEO_ICON_SVG;
+      body.appendChild(vid);
+    }
     row.appendChild(body);
 
     // No favorite heart here (unlike buildSongRow) -- episode titles run long, and the row
     // has no cover-art variety to spare a column for anything but the title and its date.
     // Play Next / Add to Queue.
-    row.appendChild(buildRowMoreBtn(ep));
+    if(!opts || opts.menu !== false) row.appendChild(buildRowMoreBtn(ep));
     row.addEventListener('click', function(){ playEntity(ep); });
     return row;
   }
@@ -18170,6 +18908,8 @@
   });
 
   // ---------- export / import (favorites, recent stations, custom cover art, custom searches) ----------
+  // What a backup holds, for the Export dialog.
+  var EXPORT_CONTENTS_NOTE = 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions & podcast categories are all in it.';
   exportFavBtn.addEventListener('click', function(){
     var payload = {
       favorites: favorites,
@@ -18183,16 +18923,34 @@
       podcastCategories: podcastCategories,
       exportedAt: new Date().toISOString()
     };
-    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var text = JSON.stringify(payload, null, 2);
+    // Dated, so a second export beside an older one is easy to tell apart.
+    var fileName = 'amplify-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    var nativePlugin = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
+      && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer;
+    if(nativePlugin && typeof nativePlugin.saveToDownloads === 'function'){
+      // In the Android app a download link does nothing (the WebView ignores it), which is how
+      // Export once reported success while writing no file. The native side writes it into
+      // Downloads and says where; the dialog reports what actually happened.
+      nativePlugin.saveToDownloads({ name: fileName, text: text, mime: 'application/json' }).then(function(res){
+        var where = (res && res.folder) || 'Downloads';
+        var saved = (res && res.name) || fileName;
+        openDataDialog('Export Complete', 'Saved to your ' + where + ' folder as \u201c' + saved + '\u201d. ' + EXPORT_CONTENTS_NOTE, false);
+      }, function(err){
+        openDataDialog('Export Failed', 'The backup could not be saved' + (err && err.message ? ': ' + err.message : '.') + ' Nothing was changed.', true);
+      });
+      return;
+    }
+    var blob = new Blob([text], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'radio-player-data.json';
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    openDataDialog('Export Complete', 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions & podcast categories have been saved to radio-player-data.json.', false);
+    openDataDialog('Export Complete', 'Saved as \u201c' + fileName + '\u201d. ' + EXPORT_CONTENTS_NOTE, false);
   });
   importFavBtn.addEventListener('click', function(){ importFavInput.click(); });
   importFavInput.addEventListener('change', function(){
@@ -18614,113 +19372,6 @@
     recordRecent(station);
   }
 
-  // ---------- stream video ----------
-  // A stream that carries a picture (an IPTV channel pasted into search, say) shows it on the
-  // Now Playing screen, in the #npVideo box at the top. Only for live streams, and only while
-  // Now Playing is showing what is actually playing.
-  //
-  // Android app: the native player makes the sound and has no screen of its own, so it draws
-  // the picture in a native view laid over this page. It reports whether the stream has video
-  // ('video' events); this block tells it, every frame while there is a picture to show, where
-  // the box is -- and to hide whenever the box is off screen, covered (a menu, the queue
-  // panel, a dialog) or Now Playing isn't open. Tapping the picture there goes full screen.
-  // Browser: the player element is a <video>; it moves into the box while there is a picture
-  // and back out of the layout when there isn't. Nothing changes for streams without video.
-  var npVideo = document.getElementById('npVideo');
-  var videoPlugin = (window.AmplifyNativeAudio && window.Capacitor && window.Capacitor.Plugins &&
-    window.Capacitor.Plugins.AmplifyPlayer) || null;
-  var streamVideo = { has: false, w: 0, h: 0, fullscreen: false };
-  var videoLastSent = '';
-  var videoRaf = 0, videoPoll = 0;
-
-  function videoWanted(){
-    if(!streamVideo.has || !npVideo || document.hidden) return false;
-    if(nowPlayingScreen.style.display !== 'flex' || npClosing()) return false;
-    if(!currentStation || !npStation || !isLiveStream(currentStation)) return false;
-    return favKey(npStation) === favKey(currentStation);
-  }
-  // Is the box on screen with nothing of the page on top of it? Samples a grid across it,
-  // with its outer rows and columns just inside the edges, so a menu that only tucks under
-  // an edge still counts. Points past the edge of the screen don't count (the picture is
-  // clipped there the same way the page is).
-  function videoBoxClear(r){
-    var vw = window.innerWidth, vh = window.innerHeight;
-    if(r.width < 2 || r.height < 2 || r.bottom <= 0 || r.top >= vh || r.right <= 0 || r.left >= vw) return false;
-    var xs = [r.left + 2, r.left + r.width * .25, r.left + r.width / 2, r.left + r.width * .75, r.right - 2];
-    var ys = [r.top + 2, r.top + r.height / 3, r.top + r.height * 2 / 3, r.bottom - 2];
-    var pts = [];
-    xs.forEach(function(x){ ys.forEach(function(y){ pts.push([x, y]); }); });
-    var seen = 0;
-    for(var i = 0; i < pts.length; i++){
-      var x = pts[i][0], y = pts[i][1];
-      if(x < 0 || y < 0 || x >= vw || y >= vh) continue;
-      var el = document.elementFromPoint(x, y);
-      if(!el || !npVideo.contains(el)) return false;
-      seen++;
-    }
-    return seen > 0;
-  }
-  function sendVideoView(show, r){
-    if(!videoPlugin) return;
-    var msg = show
-      ? { show: true, x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }
-      : { show: false };
-    var key = JSON.stringify(msg);
-    if(key === videoLastSent) return;
-    videoLastSent = key;
-    videoPlugin.setVideoView(msg)['catch'](function(){});
-  }
-  function placeBrowserVideo(show){
-    if(videoPlugin || !audio || audio.isNative) return;
-    if(show && audio.parentNode !== npVideo) npVideo.appendChild(audio);
-    else if(!show && audio.parentNode !== document.body) document.body.appendChild(audio);
-  }
-  function videoFrame(){
-    videoRaf = 0;
-    var want = videoWanted();
-    npVideo.hidden = !want;
-    nowPlayingScreen.classList.toggle('has-video', want);
-    if(want && streamVideo.w > 0 && streamVideo.h > 0){
-      npVideo.style.setProperty('--video-aspect', String(streamVideo.w / streamVideo.h));
-    }
-    placeBrowserVideo(want);
-    if(!want){ sendVideoView(false); return; }
-    var r = npVideo.getBoundingClientRect();
-    // Full screen covers the page anyway, and the page reflows under it as the phone turns:
-    // only a change of stream or leaving Now Playing takes the picture down then.
-    sendVideoView(streamVideo.fullscreen || videoBoxClear(r), r);
-    videoRaf = requestAnimationFrame(videoFrame);
-  }
-  // Called whenever something might have changed. While there is a picture, a slow poll
-  // catches Now Playing opening (the frame loop only runs while it is wanted).
-  function syncStreamVideo(){
-    if(streamVideo.has && !videoPoll){
-      videoPoll = setInterval(function(){ if(!videoRaf) videoFrame(); }, 250);
-    } else if(!streamVideo.has && videoPoll){
-      clearInterval(videoPoll); videoPoll = 0;
-    }
-    if(!videoRaf) videoFrame();
-  }
-  function setStreamVideo(has, w, h){
-    streamVideo.has = !!has; streamVideo.w = w || 0; streamVideo.h = h || 0;
-    syncStreamVideo();
-  }
-  if(videoPlugin){
-    videoPlugin.addListener('video', function(ev){
-      if(!ev) return;
-      if(ev.id !== audio._id){ if(streamVideo.has) setStreamVideo(false); return; }
-      streamVideo.fullscreen = !!ev.fullscreen;
-      setStreamVideo(ev.hasVideo, ev.width, ev.height);
-    });
-    videoPlugin.videoState().then(function(ev){
-      if(ev && ev.id === audio._id) setStreamVideo(ev.hasVideo, ev.width, ev.height);
-    })['catch'](function(){});
-  } else if(audio && audio.addEventListener){
-    var browserVideoCheck = function(){ setStreamVideo(audio.videoWidth > 0, audio.videoWidth, audio.videoHeight); };
-    ['loadedmetadata', 'resize', 'emptied', 'loadstart'].forEach(function(t){ audio.addEventListener(t, browserVideoCheck); });
-  }
-  document.addEventListener('visibilitychange', syncStreamVideo);
-
   // ---------- stream auto-reconnect ----------
   // Internet radio drops all the time -- a server restarts, a phone hops from Wi-Fi to
   // cellular, a tunnel. Rather than leaving the station dead with an error until someone
@@ -18815,12 +19466,19 @@
       return;
     }
 
+    // Only while this episode is still the one wanted, as playStreamStation checks: an
+    // episode slow to fail used to write its error over whatever was picked after it --
+    // tap a podcast, switch to a station, and "Could not play this episode" replaced the
+    // station in the player bar a moment later.
+    function stillWanted(){ return currentStation === episode; }
     tryPlayUrl(url).then(function(){
+      if(!stillWanted()) return;
       try{ audio.playbackRate = loadPodcastSpeed(); }catch(e){}
       resumePodcastPosition(episode);
       onPlaybackSuccess(episode);
       markPodcastEpisodePlayed(episode);
     })['catch'](function(err){
+      if(!stillWanted()) return;
       attemptInProgress = false;
       showPlaybackFailure(episode, url, err);
     });
@@ -19288,9 +19946,9 @@
   loadLibrary();
   // Warms the Artists list so the sidebar count is the merged one, not a library-only
   // undercount. Normally a cache read; the network is touched only once a day.
-  loadArtistStations().then(function(){ renderLibraryList(); })['catch'](function(){});
+  loadArtistStations().then(function(){ renderLibraryList(); refreshMissingArtistArt(); })['catch'](function(){});
   // Cached biographies and portraits only; this never touches the network.
-  loadArtistMetaCache().then(function(){ refreshLibraryView(); })['catch'](function(){});
+  loadArtistMetaCache().then(function(){ refreshMissingArtistArt(); refreshLibraryView(); })['catch'](function(){});
   // ---------- Android Auto menu (Android app only) ----------
   // The car can't see this page, so every list its menu needs is worked out here and saved
   // to the native side as one snapshot (see CarLibrary.java). It is re-sent whenever the
@@ -19359,7 +20017,8 @@
       })['catch'](function(){ return ''; });
     }
     function carEpisode(ep, prog, group){
-      if(!ep || !ep.episodeUrl || ep.isVideo) return null;
+      // A video episode's file carries its sound too, so the car plays it like any other.
+      if(!ep || !ep.episodeUrl) return null;
       var rec = prog && prog[ep.guid];
       var o = {
         t: 'episode', k: favKey(ep), guid: ep.guid, title: ep.name || 'Episode',
@@ -19855,7 +20514,8 @@
           collectionName: r.collectionName || it.sub || 'Podcast', artistName: r.artistName || '',
           name: r.trackName || it.title || 'Episode', favicon: r.artworkUrl || it.art || '',
           releaseDate: r.releaseDate || '', duration: r.durationSec || 0,
-          episodeUrl: r.episodeUrl || it.url, description: r.description || ''
+          episodeUrl: r.episodeUrl || it.url, description: r.description || '',
+          isVideo: !!r.isVideo
         };
       }
       if(it.t === 'station'){

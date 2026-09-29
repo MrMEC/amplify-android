@@ -539,7 +539,7 @@ final class CarLibrary {
         return "You aren't following any podcasts yet.";
       case "lib:songs":
         return "No songs yet. On your phone, open Amplify, tap Add folder and pick your music"
-                   + " folder.";
+            + " folder.";
       case "home:topartists":
         return "Artists you play most will show up here.";
       case "home:favorites":
@@ -658,6 +658,11 @@ final class CarLibrary {
     if (jSONObject == null) {
       return arrayList;
     }
+    // The artist's stations first, then their albums (build 48).
+    Iterator<JSONObject> it = arrayOf(jSONObject, "stations").iterator();
+    while (it.hasNext()) {
+      arrayList.add(withGroup(it.next(), "Stations"));
+    }
     JSONArray jSONArrayOptJSONArray = jSONObject.optJSONArray("albums");
     if (jSONArrayOptJSONArray != null) {
       for (int i = 0; i < jSONArrayOptJSONArray.length(); i++) {
@@ -670,10 +675,6 @@ final class CarLibrary {
         }
         arrayList.add(jSONObject2);
       }
-    }
-    Iterator<JSONObject> it = arrayOf(jSONObject, "stations").iterator();
-    while (it.hasNext()) {
-      arrayList.add(withGroup(it.next(), "Stations"));
     }
     return arrayList;
   }
