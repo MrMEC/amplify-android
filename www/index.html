@@ -1998,6 +1998,24 @@
     transition:filter .08s linear, opacity .08s linear;
     will-change:filter, opacity, transform;
   }
+  /* The picture of a stream that carries video. A box at the top of the screen, under the
+     minimize button and clear of the title (which starts at the middle of the screen): as tall
+     as the width allows at the video's own shape, but never reaching that title. Centred when
+     that makes it narrower than the screen. Black, so letterboxing reads as part of the frame.
+     The cover art steps aside while it shows; its blurred twin stays as the backdrop. */
+  .np-video{
+    position:absolute; z-index:2; left:50%; transform:translateX(-50%);
+    top:calc(env(safe-area-inset-top, 0px) + 64px);
+    height:min(calc(100vw / var(--video-aspect, 1.7778)), calc(50vh - env(safe-area-inset-top, 0px) - 84px));
+    height:min(calc(100vw / var(--video-aspect, 1.7778)), calc(50dvh - env(safe-area-inset-top, 0px) - 84px));
+    aspect-ratio:var(--video-aspect, 1.7778); max-width:100%;
+    background:#000; overflow:hidden;
+  }
+  .np-video[hidden]{ display:none; }
+  .np-video video{ width:100%; height:100%; object-fit:contain; display:block; background:#000; }
+  .now-playing-screen.has-video .np-art{ visibility:hidden; }
+  /* The player element lives outside the layout until a picture needs it. */
+  body > #audio{ display:none; }
   .np-hero-fade{
     position:absolute; inset:0; pointer-events:none;
     /* Only the top darkening now, so the floating buttons read against a pale cover. */
@@ -3574,6 +3592,12 @@
     -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
   }
   body.rotate-lock .np-art img{ border-radius:18px; }
+  /* Landscape: the picture takes the artwork's square, letterboxed. */
+  body.rotate-lock .np-video{
+    top:0 !important; left:0 !important; transform:none !important;
+    width:100% !important; height:100% !important; max-width:none !important;
+    border-radius:18px; overflow:hidden;
+  }
   /* margin-top:0 explicitly cancels the vertical-centring offset the plain (portrait) mobile
      rule above gives .np-hero-foot (calc(50vh - 100vw), meant to land the title on a tall
      phone screen's centre) -- rotate-lock is its own row layout, centred by .np-hero's own
@@ -4395,6 +4419,10 @@
           <div class="np-art-bleed" id="npArtBleed" aria-hidden="true"></div>
           <div class="np-art" id="npArt"></div>
           <div class="np-hero-fade" aria-hidden="true"></div>
+          <!-- A stream that carries video (an IPTV channel pasted into search) shows its picture
+               here. In the Android app the native player draws it on top of this box (see
+               "stream video" in the script); in a browser the player element itself moves in. -->
+          <div class="np-video" id="npVideo" aria-label="Video" hidden></div>
         </div>
 
         <div class="np-hero-top">
@@ -5024,7 +5052,9 @@
   </button>
 </div>
 
-<audio id="audio" preload="none"></audio>
+<!-- A <video> rather than an <audio>, so a stream that carries a picture can show it (it moves
+     into the Now Playing video box). Everywhere else it is just the player, and stays hidden. -->
+<video id="audio" preload="none" playsinline></video>
 
 <script>
 // ---------- Android app bridge ----------
@@ -18583,6 +18613,113 @@
     recordArtistPlay(station);
     recordRecent(station);
   }
+
+  // ---------- stream video ----------
+  // A stream that carries a picture (an IPTV channel pasted into search, say) shows it on the
+  // Now Playing screen, in the #npVideo box at the top. Only for live streams, and only while
+  // Now Playing is showing what is actually playing.
+  //
+  // Android app: the native player makes the sound and has no screen of its own, so it draws
+  // the picture in a native view laid over this page. It reports whether the stream has video
+  // ('video' events); this block tells it, every frame while there is a picture to show, where
+  // the box is -- and to hide whenever the box is off screen, covered (a menu, the queue
+  // panel, a dialog) or Now Playing isn't open. Tapping the picture there goes full screen.
+  // Browser: the player element is a <video>; it moves into the box while there is a picture
+  // and back out of the layout when there isn't. Nothing changes for streams without video.
+  var npVideo = document.getElementById('npVideo');
+  var videoPlugin = (window.AmplifyNativeAudio && window.Capacitor && window.Capacitor.Plugins &&
+    window.Capacitor.Plugins.AmplifyPlayer) || null;
+  var streamVideo = { has: false, w: 0, h: 0, fullscreen: false };
+  var videoLastSent = '';
+  var videoRaf = 0, videoPoll = 0;
+
+  function videoWanted(){
+    if(!streamVideo.has || !npVideo || document.hidden) return false;
+    if(nowPlayingScreen.style.display !== 'flex' || npClosing()) return false;
+    if(!currentStation || !npStation || !isLiveStream(currentStation)) return false;
+    return favKey(npStation) === favKey(currentStation);
+  }
+  // Is the box on screen with nothing of the page on top of it? Samples a grid across it,
+  // with its outer rows and columns just inside the edges, so a menu that only tucks under
+  // an edge still counts. Points past the edge of the screen don't count (the picture is
+  // clipped there the same way the page is).
+  function videoBoxClear(r){
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if(r.width < 2 || r.height < 2 || r.bottom <= 0 || r.top >= vh || r.right <= 0 || r.left >= vw) return false;
+    var xs = [r.left + 2, r.left + r.width * .25, r.left + r.width / 2, r.left + r.width * .75, r.right - 2];
+    var ys = [r.top + 2, r.top + r.height / 3, r.top + r.height * 2 / 3, r.bottom - 2];
+    var pts = [];
+    xs.forEach(function(x){ ys.forEach(function(y){ pts.push([x, y]); }); });
+    var seen = 0;
+    for(var i = 0; i < pts.length; i++){
+      var x = pts[i][0], y = pts[i][1];
+      if(x < 0 || y < 0 || x >= vw || y >= vh) continue;
+      var el = document.elementFromPoint(x, y);
+      if(!el || !npVideo.contains(el)) return false;
+      seen++;
+    }
+    return seen > 0;
+  }
+  function sendVideoView(show, r){
+    if(!videoPlugin) return;
+    var msg = show
+      ? { show: true, x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }
+      : { show: false };
+    var key = JSON.stringify(msg);
+    if(key === videoLastSent) return;
+    videoLastSent = key;
+    videoPlugin.setVideoView(msg)['catch'](function(){});
+  }
+  function placeBrowserVideo(show){
+    if(videoPlugin || !audio || audio.isNative) return;
+    if(show && audio.parentNode !== npVideo) npVideo.appendChild(audio);
+    else if(!show && audio.parentNode !== document.body) document.body.appendChild(audio);
+  }
+  function videoFrame(){
+    videoRaf = 0;
+    var want = videoWanted();
+    npVideo.hidden = !want;
+    nowPlayingScreen.classList.toggle('has-video', want);
+    if(want && streamVideo.w > 0 && streamVideo.h > 0){
+      npVideo.style.setProperty('--video-aspect', String(streamVideo.w / streamVideo.h));
+    }
+    placeBrowserVideo(want);
+    if(!want){ sendVideoView(false); return; }
+    var r = npVideo.getBoundingClientRect();
+    // Full screen covers the page anyway, and the page reflows under it as the phone turns:
+    // only a change of stream or leaving Now Playing takes the picture down then.
+    sendVideoView(streamVideo.fullscreen || videoBoxClear(r), r);
+    videoRaf = requestAnimationFrame(videoFrame);
+  }
+  // Called whenever something might have changed. While there is a picture, a slow poll
+  // catches Now Playing opening (the frame loop only runs while it is wanted).
+  function syncStreamVideo(){
+    if(streamVideo.has && !videoPoll){
+      videoPoll = setInterval(function(){ if(!videoRaf) videoFrame(); }, 250);
+    } else if(!streamVideo.has && videoPoll){
+      clearInterval(videoPoll); videoPoll = 0;
+    }
+    if(!videoRaf) videoFrame();
+  }
+  function setStreamVideo(has, w, h){
+    streamVideo.has = !!has; streamVideo.w = w || 0; streamVideo.h = h || 0;
+    syncStreamVideo();
+  }
+  if(videoPlugin){
+    videoPlugin.addListener('video', function(ev){
+      if(!ev) return;
+      if(ev.id !== audio._id){ if(streamVideo.has) setStreamVideo(false); return; }
+      streamVideo.fullscreen = !!ev.fullscreen;
+      setStreamVideo(ev.hasVideo, ev.width, ev.height);
+    });
+    videoPlugin.videoState().then(function(ev){
+      if(ev && ev.id === audio._id) setStreamVideo(ev.hasVideo, ev.width, ev.height);
+    })['catch'](function(){});
+  } else if(audio && audio.addEventListener){
+    var browserVideoCheck = function(){ setStreamVideo(audio.videoWidth > 0, audio.videoWidth, audio.videoHeight); };
+    ['loadedmetadata', 'resize', 'emptied', 'loadstart'].forEach(function(t){ audio.addEventListener(t, browserVideoCheck); });
+  }
+  document.addEventListener('visibilitychange', syncStreamVideo);
 
   // ---------- stream auto-reconnect ----------
   // Internet radio drops all the time -- a server restarts, a phone hops from Wi-Fi to

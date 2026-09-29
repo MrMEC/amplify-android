@@ -17,10 +17,13 @@ import androidx.activity.result.ActivityResult;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.core.content.ContextCompat;
+import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Tracks;
+import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaController;
@@ -67,6 +70,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private final Handler main = new Handler(Looper.getMainLooper());
   private final List<Runnable> pending = new ArrayList();
   private final Player.Listener exoListener = new ExoListener();
+  // Video: whether what is loaded carries a picture, its size, and the view that shows it.
+  private boolean hasVideo;
+  private int videoW, videoH;
+  private float videoRatio = 1f;
+  private VideoOverlay video;
   private final Runnable progressTick =
       () -> {
         this.progressTick();
@@ -131,6 +139,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           }
           this.attached = false;
           this.main.removeCallbacks(this.progressTick);
+          if (this.video != null) {
+            this.video.release();
+            this.video = null;
+          }
           ListenableFuture<MediaController> listenableFuture = this.controllerFuture;
           if (listenableFuture != null) {
             MediaController.releaseFuture(listenableFuture);
@@ -1025,7 +1037,93 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     this.main.postDelayed(this.progressTick, 500L);
   }
 
+  // ---------------- video ----------------
+
+  private JSObject videoJson() {
+    JSObject o = new JSObject();
+    o.put("id", currentId);
+    o.put("hasVideo", hasVideo);
+    o.put("width", Math.round(videoW * videoRatio));
+    o.put("height", videoH);
+    o.put("fullscreen", video != null && video.isFullscreen());
+    return o;
+  }
+
+  private void emitVideo() {
+    if (currentId != null) notifyListeners("video", videoJson());
+  }
+
+  /**
+   * Whether the current stream has a picture (the page asks on start; changes arrive as events).
+   */
+  @PluginMethod
+  public void videoState(PluginCall call) {
+    main.post(() -> call.resolve(videoJson()));
+  }
+
+  /**
+   * Where the page's video box is: {show, x, y, width, height} in CSS pixels relative to the
+   * WebView. show=false whenever there is nothing to show or the box is covered.
+   */
+  @PluginMethod
+  public void setVideoView(PluginCall call) {
+    boolean show = Boolean.TRUE.equals(call.getBoolean("show", false));
+    float x = call.getFloat("x", 0f), y = call.getFloat("y", 0f);
+    float w = call.getFloat("width", 0f), h = call.getFloat("height", 0f);
+    main.post(
+        () -> {
+          if (getActivity() == null || getBridge() == null) {
+            call.resolve();
+            return;
+          }
+          if (video == null) {
+            if (!show) {
+              call.resolve();
+              return;
+            }
+            video = new VideoOverlay(getActivity(), getBridge().getWebView(), fs -> emitVideo());
+            video.setVideoSize(videoW, videoH, videoRatio);
+          }
+          if (show && hasVideo) video.show(exo(), x, y, w, h);
+          else video.hide();
+          call.resolve();
+        });
+  }
+
+  private void onTracks(Tracks tracks) {
+    boolean v = tracks.containsType(C.TRACK_TYPE_VIDEO);
+    if (v == hasVideo) return;
+    hasVideo = v;
+    if (!v) {
+      videoW = videoH = 0;
+      videoRatio = 1f;
+      if (video != null) video.hide();
+    }
+    emitVideo();
+  }
+
+  private void onVideoSize(VideoSize size) {
+    if (size.width == videoW && size.height == videoH && size.pixelWidthHeightRatio == videoRatio) {
+      return;
+    }
+    videoW = size.width;
+    videoH = size.height;
+    videoRatio = size.pixelWidthHeightRatio > 0 ? size.pixelWidthHeightRatio : 1f;
+    if (video != null) video.setVideoSize(videoW, videoH, videoRatio);
+    if (hasVideo) emitVideo();
+  }
+
   private final class ExoListener implements Player.Listener {
+    @Override
+    public void onTracksChanged(Tracks tracks) {
+      onTracks(tracks);
+    }
+
+    @Override
+    public void onVideoSizeChanged(VideoSize videoSize) {
+      onVideoSize(videoSize);
+    }
+
     private ExoListener() {}
 
     @Override
