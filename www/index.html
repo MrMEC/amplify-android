@@ -2830,6 +2830,11 @@
   .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; }
   @media (max-width: 900px){ .tile-grid > .grid-section-label.ch-row-label{ margin:-6px 0 -18px; } .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; } }
   .tile.tile-row.ch-item .tile-art{ border-radius:8px; }
+  .ch-sort{ grid-column:1/-1; display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:-6px 0 -6px; }
+  .ch-sort-label{ font-size:13px; font-weight:600; color:var(--text-dim); }
+  .ch-sort .settings-select{ min-width:130px; }
+  .tile.tile-row.ch-item .ch-grip{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
+  .tile.tile-row.ch-item .ch-grip svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
   .tile.tile-row.ch-item.playing .tile-name{ color:var(--accent); }
   .ch-tools{ grid-column:1/-1; display:flex; flex-direction:column; gap:10px; margin:0 0 4px; }
   .ch-tools .home-tabs{ margin:0 0 4px; }
@@ -4852,6 +4857,13 @@
         <option value="500">500</option>
       </select>
     </div>
+    <div class="settings-row">
+      <span class="settings-label">Adult channels</span>
+      <select class="settings-select" id="adultChannelsSelect" title="Show or hide the Adult category in Video" aria-label="Adult channels">
+        <option value="hide">Hide</option>
+        <option value="show">Show</option>
+      </select>
+    </div>
     <div class="settings-row settings-row--stack">
       <span class="settings-label">Backup &amp; restore</span>
       <div class="settings-data-actions settings-actions-pair">
@@ -6160,6 +6172,16 @@
     return DEFAULT_RESULT_LIMIT;
   }
   var resultLimit = loadResultLimit();
+  var adultChannelsSelect = document.getElementById('adultChannelsSelect');
+  if(adultChannelsSelect){
+    try{ adultChannelsSelect.value = localStorage.getItem('radioPlayerAdultChannels') === 'show' ? 'show' : 'hide'; }catch(e){}
+    adultChannelsSelect.addEventListener('change', function(){
+      allowAdultChannels = adultChannelsSelect.value === 'show';
+      try{ localStorage.setItem(ADULT_CHANNELS_KEY, allowAdultChannels ? 'show' : 'hide'); }catch(e){}
+      if(onVideoView) renderVideoHome();
+      if(onAddChannelsView){ addChannelsState.cat = ''; addChannelsState.shown = 60; renderAddChannels(); }
+    });
+  }
   resultLimitSelect.value = String(resultLimit);
   resultLimitSelect.addEventListener('change', function(){
     var n = parseInt(resultLimitSelect.value, 10);
@@ -10121,6 +10143,24 @@
   var videoChannels = [];
   try{ videoChannels = JSON.parse(localStorage.getItem(VIDEO_CHANNELS_KEY) || '[]') || []; }catch(e){ videoChannels = []; }
   if(!Array.isArray(videoChannels)) videoChannels = [];
+  // Adult channels (iptv-org's "XXX" category, or a playlist group named that way) are hidden
+  // everywhere in Video -- Add Channels and My Channels -- unless Settings says to show them.
+  var ADULT_CHANNELS_KEY = 'radioPlayerAdultChannels';
+  var allowAdultChannels = false;
+  try{ allowAdultChannels = localStorage.getItem(ADULT_CHANNELS_KEY) === 'show'; }catch(e){}
+  var ADULT_GROUP_RE = /^(xxx|adult|adults|18\+|porn|nsfw)$/i;
+  function isAdultChannel(e){
+    if(!e) return false;
+    if(e.adult) return true;
+    return (e.cats || []).some(function(c){ return c === 'xxx' || ADULT_GROUP_RE.test(String(c)); }) ||
+      ADULT_GROUP_RE.test(String(e.group || ''));
+  }
+  function channelVisible(e){ return allowAdultChannels || !isAdultChannel(e); }
+  function visibleVideoChannels(){ return videoChannels.filter(channelVisible); }
+  // My Channels: grouped by category, or one list in your own order.
+  var CHANNEL_SORT_KEY = 'radioPlayerChannelSort';
+  var channelSort = 'category';
+  try{ if(localStorage.getItem(CHANNEL_SORT_KEY) === 'list') channelSort = 'list'; }catch(e){}
   function saveVideoChannels(){
     try{ localStorage.setItem(VIDEO_CHANNELS_KEY, JSON.stringify(videoChannels)); }catch(e){}
     if(typeof syncNpChannelLink === 'function') syncNpChannelLink();
@@ -10152,13 +10192,14 @@
     if(!ch || !ch.url || findVideoChannel(ch.url)) return false;
     videoChannels.push({ id: ch.id || ('link:' + ch.url), name: ch.name || 'Channel', url: ch.url, logo: ch.logo || '',
       country: ch.country || '', cats: ch.cats || [], catNames: (ch.cats || []).map(categoryName),
-      src: ch.src || 'link', addedAt: Date.now() });
+      src: ch.src || 'link', adult: isAdultChannel(ch) || undefined, addedAt: Date.now() });
     saveVideoChannels();
     return true;
   }
   // A category's display name: the directory's own name when it's loaded, else the id
   // tidied up ("news" -> "News", "kids" -> "Kids").
   function categoryName(id){
+    if(id === 'xxx') return 'Adult';
     if(iptvIndex && iptvIndex.cats && iptvIndex.cats[id]) return iptvIndex.cats[id];
     return String(id || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
   }
@@ -10196,10 +10237,11 @@
   }
   function renderVideoHome(){
     resetStationsGrid();
-    videoReorderHeaderBtnEl.style.display = videoChannels.length > 1 ? '' : 'none';
+    var mine = visibleVideoChannels();
+    videoReorderHeaderBtnEl.style.display = mine.length > 1 ? '' : 'none';
     updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing);
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
-    if(!videoChannels.length){
+    if(!mine.length){
       appendGridSection('My Channels', 0);
       var empty = document.createElement('div');
       empty.className = 'empty-state';
@@ -10207,24 +10249,36 @@
       stationsGrid.appendChild(empty);
       return;
     }
-    // Reordering is one list of everything, dragged into order.
+    // Reordering is one list of everything, as the same stacked rows, dragged into order.
     if(videoChannelsEditing){
-      appendGridSection('My Channels', videoChannels.length);
-      videoChannels.forEach(function(ch){
-        stationsGrid.appendChild(buildEntityTile({
-          key: 'channel:' + ch.url, reorderId: ch.url, entity: 'video-channel', name: ch.name,
+      appendGridSection('My Channels', mine.length).classList.add('ch-row-label');
+      mine.forEach(function(ch){
+        var row = buildEntityTile({
+          key: 'channel:' + ch.url, reorderId: ch.url, entity: 'video-channel', name: ch.name, row: true,
           artFrom: channelToStation(ch), draggable: true, onReorder: reorderVideoChannelsFromGrid
-        }));
+        });
+        row.classList.add('ch-item');
+        var grip = document.createElement('span');
+        grip.className = 'ch-grip';
+        grip.setAttribute('aria-hidden', 'true');
+        grip.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"></path></svg>';
+        row.appendChild(grip);
+        stationsGrid.appendChild(row);
       });
       return;
     }
-    // Otherwise the channels stack as full-width rows under a heading per category (News,
-    // Sports, Movies...). Categories come in the order their first channel has in My
-    // Channels, and each keeps that order, so Reorder still decides what comes first. A
-    // channel is shown in its first category; channels with none (a pasted link, most of
-    // Free-TV) share one list at the end.
+    stationsGrid.appendChild(buildChannelSortRow());
+    if(channelSort === 'list'){
+      appendGridSection('My Channels', mine.length).classList.add('ch-row-label');
+      mine.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
+      return;
+    }
+    // By category: full-width rows under a heading per category (News, Sports, Movies...).
+    // Categories come in the order their first channel has in My Channels, and each keeps
+    // that order, so Reorder still decides what comes first. A channel is shown in its first
+    // category; channels with none (a pasted link, most of Free-TV) share one list at the end.
     var groups = [], byName = {};
-    videoChannels.forEach(function(ch){
+    mine.forEach(function(ch){
       var name = channelRowName(ch) || '';
       if(!byName[name]){ byName[name] = { name: name, list: [] }; groups.push(byName[name]); }
       byName[name].list.push(ch);
@@ -10235,6 +10289,22 @@
       appendGridSection(g.name || (groups.length > 1 ? 'Other' : 'My Channels'), g.list.length).classList.add('ch-row-label');
       g.list.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
     });
+  }
+  function buildChannelSortRow(){
+    var row = document.createElement('div');
+    row.className = 'ch-sort';
+    var label = document.createElement('span');
+    label.className = 'ch-sort-label';
+    label.textContent = 'Sort by';
+    row.appendChild(label);
+    var sel = selectEl([['category', 'Category'], ['list', 'List']], channelSort, function(v){
+      channelSort = v === 'list' ? 'list' : 'category';
+      try{ localStorage.setItem(CHANNEL_SORT_KEY, channelSort); }catch(e){}
+      renderVideoHome();
+    }, 'Sort by');
+    sel.id = 'channelSortSelect';
+    row.appendChild(sel);
+    return row;
   }
   // One channel as a full-width row: logo, name (and "Not working" under it when it last
   // failed), and the More button (Favorite, Play Next, Add to Queue, Remove) as its only icon.
@@ -10259,7 +10329,9 @@
     var byUrl = {};
     videoChannels.forEach(function(c){ byUrl[c.url] = c; });
     var re = order.map(function(u){ return byUrl[u]; }).filter(Boolean);
-    if(re.length === videoChannels.length){ videoChannels = re; saveVideoChannels(); }
+    // Hidden (adult) channels keep their place at the end of the order.
+    var hidden = videoChannels.filter(function(c){ return !channelVisible(c); });
+    if(re.length + hidden.length === videoChannels.length){ videoChannels = re.concat(hidden); saveVideoChannels(); }
   }
   videoReorderHeaderBtnEl.addEventListener('click', function(){
     videoChannelsEditing = !videoChannelsEditing;
@@ -10318,7 +10390,7 @@
 
   // ---- the iptv-org directory, reduced to what the browser needs, kept for a day
   var IPTV_API = 'https://iptv-org.github.io/api/';
-  var IPTV_CACHE = 'amplify-iptv-v1';
+  var IPTV_CACHE = 'amplify-iptv-v2';
   var iptvIndex = null, iptvIndexPromise = null;
   function loadIptvIndex(){
     if(iptvIndex) return Promise.resolve(iptvIndex);
@@ -10349,10 +10421,15 @@
       j('countries.json'), j('blocklist.json')['catch'](function(){ return []; })]).then(function(r){
       var channels = r[0], streams = r[1], logos = r[2], cats = r[3], countries = r[4], block = r[5];
       var blocked = {};
-      block.forEach(function(b){ if(b && b.channel) blocked[b.channel] = true; });
+      var nsfw = {};
+      // Blocked for a legal reason: left out. Blocked only for being adult: kept, flagged adult.
+      block.forEach(function(b){
+        if(!b || !b.channel) return;
+        if(b.reason === 'nsfw') nsfw[b.channel] = true; else blocked[b.channel] = true;
+      });
       var byId = {};
       channels.forEach(function(c){
-        if(!c || !c.id || c.is_nsfw || c.closed || blocked[c.id]) return;
+        if(!c || !c.id || c.closed || blocked[c.id]) return;
         byId[c.id] = c;
       });
       var logoFor = {};
@@ -10372,12 +10449,16 @@
       var list = [];
       Object.keys(best).forEach(function(id){
         var c = byId[id], st = best[id];
-        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: c.categories || [],
-          url: st.url, logo: logoFor[id] ? logoFor[id].url : '' });
+        var adult = !!(c.is_nsfw || nsfw[id]);
+        var cs = (c.categories || []).slice();
+        if(adult && cs.indexOf('xxx') === -1) cs.push('xxx');
+        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: cs,
+          url: st.url, logo: logoFor[id] ? logoFor[id].url : '', adult: adult || undefined });
       });
       list.sort(function(a, b){ return a.name.localeCompare(b.name); });
       var catNames = {};
       cats.forEach(function(c){ if(c && c.id) catNames[c.id] = c.name; });
+      catNames.xxx = 'Adult';
       var countryNames = {};
       countries.forEach(function(c){ if(c && c.code) countryNames[c.code] = c.name; });
       return { at: Date.now(), list: list, cats: catNames, countries: countryNames };
@@ -10492,6 +10573,7 @@
   function filterChannels(list, useCountry){
     var words = addChannelsState.q.toLowerCase().split(/\s+/).filter(Boolean);
     return list.filter(function(e){
+      if(!channelVisible(e)) return false;
       if(useCountry && addChannelsState.country && e.country !== addChannelsState.country) return false;
       if(addChannelsState.cat && (e.cats || []).indexOf(addChannelsState.cat) === -1) return false;
       if(!words.length) return true;
@@ -10554,7 +10636,7 @@
     var tab = addChannelsTab;
     loader.then(function(list){
       if(!onAddChannelsView || addChannelsTab !== tab) return;
-      if(!keepTools) fillBrowseSelects(list);
+      if(!keepTools) fillBrowseSelects(list.filter(channelVisible));
       body.remove();
       var host = document.createElement('div');
       host.style.display = 'contents';
@@ -10644,7 +10726,8 @@
         var list = /#EXTINF/i.test(t) ? parseM3uChannels(t, u) : null;
         if(list){
           addChannelsState.linkList = list.map(function(c){
-            return { id: 'link:' + c.url, name: c.name, country: c.country || c.group || '', cats: [], url: c.url, logo: c.logo, src: 'link' };
+            return { id: 'link:' + c.url, name: c.name, country: c.country || c.group || '', cats: [], url: c.url, logo: c.logo, src: 'link',
+              adult: ADULT_GROUP_RE.test(c.group || '') || undefined };
           });
         } else {
           addChannelsState.linkList = [singleStreamEntry(u)];
@@ -10688,16 +10771,16 @@
       setResultCount(0, 'channel');
       return;
     }
-    if(l.length > 1){
+    if(l.filter(channelVisible).length > 1){
       var all = document.createElement('button');
       all.type = 'button';
       all.className = 'settings-select ch-more';
       all.style.gridColumn = '1 / -1';
       all.style.justifySelf = 'start';
-      all.textContent = 'Add all ' + l.length;
+      all.textContent = 'Add all ' + l.filter(channelVisible).length;
       all.addEventListener('click', function(){
         var n = 0;
-        l.forEach(function(e){ if(addVideoChannel(e)) n++; });
+        l.filter(channelVisible).forEach(function(e){ if(addVideoChannel(e)) n++; });
         setStatus(n ? 'Added ' + n + ' channel' + (n === 1 ? '' : 's') + ' to My Channels.' : 'They’re all in My Channels already.');
         renderAddChannels(true);
       });

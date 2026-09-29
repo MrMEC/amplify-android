@@ -112,6 +112,14 @@ async def main():
         await pg.evaluate("(()=>{var s=document.querySelectorAll('.ch-tools select')[1];s.value='weather';s.dispatchEvent(new Event('change'));})()"); await pg.wait_for_timeout(500)
         check([x['name'] for x in await rows(pg)] == ['Weather Nation'], 'category filter')
         await pg.evaluate("(()=>{var s=document.querySelectorAll('.ch-tools select')[1];s.value='';s.dispatchEvent(new Event('change'));})()"); await pg.wait_for_timeout(500)
+        setadult = "(v)=>{var s=document.getElementById('adultChannelsSelect');s.value=v;s.dispatchEvent(new Event('change'));}"
+        catopts = "Array.prototype.map.call(document.querySelectorAll('.ch-tools select')[1].options,function(o){return o.textContent;})"
+        await pg.evaluate(setadult, 'show'); await pg.wait_for_timeout(700)
+        names = [x['name'] for x in await rows(pg)]
+        check('Hidden Adult' in names and 'Adult' in await pg.evaluate(catopts), f'Settings > Adult channels: Show lists them and the Adult category {names}')
+        await pg.evaluate(setadult, 'hide'); await pg.wait_for_timeout(700)
+        names = [x['name'] for x in await rows(pg)]
+        check('Hidden Adult' not in names and 'Adult' not in await pg.evaluate(catopts), f'Hide takes them and the category away again {names}')
         for n in ('ABC News Live', 'BBC News'):
             await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent===n;}).querySelector('.ch-add').click()", n)
         await pg.wait_for_timeout(200)
@@ -162,10 +170,24 @@ async def main():
         check(lk2 == 'Remove from My Channels', f'a saved channel offers Remove from My Channels ({lk2})')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')
+        setsort = "(v)=>{var s=document.getElementById('channelSortSelect');s.value=v;s.dispatchEvent(new Event('change'));}"
+        lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;})"
+        await pg.evaluate(setsort, 'list'); await pg.wait_for_timeout(300)
+        t = [x['name'] for x in await my_tiles(pg)]
+        check(await pg.evaluate(lbls) == ['My Channels5'] and t == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Sort by List: one list in your order {t}')
+        await pg.screenshot(path=f'{SHOTS}/ch-my-list.png')
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
+        check(await pg.evaluate(lbls) == ['My Channels5'], 'the sort choice is kept')
+        await pg.evaluate(setsort, 'category'); await pg.wait_for_timeout(300)
+        check(await pg.evaluate(lbls) == ['News2', 'Other3'], 'Sort by Category brings the headings back')
 
         await pg.evaluate("document.getElementById('videoReorderHeaderBtn').click()"); await pg.wait_for_timeout(300)
         drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile.tile-draggable').length")
         check(drag == 5, f'Reorder makes the tiles draggable ({drag})')
+        stacked = await pg.evaluate("document.querySelectorAll('#stationsGrid > .tile.tile-row.tile-draggable').length")
+        check(stacked == 5, f'Reorder uses the same stacked rows ({stacked})')
+        await pg.screenshot(path=f'{SHOTS}/ch-reorder.png')
         await pg.evaluate("document.getElementById('videoReorderHeaderBtn').click()"); await pg.wait_for_timeout(300)
         # Remove via the More menu
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}).querySelector('.row-more-btn').click()"); await pg.wait_for_timeout(300)
