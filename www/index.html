@@ -2813,6 +2813,12 @@
   .tile-video{ display:flex; align-items:center; margin-top:3px; color:var(--text-dim); line-height:0; }
   .tile-video svg{ width:15px; height:15px; fill:currentColor; }
   .cs-video{ display:inline-flex; align-items:center; flex:none; color:var(--text-dim); line-height:0; }
+  /* A station with video, in the search results: the camera to the right of the name, level
+     with its first line. The name keeps its two-line clamp and gives way to the icon. */
+  .tile-name-row{ display:flex; align-items:flex-start; gap:5px; margin-top:9px; min-width:0; }
+  .tile-name-row .tile-name{ margin-top:0; flex:1 1 auto; }
+  .tile-name-row .tile-video{ margin-top:0; flex:none; }
+  .tile-name-row .tile-video svg{ width:14px; height:14px; }
   .cs-video svg{ width:15px; height:15px; fill:currentColor; }
   .podcast-description-artist{ font-size:13px; font-weight:600; color:var(--text-dim); margin-bottom:10px; }
   .podcast-description-text{
@@ -6987,6 +6993,7 @@
       if(!ev || ev.id !== audio._id) return;
       streamVideo.has = !!ev.hasVideo; streamVideo.w = ev.width || 0; streamVideo.h = ev.height || 0;
       var st = currentStation;
+      if(streamVideo.has) rememberVideoStation(st);
       if(streamVideo.has && streamVideoCapable(st) && !npVideoOn && streamVideoOffKey !== favKey(st)){
         setStreamVideoOn(true);
       } else if(!streamVideo.has && npVideoStream){
@@ -18199,7 +18206,9 @@
           onClick: function(){ openAlbumPage(item.key, null); }
         }));
       } else {
-        stationsGrid.appendChild(buildTile(item));
+        var tile = buildTile(item);
+        markStationVideo(tile, item);
+        stationsGrid.appendChild(tile);
       }
     });
 
@@ -18456,7 +18465,9 @@
       return cards;
     }
     all.forEach(function(s){
-      stationsGrid.appendChild(buildTile(s));
+      var tile = buildTile(s);
+      markStationVideo(tile, s);
+      stationsGrid.appendChild(tile);
     });
     if(pending){
       var spin = document.createElement('div');
@@ -18563,6 +18574,56 @@
   // when every row shares the same show art.
   // A small video camera, drawn (the icon font subset has no video glyph).
   var VIDEO_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="6" width="13" height="12" rx="2.5"></rect><path d="M15.5 10.2 21 7v10l-5.5-3.2z"></path></svg>';
+  // ---------- stations with video, in search results ----------
+  // Two ways to know. The station directory lists each stream's codecs, and a stream that
+  // carries video lists its video codec too ("AAC,H.264"). And any station (or pasted stream)
+  // the app has played and found a picture in is remembered, so it is marked from then on even
+  // when the directory doesn't say.
+  var VIDEO_CODEC_RE = /(^|[^a-z0-9])(h\.?26[456]|avc1?|hevc|hvc1|hev1|vp0?[89]|av0?1|mp4v|theora|mpeg-?[124]v?\s*video)([^a-z0-9]|$)/i;
+  var VIDEO_STATIONS_KEY = 'radioPlayerVideoStations';
+  var videoStationKeys = null;
+  function loadVideoStationKeys(){
+    if(videoStationKeys) return videoStationKeys;
+    videoStationKeys = {};
+    try{
+      (JSON.parse(localStorage.getItem(VIDEO_STATIONS_KEY) || '[]') || []).forEach(function(k){ videoStationKeys[k] = true; });
+    }catch(e){}
+    return videoStationKeys;
+  }
+  function stationHasVideo(st){
+    if(!st || !isLiveStream(st)) return false;
+    if(st.codec && VIDEO_CODEC_RE.test(String(st.codec))) return true;
+    return !!loadVideoStationKeys()[favKey(st)];
+  }
+  function rememberVideoStation(st){
+    if(!st || !isLiveStream(st)) return;
+    var keys = loadVideoStationKeys(), k = favKey(st);
+    if(keys[k]) return;
+    keys[k] = true;
+    var list = Object.keys(keys);
+    if(list.length > 500) list = list.slice(list.length - 500);
+    try{ localStorage.setItem(VIDEO_STATIONS_KEY, JSON.stringify(list)); }catch(e){}
+    // Mark it straight away if it is on screen in the results.
+    Array.prototype.forEach.call(stationsGrid.querySelectorAll('.tile'), function(t){
+      if(t.dataset.key === k) markStationVideo(t, st);
+    });
+  }
+  function markStationVideo(tile, st){
+    if(!tile || tile.querySelector('.tile-video') || !stationHasVideo(st)) return;
+    var name = tile.querySelector(':scope > .tile-name');
+    if(!name) return;
+    var row = document.createElement('div');
+    row.className = 'tile-name-row';
+    name.parentNode.insertBefore(row, name);
+    row.appendChild(name);
+    var vid = document.createElement('span');
+    vid.className = 'tile-video';
+    vid.title = 'Video available';
+    vid.setAttribute('aria-label', 'Video available');
+    vid.innerHTML = VIDEO_ICON_SVG;
+    row.appendChild(vid);
+  }
+
   // opts.menu false: no Play Next / Add to Queue menu (the Podcasts page, build 48).
   function buildPodcastEpisodeRow(ep, opts){
     var row = document.createElement('div');
