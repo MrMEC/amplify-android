@@ -8,8 +8,8 @@ import org.json.JSONObject;
 
 /**
  * Where podcast episodes played from the car got to. The page keeps its own progress in its
- * database, which the car can't reach, so the car writes here (guid -> position, duration,
- * the episode record) and the page folds these in the next time it opens.
+ * database, which the car can't reach, so the car writes here (guid -> position, duration, the
+ * episode record) and the page folds these in the next time it opens.
  */
 final class CarProgress {
 

@@ -4,4 +4,5 @@
     <string name="title_activity_main">Amplify</string>
     <string name="package_name">com.markcoleman.amplify</string>
     <string name="custom_url_scheme">com.markcoleman.amplify</string>
+    <string name="widget_description">What Amplify is playing, with Previous, Play and Next.</string>
 </resources>

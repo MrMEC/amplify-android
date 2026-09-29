@@ -29,6 +29,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Build number
+        run: echo "BUILD=$(( ${{ github.run_number }} + 33 ))" >> "$GITHUB_ENV"
+
       - name: Install
         run: npm ci
 
@@ -53,13 +56,13 @@ jobs:
           if [ -f build.log ]; then cp build.log out/build.log; tail -c 80000 build.log > out/build-tail.log; else echo "no build log" > out/build.log; fi
           APK=android/app/build/outputs/apk/release/app-release.apk
           if [ -f "$APK" ]; then cp "$APK" out/Amplify.apk; fi
-          echo "run=${{ github.run_number }} sha=${{ github.sha }} result=$RESULT" > out/status.txt
+          echo "build=$BUILD run=${{ github.run_number }} sha=${{ github.sha }} result=$RESULT" > out/status.txt
           cd out
           git init -q -b build-output
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add -A
-          git commit -qm "Build ${{ github.run_number }}: $RESULT"
+          git commit -qm "Build $BUILD: $RESULT"
           git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" build-output
 
       - name: Publish release
@@ -70,5 +73,5 @@ jobs:
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest out/Amplify.apk \
             --target "${{ github.sha }}" \
-            --title "Amplify build ${{ github.run_number }}" \
+            --title "Amplify build $BUILD" \
             --notes "Open this page on the phone and tap Amplify.apk to install or update."

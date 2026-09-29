@@ -459,6 +459,13 @@
      the left of whatever action follows it -- Save on a search, the edit pencil on a custom
      station. */
   .section-heading-right{ display:flex; align-items:center; gap:10px; margin-left:auto; flex-shrink:0; }
+  /* A small link sitting right after the page heading, on its line. */
+  .heading-side-link{
+    background:none; border:none; padding:4px 2px; margin:0 auto 0 2px; cursor:pointer;
+    font:inherit; font-size:13px; font-weight:600; color:var(--accent); white-space:nowrap;
+    align-self:center;
+  }
+  .heading-side-link:hover{ text-decoration:underline; }
   .result-count{ font-size:12px; color:var(--text-faint); white-space:nowrap; }
   /* On a phone the heading plus a count plus two labelled buttons won't fit, so the buttons
      fall back to their icons. */
@@ -489,6 +496,20 @@
     body:not(.album-open):not(.artist-open) .section-heading-row.has-back .section-heading,
     body:not(.album-open):not(.artist-open) .section-heading-row.has-back .section-heading-input{
       order:3; flex-basis:100%; width:100%; margin-top:10px;
+    }
+  }
+  /* With the small link beside the title (Top Artists' "All Artists"), the title keeps its own
+     line under the back button, but only as wide as it is, with the link right after it. The
+     empty ::after is the line break: it sits after the right-hand cluster, full width. */
+  @media (max-width: 900px){
+    body:not(.album-open):not(.artist-open) .section-heading-row.has-back.has-side-link::after{
+      content:''; order:2; flex-basis:100%; height:0;
+    }
+    body:not(.album-open):not(.artist-open) .section-heading-row.has-back.has-side-link .section-heading{
+      flex-basis:auto; width:auto;
+    }
+    body:not(.album-open):not(.artist-open) .section-heading-row.has-back.has-side-link .heading-side-link{
+      order:4; margin-top:10px; margin-left:4px;
     }
   }
   /* A search puts the query itself in the heading, and a long one used to wrap into a
@@ -524,6 +545,9 @@
      carries its own grid, so the station tiles keep their square proportions while the
      song rows keep their full-width shape, and neither pushes the other around. */
   .recent-split{ display:grid; grid-template-columns: 1fr 1fr; gap:28px 32px; align-items:start; }
+  /* Recent Songs is now part of Continue Listening, so Continue Listening has the row alone. */
+  #recentSongsCol{ display:none !important; }
+  .recent-split{ grid-template-columns:1fr; }
   .recent-col{ min-width:0; }
   .recent-col-heading{
     font-size:13px; font-weight:700; letter-spacing:.01em;
@@ -650,7 +674,15 @@
   body.home-stacked .home-row > #favoritesGrid > .tile{ flex:0 0 226px; }
   @media (max-width: 900px){
     body.home-stacked .home-row > .tile-grid > .tile{ flex:0 0 132px; }
-    body.home-stacked .home-row > #favoritesGrid > .tile{ flex:0 0 min(66vw, 250px); }
+    /* Phones: the same width as the covers in the rows below, so more of them fit. */
+    body.home-stacked .home-row > #favoritesGrid > .tile{ flex:0 0 132px; }
+    /* Covers never quite fill the row: two and a bit on a narrow phone, so the cut-off one
+       at the edge shows the row scrolls (see Top Artists below for the arithmetic). */
+    body.home-stacked .home-row > .tile-grid > .tile,
+    body.home-stacked .home-row > #favoritesGrid > .tile{ flex:0 0 min(132px, calc((100vw - 46px - 32px) / 2.35)); }
+    body.home-stacked #favoritesGrid .fav-card-cap{ min-height:54px; padding:8px 10px; }
+    body.home-stacked #favoritesGrid .fav-card .tile-name{ font-size:12.5px; }
+    body.home-stacked #favoritesGrid .fav-card .tile-sub{ font-size:11px; }
     body.home-stacked .home-row > .tile-grid > .song-row{ flex:0 0 min(78vw, 290px); }
     body.home-stacked .home-section, body.home-stacked .recent-section{ margin-bottom:26px; }
   }
@@ -744,6 +776,14 @@
   #topArtistsSection .home-row-nav{ top:29px; }
   @media (max-width: 900px){
     body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 78px; }
+    /* Sized from the screen's width so the last visible portrait is always cut off -- the
+       cue that the row scrolls. The row is the viewport less 46px of padding, with 16px
+       gaps: 3 whole portraits and a third of the next on a narrow phone, 4 and a third on a
+       wider one. (A phone with a large display-size setting is only ~320px wide.) */
+    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 min(78px, calc((100vw - 46px - 64px) / 4.35)); }
+  }
+  @media (max-width: 380px){
+    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 min(78px, calc((100vw - 46px - 48px) / 3.35)); }
   }
 
 
@@ -892,6 +932,8 @@
   .tile-grid > .cl-row > .song-row{ grid-column:auto; flex:0 0 300px; scroll-snap-align:start; }
   @media (max-width: 900px){
     .tile-grid > .cl-row > .tile{ flex:0 0 132px; }
+    /* Same as the home rows: two covers and a bit, so the cut-off one shows it scrolls. */
+    .tile-grid > .cl-row > .tile{ flex:0 0 min(132px, calc((100vw - 46px - 32px) / 2.35)); }
     .tile-grid > .cl-row > .song-row{ flex:0 0 min(78vw, 290px); }
   }
   /* The first one has the heading above it already, so it does not need the run-up. Not
@@ -959,6 +1001,14 @@
     display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
   .tile.tile-row[data-entity="library-section"] .tile-name{ line-height:20px; }
+  /* My Library's rows start flush with the heading above them: no inset before the icon. */
+  .tile.tile-row[data-entity="library-section"]{ padding-left:0; }
+  .tile.tile-row[data-entity="library-section"] .tile-art-icon{ justify-content:flex-start; }
+  /* The icon was 62% of a 40px box, drawn at the box's left edge, so 15px of empty box sat
+     between it and the 14px gap: 29px from icon to label. The box is now the icon's own
+     width (the icon itself is the same size), leaving just the gap. */
+  .tile.tile-row[data-entity="library-section"] .tile-art{ width:25px; max-width:25px; }
+  .tile.tile-row[data-entity="library-section"] .tile-art-icon-svg{ width:25px; height:25px; }
   .tile.tile-row[data-entity="library-section"] .tile-sub{
     margin-top:0; line-height:20px; text-align:right; white-space:nowrap; flex-shrink:0;
   }
@@ -1013,6 +1063,11 @@
      the same spot (toggling Reorder) without touching -- or being touched by -- either of
      those selectors. Its own margin reproduces the same pulled-together spacing by hand. */
   .fav-artists-block{ grid-column:1/-1; margin:10px 0 0; }
+  /* My Library's Continue Listening heading. It used to carry margin-bottom:-32px inline,
+     which pulled the row 8px up INTO the heading, so the covers (and the playing ring)
+     overlapped the words. The row now starts 14px under the heading, the same as Favorite
+     Artists above it, and the space above matches that section's too. */
+  .tile-grid > .grid-section-label.cl-section-label{ margin-top:6px; margin-bottom:-10px; }
   .fav-artists-block .grid-section-label{ margin:0 0 14px; }
   .fav-artists-block .edit-link-btn{ margin-left:2px; }
   /* Same sideways-scroller as .cl-row (Continue Listening, Recent Songs/Stations) -- spelled
@@ -1801,6 +1856,14 @@
     transition: background .15s ease, border-color .15s ease;
   }
   .np-back:hover{ background:rgba(20,20,22,.62); border-color:rgba(255,255,255,.3); }
+  /* A drawn chevron: the icon font subset has no chevron-down. */
+  .np-back-chevron{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+  /* The screen rises from the mini player like a sheet and drops back into it. np-sheet-down
+     is the parked position; np-sheet-anim carries the motion (ease-out rising, ease-in
+     falling, so it leaves and arrives the way a physical sheet would). */
+  .now-playing-screen.np-sheet-anim{ transition:transform .34s cubic-bezier(.2,.8,.2,1); will-change:transform; }
+  .now-playing-screen.np-sheet-anim.np-sheet-closing{ transition:transform .28s cubic-bezier(.4,0,1,1); }
+  .now-playing-screen.np-sheet-down{ transform:translateY(100%); }
   /* ---------- Now Playing hero ---------- */
   /* --np-tint is written from the cover's own dominant colour (see readDominantColor); it
      falls back to the panel colour so the screen is never unstyled while art is resolving.
@@ -2009,14 +2072,35 @@
     min-width:0; max-width:520px; margin:0 auto;
   }
   .np-name{
-    font-size:clamp(28px, 7vw, 40px); font-weight:800; letter-spacing:-.01em;
-    line-height:1.1; margin-bottom:8px; color:#fff; text-align:center;
+    /* Sized down (was 28-40px): the artwork is the headline on this screen, and the name, the
+       song and the station details read as one caption under it rather than a banner. */
+    font-size:clamp(18px, 5vw, 26px); font-weight:800; letter-spacing:-.005em;
+    line-height:1.2; margin-bottom:6px; color:#fff; text-align:center;
     text-shadow:0 2px 18px rgba(0,0,0,.45);
     max-width:100%; overflow-wrap:anywhere;
   }
   .np-sub{
     font-size:13.5px; color:rgba(255,255,255,.8); margin-bottom:20px; text-align:center;
     text-shadow:0 1px 10px rgba(0,0,0,.5); max-width:100%;
+  }
+  /* The song on air. Between the station name and its stream details, and louder than the
+     details: it is the thing that changes, and the reason to glance at the screen. One line;
+     a long title ellipsizes rather than pushing the transport down. The dot says "live"
+     without spending a word on it. */
+  .np-onair{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    max-width:100%; margin:0 0 6px; font-size:15px; line-height:1.35;
+    color:#fff; text-shadow:0 1px 10px rgba(0,0,0,.5);
+  }
+  .np-onair[hidden]{ display:none; }
+  .np-onair-text{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .np-onair-title{ font-weight:400; }
+  .np-onair-artist{ color:rgba(255,255,255,.82); }
+  .np-onair .np-sub-link{ color:rgba(255,255,255,.82); font-weight:400; }
+  .np-onair .np-sub-link:hover, .np-onair .np-sub-link:focus-visible{ color:#fff; }
+  @media (prefers-reduced-motion: no-preference){
+    .np-onair.changed .np-onair-text{ animation:npOnAirIn .35s ease; }
+    @keyframes npOnAirIn{ from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:none; } }
   }
   /* The title as a link: it has to stay the title -- same size, same weight, same colour --
      so the page does not suddenly sprout a giant coloured word. Only the pointer and a slight
@@ -2027,7 +2111,7 @@
     transition: opacity .15s ease;
   }
   .np-name-link:hover, .np-name-link:focus-visible{ opacity:.84; }
-  .np-sub .np-sub-link{ color:rgba(255,255,255,.88); }
+  .np-sub .np-sub-link{ color:rgba(255,255,255,.88); text-align:center; }
   .np-sub .np-sub-link:hover, .np-sub .np-sub-link:focus-visible{ color:#fff; }
   /* Artist and album on a local track's Now Playing line are navigation, so they read as
      links rather than as the flat metadata a station's subtitle is. Buttons, not anchors:
@@ -2202,6 +2286,7 @@
     box-shadow:0 18px 40px rgba(0,0,0,.45);
   }
   .artist-menu .np-menu-item{ color:#f5f6f8; }
+  .np-menu-item[hidden]{ display:none; }
   .artist-menu .np-menu-item:hover{ background:rgba(255,255,255,.12); }
   /* A filled heart on a row that already says "Favorited" would be saying it twice in grey;
      the accent is what makes the state readable at a glance. */
@@ -2461,7 +2546,11 @@
      scrollbar rides the true outer edge rather than floating an inch inside it, and the cover
      art plus related-station grid get the full width to work with. */
   @media (max-width: 900px){
-    body.np-open .now-playing-screen{
+    /* body.np-sheet is the moment the screen is sliding: it has Now Playing's own layout but
+       the page underneath is left exactly as it was (header, tabs, mini player), with the
+       sheet above all of it. */
+    body.np-sheet #nowPlayingScreen{ z-index:1000; }
+    body.np-open .now-playing-screen, body.np-sheet .now-playing-screen{
       /* From the very top of the screen: the artwork is meant to run under the status bar
          edge to edge, which it cannot do while a 60px header sits above it. */
       position:fixed; top:0; right:0; bottom:0; left:0; z-index:40;
@@ -2489,7 +2578,7 @@
     body.np-open .sidebar-top .hamburger-btn span{ background:#fff; }
     /* Leaves room for that floating hamburger at the same height. */
     /* Below the fold the content needs the side gutter the screen no longer provides. */
-    body.np-open .np-below{ padding-left:18px; padding-right:18px; }
+    body.np-open .np-below, body.np-sheet .np-below{ padding-left:18px; padding-right:18px; }
     /* The desktop box ties its height to the viewport (min(82vh,880px)) so the hero reads as
        a tall banner rather than a sliver on a wide column -- but a phone screen is already
        narrow, so that same tall box forces `cover` to blow a square (or near-square) cover
@@ -2602,6 +2691,25 @@
      .settings-header above, so this starts with the artist line, then the description
      itself, capped and scrollable so a long synopsis doesn't push the modal past the
      viewport. */
+  /* Artist bio modal. The picture is a small circle, the same shape and crop as the artist's
+     tile, so it reads as "this person" rather than as a second cover. The text scrolls inside
+     the panel; the credit stays quiet at the foot (Wikipedia's licence asks for it). */
+  .artist-bio-head{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .artist-bio-head h2{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .artist-bio-avatar{
+    position:relative; flex:none; width:56px; height:56px; border-radius:50%; overflow:hidden;
+    background:var(--panel-2);
+  }
+  .artist-bio-avatar img{ width:100%; height:100%; object-fit:cover; object-position:var(--portrait-crop, 50% 28%); display:block; }
+  .artist-bio-text{
+    font-size:14px; line-height:1.6; color:var(--text-dim); white-space:pre-line;
+    max-height:min(55vh, 520px); overflow-y:auto; margin-top:8px; padding-right:4px;
+  }
+  .artist-bio-credit{ display:inline-block; margin-top:12px; font-size:11.5px; color:var(--text-faint); text-decoration:none; }
+  .artist-bio-credit:hover, .artist-bio-credit:focus-visible{ color:var(--text); text-decoration:underline; }
+  .artist-bio-credit[hidden]{ display:none; }
+  button.artist-hero-bio-source{ background:none; border:0; border-bottom:1px solid var(--accent-dim); padding:0; font-family:inherit; cursor:pointer; }
+  body.artist-open button.artist-hero-bio-source{ border-bottom-color:rgba(255,255,255,.5); }
   .podcast-description-artist{ font-size:13px; font-weight:600; color:var(--text-dim); margin-bottom:10px; }
   .podcast-description-text{
     font-size:14px; line-height:1.55; color:var(--text-dim); white-space:pre-line;
@@ -2639,6 +2747,49 @@
   }
   .art-url-search-btn:hover{ color:var(--text); border-color:var(--accent-dim); }
   .art-url-actions-left{ display:flex; gap:8px; flex-wrap:wrap; min-width:0; }
+  /* Suggestions: four square thumbnails a row (minmax(0,1fr) so the tracks can shrink on a
+     narrow phone), rounded like every other cover in the app. A thumbnail stays hidden until
+     its image has actually loaded, so a cover the archive doesn't have never shows as a
+     broken tile; skeletons hold the space until the first ones arrive. */
+  .art-suggest{ margin:4px 0 6px; }
+  .art-url-main[hidden]{ display:none; }
+  .art-url-head-left{ display:flex; align-items:center; gap:4px; min-width:0; }
+  .art-url-back{ margin-left:-6px; font-size:17px; }
+  .art-url-back[hidden]{ display:none; }
+  /* Full width at the top of the body: the obvious first thing to try for an album or an
+     artist, and a row of four buttons would not fit a phone. */
+  .art-url-suggest-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:12px;
+    background:none; border:1px solid var(--border); color:var(--text); border-radius:8px;
+    padding:10px 14px; font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .art-url-suggest-btn i{ font-size:13px; color:var(--accent); }
+  .art-url-suggest-btn:hover, .art-url-suggest-btn:focus-visible{ border-color:var(--accent-dim); }
+  .art-url-suggest-btn[hidden]{ display:none; }
+  .art-suggest[hidden]{ display:none; }
+  .art-suggest-head{ margin-bottom:10px; }
+  .art-suggest-src{ font-size:11px; color:var(--text-dim); }
+  .art-suggest-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; }
+  .art-suggest-tile{
+    position:relative; aspect-ratio:1; padding:0; border:0; border-radius:8px; overflow:hidden;
+    background:rgba(127,127,127,.14); cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .art-suggest-tile[hidden]{ display:none; }
+  .art-suggest-tile img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .art-suggest-tile:hover, .art-suggest-tile:focus-visible{ transform:scale(1.04); box-shadow:0 0 0 2px var(--accent); outline:none; }
+  .art-suggest-tile.busy::after{
+    content:''; position:absolute; inset:0; margin:auto; width:26px; height:26px; border-radius:50%;
+    border:3px solid rgba(255,255,255,.35); border-top-color:#fff; animation:artSuggestSpin .8s linear infinite;
+  }
+  .art-suggest-tile.busy img{ filter:brightness(.55); }
+  .art-suggest-grid.picking .art-suggest-tile:not(.busy){ opacity:.4; pointer-events:none; }
+  .art-suggest-skel{ aspect-ratio:1; border-radius:8px; background:rgba(127,127,127,.14); animation:artSuggestPulse 1.2s ease-in-out infinite; }
+  @keyframes artSuggestSpin{ to{ transform:rotate(360deg); } }
+  @keyframes artSuggestPulse{ 50%{ opacity:.45; } }
+  @media (prefers-reduced-motion: reduce){ .art-suggest-skel{ animation:none; } .art-suggest-tile{ transition:none; } }
+  .art-suggest-note{ font-size:12px; color:var(--text-dim); margin-top:6px; }
+  .art-suggest-note:empty{ display:none; }
   .art-url-preview{
     width:120px; height:120px; margin:0 auto 14px; border-radius:12px; overflow:hidden;
     background:var(--panel-2); border:1px solid var(--border);
@@ -2660,6 +2811,28 @@
   /* The cover dialog can be opened from on top of another dialog (a custom search's edit
      modal), so it has to stack above the other .settings-overlay panels. */
   #artUrlOverlay{ z-index:502; }
+  /* Fix artist info. Each candidate is one row: a small portrait (or a neutral tile), the
+     article title, and Wikipedia's one-line description, which is what actually tells a band
+     from a blood disorder at a glance. */
+  .artist-info-lede{ margin:0 0 10px; font-size:13.5px; color:var(--text-dim); line-height:1.4; }
+  .artist-info-list{ display:flex; flex-direction:column; gap:2px; margin-top:10px; max-height:min(52vh, 420px); overflow-y:auto; }
+  .artist-info-row{
+    display:flex; align-items:center; gap:12px; width:100%; padding:8px; border:0; border-radius:10px;
+    background:transparent; color:var(--text); text-align:left; cursor:pointer; font:inherit;
+  }
+  .artist-info-row:hover, .artist-info-row:focus-visible{ background:color-mix(in srgb, var(--text) 8%, transparent); outline:none; }
+  .artist-info-row[aria-selected="true"]{ background:color-mix(in srgb, var(--accent) 16%, transparent); }
+  .artist-info-thumb{
+    flex:none; width:44px; height:44px; border-radius:8px; object-fit:cover;
+    background:color-mix(in srgb, var(--text) 10%, transparent);
+  }
+  .artist-info-text{ min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
+  .artist-info-name{ font-weight:600; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .artist-info-desc{ font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .artist-info-row .fa-check{ flex:none; color:var(--accent); }
+  .artist-info-row.busy{ opacity:.55; pointer-events:none; }
+  .artist-info-empty{ padding:14px 8px; font-size:13.5px; color:var(--text-dim); }
+  #artistInfoResetBtn[hidden]{ display:none; }
   .cs-field:last-child{ margin-bottom:0; }
   .cs-field label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; font-weight:600; }
   .cs-field-input{
@@ -3129,7 +3302,7 @@
     body.np-open .mobile-scroll-fade,
     body.np-open .player-bar,
     body.np-open .search-sheet{ display:none; }
-    body.np-open .now-playing-screen{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
+    body.np-open .now-playing-screen, body.np-sheet .now-playing-screen{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
     .mobile-nav, .search-sheet{ background:var(--panel); }
@@ -3223,6 +3396,65 @@
   .settings-select:hover{ border-color:var(--accent-dim); }
   .settings-select:focus{ outline:none; border-color:var(--accent); }
   .settings-data-btn:hover{ border-color:var(--accent-dim); }
+
+  /* ---------- the Settings card itself ----------
+     Scoped to #settingsPanel: the other dialogs share .settings-panel/.settings-row. Every
+     row is one of two shapes -- label and a small control side by side, or label above a
+     full-width control -- and every width is shared out rather than fixed, so a phone with
+     large text keeps everything inside the card instead of pushing buttons off its edge. */
+  #settingsPanel{
+    width:min(400px, 100%); max-height:calc(100dvh - 40px); overflow-y:auto;
+    padding:20px 20px 14px;
+  }
+  #settingsPanel .settings-header{ margin-bottom:0; padding-bottom:6px; }
+  #settingsPanel .settings-header + .settings-row{ border-top:none; padding-top:10px; }
+  #settingsPanel .settings-header h2{ font-size:18px; font-weight:700; }
+  #settingsPanel .settings-row{ flex-wrap:wrap; padding:14px 0; column-gap:12px; row-gap:10px; }
+  #settingsPanel .settings-row > *{ min-width:0; }
+  #settingsPanel .settings-label{ font-size:13px; font-weight:600; color:var(--text-dim); }
+  #settingsPanel .settings-row--stack{ flex-direction:column; flex-wrap:nowrap; align-items:stretch; }
+  /* Theme: one segmented control, the three choices sharing its width equally. */
+  #settingsPanel .theme-switch{
+    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; padding:4px;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:10px;
+  }
+  #settingsPanel .theme-opt{
+    display:flex; align-items:center; justify-content:center; gap:6px; min-width:0;
+    padding:8px 6px; border:none; border-radius:7px; background:transparent; color:var(--text-dim);
+    font-size:12.5px; font-weight:600; white-space:nowrap; font-family:inherit;
+  }
+  #settingsPanel .theme-opt span{ overflow:hidden; text-overflow:ellipsis; }
+  #settingsPanel .theme-opt i{ margin:0; flex-shrink:0; font-size:.95em; }
+  #settingsPanel .theme-opt:hover{ color:var(--text); }
+  #settingsPanel .theme-opt.active{
+    background:var(--accent); color:var(--accent-text); box-shadow:0 1px 3px rgba(0,0,0,.18);
+  }
+  /* Too narrow for icon and word side by side (a small phone with large text): the words
+     are what say which is which, so the icons give way. */
+  @media (max-width: 360px){ #settingsPanel .theme-opt i{ display:none; } }
+  /* Accent colour: a round swatch rather than the browser's boxed colour well. */
+  #settingsPanel .accent-color-input{
+    width:32px; height:32px; border-radius:50%; border:1px solid var(--border); overflow:hidden;
+    -webkit-appearance:none; appearance:none;
+  }
+  #settingsPanel .accent-color-input::-webkit-color-swatch-wrapper{ padding:0; }
+  #settingsPanel .accent-color-input::-webkit-color-swatch{ border:none; border-radius:50%; }
+  #settingsPanel .accent-color-input::-moz-color-swatch{ border:none; border-radius:50%; }
+  #settingsPanel .accent-reset-btn{ font-weight:600; font-family:inherit; }
+  #settingsPanel .settings-select{ min-width:84px; }
+  #settingsPanel .settings-actions-pair{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  #settingsPanel .settings-data-btn{ justify-content:center; min-width:0; white-space:nowrap; font-family:inherit; }
+  #settingsPanel .settings-wide-btn{ width:100%; }
+  #settingsPanel .settings-svg{
+    width:1.15em; height:1.15em; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.9;
+    stroke-linecap:round; stroke-linejoin:round;
+  }
+  #settingsPanel .settings-row-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  #settingsPanel .build-stamp{
+    background:none; border:none; padding:0; color:var(--text-faint); font-size:12px;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  #settingsPanel .settings-diagnostics{ margin:4px 0 6px; }
 
   /* ---------- Font Awesome (self-hosted subset, embedded so the app has zero external
      network dependencies) ---------- */
@@ -3355,10 +3587,11 @@
      otherwise push the seek bar and transport down far enough to run off the bottom of a
      short landscape screen. Two lines for the title, one for the artist/show line below it. */
   body.rotate-lock .np-name{
-    font-size:clamp(19px, 3.4vh, 27px); text-align:left; text-shadow:none; margin-bottom:2px;
+    font-size:clamp(16px, 2.8vh, 21px); text-align:left; text-shadow:none; margin-bottom:2px;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
     overflow:hidden; white-space:normal; line-height:1.2; max-height:2.4em;
   }
+  body.rotate-lock .np-onair{ justify-content:flex-start; text-shadow:none; margin:0 0 2px; font-size:14px; }
   body.rotate-lock .np-sub{
     text-align:left; text-shadow:none; margin-bottom:16px; font-size:13px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -3607,9 +3840,13 @@
   .queue-clear:hover{ background:rgba(255,255,255,.12); }
   .queue-scroll{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 10px 24px; -webkit-overflow-scrolling:touch; }
   .queue-section{ margin-top:14px; }
-  .queue-heading-row{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  /* The rest of the album / playlist / shuffle carries straight on under Up Next, as one list. */
+  .queue-section.queue-section-cont{ margin-top:0; }
+  /* The count sits right after the heading, not pushed to the far edge. */
+  .queue-heading-row{ display:flex; align-items:baseline; justify-content:flex-start; gap:0; }
   .queue-heading{ font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--text-faint); padding:0 8px 6px; }
-  .queue-count{ font-size:12px; color:var(--text-faint); padding-right:8px; }
+  .queue-count{ font-size:12px; color:var(--text-faint); padding:0 8px 6px 0; }
+  .queue-count:empty{ display:none; }
   .queue-list{ display:flex; flex-direction:column; gap:2px; }
   .queue-row{
     display:flex; align-items:center; gap:12px; padding:7px 4px 7px 8px; border-radius:12px;
@@ -3838,7 +4075,10 @@
       <div class="home-section favorites-section" id="favoritesSection" style="display:none;">
         <div class="home-section-head">
           <h2 class="home-heading-link" id="favoritesHeading" role="button" tabindex="0">Favorites<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
-          <button type="button" class="edit-link-btn" id="favEditBtn" title="Reorder" aria-label="Reorder"><i class="fa-solid fa-pen"></i></button>
+          <!-- Editing (reorder / remove) lives on the Favorites page itself; the home row is for
+               playing. The button stays in the markup, hidden, because the old list-editing
+               code still refers to it. -->
+          <button type="button" class="edit-link-btn" id="favEditBtn" title="Reorder" aria-label="Reorder" hidden style="display:none !important;"><i class="fa-solid fa-pen"></i></button>
         </div>
         <div class="tile-grid" id="favoritesGrid"></div>
         <!-- Reordering happens as a list, not as a row of covers: dragging a tile sideways
@@ -3862,6 +4102,15 @@
       <!-- Stations and songs are different shapes -- captioned squares against full-width
            rows -- so interleaving them by recency produced a ragged column with tiles
            stranded beside half-empty gaps. They get a section each, stacked. -->
+      <!-- Latest Podcasts: the newest episode from each followed show, newest first -- the
+           same row of covers as Top Stations. Sits between Top Artists and Continue Listening. Re-checked for new episodes on every
+           page load; hidden while nothing is followed. The heading opens the Podcasts page. -->
+      <div class="home-section latest-podcasts-section" id="latestPodcastsSection" style="display:none;">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="latestPodcastsHeading" role="button" tabindex="0">Latest Podcasts<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid" id="latestPodcastsGrid"></div>
+      </div>
       <div class="recent-section" id="recentSection" style="display:none;">
         <!-- Mobile only: stacked, the songs half starts a screen down, so these jump to it. -->
         <div class="recent-anchors" id="recentAnchors">
@@ -3879,16 +4128,6 @@
           </section>
         </div>
       </div>
-      <!-- Latest Podcasts: the newest episode from each followed show, newest first -- the
-           same row of covers as Top Stations below it. Re-checked for new episodes on every
-           page load; hidden while nothing is followed. The heading opens the Podcasts page. -->
-      <div class="home-section latest-podcasts-section" id="latestPodcastsSection" style="display:none;">
-        <div class="home-section-head">
-          <h2 class="home-heading-link" id="latestPodcastsHeading" role="button" tabindex="0">Latest Podcasts<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
-        </div>
-        <div class="tile-grid" id="latestPodcastsGrid"></div>
-      </div>
-
       <!-- Only on a stacked home: the tab used to name this panel, and with the tabs gone
            it needs a heading of its own. -->
       <div class="home-section-head" id="homeTopHeading" style="display:none;"><h2 class="home-heading-link" id="topStationsHeading" role="button" tabindex="0">Top Stations<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2></div>
@@ -3898,6 +4137,8 @@
           <i class="fa-solid fa-arrow-left"></i><span id="detailBackLabel">Back</span>
         </button>
         <div class="section-heading" id="stationsHeading">Top Stations</div>
+        <!-- Only on the Top Artists page: the way to every artist in the library. -->
+        <button type="button" class="heading-side-link" id="allArtistsLink" style="display:none;">All Artists</button>
         <input type="text" class="section-heading-input" id="stationsHeadingInput" style="display:none;">
         <div class="section-heading-right">
           <span class="result-count" id="resultCount" style="display:none;"></span>
@@ -3925,6 +4166,10 @@
           <!-- Only shown on the Recent Stations / Recent Songs "see all" pages: wipes that
                listening history. A different action from Clear search above (which resets a
                text query), so it gets its own button rather than reusing that one's label. -->
+          <!-- Only on the Favorites page: drag to reorder, and remove. -->
+          <button type="button" class="clear-search-btn" id="favPageEditBtn" style="display:none;" title="Edit favorites">
+            <i class="fa-solid fa-pen"></i><span class="btn-text">Edit</span>
+          </button>
           <button type="button" class="clear-search-btn" id="clearHistoryBtn" style="display:none;" title="Clear this history">
             <i class="fa-solid fa-trash"></i><span class="btn-text">Clear history</span>
           </button>
@@ -4051,6 +4296,9 @@
                   <button type="button" class="np-menu-item" id="artistArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit artist image</span>
                   </button>
+                  <button type="button" class="np-menu-item" id="artistInfoFixBtn" role="menuitem">
+                    <i class="fa-solid fa-magnifying-glass"></i><span>Fix artist info</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -4101,6 +4349,9 @@
               <button type="button" class="np-menu-item" id="albumAddQueueBtn" role="menuitem">
                 <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 13.5v7M14.5 17h7"/></svg><span>Add to Queue</span>
               </button>
+              <button type="button" class="np-menu-item" id="albumArtEditBtn" role="menuitem">
+                <i class="fa-solid fa-pen"></i><span>Edit Album Cover</span>
+              </button>
             </div>
           </div>
         </div>
@@ -4147,7 +4398,7 @@
         </div>
 
         <div class="np-hero-top">
-          <button class="np-back" id="npBackBtn" title="Close" aria-label="Close Now Playing"><i class="fa-solid fa-xmark"></i></button>
+          <button class="np-back" id="npBackBtn" title="Minimize" aria-label="Minimize Now Playing"><svg class="np-back-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
 
         <!-- Title, then the controls under it, both sitting on the faded lower third of
@@ -4155,6 +4406,8 @@
         <div class="np-hero-foot">
           <div class="np-details">
             <div class="np-name" id="npName"></div>
+            <!-- What a live station is playing, when its stream names it. Hidden otherwise. -->
+            <div class="np-onair" id="npOnAir" hidden></div>
             <div class="np-sub" id="npSub"></div>
             <!-- Play in the middle, larger and solid; everything else is a small translucent
                  disc around it. Local files have a real duration and are seekable; a live
@@ -4333,24 +4586,27 @@
       <h2>Settings</h2>
       <button class="settings-close" id="settingsCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="settings-row">
-      <span>Theme</span>
-      <div class="theme-switch" id="themeSwitch">
-        <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i>Light</button>
-        <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i>Dark</button>
-        <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i>System</button>
+    <!-- Wide controls (the theme switch, the two backup buttons, Check storage) sit on their
+         own line under their label, so nothing runs off the card on a phone -- including one
+         with Android's larger text size turned on. Small controls stay beside the label. -->
+    <div class="settings-row settings-row--stack">
+      <span class="settings-label" id="themeLabel">Theme</span>
+      <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
+        <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
+        <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
+        <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
       </div>
     </div>
     <div class="settings-row">
-      <span>Accent color</span>
+      <span class="settings-label">Accent color</span>
       <div class="accent-picker-wrap">
-        <input type="color" class="accent-color-input" id="accentColorInput" value="#1c203c">
+        <input type="color" class="accent-color-input" id="accentColorInput" value="#1c203c" aria-label="Accent color">
         <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
       </div>
     </div>
     <div class="settings-row">
-      <span>Search results</span>
-      <select class="settings-select" id="resultLimitSelect" title="How many stations each search asks the directory for">
+      <span class="settings-label">Search results</span>
+      <select class="settings-select" id="resultLimitSelect" title="How many stations each search asks the directory for" aria-label="Search results">
         <option value="50">50</option>
         <option value="100">100</option>
         <option value="200">200</option>
@@ -4359,9 +4615,9 @@
         <option value="500">500</option>
       </select>
     </div>
-    <div class="settings-row">
-      <span>Backup &amp; restore</span>
-      <div class="settings-data-actions">
+    <div class="settings-row settings-row--stack">
+      <span class="settings-label">Backup &amp; restore</span>
+      <div class="settings-data-actions settings-actions-pair">
         <button type="button" class="settings-data-btn" id="exportFavBtn" title="Export favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-export"></i>Export</button>
         <button type="button" class="settings-data-btn" id="importFavBtn" title="Import favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-import"></i>Import</button>
         <input type="file" id="importFavInput" accept="application/json" hidden>
@@ -4370,12 +4626,12 @@
     <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
          re-downloaded and opened from several places, and without this there is no way to
          tell one build from another from inside the app. -->
-    <div class="settings-row">
-      <span>Build</span>
-      <div class="settings-data-actions">
+    <div class="settings-row settings-row--stack">
+      <div class="settings-row-head">
+        <span class="settings-label">Build</span>
         <code class="build-stamp" id="buildStamp"></code>
-        <button type="button" class="settings-data-btn" id="diagnosticsBtn"><i class="fa-solid fa-stethoscope"></i>Check storage</button>
       </div>
+      <button type="button" class="settings-data-btn settings-wide-btn" id="diagnosticsBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>Check storage</button>
     </div>
     <div class="settings-diagnostics" id="diagnostics" style="display:none;"></div>
   </div>
@@ -4384,10 +4640,17 @@
 <div class="settings-overlay" id="artUrlOverlay">
   <div class="settings-panel" id="artUrlPanel">
     <div class="settings-header">
-      <h2 id="artUrlTitle">Custom Cover Art</h2>
+      <div class="art-url-head-left">
+        <button type="button" class="settings-close art-url-back" id="artUrlBackBtn" aria-label="Back" hidden><i class="fa-solid fa-arrow-left"></i></button>
+        <h2 id="artUrlTitle">Custom Cover Art</h2>
+      </div>
       <button class="settings-close" id="artUrlCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    <div class="art-url-main" id="artUrlMain">
     <div class="art-url-body">
+      <!-- Suggestions live on their own screen and are only looked up when this is tapped:
+           opening the dialog makes no requests to MusicBrainz or any image archive. -->
+      <button type="button" class="art-url-suggest-btn" id="artSuggestBtn" hidden><i class="fa-solid fa-magnifying-glass"></i><span>Suggest Images</span></button>
       <!-- Shows whatever the dialog would save: the current custom image, an image just
            picked from the device, or the URL being typed. -->
       <div class="art-url-preview" id="artUrlPreview" style="display:none;"><img id="artUrlPreviewImg" alt="" referrerpolicy="no-referrer"></div>
@@ -4406,7 +4669,41 @@
       </div>
       <button class="art-url-save-btn" id="artUrlSaveBtn">Save</button>
     </div>
+    </div>
+    <!-- Second screen: covers suggested from public archives (MusicBrainz / Cover Art Archive,
+         Wikimedia Commons). Tapping one applies its full-size original and closes the dialog. -->
+    <div class="art-suggest" id="artSuggest" hidden>
+      <div class="art-suggest-head"><span class="art-suggest-src" id="artSuggestSrc">MusicBrainz</span></div>
+      <div class="art-suggest-grid" id="artSuggestGrid" role="list"></div>
+      <div class="art-suggest-note" id="artSuggestNote"></div>
+    </div>
     <input type="file" id="artUrlFileInput" accept="image/*" style="display:none;">
+  </div>
+</div>
+
+<!-- Fix artist info: the Wikipedia article an artist's bio and portrait come from, chosen by
+     hand when the automatic match lands on the wrong subject (a band that shares its name with
+     a disease, a city or a king). The choice is kept for good. -->
+<div class="settings-overlay" id="artistInfoOverlay">
+  <div class="settings-panel" id="artistInfoPanel" role="dialog" aria-labelledby="artistInfoTitle">
+    <div class="settings-header">
+      <h2 id="artistInfoTitle">Artist info</h2>
+      <button class="settings-close" id="artistInfoCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="art-url-body">
+      <p class="artist-info-lede" id="artistInfoLede">Choose the article about this artist.</p>
+      <div class="art-url-input-row">
+        <input type="search" class="art-url-input" id="artistInfoInput" placeholder="Search Wikipedia" enterkeyhint="search" autocomplete="off">
+      </div>
+      <div class="artist-info-list" id="artistInfoList" role="listbox" aria-label="Wikipedia articles"></div>
+      <div class="art-url-upload-note" id="artistInfoNote"></div>
+    </div>
+    <div class="art-url-actions">
+      <div class="art-url-actions-left">
+        <button type="button" class="art-url-search-btn" id="artistInfoNoneBtn">Show no info</button>
+      </div>
+      <button type="button" class="art-url-search-btn" id="artistInfoResetBtn">Reset to automatic</button>
+    </div>
   </div>
 </div>
 
@@ -4486,6 +4783,21 @@
       <div class="podcast-description-artist" id="podcastDescriptionArtist"></div>
       <div class="podcast-description-text" id="podcastDescriptionText"></div>
     </div>
+  </div>
+</div>
+
+<!-- An artist's bio in full: opened by "More" under the bio on an artist page. -->
+<div class="settings-overlay" id="artistBioOverlay">
+  <div class="settings-panel" id="artistBioPanel" role="dialog" aria-modal="true" aria-labelledby="artistBioName">
+    <div class="settings-header">
+      <div class="artist-bio-head">
+        <div class="artist-bio-avatar" id="artistBioAvatar" aria-hidden="true"></div>
+        <h2 id="artistBioName"></h2>
+      </div>
+      <button class="settings-close" id="artistBioCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="artist-bio-text" id="artistBioText"></div>
+    <a class="artist-bio-credit" id="artistBioCredit" target="_blank" rel="noopener noreferrer">From Wikipedia</a>
   </div>
 </div>
 
@@ -4689,6 +5001,10 @@
       <div class="queue-list" id="queueUpList"></div>
       <div class="queue-empty" id="queueUpEmpty">Your queue is empty.</div>
     </div>
+    <!-- What carries on after Up Next: the rest of the shuffle, album, playlist or library. -->
+    <div class="queue-section queue-section-cont" id="queueCtxSection" style="display:none;">
+      <div class="queue-list" id="queueCtxList"></div>
+    </div>
   </div>
 </div>
 
@@ -4720,7 +5036,14 @@
 (function(){
   var Cap = window.Capacitor;
   if(!Cap || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform()) return;
-  var P = Cap.registerPlugin('AmplifyPlayer');
+  // The real Android shell injects Capacitor.Plugins.AmplifyPlayer (one function per native
+  // method, plus addListener). It does NOT provide Capacitor.registerPlugin -- that lives in
+  // @capacitor/core, which this single-file app doesn't load. Calling registerPlugin here
+  // threw on every launch, this whole block was skipped, and the page quietly played through
+  // the WebView's own <audio> instead of the native player: no stream titles, no car queue,
+  // nothing from the page in the notification. Plugins first; registerPlugin only if present.
+  var P = (Cap.Plugins && Cap.Plugins.AmplifyPlayer) || (typeof Cap.registerPlugin === 'function' ? Cap.registerPlugin('AmplifyPlayer') : null);
+  if(!P){ console.error('Amplify: native player plugin missing; using the WebView player'); window.AmplifyNativeAudioMissing = true; return; }
   var seq = 0;
   function now(){ return (window.performance && performance.now) ? performance.now() : Date.now(); }
   function mkErr(name, msg){ var e = new Error(msg || name); e.name = name; return e; }
@@ -4780,6 +5103,7 @@
     this._dur = NaN; this._ready = 0; this._err = null;
     this._rate = 1; this._vol = 1; this._muted = false;
     this._pending = []; this._lastState = '';
+    this._car = false;
   }
   var A = NativeAudio.prototype;
   A._emit = function(type){ try{ this.dispatchEvent(new Event(type)); }catch(e){ console.error(e); } };
@@ -4791,6 +5115,7 @@
     var self = this;
     this._settle(false, mkErr('AbortError', 'The play() request was interrupted by a new load request.'));
     var id = 'm' + (++seq);
+    this._car = false; // the page is playing something itself again
     this._id = u ? id : null; this._src = u; this._sent = false;
     this._err = null; this._dur = NaN; this._ready = 0; this._time = 0; this._t0 = now();
     this._startAt = 0; this._playing = false; this._ended = false; this._lastState = '';
@@ -4802,7 +5127,8 @@
     real.then(function(url){
       if(!wanted()) return;
       self._sent = true;
-      return P.load({ id: id, url: url, play: !self._paused, start: self._startAt || 0, rate: self._rate, volume: self._muted ? 0 : self._vol });
+      return P.load({ id: id, url: url, play: !self._paused, start: self._startAt || 0, rate: self._rate, volume: self._muted ? 0 : self._vol })
+        .then(function(r){ try{ window.dispatchEvent(new Event('amplify-native-loaded')); }catch(e){} return r; });
     })['catch'](function(e){
       if(!wanted() || (e && e.name === 'AbortError')) return;
       self._fail(4, (e && e.message) || 'Could not load');
@@ -4887,19 +5213,71 @@
       this._emit('durationchange');
     }
   };
+  // Android Auto started something from its own menu. The page follows the native player
+  // under the car's id: it shows the item (see followCar in the car block) and its
+  // play/pause/seek act on the car's queue, until the page loads something itself.
+  A._followCar = function(ev){
+    this._settle(false, mkErr('AbortError', 'Android Auto took over playback.'));
+    this._car = true;
+    this._id = ev.id; this._src = 'car:' + ev.id; this._sent = true;
+    this._err = null; this._ended = false; this._ready = 4; this._startAt = 0;
+    this._lastState = ev.state || '';
+    this._dur = NaN;
+    this._onTime(ev);
+    this._paused = !ev.playWhenReady;
+    this._playing = !!ev.isPlaying;
+    try{ window.dispatchEvent(new CustomEvent('amplify-car', { detail: ev })); }catch(e){ console.error(e); }
+    this._emit('durationchange'); this._emit('timeupdate');
+  };
+  Object.defineProperty(A, 'isCarFollowing', { get: function(){ return this._car; } });
   var audio = new NativeAudio();
+  P.addListener('car', function(ev){ if(ev && ev.id && ev.item) audio._followCar(ev); });
+  // The song a live station names in its stream (read natively; a browser can't see it).
+  // Sent as its own event on a change, and also carried on every progress and state update
+  // (onAirTitle/onAirArtist), so a change the page missed is picked up within half a second.
+  var lastOnAirKey = null;
+  function syncOnAir(ev){
+    if(!ev || ev.id !== audio._id || typeof ev.onAirTitle !== 'string') return;
+    var key = ev.id + '\n' + ev.onAirTitle + '\n' + (ev.onAirArtist || '');
+    if(key === lastOnAirKey) return;
+    lastOnAirKey = key;
+    try{ window.dispatchEvent(new CustomEvent('amplify-onair', { detail: { id: ev.id, title: ev.onAirTitle, artist: ev.onAirArtist || '' } })); }catch(e){ console.error(e); }
+  }
+  P.addListener('onair', function(ev){
+    if(!ev || ev.id !== audio._id) return;
+    lastOnAirKey = ev.id + '\n' + (ev.title || '') + '\n' + (ev.artist || '');
+    try{ window.dispatchEvent(new CustomEvent('amplify-onair', { detail: ev })); }catch(e){ console.error(e); }
+  });
+  A.onAirNow = function(){
+    var id = this._id;
+    return P.onAirNow().then(function(ev){ return ev && ev.id === id ? ev : null; })['catch'](function(){ return null; });
+  };
   P.addListener('progress', function(ev){
     if(!ev || ev.id !== audio._id) return;
+    syncOnAir(ev);
     audio._onTime(ev);
     audio._emit('timeupdate');
   });
   P.addListener('state', function(ev){
     var a = audio;
     if(!ev || ev.id !== a._id) return;
+    syncOnAir(ev);
     a._onTime(ev);
     if(ev.state === 'ready' && a._ready < 4){
       if(a._ready < 1){ a._ready = 1; a._emit('loadedmetadata'); }
       a._ready = 4; a._emit('loadeddata'); a._emit('canplay'); a._emit('canplaythrough');
+    }
+    if(a._car){
+      // Following the car: every pause/resume is the car's (or the phone's buttons acting on
+      // the car's queue), so the page's buttons just follow. Buffering, errors and the end
+      // of the queue are the car's to handle -- none of them may start the page's own
+      // reconnect or next-track logic, which would take playback back from the car.
+      a._lastState = ev.state;
+      if(!ev.playWhenReady && !a._paused){ a._paused = true; a._emit('pause'); a._emit('externalpause'); }
+      else if(ev.playWhenReady && a._paused){ a._paused = false; a._emit('play'); a._emit('externalplay'); }
+      if(ev.isPlaying && !a._playing){ a._playing = true; a._emit('playing'); }
+      else if(!ev.isPlaying && a._playing){ a._playing = false; }
+      return;
     }
     if(ev.state === 'buffering' && a._lastState !== 'buffering' && !a._paused) a._emit('waiting');
     a._lastState = ev.state;
@@ -4919,7 +5297,7 @@
     }
   });
   P.addListener('error', function(ev){
-    if(!ev || ev.id !== audio._id) return;
+    if(!ev || ev.id !== audio._id || audio._car) return;
     var net = ev.code >= 2000 && ev.code < 3000;
     audio._fail(net ? 2 : 4, ev.name || ev.message || 'Playback error');
   });
@@ -4961,7 +5339,9 @@
     if(skipTimer) return;
     skipTimer = setTimeout(function(){
       skipTimer = null;
-      P.setSkip({ next: !!handlers.nexttrack, prev: !!handlers.previoustrack })['catch'](function(){});
+      // An episode gets skip back 15 s / forward 30 s in Previous/Next's places outside the
+      // app (see setMediaSessionHandlers, which marks it).
+      P.setSkip({ next: !!handlers.nexttrack, prev: !!handlers.previoustrack, podcast: !!session.amplifyPodcast })['catch'](function(){});
     }, 0);
   }
   var md = null, state = 'none';
@@ -4982,6 +5362,9 @@
   }
   var ACTIONS = { play: 'play', pause: 'pause', stop: 'stop', next: 'nexttrack', previous: 'previoustrack' };
   P.addListener('remote', function(ev){
+    // A row picked in the car's queue: "queue:3" is the third item coming up.
+    var qm = ev && /^queue:(\d+)$/.exec(ev.action || '');
+    if(qm){ if(window.__amplifyPlayUpcoming) window.__amplifyPlayUpcoming(parseInt(qm[1], 10)); return; }
     var name = ev && ACTIONS[ev.action];
     if(!name) return;
     var fn = handlers[name];
@@ -5069,6 +5452,9 @@
   // Emptying the grid has to drop the layout modifier too, or a song list's tight row
   // spacing survives into whatever view is drawn next.
   function resetStationsGrid(){
+    var allArtists = document.getElementById('allArtistsLink');
+    if(allArtists) allArtists.style.display = 'none';
+    sectionHeadingRow.classList.remove('has-side-link');
     stationsGrid.innerHTML = '';
     stationsGrid.classList.remove('grid-songs');
     stationsGrid.classList.remove('grid-album');
@@ -5173,6 +5559,8 @@
   var genresReorderHeaderBtn = document.getElementById('genresReorderHeaderBtn');
   var clearSearchBtn = document.getElementById('clearSearchBtn');
   var clearHistoryBtn = document.getElementById('clearHistoryBtn');
+  var favPageEditBtn = document.getElementById('favPageEditBtn');
+  var favPageEditing = false;
   var favoritesHeadingEl = document.getElementById('favoritesHeading');
   var recentStationsHeadingBtn = document.getElementById('recentStationsHeading');
   var recentSongsHeadingBtn = document.getElementById('recentSongsHeading');
@@ -5201,6 +5589,7 @@
   var npArt = document.getElementById('npArt');
   var npName = document.getElementById('npName');
   var npSub = document.getElementById('npSub');
+  var npOnAir = document.getElementById('npOnAir');
   var npFavBtn = document.getElementById('npFavBtn');
   var npPlayBtn = document.getElementById('npPlayBtn');
   var npArtWrap = document.getElementById('npArtWrap');
@@ -5227,6 +5616,12 @@
   var accentColorInput = document.getElementById('accentColorInput');
   var accentResetBtn = document.getElementById('accentResetBtn');
   var artUrlOverlay = document.getElementById('artUrlOverlay');
+  var artistInfoOverlay = document.getElementById('artistInfoOverlay');
+  var artistInfoInput = document.getElementById('artistInfoInput');
+  var artistInfoList = document.getElementById('artistInfoList');
+  var artistInfoNote = document.getElementById('artistInfoNote');
+  var artistInfoResetBtn = document.getElementById('artistInfoResetBtn');
+  var artistInfoFixBtn = document.getElementById('artistInfoFixBtn');
   var artUrlCloseBtn = document.getElementById('artUrlCloseBtn');
   var artUrlInput = document.getElementById('artUrlInput');
   var artUrlClearBtn = document.getElementById('artUrlClearBtn');
@@ -5267,6 +5662,7 @@
   var albumFavBtn = document.getElementById('albumFavBtn');
   var albumMenuBtn = document.getElementById('albumMenuBtn');
   var albumMenu = document.getElementById('albumMenu');
+  var albumArtEditBtn = document.getElementById('albumArtEditBtn');
   var albumPlayNextBtn = document.getElementById('albumPlayNextBtn');
   var albumAddQueueBtn = document.getElementById('albumAddQueueBtn');
   var azRail = document.getElementById('azRail');
@@ -5555,6 +5951,27 @@
       return ok;
     }catch(e){ return false; }
   }
+  // Moments the app stopped responding for a second or more, kept so Check storage can show
+  // them afterwards (a freeze leaves nothing else behind to look at).
+  var SLOW_LOG_KEY = 'amplifySlowMoments';
+  function readSlowLog(){
+    try{ var v = JSON.parse(localStorage.getItem(SLOW_LOG_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch(e){ return []; }
+  }
+  try{
+    if(window.PerformanceObserver){
+      new PerformanceObserver(function(list){
+        list.getEntries().forEach(function(e){
+          if(e.duration < 1000) return;
+          var log = readSlowLog();
+          log.push({ at: Date.now(), ms: Math.round(e.duration),
+            view: (document.body.className || '').split(' ').filter(Boolean).slice(0, 4).join(' '),
+            doing: window.__amplifyDoing || '' });
+          try{ localStorage.setItem(SLOW_LOG_KEY, JSON.stringify(log.slice(-8))); }catch(err){}
+        });
+      }).observe({ entryTypes: ['longtask'] });
+    }
+  }catch(e){}
   function renderDiagnostics(){
     diagnosticsEl.style.display = '';
     diagnosticsEl.innerHTML = 'Checking…';
@@ -5589,6 +6006,15 @@
         line('Artist portraits stored', num(counts[2]), counts[2] < 0) +
         line('Saved cover-art URLs', customCount) +
         line('Resolved art entries', artCount) +
+        (function(){
+          var log = readSlowLog();
+          if(!log.length) return line('Slow moments', 'none');
+          return line('Slow moments', log.length, true) + log.slice(-4).reverse().map(function(x){
+            return '<div>' + escapeHtml(new Date(x.at).toLocaleString()) + ': <b>' + (x.ms / 1000).toFixed(1)
+              + ' s</b> ' + escapeHtml(x.doing || x.view || '') + '</div>';
+          }).join('');
+        })() +
+        '<div id="carDiag"></div>' +
         (dbDown
           ? line('Station list cached without the database', stationsCached ? 'yes' : 'not yet')
             + line('Artist lookups cached without the database', metaFallback)
@@ -5603,6 +6029,14 @@
           + 'URLs -- is cached in settings storage instead, so it is not re-downloaded. '
           + 'Storing your own music files needs the app installed rather than opened as a '
           + 'file.</div>' : '');
+      // What the car side holds (the phone app on Android only).
+      if(window.__amplifyCarDebug){
+        window.__amplifyCarDebug().then(function(t){
+          var el = document.getElementById('carDiag');
+          if(el && t) el.innerHTML = '<div style="margin-top:8px"><b>Android Auto</b></div>'
+            + t.split('\n').map(function(l){ return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+        })['catch'](function(){});
+      }
     })['catch'](function(){
       diagnosticsEl.textContent = 'Storage could not be read on this device.';
     });
@@ -5642,18 +6076,80 @@
   sidebarBackdrop.addEventListener('click', closeDrawer);
 
   // ---------- now playing (expanded) screen ----------
-  function openNowPlaying(station){
+  // ---- the slide up / slide down ----
+  var npSheetTimer = null, npSheetDone = null;
+  function npSheetMotionOk(){
+    if(document.body.classList.contains('rotate-lock')) return false;
+    return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function npSheetMobile(){ return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches); }
+  // Stops a slide part-way and drops its classes. finish=true runs what the slide was going
+  // to do at its end; false abandons it (a slide down interrupted by opening again).
+  function stopNpSheet(finish){
+    clearTimeout(npSheetTimer); npSheetTimer = null;
+    var done = npSheetDone; npSheetDone = null;
+    nowPlayingScreen.classList.remove('np-sheet-anim', 'np-sheet-closing', 'np-sheet-down');
+    document.body.classList.remove('np-sheet');
+    if(finish && done) done();
+  }
+  function runNpSheet(down, done){
+    npSheetDone = done;
+    var el = nowPlayingScreen;
+    if(down){
+      el.classList.add('np-sheet-anim', 'np-sheet-closing');
+      void el.offsetHeight;
+      // Let go after a swipe down: it carries on from where the finger left it.
+      el.style.transform = '';
+      el.classList.add('np-sheet-down');
+    } else if(el.classList.contains('np-sheet-anim') && el.classList.contains('np-sheet-down')){
+      // Caught on its way down: turn round from wherever it has got to.
+      el.classList.remove('np-sheet-closing', 'np-sheet-down');
+    } else {
+      el.classList.remove('np-sheet-anim', 'np-sheet-closing');
+      el.classList.add('np-sheet-down');
+      void el.offsetHeight; // the parked position has to be painted before the move starts
+      el.classList.add('np-sheet-anim');
+      el.classList.remove('np-sheet-down');
+    }
+    npSheetTimer = setTimeout(function(){ stopNpSheet(true); }, down ? 300 : 360);
+  }
+  function npClosing(){ return !!npSheetDone && nowPlayingScreen.classList.contains('np-sheet-closing'); }
+
+  // animate: only when the user taps the mini player. Every other opener (rotating into
+  // landscape, a restore) puts the screen up at once.
+  function openNowPlaying(station, animate){
     // Falls back to whatever was last played so the screen never opens on nothing -- see
     // lastPlayedStation().
     var target = station || currentStation || lastPlayedStation();
     if(!target) return;
+    var closing = npClosing();
+    // Tapped again while it was dropping: bring it back up from where it is.
+    if(closing){ clearTimeout(npSheetTimer); npSheetTimer = null; npSheetDone = null; }
+    var already = nowPlayingScreen.style.display === 'flex' && !closing;
+    if(!already && npSheetDone) stopNpSheet(true);
     npStation = target;
-    savedBrowseScrollY = window.scrollY;
+    if(!closing) savedBrowseScrollY = window.scrollY;
     renderNowPlayingScreen();
-    browseView.style.display = 'none';
     nowPlayingScreen.style.display = 'flex';
-    document.body.classList.add('np-open');
     closeDrawer();
+    var slide = (animate || closing) && !already && npSheetMotionOk();
+    if(slide && npSheetMobile()){
+      // The page stays exactly where it is under the rising sheet; it is only hidden once
+      // the sheet covers it.
+      document.body.classList.remove('np-open');
+      document.body.classList.add('np-sheet');
+      nowPlayingScreen.scrollTop = 0;
+      if(npArtWrap){ npArtWrap.style.setProperty('--hero-scroll', 0); npArtWrap.style.setProperty('--hero-parallax', 0); }
+      runNpSheet(false, function(){
+        document.body.classList.add('np-open');
+        browseView.style.display = 'none';
+        window.scrollTo(0, 0);
+      });
+      return;
+    }
+    browseView.style.display = 'none';
+    document.body.classList.add('np-open');
+    if(slide) runNpSheet(false, null);
     window.scrollTo(0, 0);
     // On mobile the screen is its own scroll region (see body.np-open), so resetting the
     // window alone would leave a station opened from the related grid scrolled half-way down.
@@ -5667,9 +6163,28 @@
   // now playing is open (a genre pill, a different playlist, top stations, stopping
   // playback entirely) -- those should land at the top of the new list, not jump to
   // wherever the previous screen happened to be scrolled.
-  function closeNowPlaying(restoreScroll){
+  // animate: only the down-arrow button, which slides the screen back into the mini player.
+  function closeNowPlaying(restoreScroll, animate){
+    if(npClosing()){
+      if(animate) return; // already on its way down
+      stopNpSheet(false);
+    } else if(npSheetDone){
+      stopNpSheet(true); // still rising: finish that first so the close below is clean
+    }
     var wasOpen = nowPlayingScreen.style.display === 'flex';
     closeQueuePanel();
+    if(animate && wasOpen && npSheetMotionOk()){
+      var mobile = npSheetMobile();
+      if(mobile){
+        // The page comes back underneath at once, where it was, and the sheet drops off it.
+        document.body.classList.add('np-sheet');
+        document.body.classList.remove('np-open');
+        browseView.style.display = '';
+        if(restoreScroll) window.scrollTo(0, savedBrowseScrollY);
+      }
+      runNpSheet(true, function(){ closeNowPlaying(restoreScroll && !mobile); });
+      return;
+    }
     nowPlayingScreen.style.display = 'none';
     browseView.style.display = '';
     document.body.classList.remove('np-open');
@@ -5827,6 +6342,86 @@
       npRelatedGrid.appendChild(buildTile(t));
     });
   }
+  // ---------- which genre a station is ----------
+  // Related Stations is a search by genre tag, and a good share of Radio Browser's stations
+  // carry no tags at all ("Coffee Jazz", "Absolute Chillout"): the section used to vanish for
+  // them. Their names usually say it, though, so an untagged station's name is matched against
+  // the directory's own tag list, weighted by how many stations use each tag -- "Coffee Jazz"
+  // is jazz (1,160 stations), not coffee (15). Two-word genres win over one-word ones ("Smooth
+  // Jazz FM" is smooth jazz, not all of jazz). The list is fetched once and kept for a month;
+  // offline, a short built-in list stands in.
+  var TAG_VOCAB_KEY = 'amplifyTagVocab';
+  var TAG_VOCAB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  var TAG_VOCAB_MIN = 20;
+  // Tags that say nothing about the music. They are common tags, which is exactly why they
+  // must not decide anything.
+  var TAG_FILLER = ['radio', 'fm', 'am', 'music', 'online', 'the', 'station', 'web', 'webradio',
+    'internet', 'stream', 'live', 'channel', 'best', 'top', 'hits', 'hit', 'new', 'my', 'and',
+    'of', 'de', 'la', 'el', 'le', 'die', 'der', 'das', 'en', 'y', 'net', 'com', 'tv', 'player',
+    'official', 'free', 'non', 'stop', 'nonstop', '24', '24/7', 'mix', 'love', 'one', 'plus'];
+  var BUILTIN_TAGS = ['pop', 'rock', 'jazz', 'classical', 'electronic', 'news', 'talk', 'dance',
+    'country', 'oldies', '80s', '90s', '70s', '60s', '00s', 'chillout', 'chill', 'lounge',
+    'ambient', 'house', 'techno', 'trance', 'reggae', 'hip hop', 'hiphop', 'rap', 'rnb', 'soul',
+    'funk', 'disco', 'blues', 'metal', 'punk', 'indie', 'alternative', 'folk', 'latin', 'salsa',
+    'gospel', 'christian', 'smooth jazz', 'piano', 'deep house', 'drum and bass', 'dubstep',
+    'reggaeton', 'k-pop', 'j-pop', 'anime', 'soundtrack', 'christmas', 'kids', 'sports',
+    'comedy', 'world music', 'bossa nova', 'swing', 'bluegrass', 'opera', 'instrumental'];
+  var tagVocabCache = null;
+  function builtinTagVocab(){
+    var v = {};
+    // Earlier in the list = more common; only the order matters here.
+    BUILTIN_TAGS.forEach(function(t, i){ v[t] = 1000 - i; });
+    return v;
+  }
+  function tagVocab(){
+    if(tagVocabCache) return Promise.resolve(tagVocabCache);
+    try{
+      var stored = JSON.parse(localStorage.getItem(TAG_VOCAB_KEY) || 'null');
+      if(stored && stored.tags && (Date.now() - (stored.ts || 0)) < TAG_VOCAB_TTL_MS){
+        tagVocabCache = stored.tags;
+        return Promise.resolve(tagVocabCache);
+      }
+    }catch(e){}
+    return apiFetch('/json/tags?order=stationcount&reverse=true&limit=1500&hidebroken=true').then(function(list){
+      var v = {};
+      (list || []).forEach(function(t){
+        if(t && t.name && (t.stationcount || 0) >= TAG_VOCAB_MIN) v[String(t.name).toLowerCase()] = t.stationcount;
+      });
+      if(!Object.keys(v).length) return builtinTagVocab();
+      tagVocabCache = v;
+      try{ localStorage.setItem(TAG_VOCAB_KEY, JSON.stringify({ ts: Date.now(), tags: v })); }catch(e){}
+      return v;
+    })['catch'](function(){ return builtinTagVocab(); });
+  }
+  function genresFromName(name, vocab){
+    var words = stripExclusively(name).toLowerCase()
+      .replace(/[^\p{L}\p{N}&+'-]+/gu, ' ').trim().split(/\s+/).filter(Boolean);
+    var found = [];
+    function consider(tag, span){
+      if(!tag || TAG_FILLER.indexOf(tag) >= 0 || !vocab[tag]) return;
+      if(found.some(function(f){ return f.tag === tag; })) return;
+      found.push({ tag: tag, span: span, count: vocab[tag] });
+    }
+    for(var i = 0; i < words.length; i++){
+      if(i + 1 < words.length){
+        consider(words[i] + ' ' + words[i + 1], 2);   // "smooth jazz", "hip hop"
+        consider(words[i] + words[i + 1], 2);         // "hiphop" spelled as two words
+      }
+      consider(words[i], 1);
+      // "Jazz24", "Rock2000": the genre with a number stuck to it. ("80s" is its own tag.)
+      var bare = words[i].replace(/\d+$/, '');
+      if(bare !== words[i] && bare.length >= 3) consider(bare, 1);
+    }
+    found.sort(function(a, b){ return (b.span - a.span) || (b.count - a.count); });
+    return found.map(function(f){ return f.tag; }).slice(0, 3);
+  }
+  function relatedTagsFor(station){
+    var own = String(station.tags || '').split(',').map(function(t){ return t.trim().toLowerCase(); })
+      .filter(function(t){ return t && TAG_FILLER.indexOf(t) < 0; }).slice(0, 3);
+    if(own.length) return Promise.resolve(own);
+    return tagVocab().then(function(v){ return genresFromName(station.name, v); });
+  }
+
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
     if(isLocalTrack(station)){
@@ -5836,33 +6431,35 @@
     var headingEl = npRelated.querySelector('.np-related-heading');
     if(headingEl) headingEl.textContent = 'Related Stations';
     npRelatedGrid.classList.remove('grid-songs');
-    var tagsStr = (station.tags || '').trim();
-    var firstTag = tagsStr ? tagsStr.split(',')[0].trim() : '';
-    if(!firstTag){
-      npRelated.style.display = 'none';
-      npRelatedGrid.innerHTML = '';
-      return;
-    }
     npRelated.style.display = '';
     npRelatedGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-    // Fetch more than the display limit -- filtering out the currently-playing station,
-    // blacklisted stations, and duplicate streams can all shrink the list below what the
-    // API returned, so a generous buffer keeps the grid reliably full.
-    apiFetch('/json/stations/search?tag=' + encodeURIComponent(firstTag.toLowerCase()) + '&limit=24&hidebroken=true&order=clickcount&reverse=true')
-      .then(function(data){
-        if(requestId !== npRelatedRequestId) return;
-        var related = dedupeByStreamUrl(
-          data.map(stationToCardData)
-            .filter(function(s){ return favKey(s) !== favKey(station) && !isBlacklisted(s); })
-          ).slice(0, 16);
-        npRelatedGrid.innerHTML = '';
-        if(!related.length){ npRelated.style.display = 'none'; return; }
-        related.forEach(function(s){ npRelatedGrid.appendChild(buildTile(s)); });
-      })
-      .catch(function(){
-        if(requestId !== npRelatedRequestId) return;
-        npRelated.style.display = 'none';
-      });
+    function hide(){
+      if(requestId !== npRelatedRequestId) return;
+      npRelated.style.display = 'none';
+      npRelatedGrid.innerHTML = '';
+    }
+    // Each genre in turn until one finds other stations: a station's first tag can be one
+    // nobody else uses.
+    function tryTag(tags, i){
+      if(requestId !== npRelatedRequestId) return;
+      if(i >= tags.length){ hide(); return; }
+      // Fetch more than the display limit -- filtering out the currently-playing station,
+      // blacklisted stations, and duplicate streams can all shrink the list below what the
+      // API returned, so a generous buffer keeps the grid reliably full.
+      apiFetch('/json/stations/search?tag=' + encodeURIComponent(tags[i]) + '&limit=24&hidebroken=true&order=clickcount&reverse=true')
+        .then(function(data){
+          if(requestId !== npRelatedRequestId) return;
+          var related = dedupeByStreamUrl(
+            (data || []).map(stationToCardData)
+              .filter(function(s){ return favKey(s) !== favKey(station) && !isBlacklisted(s); })
+            ).slice(0, 16);
+          if(!related.length){ tryTag(tags, i + 1); return; }
+          npRelatedGrid.innerHTML = '';
+          related.forEach(function(s){ npRelatedGrid.appendChild(buildTile(s)); });
+        })
+        .catch(hide);
+    }
+    relatedTagsFor(station).then(function(tags){ tryTag(tags, 0); }, hide);
   }
   var npDeleteConfirmKey = null; // which station's key the delete button is currently armed for
   // ---------- the colour the screen is built from ----------
@@ -6166,6 +6763,7 @@
     renderStationArt(npArt, st);
     syncNpTint();
     renderNpName(st);
+    renderNpOnAir(st);
     renderNpSub(st);
     renderNpGenres(st);
     renderNpCollection(st);
@@ -6195,12 +6793,12 @@
       npDeleteConfirmKey = null;
     }
   }
-  npBackBtn.addEventListener('click', function(){ closeNowPlaying(true); });
+  npBackBtn.addEventListener('click', function(){ closeNowPlaying(true, true); });
   npFavBtn.addEventListener('click', function(){
     var st = npTarget();
     if(st) toggleFavorite(st);
   });
-  playerNowTrigger.addEventListener('click', function(){ openNowPlaying(currentStation); });
+  playerNowTrigger.addEventListener('click', function(){ openNowPlaying(currentStation, true); });
 
   // ---------- copy stream URL ----------
   function legacyCopyText(text){
@@ -6376,7 +6974,7 @@
     if(!target || !target.key) return;
     artDialogTarget = target;
     artUrlTitle.textContent = target.title || 'Custom Cover Art';
-    var existing = getCustomArtUrl(target.key) || '';
+    var existing = getCustomArtUrl(target.key) || (target.clearAlso && getCustomArtUrl(target.clearAlso)) || '';
     // An uploaded image is kept out of the text field -- a data: URL is tens of thousands of
     // characters of noise there -- and shown in the preview instead.
     if(/^data:/i.test(existing)){
@@ -6389,6 +6987,8 @@
       setArtNote('');
     }
     updateArtUrlClearState();
+    showArtMainScreen();
+    artSuggestBtn.hidden = !target.suggest;
     artUrlOverlay.classList.add('open');
     // Same rule as search: a phone does not get an unasked-for keyboard.
     if(!isPhoneLayout()) artUrlInput.focus();
@@ -6396,13 +6996,33 @@
   function openArtUrlDialog(){
     var st = npTarget();
     if(!st) return;
+    // A local song with an album tag edits the album's cover (a cover belongs to the album);
+    // any older custom art on the song itself is cleared when a new one is saved, or it would
+    // keep winning. An untagged song keeps its own. A station that stands for an artist gets
+    // that artist's suggestions; any other station has none to offer.
+    if(isLocalTrack(st) && String(st.album || '').trim()){
+      var akey = albumKeyFor(st);
+      openArtUrlDialogFor({
+        key: 'album:' + akey,
+        clearAlso: favKey(st),
+        name: st.album + (st.artist ? ' ' + st.artist : ''),
+        title: 'Album Cover',
+        suggest: { kind: 'album', artist: st.artist || '', album: st.album },
+        refresh: function(){ refreshAlbumArt(akey); }
+      });
+      return;
+    }
+    var artistLink = isLocalTrack(st) ? null : stationArtistLink(st);
     openArtUrlDialogFor({
       key: favKey(st),
       name: stripExclusively(st.name),
+      suggest: isLocalTrack(st) ? { kind: 'album', artist: st.artist || '', album: st.name || '' }
+        : artistLink ? { kind: 'artist', name: artistLink.name } : null,
       refresh: function(){ refreshStationArt(st); }
     });
   }
   function closeArtUrlDialog(){
+    showArtMainScreen();
     artUrlOverlay.classList.remove('open');
     artPendingUpload = null;
     artUrlFileInput.value = '';
@@ -6441,6 +7061,7 @@
     var t = artDialogTarget;
     if(!t) return;
     var val = currentArtDialogValue();
+    if(t.clearAlso) clearCustomArtUrl(t.clearAlso);
     var ok = val ? setCustomArtUrl(t.key, val) : clearCustomArtUrl(t.key);
     if(!ok && val){
       setArtNote('This image could not be saved -- browser storage is full. Try a smaller image or a URL.', true);
@@ -6454,11 +7075,255 @@
     var t = artDialogTarget;
     if(!t || artUrlClearBtn.disabled) return;
     clearCustomArtUrl(t.key);
+    if(t.clearAlso) clearCustomArtUrl(t.clearAlso);
     artUrlInput.value = '';
     artPendingUpload = null;
     if(t.refresh) t.refresh();
     closeArtUrlDialog();
   });
+  // ---------- Cover art suggestions ----------
+  // Albums: MusicBrainz release groups matching artist + album (the album itself sorts ahead
+  // of singles and compilations with the same title), then other editions of the best match,
+  // since reissues and deluxe versions often carry their own sleeve. Covers come from the
+  // Cover Art Archive: 250px thumbnails in the grid, the archive's original on selection.
+  // Artists: MusicBrainz finds the artist, its Wikidata link gives the photo on Wikimedia
+  // Commons (first), then the artist's albums' covers. Every service here answers browsers
+  // with Access-Control-Allow-Origin: *. MusicBrainz asks for at most one request a second,
+  // so its calls go through a queue spaced a little over that.
+  var ART_SUGGEST_MAX = 12;
+  var MB_API = 'https://musicbrainz.org/ws/2/';
+  var CAA_BASE = 'https://coverartarchive.org/';
+  var MB_GAP_MS = 1100;
+  // A photo's original on Commons is often a 20+ megapixel camera file; this width is well
+  // past any screen the art is drawn on and a fraction of the download.
+  var COMMONS_FULL_WIDTH = 1600;
+  var mbQueue = Promise.resolve();
+  function mbGet(path){
+    var url = MB_API + path + (path.indexOf('?') < 0 ? '?' : '&') + 'fmt=json';
+    var run = mbQueue.then(function(){
+      return fetchWithTimeout(url, {}, 10000).then(function(res){
+        if(!res || !res.ok) throw new Error('musicbrainz ' + (res && res.status));
+        return res.json();
+      });
+    });
+    function gap(){ return new Promise(function(r){ setTimeout(r, MB_GAP_MS); }); }
+    mbQueue = run.then(gap, gap);
+    return run;
+  }
+  function luceneQuote(v){ return '"' + String(v).replace(/[\\"]/g, '\\$&') + '"'; }
+  function yearOf(d){ return d ? String(d).slice(0, 4) : ''; }
+  function creditName(x){
+    var ac = x && x['artist-credit'];
+    return ac && ac[0] ? (ac[0].name || (ac[0].artist && ac[0].artist.name) || '') : '';
+  }
+  function caaCover(kind, id){
+    var base = CAA_BASE + kind + '/' + id;
+    return {
+      thumb: base + '/front-250',
+      full: function(){
+        // The listing names the original file directly (no redirect to follow later).
+        return fetchWithTimeout(base, {}, 10000).then(function(res){ return res && res.ok ? res.json() : null; })
+          .then(function(d){
+            var imgs = (d && d.images) || [];
+            var front = imgs.filter(function(i){ return i.front; })[0] || imgs[0];
+            return front && front.image ? secureUrl(front.image) : base + '/front';
+          })['catch'](function(){ return base + '/front'; });
+      }
+    };
+  }
+  function albumSuggestions(artist, album, add){
+    var a = sanitizeArtistName(artist), t = sanitizeArtistName(album);
+    if(!t) return Promise.resolve();
+    var q = 'releasegroup:' + luceneQuote(t) + (a ? ' AND artist:' + luceneQuote(a) : '');
+    return mbGet('release-group/?limit=15&query=' + encodeURIComponent(q)).then(function(d){
+      var groups = ((d && d['release-groups']) || []).filter(function(g){ return (g.score || 0) >= 70; });
+      function rank(g){ return g['primary-type'] === 'Album' ? 0 : 1; }
+      groups.sort(function(x, y){ return ((y.score || 0) - (x.score || 0)) || (rank(x) - rank(y)); });
+      add(groups.map(function(g){
+        var c = caaCover('release-group', g.id), y = yearOf(g['first-release-date']);
+        var type = g['primary-type'] && g['primary-type'] !== 'Album' ? ' \u00b7 ' + g['primary-type'] : '';
+        return { thumb: c.thumb, full: c.full,
+          label: g.title + ' \u00b7 ' + creditName(g) + (y ? ' (' + y + ')' : '') + type };
+      }));
+      if(!groups[0]) return;
+      return mbGet('release/?limit=25&query=' + encodeURIComponent('rgid:' + groups[0].id)).then(function(r){
+        add(((r && r.releases) || []).map(function(rel){
+          var c = caaCover('release', rel.id);
+          var bits = [rel.country, yearOf(rel.date), rel.disambiguation].filter(Boolean).join(', ');
+          return { thumb: c.thumb, full: c.full, label: rel.title + (bits ? ' (' + bits + ')' : '') + ' edition' };
+        }));
+      });
+    });
+  }
+  function commonsFile(file, width){
+    return 'https://commons.wikimedia.org/wiki/Special:FilePath/'
+      + encodeURIComponent(String(file).replace(/ /g, '_')) + '?width=' + width;
+  }
+  function artistSuggestions(name, add){
+    var n = sanitizeArtistName(name);
+    if(!n) return Promise.resolve();
+    return mbGet('artist/?limit=5&query=' + encodeURIComponent('artist:' + luceneQuote(n))).then(function(d){
+      var best = ((d && d.artists) || []).filter(function(x){ return (x.score || 0) >= 90; })[0];
+      if(!best) return;
+      var photos = mbGet('artist/' + best.id + '?inc=url-rels').then(function(full){
+        var rel = ((full && full.relations) || []).filter(function(r){
+          return r.type === 'wikidata' && r.url && r.url.resource;
+        })[0];
+        var qid = rel && /Q\d+/.exec(rel.url.resource);
+        if(!qid) return;
+        return wikiFetch(WIKIDATA_API + '?action=wbgetclaims&format=json&origin=*&property=P18&entity=' + qid[0])
+          .then(function(res){ return res && res.ok ? res.json() : null; })
+          .then(function(c){
+            var files = ((c && c.claims && c.claims.P18) || []).map(function(x){
+              return x.mainsnak && x.mainsnak.datavalue && x.mainsnak.datavalue.value;
+            }).filter(Boolean);
+            add(files.map(function(f){
+              return { thumb: commonsFile(f, 300),
+                full: function(){ return Promise.resolve(commonsFile(f, COMMONS_FULL_WIDTH)); },
+                label: 'Photo of ' + best.name + ' (Wikimedia Commons)' };
+            }), true);
+          });
+      })['catch'](function(){});
+      return photos.then(function(){
+        return mbGet('release-group?limit=25&type=album&artist=' + best.id);
+      }).then(function(b){
+        var groups = ((b && b['release-groups']) || []).slice().sort(function(x, y){
+          return String(x['first-release-date'] || '9999').localeCompare(String(y['first-release-date'] || '9999'));
+        });
+        add(groups.map(function(g){
+          var c = caaCover('release-group', g.id), y = yearOf(g['first-release-date']);
+          return { thumb: c.thumb, full: c.full, label: g.title + (y ? ' (' + y + ')' : '') };
+        }));
+      });
+    });
+  }
+
+  var artSuggest = document.getElementById('artSuggest');
+  var artSuggestGrid = document.getElementById('artSuggestGrid');
+  var artSuggestNote = document.getElementById('artSuggestNote');
+  var artSuggestSrc = document.getElementById('artSuggestSrc');
+  var artSuggestSeq = 0;
+  var artUrlMain = document.getElementById('artUrlMain');
+  var artUrlBackBtn = document.getElementById('artUrlBackBtn');
+  var artSuggestBtn = document.getElementById('artSuggestBtn');
+  var artMainTitle = '';
+  // The dialog's two screens. Leaving the suggestions screen (back, or closing the dialog)
+  // bumps the sequence, so a lookup still in flight lands nowhere.
+  function showArtMainScreen(){
+    artSuggestSeq++;
+    artSuggest.hidden = true;
+    artUrlMain.hidden = false;
+    artUrlBackBtn.hidden = true;
+    if(artMainTitle) artUrlTitle.textContent = artMainTitle;
+    artMainTitle = '';
+  }
+  function showArtSuggestScreen(){
+    var t = artDialogTarget;
+    if(!t || !t.suggest) return;
+    artMainTitle = artUrlTitle.textContent;
+    artUrlTitle.textContent = 'Suggested Images';
+    artUrlMain.hidden = true;
+    artSuggest.hidden = false;
+    artUrlBackBtn.hidden = false;
+    renderArtSuggestions(t);
+    artUrlBackBtn.focus();
+  }
+  artSuggestBtn.addEventListener('click', showArtSuggestScreen);
+  artUrlBackBtn.addEventListener('click', showArtMainScreen);
+  function renderArtSuggestions(target){
+    var seq = ++artSuggestSeq;
+    var want = target && target.suggest;
+    artSuggestGrid.innerHTML = '';
+    artSuggestGrid.classList.remove('picking');
+    artSuggestNote.textContent = '';
+    if(!want) return;
+    artSuggestSrc.textContent = want.kind === 'artist'
+      ? 'MusicBrainz \u00b7 Wikimedia Commons' : 'MusicBrainz \u00b7 Cover Art Archive';
+    for(var i = 0; i < 8; i++){
+      var sk = document.createElement('div');
+      sk.className = 'art-suggest-skel';
+      artSuggestGrid.appendChild(sk);
+    }
+    var seen = {};
+    var finished = false, failed = false;
+    function live(){ return seq === artSuggestSeq; }
+    function settle(){
+      if(!live()) return;
+      var ok = 0, pending = 0;
+      artSuggestGrid.querySelectorAll('.art-suggest-tile').forEach(function(t){
+        if(t.dataset.state === 'ok'){ ok++; t.hidden = ok > ART_SUGGEST_MAX; }
+        else { pending++; t.hidden = true; }
+      });
+      var keepSkeletons = ok === 0 && (pending > 0 || !finished);
+      if(!keepSkeletons) artSuggestGrid.querySelectorAll('.art-suggest-skel').forEach(function(k){ k.remove(); });
+      if(finished && ok === 0 && pending === 0){
+        artSuggestNote.textContent = failed
+          ? 'Couldn\u2019t reach MusicBrainz. Check the connection and try again.'
+          : 'No covers found in MusicBrainz. Upload one or paste a link below.';
+      }
+    }
+    function add(items, first){
+      if(!live()) return;
+      var anchor = first ? artSuggestGrid.querySelector('.art-suggest-tile') : null;
+      (items || []).forEach(function(it){
+        if(!it || !it.thumb || seen[it.thumb]) return;
+        seen[it.thumb] = true;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'art-suggest-tile';
+        b.dataset.state = 'loading';
+        b.hidden = true;
+        b.title = it.label || '';
+        b.setAttribute('role', 'listitem');
+        b.setAttribute('aria-label', 'Use cover: ' + (it.label || 'suggested image'));
+        var img = document.createElement('img');
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.onload = function(){ b.dataset.state = 'ok'; settle(); };
+        img.onerror = function(){ b.remove(); settle(); };
+        img.src = it.thumb;
+        b.appendChild(img);
+        b.onclick = function(){ chooseSuggestedArt(b, it); };
+        if(anchor) artSuggestGrid.insertBefore(b, anchor); else artSuggestGrid.appendChild(b);
+      });
+      settle();
+    }
+    var job = want.kind === 'artist' ? artistSuggestions(want.name, add) : albumSuggestions(want.artist, want.album, add);
+    job.then(function(){ finished = true; settle(); }, function(){ finished = true; failed = true; settle(); });
+  }
+  // Fetches the full-size original, makes sure it really loads (a cover that fails later
+  // would leave a placeholder where art was chosen), then saves it the way Save would.
+  function chooseSuggestedArt(tile, it){
+    var t = artDialogTarget;
+    if(!t || artSuggestGrid.classList.contains('picking')) return;
+    var seq = artSuggestSeq;
+    artSuggestGrid.classList.add('picking');
+    tile.classList.add('busy');
+    setArtNote('');
+    function fail(){
+      if(seq !== artSuggestSeq) return;
+      artSuggestGrid.classList.remove('picking');
+      tile.classList.remove('busy');
+      artSuggestNote.textContent = 'That image couldn\u2019t be loaded. Try another one.';
+    }
+    it.full().then(function(url){
+      return new Promise(function(resolve, reject){
+        var probe = new Image();
+        var timer = setTimeout(function(){ reject(new Error('timeout')); }, 20000);
+        probe.referrerPolicy = 'no-referrer';
+        probe.onload = function(){ clearTimeout(timer); resolve(url); };
+        probe.onerror = function(){ clearTimeout(timer); reject(new Error('load')); };
+        probe.src = url;
+      });
+    }).then(function(url){
+      if(seq !== artSuggestSeq || artDialogTarget !== t) return;
+      if(t.clearAlso) clearCustomArtUrl(t.clearAlso);
+      if(!setCustomArtUrl(t.key, url)){ fail(); return; }
+      if(t.refresh) t.refresh();
+      closeArtUrlDialog();
+    }, fail);
+  }
+
   artUrlSearchBtn.addEventListener('click', function(){
     var t = artDialogTarget;
     if(!t) return;
@@ -6685,11 +7550,27 @@
   // spot than where its actual name would alphabetize, which reads as "not sorted" to anyone
   // looking at it. Stripping everything but letters/digits down to a single normalized string
   // before comparing makes the sort match what people actually mean by "alphabetical."
+  // Remembered, because a big library sorts the same few thousand names over and over.
+  var alphaKeyMemo = new Map();
   function alphaSortKey(name){
-    return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    var n = name || '';
+    var k = alphaKeyMemo.get(n);
+    if(k === undefined){
+      k = n.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if(alphaKeyMemo.size > 50000) alphaKeyMemo.clear();
+      alphaKeyMemo.set(n, k);
+    }
+    return k;
+  }
+  // The same ordering as localeCompare(b, undefined, {numeric, sensitivity:'base'}), but one
+  // collator for every comparison: localeCompare with options builds a new one each call,
+  // which made sorting a big library take seconds on a phone.
+  var ALPHA_COLLATOR = (window.Intl && Intl.Collator) ? new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }) : null;
+  function alphaCompare(a, b){
+    return ALPHA_COLLATOR ? ALPHA_COLLATOR.compare(a, b) : a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
   }
   function byNameAsc(a, b){
-    return alphaSortKey(a.name).localeCompare(alphaSortKey(b.name), undefined, { numeric: true, sensitivity: 'base' });
+    return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name));
   }
   function sortAlphaWithFavoritesFirst(cards){
     var favs = cards.filter(isFavorite).sort(byNameAsc);
@@ -6997,6 +7878,28 @@
     return container._artToken === token && document.body.contains(container);
   }
 
+  // A local song's cover: its own custom art if it has any, otherwise the custom cover of the
+  // album it belongs to ('album:' + album key -- the key the car already read). An album cover
+  // is set once and every song, the album tile, the album page and the lock screen follow.
+  // Untagged songs (no album) never share one: "Singles" would lump them all together.
+  function customArtFor(track){
+    var own = getCustomArtUrl(favKey(track));
+    if(own || !isLocalTrack(track) || !String(track.album || '').trim()) return own;
+    return getCustomArtUrl('album:' + albumKeyFor(track));
+  }
+  function refreshAlbumArt(akey){
+    var tracks = libraryTracks.filter(function(t){ return albumKeyFor(t) === akey; });
+    tracks.forEach(refreshStationArt);
+    var src = artSourceForTracks(tracks);
+    if(!src) return;
+    document.querySelectorAll('.tile').forEach(function(el){
+      if(el.dataset.key !== 'album:' + akey) return;
+      var art = el.querySelector('.tile-art');
+      if(art) renderStationArt(art, src);
+    });
+    if(albumHeroArt.dataset.albumKey === akey && document.body.classList.contains('album-open')) renderStationArt(albumHeroArt, src);
+  }
+
   function renderStationArt(container, station){
     container.innerHTML = '';
     var token = beginArtRender(container);
@@ -7019,7 +7922,7 @@
       container.appendChild(img);
     }
 
-    var customUrl = getCustomArtUrl(key);
+    var customUrl = customArtFor(station);
     if(customUrl){
       paint(customUrl);
       return; // user-supplied art is authoritative -- never overridden by the lookup chain
@@ -7517,29 +8420,45 @@
   function renderRecentSection(){
     renderTopArtistsSection();
     renderLatestPodcastsSection();
-    var stations = [], songs = [];
-    recentStations.forEach(function(s){
-      (isLocalTrack(s) ? songs : stations).push(s);
-    });
-
+    // One list, in the order things were played: songs, stations and podcast episodes
+    // together (Recent Songs used to be a list of its own).
     recentGrid.innerHTML = '';
-    if(!stations.length){
-      recentGrid.innerHTML = '<div class="empty-state">Stations you play will show up here.</div>';
+    if(!recentStations.length){
+      recentGrid.innerHTML = '<div class="empty-state">Songs, stations and podcasts you play will show up here.</div>';
     } else {
-      stations.slice(0, RECENT_LIMIT).forEach(function(s){ recentGrid.appendChild(withRecentDismiss(buildTile(s), s)); });
+      recentStations.slice(0, RECENT_LIMIT).forEach(function(s){ recentGrid.appendChild(withRecentDismiss(continueTile(s), s)); });
     }
-
     recentSongsGrid.innerHTML = '';
-    if(!songs.length){
-      recentSongsGrid.innerHTML = '<div class="empty-state">Songs you play will show up here.</div>';
-    } else {
-      songs.slice(0, RECENT_LIMIT).forEach(function(s){ recentSongsGrid.appendChild(buildTile(s)); });
-    }
-
-    // With nothing on one side there is nothing to jump to, so the anchors stay out of the
-    // way rather than offering a trip to an empty heading.
-    recentAnchors.classList.toggle('has-both', !!(stations.length && songs.length));
+    recentSongsCol.style.display = 'none';
+    recentAnchors.classList.remove('has-both');
     applyHomeTab();
+  }
+  // One Continue Listening tile, the same shape for everything: cover, then title, then who
+  // it's by. A song is a row everywhere else (buildTile), which broke the row up, so here it
+  // is a cover tile like the stations and episodes beside it.
+  function continueTile(s){
+    if(isPodcastTrack(s)){
+      // An episode's "by" line is its show.
+      var t = buildTile(s);
+      if(!t.querySelector('.tile-sub') && s.collectionName){
+        var sub = document.createElement('div');
+        sub.className = 'tile-sub';
+        sub.textContent = s.collectionName;
+        var name = t.querySelector('.tile-name');
+        if(name && name.nextSibling) t.insertBefore(sub, name.nextSibling); else t.appendChild(sub);
+      }
+      return t;
+    }
+    if(!isLocalTrack(s)) return buildTile(s);
+    return buildEntityTile({
+      key: favKey(s),
+      entity: 'song',
+      name: s.name || '',
+      sub: s.artist || '',
+      artFrom: s,
+      favTarget: s,
+      onClick: function(){ playEntity(s); }
+    });
   }
   // Continue Listening's tiles and rows trade the heart for a More button: Favorite, Play
   // Next, Add to Queue, and Remove (off this list).
@@ -7561,6 +8480,7 @@
     renderRecentList();
     renderRecentSection();
     if(activeHomeSection === 'recentStations') renderHomeSectionPage();
+    if(onMyLibraryHomeView) openMyLibraryHome();
     // The idle player bar previews the most recent entry; it moves on with the list.
     if(!currentStation) renderIdlePlayerBar();
   }
@@ -7647,6 +8567,9 @@
           favTarget: s,
           onClick: function(){ playEntity(s); }
         }) : buildTile(s);
+        // Everything here is a favourite already; the heart only duplicated that.
+        var heart = tile.querySelector('.tile-fav');
+        if(heart) heart.remove();
         favoritesGrid.appendChild(asFavoriteCard(tile));
       });
     }
@@ -7914,7 +8837,7 @@
       // or a stray punctuation mark would otherwise send the rail's jump somewhere the list
       // itself doesn't agree with.
       list.sort(function(a, b){
-        return alphaSortKey(a.collectionName).localeCompare(alphaSortKey(b.collectionName), undefined, { numeric: true, sensitivity: 'base' });
+        return alphaCompare(alphaSortKey(a.collectionName), alphaSortKey(b.collectionName));
       });
     }
     return list;
@@ -8429,26 +9352,21 @@
     // Above Recent Songs, below the fixed My Library rows -- see buildFavoriteArtistsBlock.
     renderFavoriteArtistsRow();
 
-    // Same "Recent Songs" list the homepage shows (see renderRecentSection's recentSongsGrid) --
-    // a sideways-scrolling row, same as that one and Continue Listening (.cl-row) rather than
-    // a wrapping grid. appendGridSection's default spacing reads as too little room between
-    // this label and the Genres row above it, and too much between the label and its own row
-    // below -- pulled apart from the shared default here so it sits the other way round: more
-    // separation from the section above, closer to the row it's labelling.
-    var recentSongsLabel = appendGridSection('Recent Songs');
-    recentSongsLabel.style.marginTop = '10px';
-    recentSongsLabel.style.marginBottom = '-32px';
-    var recentSongsOnly = recentStations.filter(function(s){ return isLocalTrack(s); });
-    if(!recentSongsOnly.length){
-      var emptyRecentSongs = document.createElement('div');
-      emptyRecentSongs.className = 'empty-state';
-      emptyRecentSongs.textContent = 'Songs you play will show up here.';
-      stationsGrid.appendChild(emptyRecentSongs);
+    // Continue Listening, the same list and sideways row as on Home: everything recently
+    // played, songs, stations and podcasts together (it replaced Recent Songs here). The label
+    // sits closer to its row than appendGridSection's default, further from the rows above.
+    var clLabel = appendGridSection('Continue Listening');
+    clLabel.classList.add('cl-section-label');
+    if(!recentStations.length){
+      var emptyCl = document.createElement('div');
+      emptyCl.className = 'empty-state';
+      emptyCl.textContent = 'Songs, stations and podcasts you play will show up here.';
+      stationsGrid.appendChild(emptyCl);
     } else {
-      var recentSongsWrap = document.createElement('div');
-      recentSongsWrap.className = 'cl-row';
-      recentSongsOnly.slice(0, RECENT_LIMIT).forEach(function(s){ recentSongsWrap.appendChild(buildTile(s)); });
-      stationsGrid.appendChild(recentSongsWrap);
+      var clWrap = document.createElement('div');
+      clWrap.className = 'cl-row';
+      recentStations.slice(0, RECENT_LIMIT).forEach(function(s){ clWrap.appendChild(withRecentDismiss(continueTile(s), s)); });
+      stationsGrid.appendChild(clWrap);
     }
   }
 
@@ -11512,13 +12430,14 @@
     // The library changed shape, so anything worked out from it has to be worked out again.
     artistArtResolved = {};
     albumMateArt = {};
+    artistIndexBurst = null;
     libraryTracks.sort(function(a, b){
       var aa = alphaSortKey(a.artist || '\uffff');
       var ba = alphaSortKey(b.artist || '\uffff');
-      if(aa !== ba) return aa.localeCompare(ba, undefined, { numeric:true, sensitivity:'base' });
+      if(aa !== ba) return alphaCompare(aa, ba);
       var al = alphaSortKey(a.album || '');
       var bl = alphaSortKey(b.album || '');
-      if(al !== bl) return al.localeCompare(bl, undefined, { numeric:true, sensitivity:'base' });
+      if(al !== bl) return alphaCompare(al, bl);
       if((a.trackNo || 0) !== (b.trackNo || 0)) return (a.trackNo || 0) - (b.trackNo || 0);
       return byNameAsc(a, b);
     });
@@ -11582,6 +12501,7 @@
       size: file.size,
       lastModified: file.lastModified || 0,
       mime: file.type || '',
+      srcUri: file.amplifySrcUri || '',
       hasArt: !!((t.art && t.art.length) || folderArtBlob)
     };
   }
@@ -11876,7 +12796,7 @@
     // Stored once per directory, regardless of whether any track ends up using it as its
     // own art -- the artist page reads these back later.
     if(folderArtIndex) persistFolderArt(folderArtIndex);
-    var added = 0, skipped = 0, failed = 0, quotaHit = false, doneCount = 0;
+    var added = 0, skipped = 0, failed = 0, quotaHit = false, doneCount = 0, linked = 0;
     var next = 0;
     var total = files.length;
 
@@ -11900,15 +12820,26 @@
         // A song picked in the Android app is fetched only now; one already in the library
         // is recognised from its listing and never read at all.
         var preId = makeLocalTrackId(relPathOf(file), file.size, file.lastModified);
-        job = (libraryById[preId] || reserved.ids[preId])
-          ? Promise.resolve({ skipped: true })
-          : file.amplifyLoad().then(function(real){ return importOneFile(real, folderArtIndex, reserved); });
+        var existing = libraryById[preId];
+        if(existing && !existing.srcUri && file.amplifyEntry && file.amplifyEntry.uri){
+          // Already in the library from an earlier import: just note where it lives on the
+          // phone so the car can play it. Nothing is read or copied again.
+          existing.srcUri = file.amplifyEntry.uri;
+          job = idbDo([LIB_STORE_TRACKS], 'readwrite', function(tx){
+            return tx.objectStore(LIB_STORE_TRACKS).put(existing);
+          }).then(function(){ return { skipped: true, linked: true }; });
+        } else {
+          job = (existing || reserved.ids[preId])
+            ? Promise.resolve({ skipped: true })
+            : file.amplifyLoad().then(function(real){ return importOneFile(real, folderArtIndex, reserved); });
+        }
       } else {
         job = importOneFile(file, folderArtIndex, reserved);
       }
       return job.then(function(res){
         if(res && res.added) added++;
         else if(res && res.skipped) skipped++;
+        if(res && res.linked) linked++;
       })['catch'](function(err){
         if(isQuotaError(err)) quotaHit = true;
         else failed++;
@@ -11939,6 +12870,7 @@
       var bits = [];
       if(added) bits.push(added + (added === 1 ? ' track added' : ' tracks added'));
       if(skipped) bits.push(skipped + ' already in your library');
+      if(linked) bits.push(linked + ' now playable in Android Auto');
       if(failed) bits.push(failed + ' could not be read');
       var summary = bits.join(', ') || 'Nothing added';
       if(importCancelled){
@@ -12219,7 +13151,7 @@
   var HAS_MEDIA_SESSION = !!(navigator.mediaSession && typeof window.MediaMetadata === 'function');
   function mediaArtworkUrl(track){
     var key = favKey(track);
-    var custom = getCustomArtUrl(key);
+    var custom = customArtFor(track);
     if(custom) return Promise.resolve(custom);
     if(isLocalTrack(track)) return localArtUrl(track);
     var cached = getArtCacheEntry(key);
@@ -12236,7 +13168,7 @@
       try{
         navigator.mediaSession.metadata = new window.MediaMetadata({
           title: stripExclusively(track.name) || 'Unknown',
-          artist: isLocal ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (track.country || 'Internet radio')),
+          artist: isLocal ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
           album: isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify'),
           artwork: art ? [{ src: secureUrl(art), sizes: '512x512', type: '' }] : []
         });
@@ -12254,6 +13186,9 @@
     // stream, so the handlers are registered and unregistered as the playing track type
     // changes rather than left on.
     var seekable = isLocal || isPodcast;
+    // Read by the Android app's media session (it swaps Previous/Next for the skip buttons);
+    // a plain flag that a browser's own media session simply ignores.
+    try{ navigator.mediaSession.amplifyPodcast = !!isPodcast; }catch(e){}
     safeSetHandler('play', function(){ if(currentStation && !uiIsPlaying) togglePlayPause(); });
     safeSetHandler('pause', function(){ if(currentStation && uiIsPlaying) togglePlayPause(); });
     safeSetHandler('stop', function(){ stopPlayback(); });
@@ -12274,10 +13209,10 @@
       try{ audio.currentTime = Math.min(dur, (audio.currentTime || 0) + by); }catch(e){}
     } : null);
     // Hardware and lock-screen track skipping, offered only when a queue exists.
-    safeSetHandler('previoustrack', isLocal ? function(){ stepBack(); } : null);
+    safeSetHandler('previoustrack', (isLocal || isQueueCurrent(currentStation)) ? function(){ stepBack(); } : null);
     // Next is offered whenever there is something to go to: the rest of a song's album or
     // playlist, or anything in Up Next -- which a station or an episode can have too.
-    safeSetHandler('nexttrack', (isLocal || upNext.length) ? function(){ playNextInLine(); } : null);
+    safeSetHandler('nexttrack', (isLocal || upNext.length || !!contextNext()) ? function(){ playNextInLine(); } : null);
   }
   function updateMediaSessionState(){
     if(!HAS_MEDIA_SESSION) return;
@@ -12355,7 +13290,17 @@
   // Accents, case, punctuation, "&" vs "and" and a leading "The" are all noise here:
   // "AC/DC" and "AC/DC - HITS" both reduce to "acdc", "The Beatles" and "Beatles" to
   // "beatles".
+  var artistKeyMemo = new Map();
   function artistMatchKey(name){
+    var raw = String(name || '');
+    var hit = artistKeyMemo.get(raw);
+    if(hit !== undefined) return hit;
+    var out = artistMatchKeyUncached(raw);
+    if(artistKeyMemo.size > 50000) artistKeyMemo.clear();
+    artistKeyMemo.set(raw, out);
+    return out;
+  }
+  function artistMatchKeyUncached(name){
     var s = String(name || '');
     if(s.normalize){
       try{ s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }catch(e){}
@@ -12521,15 +13466,24 @@
       ensure(key, name).stations.push(st);
     });
     return Object.keys(map).map(function(k){ return map[k]; }).sort(function(a, b){
-      return alphaSortKey(a.name).localeCompare(alphaSortKey(b.name), undefined, { numeric: true, sensitivity: 'base' });
+      return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name));
     });
   }
+  // Top Artists and the car menu look up many artists in one go; building the whole index
+  // for each of them was most of a big library's start-up time. One index serves a burst.
+  var artistIndexBurst = null, artistIndexSig = '';
   function findArtistEntry(key){
-    var list = buildArtistIndex();
-    for(var i = 0; i < list.length; i++){
-      if(list[i].key === key) return list[i];
+    // Anything that changes the index also changes one of these, so a burst never serves a
+    // stale answer even within the same task.
+    var sig = libraryTracks.length + '|' + (artistStations || []).length + '|' + blacklist.length;
+    if(!artistIndexBurst || sig !== artistIndexSig){
+      var map = {};
+      buildArtistIndex().forEach(function(e){ map[e.key] = e; });
+      artistIndexBurst = map;
+      artistIndexSig = sig;
+      setTimeout(function(){ artistIndexBurst = null; }, 0);
     }
-    return null;
+    return Object.prototype.hasOwnProperty.call(artistIndexBurst, key) ? artistIndexBurst[key] : null;
   }
 
   function albumKeyFor(track){
@@ -12562,8 +13516,8 @@
     // so the two have to agree.
     return list.sort(function(a, b){
       var aa = alphaSortKey(a.album), ba = alphaSortKey(b.album);
-      if(aa !== ba) return aa.localeCompare(ba, undefined, { numeric: true, sensitivity: 'base' });
-      return alphaSortKey(a.artist).localeCompare(alphaSortKey(b.artist), undefined, { numeric: true, sensitivity: 'base' });
+      if(aa !== ba) return alphaCompare(aa, ba);
+      return alphaCompare(alphaSortKey(a.artist), alphaSortKey(b.artist));
     });
   }
   function byTrackOrder(a, b){
@@ -12737,22 +13691,36 @@
    * The full two-step pipeline for one artist name.
    * Resolves to { name, bio, photoUrl, sourceUrl } or null.
    */
+  function aboutMusic(rec){
+    return !!rec && (looksMusical(rec.description) || looksMusical(rec.bio));
+  }
+  // Wikipedia's own naming for a musician who shares a title with something else.
+  var ARTIST_QUALIFIERS = ['band', 'musician', 'singer', 'rapper', 'group'];
+  function qualifiedSummary(cleanName, i){
+    i = i || 0;
+    if(i >= ARTIST_QUALIFIERS.length) return Promise.resolve(null);
+    return wikiSummary(cleanName + ' (' + ARTIST_QUALIFIERS[i] + ')').then(function(d){
+      var rec = summaryToRecord(d, cleanName);
+      return aboutMusic(rec) ? rec : qualifiedSummary(cleanName, i + 1);
+    });
+  }
+
   function fetchArtistMetadata(rawArtistName){
     var cleanName = sanitizeArtistName(rawArtistName);
     if(!cleanName) return Promise.resolve(null);
 
+    // Every route must land on an article about music, or nothing is kept. The old fallback
+    // kept the direct hit "because nothing better was found" even after this check had
+    // rejected it -- which is how a band page ended up with a blood disorder's summary and
+    // photo when the Wikidata step came back empty (a slow or rate-limited moment is enough).
     return wikiSummary(cleanName).then(function(data){
       var direct = summaryToRecord(data, cleanName);
-      // A usable summary about something that is clearly not a musician is worse than no
-      // summary: it would put a picture of the wrong subject on the artist's page.
-      if(direct && (looksMusical(direct.description) || looksMusical(direct.bio))) return direct;
-
+      if(aboutMusic(direct)) return direct;
       return wikidataTitle(cleanName).then(function(title){
-        if(!title) return direct; // nothing better found; the direct hit stands
-        if(title === cleanName) return direct;
-        return wikiSummary(title).then(function(retryData){
-          return summaryToRecord(retryData, cleanName) || direct;
-        });
+        if(!title || title === cleanName) return null;
+        return wikiSummary(title).then(function(d){ return summaryToRecord(d, cleanName); });
+      }).then(function(rec){
+        return aboutMusic(rec) ? rec : qualifiedSummary(cleanName);
       });
     })['catch'](function(){ return null; });
   }
@@ -12797,6 +13765,10 @@
   }
   function artistMetaFresh(record){
     if(!record) return false;
+    // A choice made by hand in "Fix artist info" is never second-guessed by a refresh.
+    if(record.manual) return true;
+    // A cached answer that isn't about music was accepted by the old fallback: stale now.
+    if(record.ok && !aboutMusic(record)) return false;
     var ttl = record.ok ? ARTIST_META_TTL_MS : ARTIST_META_MISS_TTL_MS;
     return (Date.now() - (record.ts || 0)) < ttl;
   }
@@ -12836,11 +13808,14 @@
         bio: found ? found.bio : '',
         photoUrl: found ? found.photoUrl : '',
         sourceUrl: found ? found.sourceUrl : '',
+        description: found ? (found.description || '') : '',
         ts: Date.now()
       };
       delete artistMetaPending[key];
       return saveArtistMeta(record).then(function(){
-        if(!record.ok || !record.photoUrl) return record;
+        // No portrait this time: drop any stored one, or the old (possibly wrong) picture
+        // would keep painting from disk.
+        if(!record.ok || !record.photoUrl) return clearArtistPhoto(key).then(function(){ return record; });
         return storeArtistPhoto(key, record.photoUrl).then(function(){ return record; });
       });
     })['catch'](function(){
@@ -12878,18 +13853,38 @@
     })['catch'](function(){ return null; }); // the remote URL still works as a fallback
   }
 
+  function clearArtistPhoto(key){
+    if(artistPhotoUrls[key]){
+      try{ URL.revokeObjectURL(artistPhotoUrls[key]); }catch(e){}
+      delete artistPhotoUrls[key];
+    }
+    return idbDo([LIB_STORE_ARTIST_PHOTO], 'readwrite', function(tx){
+      return tx.objectStore(LIB_STORE_ARTIST_PHOTO)['delete'](key);
+    })['catch'](function(){ return null; });
+  }
+
+  // Whether a stored record may be shown. A choice made in "Fix artist info" always may. An
+  // automatic match only when it is about music: a record saved by an older build (or by an
+  // unlucky moment) about something else -- "A-Ha" once came back as the blood disorder AIHA
+  // -- used to be painted straight from the cache, bio and portrait both, because only the
+  // background refresh applied this check.
+  function showableMeta(key){
+    var rec = artistMeta[key];
+    return (rec && rec.ok && (rec.manual || aboutMusic(rec))) ? rec : null;
+  }
   // Synchronous: what can be painted this instant, with no await.
   function artistPhotoUrl(key){
+    if(!showableMeta(key)) return null;
     if(artistPhotoUrls[key]) return artistPhotoUrls[key];
     var rec = artistMeta[key];
-    return (rec && rec.ok && rec.photoUrl) ? rec.photoUrl : null;
+    return rec.photoUrl || null;
   }
   // Asynchronous: reads the stored bytes if they are not in memory yet.
   function ensureArtistPhotoUrl(key){
+    var rec = showableMeta(key);
+    if(!rec) return Promise.resolve(null);
     if(artistPhotoUrls[key]) return Promise.resolve(artistPhotoUrls[key]);
     if(artistPhotoPending[key]) return artistPhotoPending[key];
-    var rec = artistMeta[key];
-    if(!rec || !rec.ok) return Promise.resolve(null);
     artistPhotoPending[key] = idbDo([LIB_STORE_ARTIST_PHOTO], 'readonly', function(tx){
       return tx.objectStore(LIB_STORE_ARTIST_PHOTO).get(key);
     }).then(function(blob){
@@ -13497,6 +14492,8 @@
     var section = activeHomeSection;
     stationsHeading.textContent = HOME_SECTION_TITLES[section] || '';
     clearHistoryBtn.style.display = (section === 'recentStations' || section === 'recentSongs') ? '' : 'none';
+    if(section !== 'favorites') favPageEditing = false;
+    syncFavPageEditBtn();
     resetStationsGrid();
     // Tighter row spacing than the grid's own 40px, meant for square covers -- the same
     // adjustment every other stacked list of rows on the page already makes.
@@ -13505,8 +14502,18 @@
     if(section === 'recentStations'){ renderRecentStationsPage(); return; }
     if(section === 'recentSongs'){ renderRecentSongsPage(); return; }
     if(section === 'topStations'){ renderTopStationsPage(); return; }
-    if(section === 'topArtists'){ renderTopArtistsPage(); return; }
+    if(section === 'topArtists'){
+      document.getElementById('allArtistsLink').style.display = '';
+      sectionHeadingRow.classList.add('has-side-link');
+      renderTopArtistsPage();
+      return;
+    }
   }
+  document.getElementById('allArtistsLink').addEventListener('click', function(){
+    pushView();
+    searchInput.value = '';
+    runLibrarySection('artists');
+  });
 
   // The same ranked list the home row shows (most played first, up to 20), as rows. An
   // artist record through buildRow gets the artist's portrait and opens their page on tap.
@@ -13521,7 +14528,98 @@
     setResultCount(list.length, 'artist');
   }
 
+  function syncFavPageEditBtn(){
+    var show = activeHomeSection === 'favorites' && (favorites.length > 0 || favPageEditing);
+    favPageEditBtn.style.display = show ? '' : 'none';
+    favPageEditBtn.innerHTML = favPageEditing
+      ? '<i class="fa-solid fa-check"></i><span class="btn-text">Done</span>'
+      : '<i class="fa-solid fa-pen"></i><span class="btn-text">Edit</span>';
+    favPageEditBtn.title = favPageEditing ? 'Done editing' : 'Edit favorites';
+    // Shuffle and Edit don't mix: while editing, a tap on the list is for arranging it.
+    if(activeHomeSection === 'favorites') libraryShuffleBtn.style.display = favPageEditing ? 'none' : '';
+  }
+  favPageEditBtn.addEventListener('click', function(){
+    if(favPageEditing) commitFavPageOrder();
+    favPageEditing = !favPageEditing;
+    syncFavPageEditBtn();
+    renderFavoritesPage();
+  });
+  // Saves the order the rows are now in (after a drag).
+  function commitFavPageOrder(){
+    var keys = Array.prototype.map.call(stationsGrid.querySelectorAll('.row-item'), function(el){ return el.dataset.key; });
+    var byKey = {};
+    favorites.forEach(function(f){ byKey[favKey(f)] = f; });
+    var reordered = keys.map(function(k){ return byKey[k]; }).filter(Boolean);
+    if(reordered.length === favorites.length){
+      var changed = reordered.some(function(f, i){ return f !== favorites[i]; });
+      if(changed){ favorites = reordered; saveFavorites(); renderFavoritesSection(); }
+    }
+  }
+  // One row of the Favorites page in Edit: a grip to drag it by, and a button to remove it.
+  function buildFavEditRow(s){
+    var row = document.createElement('div');
+    row.className = 'row-item fav-edit-row';
+    row.dataset.key = favKey(s);
+    var handle = document.createElement('div');
+    handle.className = 'row-drag-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
+    row.appendChild(handle);
+    var artistEntry = isArtistFav(s) ? artistEntryForFav(s) : null;
+    var albumEntry = isAlbumFav(s) ? albumEntryForFav(s) : null;
+    var thumb = document.createElement('div');
+    thumb.className = 'row-thumb';
+    if(artistEntry) renderArtistArt(thumb, artistEntry);
+    else if(albumEntry) renderStationArt(thumb, artSourceForTracks(albumEntry.tracks) || s);
+    else renderStationArt(thumb, s);
+    row.appendChild(thumb);
+    var name = document.createElement('div');
+    name.className = 'row-name';
+    name.textContent = artistEntry ? artistEntry.name : albumEntry ? albumEntry.album : stripExclusively(s.name);
+    row.appendChild(name);
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'row-fav fav-remove-btn';
+    remove.title = 'Remove from favorites';
+    remove.setAttribute('aria-label', 'Remove ' + (name.textContent || '') + ' from favorites');
+    remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    remove.addEventListener('click', function(e){
+      e.stopPropagation();
+      commitFavPageOrder();
+      var k = favKey(s);
+      favorites = favorites.filter(function(f){ return favKey(f) !== k; });
+      saveFavorites();
+      renderFavoritesList();
+      if(!favorites.length) favPageEditing = false;
+      syncFavPageEditBtn();
+      renderFavoritesPage();
+    });
+    row.appendChild(remove);
+    // Mouse: native drag and drop. Touch: the same finger-drag the other reorder lists use.
+    row.draggable = true;
+    row.addEventListener('dragstart', function(e){
+      row.classList.add('dragging');
+      if(e.dataTransfer){ e.dataTransfer.effectAllowed = 'move'; try{ e.dataTransfer.setData('text/plain', row.dataset.key); }catch(err){} }
+    });
+    row.addEventListener('dragend', function(){ row.classList.remove('dragging'); commitFavPageOrder(); });
+    row.addEventListener('dragover', function(e){
+      e.preventDefault();
+      var dragging = stationsGrid.querySelector('.row-item.dragging');
+      if(!dragging || dragging === row) return;
+      var rect = row.getBoundingClientRect();
+      stationsGrid.insertBefore(dragging, (e.clientY - rect.top) < rect.height / 2 ? row : row.nextSibling);
+    });
+    enableTouchReorder({ item: row, handle: handle, list: stationsGrid, selector: '.row-item', onDrop: commitFavPageOrder });
+    return row;
+  }
+
   function renderFavoritesPage(){
+    if(favPageEditing){
+      stationsGrid.innerHTML = '';
+      favorites.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
+      setResultCount(favorites.length, 'favorite');
+      return;
+    }
     if(!favorites.length){
       stationsGrid.innerHTML = '<div class="empty-state">Tap the heart on any station to save it here.</div>';
       setResultCount(0);
@@ -13541,14 +14639,14 @@
   function recentSongsOnly(){ return recentStations.filter(isLocalTrack); }
 
   function renderRecentStationsPage(){
-    var list = recentStationsOnly();
+    var list = recentStations.slice();
     if(!list.length){
-      stationsGrid.innerHTML = '<div class="empty-state">Stations you play will show up here.</div>';
+      stationsGrid.innerHTML = '<div class="empty-state">Songs, stations and podcasts you play will show up here.</div>';
       setResultCount(0);
       return;
     }
     list.forEach(function(s){ stationsGrid.appendChild(withRecentDismiss(buildRow(s, false), s)); });
-    setResultCount(list.length, 'station');
+    setResultCount(list.length, 'item');
   }
 
   function renderRecentSongsPage(){
@@ -14009,11 +15107,18 @@
       closeArtistMenu();
     };
 
+    artistInfoFixBtn.onclick = function(){
+      closeArtistMenu();
+      openArtistInfoDialog(entry);
+    };
+
     artistArtEditBtn.onclick = function(){
       closeArtistMenu();
       openArtUrlDialogFor({
         key: artistArtKey(entry.key),
         name: entry.name,
+        title: 'Artist Image',
+        suggest: { kind: 'artist', name: entry.name },
         refresh: function(){ refreshArtistArt(entry); }
       });
     };
@@ -14030,10 +15135,155 @@
     })['catch'](function(){});
   }
 
-  function renderArtistBio(entry){
+  // ---------- Fix artist info ----------
+  // Wikipedia's search returns title, one-line description and a thumbnail in one request,
+  // which is everything a row needs. Musical descriptions sort first, disambiguation pages
+  // are dropped (choosing one would give a list of other subjects, not a bio).
+  var WIKI_API = 'https://en.wikipedia.org/w/api.php';
+  var artistInfoEntry = null;
+  var artistInfoSeq = 0;
+  var artistInfoTimer = null;
+  function wikiCandidates(q){
+    var url = WIKI_API + '?action=query&format=json&origin=*&generator=search&gsrlimit=10'
+      + '&prop=pageimages%7Cdescription&piprop=thumbnail&pithumbsize=120&gsrsearch=' + encodeURIComponent(q);
+    return wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(data){
+      var pages = (data && data.query && data.query.pages) || {};
+      var list = Object.keys(pages).map(function(k){ return pages[k]; })
+        .filter(function(p){ return !/topics referred to by the same term|disambiguation/i.test(p.description || ''); })
+        .sort(function(a, b){ return a.index - b.index; });
+      var musical = list.filter(function(p){ return looksMusical(p.description); });
+      var rest = list.filter(function(p){ return !looksMusical(p.description); });
+      return musical.concat(rest).slice(0, 8);
+    })['catch'](function(){ return null; });
+  }
+  function currentArticleTitle(key){
+    var rec = artistMeta[key];
+    if(!rec || !rec.ok || !rec.sourceUrl) return '';
+    var m = /\/wiki\/([^?#]+)/.exec(rec.sourceUrl);
+    return m ? decodeURIComponent(m[1]).replace(/_/g, ' ') : '';
+  }
+  function renderArtistInfoRows(pages){
+    artistInfoList.innerHTML = '';
+    if(pages === null){
+      artistInfoList.innerHTML = '<div class="artist-info-empty">Couldn\u2019t reach Wikipedia. Check the connection and try again.</div>';
+      return;
+    }
+    if(!pages.length){
+      artistInfoList.innerHTML = '<div class="artist-info-empty">No articles found. Try another spelling.</div>';
+      return;
+    }
+    var current = currentArticleTitle(artistInfoEntry.key);
+    pages.forEach(function(p){
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'artist-info-row';
+      row.setAttribute('role', 'option');
+      var isCurrent = !!current && p.title === current;
+      row.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+      var img = document.createElement('img');
+      img.className = 'artist-info-thumb';
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      if(p.thumbnail && p.thumbnail.source) img.src = p.thumbnail.source;
+      var text = document.createElement('span');
+      text.className = 'artist-info-text';
+      var name = document.createElement('span');
+      name.className = 'artist-info-name';
+      name.textContent = p.title;
+      var desc = document.createElement('span');
+      desc.className = 'artist-info-desc';
+      desc.textContent = p.description || 'Wikipedia article';
+      text.appendChild(name); text.appendChild(desc);
+      row.appendChild(img); row.appendChild(text);
+      if(isCurrent){ var ck = document.createElement('i'); ck.className = 'fa-solid fa-check'; ck.setAttribute('aria-hidden', 'true'); row.appendChild(ck); }
+      row.onclick = function(){ chooseArtistArticle(p.title, row); };
+      artistInfoList.appendChild(row);
+    });
+  }
+  function searchArtistInfo(q){
+    var seq = ++artistInfoSeq;
+    q = String(q || '').trim();
+    if(!q){ artistInfoList.innerHTML = ''; return; }
+    artistInfoList.innerHTML = '<div class="artist-info-empty">Searching\u2026</div>';
+    wikiCandidates(q).then(function(pages){ if(seq === artistInfoSeq) renderArtistInfoRows(pages); });
+  }
+  function openArtistInfoDialog(entry){
+    artistInfoEntry = entry;
+    artistInfoNote.textContent = '';
+    artistInfoInput.value = sanitizeArtistName(entry.name);
     var rec = artistMeta[entry.key];
+    artistInfoResetBtn.hidden = !(rec && rec.manual);
+    artistInfoOverlay.classList.add('open');
+    searchArtistInfo(artistInfoInput.value);
+  }
+  function closeArtistInfoDialog(){
+    artistInfoOverlay.classList.remove('open');
+    artistInfoSeq++;
+    artistInfoEntry = null;
+  }
+  // After any change: the bio and the portrait are repainted from the new record.
+  function applyArtistInfo(entry, record){
+    return saveArtistMeta(record).then(function(){
+      var photo = record.ok && record.photoUrl ? storeArtistPhoto(entry.key, record.photoUrl) : clearArtistPhoto(entry.key);
+      return photo;
+    }).then(function(){
+      if(activeArtistKey === entry.key){
+        renderArtistBio(entry);
+        refreshArtistArt(entry);
+      }
+    });
+  }
+  function chooseArtistArticle(title, row){
+    var entry = artistInfoEntry;
+    if(!entry) return;
+    row.classList.add('busy');
+    wikiSummary(title).then(function(d){
+      var found = summaryToRecord(d, entry.name);
+      if(!found){
+        row.classList.remove('busy');
+        artistInfoNote.textContent = 'That article has no summary to show. Try another one.';
+        return;
+      }
+      closeArtistInfoDialog();
+      return applyArtistInfo(entry, {
+        key: entry.key, query: entry.name, ok: true, manual: true,
+        name: found.name, bio: found.bio, photoUrl: found.photoUrl || '',
+        sourceUrl: found.sourceUrl || '', description: found.description || '', ts: Date.now()
+      });
+    });
+  }
+  artistInfoInput.addEventListener('input', function(){
+    clearTimeout(artistInfoTimer);
+    artistInfoTimer = setTimeout(function(){ searchArtistInfo(artistInfoInput.value); }, 350);
+  });
+  artistInfoInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ clearTimeout(artistInfoTimer); searchArtistInfo(artistInfoInput.value); artistInfoInput.blur(); }
+  });
+  document.getElementById('artistInfoCloseBtn').onclick = closeArtistInfoDialog;
+  artistInfoOverlay.addEventListener('click', function(e){ if(e.target === artistInfoOverlay) closeArtistInfoDialog(); });
+  document.getElementById('artistInfoNoneBtn').onclick = function(){
+    var entry = artistInfoEntry;
+    if(!entry) return;
+    closeArtistInfoDialog();
+    applyArtistInfo(entry, { key: entry.key, query: entry.name, ok: false, manual: true, name: '', bio: '', photoUrl: '', sourceUrl: '', description: '', ts: Date.now() });
+  };
+  artistInfoResetBtn.onclick = function(){
+    var entry = artistInfoEntry;
+    if(!entry) return;
+    closeArtistInfoDialog();
+    // Forget the hand-made choice and look it up afresh.
+    var stale = { key: entry.key, query: entry.name, ok: false, manual: false, ts: 0 };
+    saveArtistMeta(stale).then(function(){ return clearArtistPhoto(entry.key); }).then(function(){
+      return ensureArtistMeta(entry);
+    }).then(function(){
+      if(activeArtistKey === entry.key){ renderArtistBio(entry); refreshArtistArt(entry); }
+    });
+  };
+
+  function renderArtistBio(entry){
+    var rec = showableMeta(entry.key);
     artistHeroBio.innerHTML = '';
-    if(!rec || !rec.ok || !rec.bio){
+    if(!rec || !rec.bio){
       artistHeroBio.style.display = 'none';
       return;
     }
@@ -14042,16 +15292,70 @@
     text.className = 'artist-hero-bio-text';
     text.textContent = rec.bio;
     artistHeroBio.appendChild(text);
-    if(rec.sourceUrl){
-      var link = document.createElement('a');
-      link.className = 'artist-hero-bio-source';
-      link.href = rec.sourceUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = 'More';
-      artistHeroBio.appendChild(link);
-    }
+    // "More" opens the whole bio here rather than sending you out to Wikipedia.
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'artist-hero-bio-source';
+    more.id = 'artistBioMoreBtn';
+    more.textContent = 'More';
+    more.setAttribute('aria-haspopup', 'dialog');
+    more.onclick = function(){ openArtistBioModal(entry); };
+    artistHeroBio.appendChild(more);
   }
+
+  // ---------- Artist bio modal ----------
+  // The page shows Wikipedia's summary (usually its first paragraph), clamped to five lines.
+  // The modal shows that at once, then the article's whole introduction, fetched only when the
+  // modal is opened and kept for the session.
+  var artistBioOverlay = document.getElementById('artistBioOverlay');
+  var artistBioAvatar = document.getElementById('artistBioAvatar');
+  var artistBioName = document.getElementById('artistBioName');
+  var artistBioText = document.getElementById('artistBioText');
+  var artistBioCredit = document.getElementById('artistBioCredit');
+  var artistBioFull = {};   // article title -> full introduction
+  var artistBioSeq = 0;
+  function fullArtistBio(title){
+    if(Object.prototype.hasOwnProperty.call(artistBioFull, title)) return Promise.resolve(artistBioFull[title]);
+    var url = WIKI_API + '?action=query&format=json&origin=*&prop=extracts&exintro=1&explaintext=1&redirects=1&titles=' + encodeURIComponent(title);
+    return wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(d){
+      var pages = (d && d.query && d.query.pages) || {};
+      var page = pages[Object.keys(pages)[0]];
+      var text = page && page.extract ? String(page.extract).replace(/\n{3,}/g, '\n\n').trim() : '';
+      if(text) artistBioFull[title] = text;
+      return text;
+    })['catch'](function(){ return ''; });
+  }
+  function openArtistBioModal(entry){
+    var rec = showableMeta(entry.key);
+    if(!rec) return;
+    var seq = ++artistBioSeq;
+    artistBioName.textContent = entry.name;
+    artistBioAvatar.innerHTML = '';
+    renderArtistArt(artistBioAvatar, entry);
+    artistBioText.textContent = rec.bio || '';
+    artistBioText.scrollTop = 0;
+    artistBioCredit.hidden = !rec.sourceUrl;
+    if(rec.sourceUrl) artistBioCredit.href = rec.sourceUrl;
+    artistBioOverlay.classList.add('open');
+    artistBioCloseBtn.focus();
+    var title = currentArticleTitle(entry.key);
+    if(!title) return;
+    fullArtistBio(title).then(function(text){
+      // Only ever a longer version of what is showing: never swap the summary for less.
+      if(seq !== artistBioSeq || !artistBioOverlay.classList.contains('open')) return;
+      if(text && text.length > (rec.bio || '').length) artistBioText.textContent = text;
+    });
+  }
+  function closeArtistBioModal(){
+    artistBioSeq++;
+    artistBioOverlay.classList.remove('open');
+  }
+  var artistBioCloseBtn = document.getElementById('artistBioCloseBtn');
+  artistBioCloseBtn.addEventListener('click', closeArtistBioModal);
+  artistBioOverlay.addEventListener('click', function(e){ if(e.target === artistBioOverlay) closeArtistBioModal(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && artistBioOverlay.classList.contains('open')) closeArtistBioModal();
+  });
 
   // ---------- Albums ----------
   // One builder for an album wherever it is listed -- the Albums index, the Favourites grid,
@@ -14158,6 +15462,7 @@
     document.body.classList.add('album-open');
     albumHero.style.display = '';
 
+    albumHeroArt.dataset.albumKey = album.key;
     renderStationArt(albumHeroArt, artSourceForTracks(album.tracks) || { name: album.album });
     watchPageTint(albumHeroArt);
 
@@ -14216,6 +15521,22 @@
     };
     albumPlayNextBtn.onclick = function(){ closeAlbumMenu(); queuePlayNext(album.tracks, album.album); };
     albumAddQueueBtn.onclick = function(){ closeAlbumMenu(); queueAddToEnd(album.tracks, album.album); };
+    // The same album cover Now Playing edits for any of its songs ('album:' + key), with the
+    // same MusicBrainz suggestions. Not offered for "Singles": untagged songs don't share a
+    // cover (see customArtFor), so one set here would show nowhere.
+    var tagged = album.tracks.filter(function(t){ return String(t.album || '').trim(); })[0];
+    albumArtEditBtn.hidden = !tagged;
+    albumArtEditBtn.onclick = function(){
+      closeAlbumMenu();
+      if(!tagged) return;
+      openArtUrlDialogFor({
+        key: 'album:' + album.key,
+        name: tagged.album + (tagged.artist ? ' ' + tagged.artist : ''),
+        title: 'Album Cover',
+        suggest: { kind: 'album', artist: tagged.artist || '', album: tagged.album },
+        refresh: function(){ refreshAlbumArt(album.key); }
+      });
+    };
   }
 
   function syncAlbumFavBtn(fav){
@@ -14505,20 +15826,20 @@
       // same page, so repeating it underneath is the same word twice pointing to the same
       // place -- but "AC/DC - HITS" is not "AC/DC", and there the subtitle still names them.
       if(artist && alphaSortKey(stripExclusively(st.name)) === alphaSortKey(artist.name)){
-        npSub.textContent = subtitleFor(st);
+        npSub.textContent = npStationDetails(st);
         return;
       }
       if(artist){
         npSub.classList.add('np-sub-linked');
         npSub.appendChild(npLink(artist.name, function(){ openArtistPage(artist.key); }));
-        var detail = subtitleFor(st);
+        var detail = npStationDetails(st);
         if(detail){
           npSub.appendChild(document.createTextNode(' · '));
           npSub.appendChild(document.createTextNode(detail));
         }
         return;
       }
-      npSub.textContent = subtitleFor(st);
+      npSub.textContent = npStationDetails(st);
       return;
     }
     var parts = [];
@@ -14572,7 +15893,9 @@
     return -1;
   }
   function setQueue(list, track, label){
-    playQueue = (list || []).filter(function(t){ return t && isLocalTrack(t); });
+    // Songs, stations and episodes can all be in a queue (a shuffled Favorites mixes them);
+    // artists and albums are pages, not things to play.
+    playQueue = (list || []).filter(function(t){ return t && queueable(t); });
     queueIndex = track ? indexOfTrack(playQueue, track) : -1;
     queueLabel = label || '';
     playingFromUpNext = false;
@@ -14620,6 +15943,36 @@
     setQueue(order, order[0], label || 'Shuffle');
     playStation(order[0]);
   }
+  // Shuffle for a list that can hold anything playable -- stations, songs, episodes -- such
+  // as Favorites. An artist or album favourite takes part as one of its own songs, picked at
+  // random, so each favourite has the same chance of coming up whatever its size.
+  function playShuffledMixed(list, label){
+    var pool = [];
+    (list || []).forEach(function(f){
+      if(!f || isBlacklisted(f)) return;
+      if(isArtistFav(f) || isAlbumFav(f)){
+        var tracks = isArtistFav(f)
+          ? ((findArtistEntry(f.artistKey || artistMatchKey(f.name || '')) || {}).tracks || [])
+          : (albumEntryForFav(f).tracks || []);
+        tracks = tracks.filter(function(t){ return !isBlacklisted(t); });
+        if(tracks.length) pool.push(tracks[Math.floor(Math.random() * tracks.length)]);
+        return;
+      }
+      if(queueable(f)) pool.push(f);
+    });
+    if(!pool.length){
+      setStatus('Nothing here to shuffle yet.', true);
+      return;
+    }
+    var order = shuffled(pool);
+    setQueue(order, order[0], label || 'Shuffle');
+    playStation(order[0]);
+  }
+  // Whether this track is the one the queue is positioned on (a queue step or a reconnect),
+  // in which case starting it must not throw the queue away.
+  function isQueueCurrent(t){
+    return !!t && queueIndex >= 0 && !!playQueue[queueIndex] && favKey(playQueue[queueIndex]) === favKey(t);
+  }
 
   function queueHasNext(){ return queueIndex >= 0 && queueIndex < playQueue.length - 1; }
   function queueHasPrev(){ return queueIndex > 0; }
@@ -14647,7 +16000,8 @@
     // of that album/playlist, or whatever is in Up Next, which a station or an episode can
     // have too.
     var local = !!currentStation && isLocalTrack(currentStation);
-    var canPrev = local && (queueHasPrev() || (playingFromUpNext && queueIndex >= 0));
+    var inQueue = !!currentStation && isQueueCurrent(currentStation);
+    var canPrev = (local || inQueue) && (queueHasPrev() || (playingFromUpNext && queueIndex >= 0) || carFollowing());
     var canNext = !!currentStation && hasNextInLine();
     // The Now Playing screen can be showing a station other than the one playing, in which
     // case its buttons would be stepping something that is not on screen. The bar has no
@@ -14667,7 +16021,8 @@
     var stream = !!st && !local && !isPodcastTrack(st);
     // The two always come as a pair so Play stays centred in the row: a station showing
     // Next for its Up Next gets a Previous beside it too, disabled (see updateStepButtons).
-    var showSteps = local || (stream && upNext.length && npIsCurrent());
+    var showSteps = local || (stream && npIsCurrent() && (upNext.length || isQueueCurrent(st)
+      || (carFollowing() && carQueueInfo && carQueueInfo.hasNext)));
     npPrevBtn.style.display = showSteps ? '' : 'none';
     npNextBtn.style.display = showSteps ? '' : 'none';
   }
@@ -14676,6 +16031,7 @@
   // back. Only near the start does it actually step. From a song played out of Up Next it
   // goes back to the album/playlist song that was interrupted.
   function stepBack(){
+    if(carFollowing() && carSkipHook){ carSkipHook(false); return; }
     if(currentStation && isLocalTrack(currentStation) && audio.currentTime > 3){
       try{ audio.currentTime = 0; }catch(e){}
       return;
@@ -14721,7 +16077,14 @@
   function contextNext(){
     return (playQueue.length && queueIndex >= 0 && queueIndex < playQueue.length - 1) ? playQueue[queueIndex + 1] : null;
   }
-  function hasNextInLine(){ return upNext.length > 0 || !!contextNext(); }
+  // Following Android Auto (the Android app only): the car owns the queue, so Next/Previous
+  // on the phone step through the car's queue (see the car block, which sets these).
+  var carQueueInfo = null, carSkipHook = null;
+  function carFollowing(){ return !!audio.isCarFollowing; }
+  function hasNextInLine(){
+    if(carFollowing() && carQueueInfo && carQueueInfo.hasNext) return true;
+    return upNext.length > 0 || !!contextNext();
+  }
   function nextInLine(){ return upNext[0] || contextNext(); }
 
   // Adding something already queued moves it rather than listing it twice.
@@ -14752,6 +16115,10 @@
       saveUpNext();
       playFromUpNext(t);
       return true;
+    }
+    if(carFollowing()){
+      if(carQueueInfo && carQueueInfo.hasNext && carSkipHook){ carSkipHook(true); return true; }
+      return false;
     }
     if(contextNext()){ playQueueStep(1); return true; }
     return false;
@@ -14792,7 +16159,7 @@
   function queueRowSub(t){
     if(isLocalTrack(t)) return [t.artist, t.album].filter(Boolean).join(' · ') || 'Song';
     if(isPodcastTrack(t)) return subtitleForPodcast(t);
-    return 'Live radio';
+    return 'Amplify Radio';
   }
   function buildQueueRow(t, o){
     var row = document.createElement('div');
@@ -14889,6 +16256,37 @@
     if(reordered.length === upNext.length){ upNext = reordered; onUpNextChanged(); }
   }
 
+  // Where the rest of the album / playlist / shuffle starts in playQueue, or -1.
+  function queueRestStart(){
+    var cur = currentStation;
+    return (cur && isQueueCurrent(cur)) ? queueIndex + 1 : (playingFromUpNext && queueIndex >= 0 ? queueIndex + 1 : -1);
+  }
+  // Everything coming after the current item, in order: Up Next, then the rest. The queue
+  // panel and the car's queue both read this, so they always agree.
+  function upcomingItems(limit){
+    var out = [];
+    for(var i = 0; i < upNext.length && out.length < limit; i++) out.push({ t: upNext[i], kind: 'up', index: i });
+    var start = queueRestStart();
+    if(start >= 0){
+      for(var j = start; j < playQueue.length && out.length < limit; j++) out.push({ t: playQueue[j], kind: 'ctx', index: j });
+    }
+    return out;
+  }
+  // Plays the n-th upcoming item (1 = the next one), the way tapping its queue row does.
+  function playUpcoming(n){
+    var it = upcomingItems(n)[n - 1];
+    if(!it) return;
+    if(it.kind === 'up'){
+      var i = upNextIndexOf(it.t);
+      if(i === -1) return;
+      upNext.splice(i, 1);
+      playFromUpNext(it.t);
+    } else {
+      playQueueStep(it.index - queueIndex);
+    }
+  }
+  window.__amplifyPlayUpcoming = playUpcoming;
+
   function renderQueuePanel(){
     var cur = currentStation;
     queueNow.innerHTML = '';
@@ -14898,11 +16296,21 @@
     queueUpList.innerHTML = '';
     upNext.forEach(function(t, i){ queueUpList.appendChild(buildQueueRow(t, { kind: 'up', index: i })); });
     queueUpEmpty.style.display = upNext.length ? 'none' : '';
-    queueUpCount.textContent = upNext.length ? upNext.length + (upNext.length === 1 ? ' item' : ' items') : '';
     queueClearBtn.style.visibility = upNext.length ? 'visible' : 'hidden';
 
-    // The rest of the album/playlist/library still plays after Up Next; the panel just
-    // doesn't list it.
+    // The rest of the shuffle / album / playlist, after Up Next (the first hundred of it).
+    var ctxEl = document.getElementById('queueCtxList');
+    var ctxSection = document.getElementById('queueCtxSection');
+    ctxEl.innerHTML = '';
+    var start = queueRestStart();
+    var rest = start >= 0 ? playQueue.slice(start) : [];
+    rest.slice(0, 100).forEach(function(t, i){ ctxEl.appendChild(buildQueueRow(t, { kind: 'ctx', index: start + i })); });
+    ctxSection.style.display = rest.length ? '' : 'none';
+    // One count beside Up Next for everything that is coming.
+    var total = upNext.length + rest.length;
+    queueUpCount.textContent = total ? String(total) : '';
+    // "Your queue is empty" only when nothing at all is coming.
+    queueUpEmpty.style.display = (upNext.length || rest.length) ? 'none' : '';
   }
   // The panel wears the Now Playing screen's own tint so it reads as the same place.
   function syncQueueTint(){
@@ -15012,6 +16420,70 @@
   }
   attachQueueSwipe(nowPlayingScreen, true);
   attachQueueSwipe(queuePanel, false);
+
+  // ---------- swiping down on Now Playing puts it away ----------
+  // Only from the top of the screen (further down, a downward swipe is just scrolling back
+  // up). The screen follows the finger with the page showing underneath; let go far or fast
+  // enough and it drops the rest of the way, otherwise it springs back up.
+  (function(){
+    var el = nowPlayingScreen;
+    var sy = 0, sx = 0, st = 0, dy = 0, mode = null, h = 0;
+    function usable(){
+      return npSheetMobile() && npSheetMotionOk() && !queuePanelOpen && !npSheetDone &&
+        document.body.classList.contains('np-open') && el.style.display === 'flex';
+    }
+    el.addEventListener('touchstart', function(e){
+      mode = null;
+      if(e.touches.length !== 1 || !usable() || el.scrollTop > 0 ||
+         (e.target.closest && e.target.closest('input[type="range"], .np-menu, .np-scrub, .queue-handle'))){ mode = 'ignore'; return; }
+      sy = e.touches[0].clientY; sx = e.touches[0].clientX; st = Date.now(); dy = 0;
+    }, { passive: true });
+    el.addEventListener('touchmove', function(e){
+      if(mode === 'ignore' || e.touches.length !== 1) return;
+      dy = e.touches[0].clientY - sy;
+      var dx = e.touches[0].clientX - sx;
+      if(mode === null){
+        if(Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+        if(dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.4 || el.scrollTop > 0){ mode = 'ignore'; return; }
+        mode = 'drag';
+        h = el.offsetHeight || window.innerHeight;
+        closeNpMenu();
+        // The page comes back underneath, where it was, so it shows as the screen moves.
+        document.body.classList.add('np-sheet');
+        document.body.classList.remove('np-open');
+        browseView.style.display = '';
+        window.scrollTo(0, savedBrowseScrollY);
+      }
+      if(mode !== 'drag') return;
+      if(e.cancelable) e.preventDefault();
+      el.style.transform = 'translateY(' + Math.max(0, dy - 12) + 'px)';
+    }, { passive: false });
+    function end(){
+      if(mode !== 'drag'){ mode = null; return; }
+      mode = null;
+      var dt = Math.max(1, Date.now() - st);
+      var fast = dy / dt > 0.5 && dy > 50;
+      var far = dy > h * 0.25;
+      if(fast || far){
+        // closeNowPlaying's slide down starts from where the finger left it (runNpSheet).
+        closeNowPlaying(true, true);
+        return;
+      }
+      // Spring back up, then Now Playing owns the screen again.
+      el.classList.add('np-sheet-anim');
+      void el.offsetHeight;
+      el.style.transform = '';
+      npSheetDone = function(){
+        document.body.classList.add('np-open');
+        browseView.style.display = 'none';
+        window.scrollTo(0, 0);
+      };
+      clearTimeout(npSheetTimer);
+      npSheetTimer = setTimeout(function(){ stopNpSheet(true); }, 360);
+    }
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+  })();
 
   // ---------- the "more" menu on song and episode rows ----------
   var rowMenuTracks = null;
@@ -15150,6 +16622,10 @@
   // control does the obvious thing on every page it appears on.
   var currentAlbumForShuffle = null;
   libraryShuffleBtn.addEventListener('click', function(){
+    // A Home "see all" page shuffles what it lists, not the whole library.
+    if(activeHomeSection === 'favorites'){ playShuffledMixed(favorites, 'Favorites'); return; }
+    if(activeHomeSection === 'recentStations'){ playShuffledMixed(recentStations, 'Continue Listening'); return; }
+    if(activeHomeSection === 'recentSongs'){ playShuffledMixed(recentSongsOnly(), 'Recent Songs'); return; }
     if(activeAlbumKey && currentAlbumForShuffle && currentAlbumForShuffle.tracks.length){
       playShuffled(currentAlbumForShuffle.tracks, currentAlbumForShuffle.album);
       return;
@@ -15245,6 +16721,9 @@
     }).then(function(b){
       var file = new File([b], f.name, { type: f.type || b.type || '', lastModified: lastModified });
       try{ Object.defineProperty(file, 'amplifyRelPath', { value: relPath, configurable: true }); }catch(e){}
+      // Where the song sits on the phone, which is what lets Android Auto play it without
+      // this page (see CarLibrary). Only a folder picked in the app has one.
+      try{ Object.defineProperty(file, 'amplifySrcUri', { value: f.uri || '', configurable: true }); }catch(e){}
       return file;
     });
   }
@@ -15497,6 +16976,12 @@
     return stripped || s;
   }
 
+  // A station's country wherever it is shown: the directory's "The United Arab Emirates" is
+  // labelled "Amplify Radio" instead.
+  function displayCountry(c){
+    var v = String(c || '');
+    return /^\s*the united arab emirates\s*$/i.test(v) ? 'Amplify Radio' : v;
+  }
   function stationToCardData(s){
     return {
       name: stripExclusively(s.name) || 'Untitled station',
@@ -15768,7 +17253,7 @@
         var t = tieBreak(a.item, b.item);
         if(t) return t;
       }
-      return alphaSortKey(nameOf(a.item)).localeCompare(alphaSortKey(nameOf(b.item)), undefined, { numeric: true, sensitivity: 'base' });
+      return alphaCompare(alphaSortKey(nameOf(a.item)), alphaSortKey(nameOf(b.item)));
     }).map(function(x){ return x.item; });
   }
 
@@ -16617,7 +18102,7 @@
   function renderFavoritesList(){
     renderFavoritesSection();
     favoritesList.innerHTML = '';
-    favEditBtn.style.display = favorites.length ? '' : 'none';
+    favEditBtn.style.display = 'none'; // editing moved to the Favorites page
     if(!favorites.length){
       favoritesList.innerHTML = '<div class="aside-empty">Tap the star on any station to save it here.</div>';
       return;
@@ -17038,7 +18523,9 @@
   function playStreamStation(station, isReconnect){
     if(!isReconnect) cancelReconnect();
     streamGaveUp = false;
-    clearQueue(); // a live stream has no next or previous
+    // A station played on its own has no next or previous; one reached through a queue (a
+    // shuffled Favorites) keeps the rest of that queue.
+    if(!isQueueCurrent(station)) clearQueue();
     currentStation = station;
     attemptInProgress = true;
     if(isReconnect){
@@ -17086,12 +18573,12 @@
     attemptInProgress = false;
     if(isReconnect){
       reconnectState = null;
-      playerSub.textContent = subtitleFor(station);
+      playerSub.textContent = barSubFor(station);
       playerSub.classList.remove('err');
       setPlayingUI(true);
       return;
     }
-    updatePlayerMeta(station, subtitleFor(station));
+    updatePlayerMeta(station, barSubFor(station));
     setPlayingUI(true);
     recordArtistPlay(station);
     recordRecent(station);
@@ -17175,7 +18662,7 @@
   // position saved back out as it plays so "Continue Listening" and the resume itself stay
   // current without a server anywhere in the loop.
   function playPodcastEpisode(episode){
-    clearQueue(); // no queue semantics yet -- Next/Previous stays a library-only affordance
+    if(!isQueueCurrent(episode)) clearQueue(); // on its own, an episode has no queue
     currentStation = episode;
     attemptInProgress = true;
     updatePlayerMeta(episode, 'Loading…');
@@ -17274,14 +18761,123 @@
     }
     return bits.join(' · ');
   }
+  // Now Playing's third line for a station: where it's from (or "Amplify Radio"), without the
+  // codec and bitrate. Those are stream plumbing; the mini player's subtitleFor keeps them.
+  function npStationDetails(station){
+    return station && station.country ? displayCountry(station.country) : '';
+  }
   function subtitleFor(station){
     if(isLocalTrack(station)) return subtitleForLocal(station);
     if(isPodcastTrack(station)) return subtitleForPodcast(station);
     var bits = [];
     if(station.codec) bits.push(station.codec);
     if(station.bitrate) bits.push(station.bitrate + 'kbps');
-    if(station.country) bits.push(station.country);
+    if(station.country) bits.push(displayCountry(station.country));
     return bits.join(' · ') || 'Playing';
+  }
+
+  // ---------------- Song on air ----------------
+  // A live station usually names the song it is playing inside its stream. The Android app
+  // reads that natively (a browser is blocked from it by most stations' CORS rules) and sends
+  // it here as 'amplify-onair'; the native side has already split it into artist and title and
+  // dropped slogans, ads and the station's own name. It is tied to the station it was heard
+  // on, so a late event can never label the next station with the last one's song.
+  var onAir = null;          // { key, title, artist, at }
+  var onAirLog = [];         // the last few songs heard, newest first (groundwork for saving one)
+  var ON_AIR_LOG_MAX = 20;
+  function onAirFor(st){
+    return (onAir && st && currentStation && favKey(st) === onAir.key && favKey(currentStation) === onAir.key) ? onAir : null;
+  }
+  // On an artist channel ("Exclusively Taylor Swift") every song's artist is the station's
+  // own name, which is already on screen: showing it again under it is the same words twice.
+  function nameKey(x){ return String(x || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+  function shownArtist(song){
+    if(!song.artist) return '';
+    var st = currentStation;
+    if(st && nameKey(song.artist) === nameKey(stripExclusively(st.name))) return '';
+    return song.artist;
+  }
+  function onAirText(song){ var a = shownArtist(song); return a ? song.title + ' \u00b7 ' + a : song.title; }
+  // What the bar's second line says for a station in the normal (not buffering, not failed)
+  // state: the song when one is named, otherwise the stream details as before.
+  function barSubFor(st){
+    var song = onAirFor(st);
+    return song ? onAirText(song) : subtitleFor(st);
+  }
+  function setOnAir(ev){
+    var prev = onAir;
+    var st = currentStation;
+    var title = ev && ev.title ? String(ev.title).trim() : '';
+    if(!title || !st || !isLiveStream(st)){
+      onAir = null;
+    } else {
+      var artist = ev.artist ? String(ev.artist).trim() : '';
+      var key = favKey(st);
+      if(prev && prev.key === key && prev.title === title && prev.artist === artist) return;
+      onAir = { key: key, title: title, artist: artist, at: Date.now() };
+      onAirLog.unshift({ key: key, station: stripExclusively(st.name), title: title, artist: artist, at: onAir.at });
+      if(onAirLog.length > ON_AIR_LOG_MAX) onAirLog.length = ON_AIR_LOG_MAX;
+    }
+    if(!prev && !onAir) return;
+    // The bar only when it is showing the normal line: never over "Buffering…", "Paused",
+    // a reconnect countdown or an error.
+    if(currentStation && isLiveStream(currentStation) && uiIsPlaying && !reconnectState
+        && !playerSub.classList.contains('err') && playerSub.textContent !== 'Buffering…'){
+      playerSub.textContent = barSubFor(currentStation);
+    }
+    if(nowPlayingScreen.style.display === 'flex'){
+      var shown = npTarget();
+      if(shown) renderNpOnAir(shown, true);
+    }
+  }
+  window.addEventListener('amplify-onair', function(e){ setOnAir(e.detail); });
+  // A phone that was locked or in another app may have missed changes; ask on the way back.
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden || !audio.onAirNow || !currentStation || !isLiveStream(currentStation)) return;
+    audio.onAirNow().then(function(ev){ if(ev) setOnAir(ev); });
+  });
+  function renderNpOnAir(st, changed){
+    var song = onAirFor(st);
+    if(!song){
+      npOnAir.hidden = true;
+      npOnAir.innerHTML = '';
+      npOnAir.removeAttribute('aria-label');
+      return;
+    }
+    var had = !npOnAir.hidden && npOnAir.dataset.song === song.title + '\n' + song.artist;
+    if(had) return;
+    npOnAir.dataset.song = song.title + '\n' + song.artist;
+    npOnAir.innerHTML = '';
+    var text = document.createElement('span');
+    text.className = 'np-onair-text';
+    var t = document.createElement('span');
+    t.className = 'np-onair-title';
+    t.textContent = song.title;
+    text.appendChild(t);
+    var shown = shownArtist(song);
+    if(shown){
+      text.appendChild(document.createTextNode(' \u00b7 '));
+      // An artist you have in your library is a way in to them, as everywhere else on this
+      // screen; anyone else is plain text.
+      var key = artistMatchKey(song.artist);
+      if(key && findArtistEntry(key)){
+        text.appendChild(npLink(song.artist, function(){ openArtistPage(key); }));
+      } else {
+        var a = document.createElement('span');
+        a.className = 'np-onair-artist';
+        a.textContent = song.artist;
+        text.appendChild(a);
+      }
+    }
+    npOnAir.appendChild(text);
+    npOnAir.title = onAirText(song);
+    npOnAir.setAttribute('aria-label', 'On air: ' + song.title + (shown ? ', by ' + shown : ''));
+    npOnAir.hidden = false;
+    if(changed){
+      npOnAir.classList.remove('changed');
+      void npOnAir.offsetWidth;
+      npOnAir.classList.add('changed');
+    }
   }
 
   function updatePlayerMeta(station, sub, isErr){
@@ -17430,7 +19026,7 @@
     if(audio.paused){
       audio.play().then(function(){
         setPlayingUI(true);
-        playerSub.textContent = subtitleFor(currentStation);
+        playerSub.textContent = barSubFor(currentStation);
         playerSub.classList.remove('err');
       }).catch(function(err){
         updatePlayerMeta(currentStation, err.message || 'Could not resume playback.', true);
@@ -17461,6 +19057,7 @@
     audio.load();
     setPlayingUI(false);
     currentStation = null;
+    setOnAir(null);
     // Frees the object URL backing whatever local file was on air. Held until now rather
     // than revoked at play time, because revoking it mid-playback kills the audio element.
     releasePlaybackUrl();
@@ -17481,7 +19078,7 @@
   audio.addEventListener('playing', function(){
     disarmStallWatch();
     setPlayingUI(true);
-    if(currentStation){ playerSub.textContent = subtitleFor(currentStation); playerSub.classList.remove('err'); }
+    if(currentStation){ playerSub.textContent = barSubFor(currentStation); playerSub.classList.remove('err'); }
   });
   audio.addEventListener('error', function(){
     if(!currentStation || attemptInProgress) return;
@@ -17576,15 +19173,60 @@
     function carStation(s){
       if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album') return null;
       if(!s.urlToResolve || isBlacklisted(s)) return null;
-      var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || s.country || '';
-      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, art: s.favicon || '', url: s.urlToResolve };
+      var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
+      // place: the location line the phone's Now Playing shows under a station, which the
+      // car's Now Playing card repeats (sub stays the genre tags the car's lists show).
+      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: s.urlToResolve };
+    }
+    // ---- pictures: the car shows the same art as the phone ----
+    // Custom cover art the user set wins, then the logo the page looked up for a station
+    // (its art cache), then the station's own icon. A picture that lives only inside this
+    // page (an uploaded image is a data: URL, a stored portrait a blob:) is copied to the
+    // phone's storage as a small JPEG and referred to as 'local:<key>' (see uploadCarArt).
+    var carImgWanted = {}; // art key -> { url } for pictures the catalog refers to
+    function carImage(id, url){
+      if(!url) return '';
+      if(/^https?:/i.test(url)) return secureUrl(url);
+      if(/^data:image\//i.test(url)){
+        var k = carArtKey(id + '|' + url.length + '|' + url.slice(-64) + '|' + url.slice(22, 86));
+        carImgWanted[k] = { url: url };
+        return 'local:' + k;
+      }
+      if(/^blob:/i.test(url)){
+        var kb = carArtKey('blob|' + id);
+        carImgWanted[kb] = { url: url };
+        return 'local:' + kb;
+      }
+      return '';
+    }
+    function carCustomArt(key){
+      var c = getCustomArtUrl(key);
+      return c ? carImage(key, c) : '';
+    }
+    function carStationArt(s){
+      var key = favKey(s);
+      var custom = carCustomArt(key);
+      if(custom) return custom;
+      var cached = getArtCacheEntry(key);
+      if(cached && cached.url) return carImage(key, cached.url) || secureUrl(s.favicon || '');
+      return s.favicon ? secureUrl(s.favicon) : '';
+    }
+    // An artist's picture, worked out the way the artist tiles do it (custom, then a stored
+    // portrait, then their songs' or stations' art).
+    function carArtistArt(key, name){
+      var custom = carCustomArt(artistArtKey(key));
+      if(custom) return Promise.resolve(custom);
+      var entry = findArtistEntry(key) || { key: key, name: name || '', tracks: [], stations: [] };
+      return resolveArtistArtUrl(entry).then(function(url){
+        return url ? carImage('artist|' + key, url) : '';
+      })['catch'](function(){ return ''; });
     }
     function carEpisode(ep, prog, group){
       if(!ep || !ep.episodeUrl || ep.isVideo) return null;
       var rec = prog && prog[ep.guid];
       var o = {
         t: 'episode', k: favKey(ep), guid: ep.guid, title: ep.name || 'Episode',
-        sub: ep.collectionName || '', art: ep.favicon || '', url: ep.episodeUrl,
+        sub: ep.collectionName || '', art: carCustomArt(favKey(ep)) || secureUrl(ep.favicon || ''), url: ep.episodeUrl,
         dur: ep.duration || (rec && rec.durationSec) || 0,
         rec: podcastRecordFromEpisode(ep)
       };
@@ -17592,9 +19234,15 @@
       if(group) o.g = group;
       return o;
     }
+    // A library song is referred to by id; its details and where it lives are in the library
+    // snapshot (buildCarLibrary), and one without a place on the phone is left out there.
+    function carSong(t){
+      if(!t || !isLocalTrack(t) || isBlacklisted(t)) return null;
+      return { t: 'song', id: favKey(t) };
+    }
     function carShow(sh){
       if(!sh || sh.collectionId == null) return null;
-      return { t: 'show', cid: String(sh.collectionId), title: sh.collectionName || 'Podcast', sub: sh.artistName || '', art: sh.artworkUrl || '' };
+      return { t: 'show', cid: String(sh.collectionId), title: sh.collectionName || 'Podcast', sub: sh.artistName || '', art: secureUrl(sh.artworkUrl || '') };
     }
     function compact(list){ return list.filter(Boolean); }
     function stationCards(data){
@@ -17631,8 +19279,23 @@
         (r[0] || []).forEach(function(rec){ if(rec && rec.guid) prog[rec.guid] = rec; });
         var lists = {};
         lists.favorites = compact(favorites.map(function(f){
-          return isPodcastTrack(f) ? carEpisode(f, prog) : carStation(f);
+          if(isPodcastTrack(f)) return carEpisode(f, prog);
+          if(isLocalTrack(f)) return carSong(f);
+          if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
+          if(f && f.type === 'album') return { t: 'album', key: f.albumKey || '', title: f.name || f.album || '' };
+          return carStation(f);
         }));
+        lists.recentSongs = compact(recentStations.filter(isLocalTrack).map(carSong));
+        lists.topArtists = compact(topArtistList().map(function(e){
+          return e && e.key ? { t: 'artist', key: e.key, title: e.name || '' } : null;
+        }));
+        stationPlaylists.forEach(function(pl){
+          lists['pl:' + pl.id] = compact((pl.stations || []).map(function(it){
+            if(isPodcastTrack(it)) return carEpisode(it, prog);
+            if(isLocalTrack(it)) return carSong(it);
+            return carStation(it);
+          }));
+        });
         lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
           .slice(0, RECENT_LIMIT).map(carStation));
         lists.topStations = compact((carNet.top || []).map(carStation));
@@ -17652,16 +19315,39 @@
           v: 1, at: Date.now(), podcastSpeed: loadPodcastSpeed(),
           forYou: forYou,
           categories: podcastCategories.map(function(c){ return { id: String(c.id), name: c.name }; }),
+          playlists: stationPlaylists.map(function(pl){ return { id: String(pl.id), label: pl.label || 'Playlist' }; }),
+          genres: genreOrder.slice(),
+          blacklist: blacklist.slice(),
+          apiHosts: API_HOSTS.slice(),
           lists: lists
         };
       });
     }
 
+    var carCatLast = '';
     function publishCarCatalog(){
       if(carBusy){ carAgain = true; return; }
       carBusy = true;
       buildCatalog().then(function(cat){
-        return P.setCarCatalog({ json: JSON.stringify(cat) });
+        // Artist rows (Favorites, Top Artists) get the picture their tile shows on the phone.
+        var jobs = [];
+        Object.keys(cat.lists || {}).forEach(function(k){
+          (cat.lists[k] || []).forEach(function(e){
+            if(e && e.t === 'artist' && e.key){
+              jobs.push(carArtistArt(e.key, e.title).then(function(a){ if(a) e.art = a; }));
+            }
+          });
+        });
+        return Promise.all(jobs).then(function(){ return cat; });
+      }).then(function(cat){
+        var at = cat.at; delete cat.at;
+        var same = JSON.stringify(cat);
+        if(same === carCatLast) return; // nothing new for the car
+        cat.at = at;
+        return P.setCarCatalog({ json: JSON.stringify(cat) }).then(function(){
+          carCatLast = same;
+          uploadCarArt();
+        });
       })['catch'](function(err){ console.warn('Car menu not saved', err); }).then(function(){
         carBusy = false;
         if(carAgain){ carAgain = false; scheduleCarCatalog(); }
@@ -17686,6 +19372,104 @@
     savePodcastCategories = function(){ _savePodcastCategories.apply(this, arguments); scheduleCarCatalog(); };
     var _saveBlacklist = saveBlacklist;
     saveBlacklist = function(){ _saveBlacklist.apply(this, arguments); scheduleCarCatalog(); };
+    // Whatever starts playing on the phone is remembered natively too, so the car opens on it
+    // (with a one-tap resume) instead of an empty "Tap to open" card.
+    var carResumeTimer = null;
+    // The current item as the car's resume record: null when the car couldn't play it.
+    function carResumeEntry(station){
+      if(!station) return null;
+      try{
+        if(isPodcastTrack(station)) return carEpisode(station, null);
+        if(isLocalTrack(station)) return station.srcUri ? carSong(station) : null;
+        return carStation(station);
+      }catch(err){ return null; }
+    }
+    function pushCarResume(station){
+      if(!P.setCarResume || !station) return Promise.resolve();
+      var e = carResumeEntry(station);
+      return e ? P.setCarResume({ json: JSON.stringify(e) })['catch'](function(){}) : Promise.resolve();
+    }
+    // ---- the queue the car shows under Now Playing ----
+    // What is coming (Up Next, then the rest of the album / playlist / shuffle), capped. It is
+    // tied to the item the player has loaded, so a list meant for the previous song never
+    // shows against the next one.
+    var CAR_QUEUE_MAX = 100;
+    var carQueueTimer = null, carQueueSent = '';
+    function carQueueEntry(t){
+      var e = null;
+      try{
+        if(isPodcastTrack(t)) e = carEpisode(t, null);
+        else if(isLocalTrack(t)) e = { t: 'song', id: favKey(t), title: t.name || 'Song', sub: t.artist || '' };
+        else e = carStation(t);
+      }catch(err){ e = null; }
+      return e || { t: 'other', k: favKey(t), title: (t && t.name) || '', sub: '' };
+    }
+    function syncCarQueue(){
+      if(!P.setCarQueue) return;
+      clearTimeout(carQueueTimer);
+      carQueueTimer = setTimeout(function(){
+        var na = window.AmplifyNativeAudio;
+        var forId = (na && na._id && !na._car) ? String(na._id) : '';
+        if(!currentStation){ if(carQueueSent){ carQueueSent = ''; P.setCarQueue({ forId: '', json: '[]' })['catch'](function(){}); } return; }
+        // Following the car: the car keeps its own queue, unless it has nothing after this item
+        // and the phone does -- then the phone's is added to it (see onPageQueue, follow).
+        var follow = carFollowing();
+        if(follow && carQueueInfo && carQueueInfo.hasNext) return;
+        var list = upcomingItems(CAR_QUEUE_MAX).map(function(it){ return carQueueEntry(it.t); });
+        // The current item as the car knows it, so the queue is saved with it (the car can
+        // then start on the whole queue by itself, at the right place in the song).
+        var cur = carResumeEntry(currentStation);
+        var json = JSON.stringify(list);
+        if(follow && !list.length) return;
+        var sig = forId + '|' + follow + '|' + (cur ? JSON.stringify(cur) : '') + '|' + json;
+        if(sig === carQueueSent) return;
+        carQueueSent = sig;
+        P.setCarQueue({ forId: follow ? '' : forId, json: json, current: cur ? JSON.stringify(cur) : '', follow: follow })['catch'](function(){});
+      }, 300);
+    }
+    var _setMediaSessionHandlers = setMediaSessionHandlers;
+    setMediaSessionHandlers = function(){ var r = _setMediaSessionHandlers.apply(this, arguments); syncCarQueue(); return r; };
+    window.addEventListener('amplify-native-loaded', syncCarQueue);
+    window.addEventListener('amplify-car', function(){ setTimeout(syncCarQueue, 400); });
+    window.__amplifyCarDebug = function(){
+      return P.carDebug ? P.carDebug().then(function(r){ return (r && r.text) || ''; }) : Promise.resolve('');
+    };
+
+    var _updatePlayerMeta = updatePlayerMeta;
+    updatePlayerMeta = function(station){
+      var r = _updatePlayerMeta.apply(this, arguments);
+      if(P.setCarResume && station){
+        clearTimeout(carResumeTimer);
+        carResumeTimer = setTimeout(function(){
+          // Decided when it fires: the page shows a new item a moment before it loads it.
+          if(carFollowing() || currentStation !== station) return;
+          pushCarResume(station);
+        }, 1500);
+      }
+      return r;
+    };
+
+    // New cover art -- set by the user, or a logo the page just looked up -- goes to the car.
+    var _setCustomArtUrl = setCustomArtUrl;
+    setCustomArtUrl = function(){ var r = _setCustomArtUrl.apply(this, arguments); scheduleCarCatalog(); scheduleCarLibrary(); return r; };
+    var _clearCustomArtUrl = clearCustomArtUrl;
+    clearCustomArtUrl = function(){ var r = _clearCustomArtUrl.apply(this, arguments); scheduleCarCatalog(); scheduleCarLibrary(); return r; };
+    // Logos are looked up in bursts as lists render; one re-send after a burst is enough.
+    var carLogoTimer = null;
+    var _saveArtCacheEntry = saveArtCacheEntry;
+    saveArtCacheEntry = function(){
+      _saveArtCacheEntry.apply(this, arguments);
+      clearTimeout(carLogoTimer);
+      carLogoTimer = setTimeout(scheduleCarCatalog, 8000);
+    };
+    var _saveArtistPlays = saveArtistPlays;
+    saveArtistPlays = function(){ _saveArtistPlays.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveStationPlaylists = saveStationPlaylists;
+    saveStationPlaylists = function(){ _saveStationPlaylists.apply(this, arguments); scheduleCarCatalog(); };
+    var _saveGenreOrder = saveGenreOrder;
+    saveGenreOrder = function(){ _saveGenreOrder.apply(this, arguments); scheduleCarCatalog(); };
+    var _renderLibraryList = renderLibraryList;
+    renderLibraryList = function(){ var r = _renderLibraryList.apply(this, arguments); scheduleCarLibrary(); return r; };
     var _removePodcastProgress = removePodcastProgress;
     removePodcastProgress = function(){
       return _removePodcastProgress.apply(this, arguments).then(function(v){ scheduleCarCatalog(); return v; });
@@ -17706,13 +19490,297 @@
       })['catch'](function(){ return 0; });
     }
 
+    // ---- the library: songs the car can play straight from the phone ----
+    function carArtKey(albumKey){
+      var h1 = 0x811c9dc5, h2 = 0x01000193, s = String(albumKey || '');
+      for(var i = 0; i < s.length; i++){
+        var c = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+        h2 = Math.imul(h2 + c, 2246822519) >>> 0;
+      }
+      return 'a' + h1.toString(16) + h2.toString(16);
+    }
+    var carArtWanted = {}; // art key -> the track whose picture it is
+    function buildCarLibrary(artistArt){
+      var playable = libraryTracks.filter(function(t){ return t.srcUri && !isBlacklisted(t); });
+      var albums = buildAlbumIndex(playable);
+      var albumArt = {};
+      carArtWanted = {};
+      albums.forEach(function(al){
+        var custom = carCustomArt('album:' + al.key);
+        if(custom){ albumArt[al.key] = custom; return; }
+        var src = artSourceForTracks(al.tracks);
+        if(src && src.hasArt){
+          var k = carArtKey(al.key);
+          albumArt[al.key] = 'local:' + k;
+          carArtWanted[k] = { id: src.localId };
+        }
+      });
+      var tracks = {};
+      playable.forEach(function(t){
+        tracks[favKey(t)] = {
+          title: t.name || t.fileName || 'Song', artist: t.artist || '', album: t.album || '',
+          genre: t.genre || '', dur: t.duration || 0, uri: t.srcUri,
+          art: carCustomArt(favKey(t)) || albumArt[albumKeyFor(t)] || ''
+        };
+      });
+      var songs = playable.slice().sort(byNameAsc).map(favKey);
+      // Each artist's albums, taken from the index above (already in album order) rather than
+      // indexing every artist's songs again.
+      var albumsOf = {};
+      albums.forEach(function(al){
+        var ak = al.key.slice(0, al.key.indexOf('|'));
+        (albumsOf[ak] = albumsOf[ak] || []).push(al);
+      });
+      var artists = buildArtistIndex().map(function(entry){
+        var own = albumsOf[entry.key] || [];
+        var stations = compact((entry.stations || []).map(carStation));
+        if(!own.length && !stations.length) return null;
+        return {
+          key: entry.key, name: entry.name,
+          art: (artistArt && artistArt[entry.key]) ||
+            (own.length ? (albumArt[own[0].key] || '') : ((stations[0] && stations[0].art) || '')),
+          albums: own.map(function(al){ return al.key; }),
+          stations: stations
+        };
+      }).filter(Boolean);
+      return {
+        v: 1,
+        tracks: tracks,
+        songs: songs,
+        albums: albums.map(function(al){
+          return { key: al.key, title: al.album, artist: al.artist, art: albumArt[al.key] || '',
+            tracks: al.tracks.map(favKey) };
+        }),
+        artists: artists
+      };
+    }
+    var carLibTimer = null, carLibLast = '', carLibBusy = false;
+    function scheduleCarLibrary(){
+      if(!P.setCarLibrary) return;
+      clearTimeout(carLibTimer);
+      carLibTimer = setTimeout(publishCarLibrary, 3000);
+    }
+    // Each artist's picture, as its tile shows it (custom, portrait, then its songs' art).
+    // Only pictures the phone already has in hand: a custom one, or the portrait/art its own
+    // artist tiles have already worked out. Resolving every artist here would mean hundreds
+    // of lookups and image copies on a big library, all competing with the app itself.
+    function carArtistArtMap(){
+      var map = {};
+      buildArtistIndex().forEach(function(entry){
+        var a = carCustomArt(artistArtKey(entry.key));
+        if(!a && Object.prototype.hasOwnProperty.call(artistArtResolved, entry.key) && artistArtResolved[entry.key]){
+          a = carImage('artist|' + entry.key, artistArtResolved[entry.key]);
+        }
+        if(a) map[entry.key] = a;
+      });
+      return Promise.resolve(map);
+    }
+    // A big library is megabytes of text. Handed over in one piece, the bridge holds the
+    // page still while the phone reads it, so it goes in slices with a breather between.
+    var CAR_LIB_SLICE = 256 * 1024;
+    function sendCarLibrary(json){
+      if(!P.setCarLibraryPart || json.length <= CAR_LIB_SLICE) return P.setCarLibrary({ json: json });
+      var off = 0;
+      function next(){
+        var first = off === 0;
+        var data = json.slice(off, off + CAR_LIB_SLICE);
+        off += CAR_LIB_SLICE;
+        var last = off >= json.length;
+        return P.setCarLibraryPart({ data: data, first: first, last: last }).then(function(){
+          if(!last) return idle().then(next);
+        });
+      }
+      return next();
+    }
+    function publishCarLibrary(){
+      if(carLibBusy || !libraryTracks) return;
+      carLibBusy = true;
+      window.__amplifyDoing = 'car library';
+      carArtistArtMap()['catch'](function(){ return {}; }).then(function(artistArt){
+        var json;
+        try{ json = JSON.stringify(buildCarLibrary(artistArt)); }catch(e){ console.warn('Car library not built', e); return; }
+        if(json === carLibLast) return;
+        return sendCarLibrary(json).then(function(){
+          carLibLast = json;
+          return uploadCarArt();
+        });
+      })['catch'](function(err){ console.warn('Car library not saved', err); }).then(function(){ carLibBusy = false; });
+    }
+    // One small cover per album, copied to the phone's own storage once so the car can show
+    // it (the pictures otherwise live only inside this page's database).
+    function artThumbBase64(blob){
+      return createImageBitmap(blob).then(function(bmp){
+        var max = 320, sc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bmp.width * sc));
+        c.height = Math.max(1, Math.round(bmp.height * sc));
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        var url = c.toDataURL('image/jpeg', 0.82);
+        return url.slice(url.indexOf(',') + 1);
+      });
+    }
+    var carArtUploading = null, carArtAgain = false;
+    function idle(){
+      return new Promise(function(r){
+        if(window.requestIdleCallback) requestIdleCallback(function(){ r(); }, { timeout: 800 });
+        else setTimeout(r, 80);
+      });
+    }
+    function uploadCarArt(){
+      if(!P.carArtKeys || !P.putCarArt) return Promise.resolve();
+      if(carArtUploading){ carArtAgain = true; return carArtUploading; }
+      carArtUploading = uploadCarArtOnce().then(function(){
+        carArtUploading = null;
+        if(carArtAgain){ carArtAgain = false; return uploadCarArt(); }
+      });
+      return carArtUploading;
+    }
+    function uploadCarArtOnce(){
+      return P.carArtKeys().then(function(res){
+        var have = {};
+        ((res && res.keys) || []).forEach(function(k){ have[k] = true; });
+        var wanted = {};
+        Object.keys(carArtWanted).forEach(function(k){ wanted[k] = carArtWanted[k]; });
+        Object.keys(carImgWanted).forEach(function(k){ wanted[k] = carImgWanted[k]; });
+        var todo = Object.keys(wanted).filter(function(k){ return !have[k]; });
+        function source(w){
+          if(w.url) return fetch(w.url).then(function(r){ return r.blob(); });
+          return idbDo([LIB_STORE_ART], 'readonly', function(tx){
+            return tx.objectStore(LIB_STORE_ART).get(w.id);
+          });
+        }
+        function next(){
+          if(!todo.length) return Promise.resolve();
+          var k = todo.shift();
+          window.__amplifyDoing = 'car pictures (' + todo.length + ' left)';
+          return source(wanted[k]).then(function(blob){
+            if(!blob) return null;
+            return artThumbBase64(blob).then(function(b64){ return P.putCarArt({ key: k, data: b64 }); });
+          })['catch'](function(){}).then(function(){
+            return idle().then(next); // one picture at a time, when the phone isn't busy
+          });
+        }
+        return next();
+      })['catch'](function(){});
+    }
+
+    // What was played in the car goes into Recent and Top Artists here too.
+    function takeCarHistory(){
+      if(!P.takeCarHistory) return Promise.resolve(0);
+      return P.takeCarHistory().then(function(res){
+        window.__amplifyDoing = 'car history';
+        var list = (res && res.history) || [];
+        list.forEach(function(h){
+          var it = h && h.item;
+          if(!it) return;
+          var obj = null;
+          if(it.t === 'song') obj = libraryById[it.id] || null;
+          else if(it.t === 'station'){
+            var pools = [favorites, recentStations, carNet.top || []];
+            Object.keys(carNet.forYou).forEach(function(k){ pools.push(carNet.forYou[k]); });
+            for(var i = 0; i < pools.length && !obj; i++){
+              for(var j = 0; j < pools[i].length; j++){
+                if(favKey(pools[i][j]) === it.k){ obj = pools[i][j]; break; }
+              }
+            }
+            if(!obj) obj = { name: it.title || 'Station', urlToResolve: it.url, favicon: it.art || '' };
+          }
+          if(!obj || isBlacklisted(obj)) return;
+          // Folded into Recent here and drawn once at the end: recordRecent redraws the
+          // lists every time, and a drive can hand back a hundred plays.
+          recentStations = recentStations.filter(function(r){ return favKey(r) !== favKey(obj); });
+          recentStations.unshift(obj);
+          try{ recordArtistPlay(obj); }catch(e){}
+        });
+        if(list.length){
+          if(recentStations.length > RECENT_LIMIT) recentStations.length = RECENT_LIMIT;
+          try{ saveRecent(); renderRecentList(); renderRecentSection(); }catch(e){}
+        }
+        return list.length;
+      })['catch'](function(){ return 0; });
+    }
+    // What the car is playing, as a track the rest of the page understands.
+    function carTrack(it){
+      if(!it) return null;
+      if(it.t === 'song') return libraryById[it.id] || null;
+      if(it.t === 'episode'){
+        var r = it.rec || {};
+        var pools = [favorites, recentStations, upNext];
+        for(var i = 0; i < pools.length; i++){
+          for(var j = 0; j < pools[i].length; j++){
+            var x = pools[i][j];
+            if(x && isPodcastTrack(x) && x.guid === it.guid) return x;
+          }
+        }
+        return {
+          type: 'podcast', guid: it.guid || r.guid, collectionId: r.collectionId,
+          collectionName: r.collectionName || it.sub || 'Podcast', artistName: r.artistName || '',
+          name: r.trackName || it.title || 'Episode', favicon: r.artworkUrl || it.art || '',
+          releaseDate: r.releaseDate || '', duration: r.durationSec || 0,
+          episodeUrl: r.episodeUrl || it.url, description: r.description || ''
+        };
+      }
+      if(it.t === 'station'){
+        var spools = [favorites, recentStations, carNet.top || []];
+        Object.keys(carNet.forYou).forEach(function(k){ spools.push(carNet.forYou[k]); });
+        stationPlaylists.forEach(function(pl){ spools.push(pl.stations || []); });
+        for(var a = 0; a < spools.length; a++){
+          for(var b = 0; b < spools[a].length; b++){
+            if(spools[a][b] && !isLocalTrack(spools[a][b]) && favKey(spools[a][b]) === it.k) return spools[a][b];
+          }
+        }
+        var o = { name: it.title || 'Station', urlToResolve: it.url, favicon: it.art || '' };
+        if(/^[0-9a-f-]{36}$/i.test(it.k || '')) o.stationuuid = it.k;
+        return o;
+      }
+      return null;
+    }
+    function followCar(ev){
+      var track = carTrack(ev.item);
+      if(!track) return;
+      carQueueInfo = { hasNext: !!ev.hasNext, hasPrev: !!ev.hasPrev };
+      try{ cancelReconnect(); }catch(e){}
+      attemptInProgress = false;
+      streamGaveUp = false;
+      clearQueue();
+      currentStation = track;
+      updatePlayerMeta(track, subtitleFor(track));
+      setPlayingUI(!!ev.playWhenReady);
+      document.querySelectorAll('.tile, .row-item').forEach(function(el){
+        el.classList.toggle('playing', el.dataset.key === favKey(track));
+      });
+      syncNpStepVisibility();
+      updateStepButtons();
+    }
+    carSkipHook = function(next){ if(P.carSkip) P.carSkip({ next: !!next })['catch'](function(){}); };
+    window.addEventListener('amplify-car', function(e){ try{ followCar(e.detail || {}); }catch(err){ console.error(err); } });
+    // Opened while the car is already playing something: pick it up.
+    function checkCarNowPlaying(){
+      if(!P.carNowPlaying || !audio._followCar || carFollowing()) return;
+      P.carNowPlaying().then(function(ev){
+        if(ev && ev.id && ev.item && !carFollowing()) audio._followCar(ev);
+      })['catch'](function(){});
+    }
+
+    function takeCarState(){
+      return Promise.all([takeCarProgress(), takeCarHistory()]).then(function(r){ return (r[0] || 0) + (r[1] || 0); });
+    }
+
     document.addEventListener('visibilitychange', function(){
       if(document.visibilityState === 'hidden') publishCarCatalog();
-      else takeCarProgress().then(function(n){ if(n) scheduleCarCatalog(); });
+      else { checkCarNowPlaying(); takeCarState().then(function(n){ if(n) scheduleCarCatalog(); }); }
     });
     setInterval(function(){ carNet.at = 0; publishCarCatalog(); }, CAR_NET_MS);
     setTimeout(function(){
-      takeCarProgress().then(publishCarCatalog);
+      // The phone's own last-played is what the car should show too (a car that's actually
+      // playing something keeps it, and the phone follows that instead).
+      (carFollowing() ? Promise.resolve() : pushCarResume(currentStation || lastPlayedStation())).then(function(){
+        syncCarQueue(); // and the queue with it
+        setTimeout(checkCarNowPlaying, 600);
+      });
+      takeCarState().then(publishCarCatalog);
+      scheduleCarLibrary();
       // Popular comes from Apple's directory and is cached for a day; loading it here means the
       // car has it without Podcasts > Popular being opened first.
       setTimeout(function(){

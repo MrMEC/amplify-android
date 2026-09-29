@@ -3,143 +3,175 @@ package com.markcoleman.amplify;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.provider.DocumentsContract;
-import androidx.activity.result.ActivityResult;
-import com.getcapacitor.JSArray;
-import com.getcapacitor.annotation.ActivityCallback;
-import java.util.ArrayDeque;
-import java.util.Locale;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.DocumentsContract;
 import android.util.Base64;
+import androidx.activity.result.ActivityResult;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.core.content.ContextCompat;
-import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
-import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaController;
 import androidx.media3.session.SessionToken;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Bridge between the web app and the native player. The page keeps its whole playback logic
- * (queue, reconnects, podcast resume); a small shim in the page stands in for its <audio>
- * element and turns element calls into these methods, and these events back into element
- * events.
+ * Bridge between the web app and the native player. The page keeps its whole playback logic (queue,
+ * reconnects, podcast resume); a small shim in the page stands in for its <audio> element and turns
+ * element calls into these methods, and these events back into element events.
  */
 @OptIn(markerClass = UnstableApi.class)
 @CapacitorPlugin(name = "AmplifyPlayer")
 public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remote {
-
-  private static final long CACHE_LIMIT_BYTES = 600L * 1024 * 1024;
-
-  private final Handler main = new Handler(Looper.getMainLooper());
-  private final List<Runnable> pending = new ArrayList<>();
-  @Nullable private ListenableFuture<MediaController> controllerFuture;
+  private static final long CACHE_LIMIT_BYTES = 629145600;
+  private static final List<String> FOLDER_EXTS =
+      Arrays.asList(
+          "mp3", "m4a", "m4b", "mp4", "aac", "flac", "ogg", "oga", "opus", "wav", "wma", "aiff",
+          "aif", "jpg", "jpeg", "png", "webp", "gif");
+  private static final int FOLDER_MAX_DEPTH = 12;
+  private static final int FOLDER_MAX_FILES = 20000;
   private boolean attached;
-  @Nullable private String currentId;
-  @Nullable private MediaMetadata lastMeta;
+  private int carSeq;
+  private ListenableFuture<MediaController> controllerFuture;
+  private String currentId;
   private boolean lastLive;
+  private MediaMetadata lastMeta;
+  private final Handler main = new Handler(Looper.getMainLooper());
+  private final List<Runnable> pending = new ArrayList();
   private final Player.Listener exoListener = new ExoListener();
-  private final Runnable progressTick = this::progressTick;
+  private final Runnable progressTick =
+      () -> {
+        this.progressTick();
+      };
 
-  // ---------------- lifecycle ----------------
-
-  @Override
+  @Override // com.getcapacitor.Plugin
   public void load() {
-    main.post(this::connect);
+    this.main.post(
+        () -> {
+          this.connect();
+        });
   }
 
-  private void connect() {
-    SessionToken token =
-        new SessionToken(getContext(), new ComponentName(getContext(), PlaybackService.class));
-    controllerFuture = new MediaController.Builder(getContext(), token).buildAsync();
-    controllerFuture.addListener(this::attach, ContextCompat.getMainExecutor(getContext()));
+  public void connect() {
+    ListenableFuture<MediaController> listenableFutureBuildAsync =
+        new MediaController.Builder(
+                getContext(),
+                new SessionToken(
+                    getContext(),
+                    new ComponentName(getContext(), (Class<?>) PlaybackService.class)))
+            .buildAsync();
+    this.controllerFuture = listenableFutureBuildAsync;
+    listenableFutureBuildAsync.addListener(
+        this::attach, ContextCompat.getMainExecutor(getContext()));
   }
 
-  private void attach() {
-    PlaybackService svc = PlaybackService.instance;
-    if (svc == null) {
-      main.postDelayed(this::attach, 100);
+  public void attach() {
+    PlaybackService playbackService = PlaybackService.instance;
+    if (playbackService == null) {
+      this.main.postDelayed(this::attach, 100L);
       return;
     }
-    svc.player.setRemote(this);
-    svc.player.setOnNativeModeStart(this::onCarTookOver);
-    svc.exo.addListener(exoListener);
-    attached = true;
-    List<Runnable> todo = new ArrayList<>(pending);
-    pending.clear();
-    for (Runnable r : todo) r.run();
+    playbackService.player.setRemote(this);
+    playbackService.player.setOnNativeModeStart(
+        () -> {
+          this.onCarTookOver();
+        });
+    playbackService.player.setOnAirListener(
+        (StreamTitle streamTitle) -> {
+          this.emitOnAir(streamTitle);
+        });
+    playbackService.exo.addListener(this.exoListener);
+    this.attached = true;
+    ArrayList arrayList = new ArrayList(this.pending);
+    this.pending.clear();
+    Iterator it = arrayList.iterator();
+    while (it.hasNext()) {
+      ((Runnable) it.next()).run();
+    }
   }
 
-  @Override
+  @Override // com.getcapacitor.Plugin
   protected void handleOnDestroy() {
-    main.post(
+    this.main.post(
         () -> {
-          PlaybackService svc = PlaybackService.instance;
-          if (svc != null) {
-            svc.player.setRemote(null);
-            svc.player.setOnNativeModeStart(null);
-            svc.exo.removeListener(exoListener);
+          PlaybackService playbackService = PlaybackService.instance;
+          if (playbackService != null) {
+            playbackService.player.setRemote(null);
+            playbackService.player.setOnNativeModeStart(null);
+            playbackService.player.setOnAirListener(null);
+            playbackService.exo.removeListener(this.exoListener);
           }
-          attached = false;
-          main.removeCallbacks(progressTick);
-          if (controllerFuture != null) MediaController.releaseFuture(controllerFuture);
+          this.attached = false;
+          this.main.removeCallbacks(this.progressTick);
+          ListenableFuture<MediaController> listenableFuture = this.controllerFuture;
+          if (listenableFuture != null) {
+            MediaController.releaseFuture(listenableFuture);
+          }
         });
   }
 
-  @Nullable
   private ExoPlayer exo() {
-    PlaybackService svc = PlaybackService.instance;
-    return svc == null ? null : svc.exo;
+    PlaybackService playbackService = PlaybackService.instance;
+    if (playbackService == null) {
+      return null;
+    }
+    return playbackService.exo;
   }
 
-  @Nullable
-  private SkipAwarePlayer sessionPlayer() {
-    PlaybackService svc = PlaybackService.instance;
-    return svc == null ? null : svc.player;
+  public SkipAwarePlayer sessionPlayer() {
+    PlaybackService playbackService = PlaybackService.instance;
+    if (playbackService == null) {
+      return null;
+    }
+    return playbackService.player;
   }
 
-  /** Runs on the main thread once the player service is up. */
-  private void run(PluginCall call, Runnable r) {
-    main.post(
+  private void run(final PluginCall pluginCall, final Runnable runnable) {
+    this.main.post(
         () -> {
-          Runnable guarded =
+          Runnable runnable2 =
               () -> {
                 try {
-                  r.run();
+                  runnable.run();
                 } catch (Exception e) {
-                  call.reject(String.valueOf(e.getMessage()));
+                  pluginCall.reject(String.valueOf(e.getMessage()));
                 }
               };
-          if (attached && exo() != null) guarded.run();
-          else pending.add(guarded);
+          if (!this.attached || exo() == null) {
+            this.pending.add(runnable2);
+          } else {
+            runnable2.run();
+          }
         });
   }
-
-  // ---------------- remote control (notification, headset, car) ----------------
 
   @Override
   public boolean onRemote(String action) {
@@ -150,37 +182,40 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     return true;
   }
 
-  // ---------------- playback ----------------
-
   @PluginMethod
-  public void load(PluginCall call) {
-    String url = call.getString("url");
-    String id = call.getString("id", "");
-    boolean play = Boolean.TRUE.equals(call.getBoolean("play", false));
-    double start = call.getDouble("start", 0.0);
-    Double rate = call.getDouble("rate", 1.0);
-    Double volume = call.getDouble("volume", 1.0);
-    if (url == null || url.isEmpty()) {
-      call.reject("No url");
-      return;
+  public void load(final PluginCall pluginCall) {
+    final String string = pluginCall.getString("url");
+    final String string2 = pluginCall.getString("id", "");
+    final boolean zEquals = Boolean.TRUE.equals(pluginCall.getBoolean("play", false));
+    final double dDoubleValue = pluginCall.getDouble("start", Double.valueOf(0.0d)).doubleValue();
+    Double dValueOf = Double.valueOf(1.0d);
+    final Double d = pluginCall.getDouble("rate", dValueOf);
+    final Double d2 = pluginCall.getDouble("volume", dValueOf);
+    if (string == null || string.isEmpty()) {
+      pluginCall.reject("No url");
+    } else {
+      run(
+          pluginCall,
+          () -> {
+            ExoPlayer exoPlayerExo = exo();
+            SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+            if (skipAwarePlayerSessionPlayer != null) {
+              skipAwarePlayerSessionPlayer.exitNativeMode();
+              skipAwarePlayerSessionPlayer.clearOnAir();
+            }
+            MediaItem.Builder mediaId = new MediaItem.Builder().setUri(string).setMediaId(string2);
+            if (string.toLowerCase().contains(".m3u8")) {
+              mediaId.setMimeType("application/x-mpegURL");
+            }
+            this.currentId = string2;
+            exoPlayerExo.setMediaItem(mediaId.build(), (long) (dDoubleValue * 1000.0d));
+            exoPlayerExo.setPlaybackSpeed(d.floatValue());
+            exoPlayerExo.setVolume(d2.floatValue());
+            exoPlayerExo.prepare();
+            exoPlayerExo.setPlayWhenReady(zEquals);
+            pluginCall.resolve();
+          });
     }
-    run(
-        call,
-        () -> {
-          ExoPlayer p = exo();
-          SkipAwarePlayer sp = sessionPlayer();
-          if (sp != null) sp.exitNativeMode();
-          MediaItem.Builder b = new MediaItem.Builder().setUri(url).setMediaId(id);
-          String lower = url.toLowerCase();
-          if (lower.contains(".m3u8")) b.setMimeType(MimeTypes.APPLICATION_M3U8);
-          currentId = id;
-          p.setMediaItem(b.build(), (long) (start * 1000));
-          p.setPlaybackSpeed(rate.floatValue());
-          p.setVolume(volume.floatValue());
-          p.prepare();
-          p.setPlayWhenReady(play);
-          call.resolve();
-        });
   }
 
   @PluginMethod
@@ -211,18 +246,22 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   @PluginMethod
-  public void stop(PluginCall call) {
+  public void stop(final PluginCall pluginCall) {
     run(
-        call,
+        pluginCall,
         () -> {
-          ExoPlayer p = exo();
-          currentId = null;
-          p.stop();
-          p.clearMediaItems();
-          SkipAwarePlayer sp = sessionPlayer();
-          if (sp != null) sp.setOverrideMetadata(null, false);
-          lastMeta = null;
-          call.resolve();
+          ExoPlayer exoPlayerExo = exo();
+          this.currentId = null;
+          exoPlayerExo.stop();
+          exoPlayerExo.clearMediaItems();
+          SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+          if (skipAwarePlayerSessionPlayer != null) {
+            skipAwarePlayerSessionPlayer.setOverrideMetadata(null, false);
+            skipAwarePlayerSessionPlayer.setSkipEnabled(false, false, false);
+            skipAwarePlayerSessionPlayer.setPageQueue(null, null);
+          }
+          this.lastMeta = null;
+          pluginCall.resolve();
         });
   }
 
@@ -260,80 +299,141 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   @PluginMethod
-  public void setSkip(PluginCall call) {
-    boolean next = Boolean.TRUE.equals(call.getBoolean("next", false));
-    boolean prev = Boolean.TRUE.equals(call.getBoolean("prev", false));
+  public void setSkip(final PluginCall pluginCall) {
+    final boolean zEquals = Boolean.TRUE.equals(pluginCall.getBoolean("next", false));
+    final boolean zEquals2 = Boolean.TRUE.equals(pluginCall.getBoolean("prev", false));
+    final boolean zEquals3 = Boolean.TRUE.equals(pluginCall.getBoolean("podcast", false));
     run(
-        call,
+        pluginCall,
         () -> {
-          sessionPlayer().setSkipEnabled(next, prev);
-          call.resolve();
+          sessionPlayer().setSkipEnabled(zEquals, zEquals2, zEquals3);
+          pluginCall.resolve();
+        });
+  }
+
+  private JSObject onAirJson(StreamTitle streamTitle) {
+    String str;
+    JSObject jSObject = new JSObject();
+    jSObject.put("id", this.currentId);
+    String str2 = "";
+    jSObject.put("title", streamTitle == null ? "" : streamTitle.title);
+    if (streamTitle == null) {
+      str = "";
+    } else {
+      str = streamTitle.artist;
+    }
+    jSObject.put("artist", str);
+    if (streamTitle != null) {
+      str2 = streamTitle.raw;
+    }
+    jSObject.put("raw", str2);
+    return jSObject;
+  }
+
+  public void emitOnAir(StreamTitle streamTitle) {
+    if (this.currentId == null) {
+      return;
+    }
+    notifyListeners("onair", onAirJson(streamTitle));
+  }
+
+  @PluginMethod
+  public void onAirNow(final PluginCall pluginCall) {
+    run(
+        pluginCall,
+        () -> {
+          SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+          pluginCall.resolve(
+              onAirJson(
+                  skipAwarePlayerSessionPlayer == null
+                      ? null
+                      : skipAwarePlayerSessionPlayer.getOnAir()));
         });
   }
 
   @PluginMethod
-  public void setMetadata(PluginCall call) {
-    MediaMetadata.Builder b =
+  public void setMetadata(final PluginCall pluginCall) {
+    MediaMetadata.Builder isPlayable =
         new MediaMetadata.Builder()
-            .setTitle(call.getString("title", ""))
-            .setArtist(call.getString("artist", ""))
-            .setAlbumTitle(call.getString("album", ""))
+            .setTitle(pluginCall.getString("title", ""))
+            .setArtist(pluginCall.getString("artist", ""))
+            .setAlbumTitle(pluginCall.getString("album", ""))
             .setIsPlayable(true);
-    boolean live = Boolean.TRUE.equals(call.getBoolean("live", false));
-    String artUrl = call.getString("artUrl");
-    String artData = call.getString("artData");
-    if (artData != null && !artData.isEmpty()) {
-      byte[] jpeg = shrinkArt(artData);
-      if (jpeg != null) b.setArtworkData(jpeg, MediaMetadata.PICTURE_TYPE_FRONT_COVER);
-    } else if (artUrl != null && artUrl.startsWith("http")) {
-      b.setArtworkUri(Uri.parse(artUrl));
+    final boolean zEquals = Boolean.TRUE.equals(pluginCall.getBoolean("live", false));
+    String string = pluginCall.getString("artUrl");
+    String string2 = pluginCall.getString("artData");
+    if (string2 != null && !string2.isEmpty()) {
+      byte[] bArrShrinkArt = shrinkArt(string2);
+      if (bArrShrinkArt != null) {
+        isPlayable.setArtworkData(bArrShrinkArt, 3);
+      }
+    } else if (string != null && string.startsWith("http")) {
+      isPlayable.setArtworkUri(Uri.parse(string));
     }
-    MediaMetadata md = b.build();
+    final MediaMetadata mediaMetadataBuild = isPlayable.build();
     run(
-        call,
+        pluginCall,
         () -> {
-          lastMeta = md;
-          lastLive = live;
-          sessionPlayer().setOverrideMetadata(md, live);
-          call.resolve();
+          String str;
+          this.lastMeta = mediaMetadataBuild;
+          this.lastLive = zEquals;
+          sessionPlayer().setOverrideMetadata(mediaMetadataBuild, zEquals);
+          ExoPlayer exoPlayerExo = exo();
+          SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+          MediaItem currentMediaItem =
+              exoPlayerExo == null ? null : exoPlayerExo.getCurrentMediaItem();
+          if (currentMediaItem != null
+              && skipAwarePlayerSessionPlayer != null
+              && !skipAwarePlayerSessionPlayer.isNativeMode()
+              && (str = this.currentId) != null
+              && str.equals(currentMediaItem.mediaId)) {
+            try {
+              exoPlayerExo.replaceMediaItem(
+                  exoPlayerExo.getCurrentMediaItemIndex(),
+                  currentMediaItem.buildUpon().setMediaMetadata(mediaMetadataBuild).build());
+            } catch (Exception unused) {
+            }
+          }
+          pluginCall.resolve();
         });
   }
 
-  /** Decodes a base64 image, scales it to at most 512px and re-encodes it as a small JPEG. */
-  @Nullable
-  private static byte[] shrinkArt(String b64) {
+  private static byte[] shrinkArt(String str) {
     try {
-      byte[] raw = Base64.decode(b64, Base64.DEFAULT);
-      Bitmap bmp = BitmapFactory.decodeByteArray(raw, 0, raw.length);
-      if (bmp == null) return null;
-      int max = Math.max(bmp.getWidth(), bmp.getHeight());
-      if (max > 512) {
-        float s = 512f / max;
-        bmp =
+      byte[] bArrDecode = Base64.decode(str, 0);
+      Bitmap bitmapDecodeByteArray =
+          BitmapFactory.decodeByteArray(bArrDecode, 0, bArrDecode.length);
+      if (bitmapDecodeByteArray == null) {
+        return null;
+      }
+      int iMax = Math.max(bitmapDecodeByteArray.getWidth(), bitmapDecodeByteArray.getHeight());
+      if (iMax > 512) {
+        float f = 512.0f / iMax;
+        bitmapDecodeByteArray =
             Bitmap.createScaledBitmap(
-                bmp,
-                Math.max(1, Math.round(bmp.getWidth() * s)),
-                Math.max(1, Math.round(bmp.getHeight() * s)),
+                bitmapDecodeByteArray,
+                Math.max(1, Math.round(bitmapDecodeByteArray.getWidth() * f)),
+                Math.max(1, Math.round(bitmapDecodeByteArray.getHeight() * f)),
                 true);
       }
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      bmp.compress(Bitmap.CompressFormat.JPEG, 85, out);
-      return out.toByteArray();
-    } catch (Exception e) {
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      bitmapDecodeByteArray.compress(Bitmap.CompressFormat.JPEG, 85, byteArrayOutputStream);
+      return byteArrayOutputStream.toByteArray();
+    } catch (Exception unused) {
       return null;
     }
   }
 
-  // ---------------- local file cache (library songs live in the page's IndexedDB) ----------------
-
   private File cacheDir() {
-    File d = new File(getContext().getCacheDir(), "audio");
-    if (!d.exists()) d.mkdirs();
-    return d;
+    File file = new File(getContext().getCacheDir(), "audio");
+    if (!file.exists()) {
+      file.mkdirs();
+    }
+    return file;
   }
 
-  private static String safeKey(String k) {
-    return k == null ? "" : k.replaceAll("[^A-Za-z0-9_-]", "");
+  private static String safeKey(String str) {
+    return str == null ? "" : str.replaceAll("[^A-Za-z0-9_-]", "");
   }
 
   @PluginMethod
@@ -385,31 +485,30 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     call.resolve(o);
   }
 
-  private void trimCache(File keep) {
-    File[] files = cacheDir().listFiles();
-    if (files == null) return;
-    Arrays.sort(files, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
-    long total = 0;
-    for (File f : files) total += f.length();
-    for (File f : files) {
-      if (total <= CACHE_LIMIT_BYTES) break;
-      if (f.equals(keep)) continue;
-      total -= f.length();
-      f.delete();
+  private void trimCache(File file) {
+    File[] fileArrListFiles = cacheDir().listFiles();
+    if (fileArrListFiles == null) {
+      return;
+    }
+    Arrays.sort(
+        fileArrListFiles,
+        (Object obj, Object obj2) -> {
+          return Long.compare(((File) obj).lastModified(), ((File) obj2).lastModified());
+        });
+    long length = 0;
+    for (File file2 : fileArrListFiles) {
+      length += file2.length();
+    }
+    for (File file3 : fileArrListFiles) {
+      if (length <= 629145600) {
+        return;
+      }
+      if (!file3.equals(file)) {
+        length -= file3.length();
+        file3.delete();
+      }
     }
   }
-
-  // ---------------- music folder picker (Storage Access Framework) ----------------
-  // Android's WebView has no folder picker (webkitdirectory), so the page asks for one here.
-  // The folder is walked natively and each file comes back as a content:// uri the page
-  // fetches through Capacitor's local server and imports exactly like a picked folder.
-
-  private static final int FOLDER_MAX_FILES = 20000;
-  private static final int FOLDER_MAX_DEPTH = 12;
-  private static final List<String> FOLDER_EXTS =
-      Arrays.asList(
-          "mp3", "m4a", "m4b", "mp4", "aac", "flac", "ogg", "oga", "opus", "wav", "wma", "aiff",
-          "aif", "jpg", "jpeg", "png", "webp", "gif");
 
   @PluginMethod
   public void pickMusicFolder(PluginCall call) {
@@ -519,60 +618,344 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   @Nullable
   private static String displayName(ContentResolver cr, Uri doc) {
     try (Cursor c =
-        cr.query(doc, new String[] {DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
+        cr.query(
+            doc, new String[] {DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
       if (c != null && c.moveToFirst()) return c.getString(0);
     } catch (Exception ignored) {
     }
     return null;
   }
 
-  // ---------------- Android Auto ----------------
-
-  /**
-   * The car started something of its own. Called just before the car's queue replaces what
-   * the page was playing, so the snapshot still describes the page's item: the page hears it
-   * as an outside pause at the right position, and stops tracking the player until it next
-   * loads something itself.
-   */
-  private void onCarTookOver() {
-    if (currentId == null) return;
-    JSObject o = snapshot();
-    o.put("isPlaying", false);
-    o.put("playWhenReady", false);
-    o.put("external", true);
-    o.put("car", true);
-    notifyListeners("state", o);
-    currentId = null;
-    lastMeta = null;
-    main.removeCallbacks(progressTick);
-  }
-
-  /** The page's lists for the car menu (see CarLibrary for the shape). */
-  @PluginMethod
-  public void setCarCatalog(PluginCall call) {
-    String json = call.getString("json");
-    if (json == null || json.isEmpty()) {
-      call.reject("No catalog");
+  public void onCarTookOver() {
+    if (this.currentId == null) {
       return;
     }
-    new Thread(
-            () -> {
-              try {
-                CarLibrary.saveCatalog(getContext(), json);
-                main.post(
-                    () -> {
-                      PlaybackService svc = PlaybackService.instance;
-                      if (svc != null) svc.onCatalogChanged();
-                    });
-                call.resolve();
-              } catch (Exception e) {
-                call.reject(String.valueOf(e.getMessage()));
-              }
-            })
-        .start();
+    JSObject jSObjectSnapshot = snapshot();
+    jSObjectSnapshot.put("isPlaying", false);
+    jSObjectSnapshot.put("playWhenReady", false);
+    jSObjectSnapshot.put("external", true);
+    jSObjectSnapshot.put("car", true);
+    notifyListeners("state", jSObjectSnapshot);
+    this.currentId = null;
+    this.lastMeta = null;
+    this.main.removeCallbacks(this.progressTick);
   }
 
-  /** Episode progress made in the car since the page last looked; handed over once. */
+  public void announceCar() {
+    MediaItem currentMediaItem;
+    String string;
+    SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+    ExoPlayer exoPlayerExo = exo();
+    if (skipAwarePlayerSessionPlayer == null
+        || exoPlayerExo == null
+        || !skipAwarePlayerSessionPlayer.isNativeMode()
+        || skipAwarePlayerSessionPlayer.isResumePending()
+        || (currentMediaItem = exoPlayerExo.getCurrentMediaItem()) == null
+        || currentMediaItem.mediaMetadata.extras == null
+        || (string = currentMediaItem.mediaMetadata.extras.getString("amplify.item")) == null) {
+      return;
+    }
+    StringBuilder sb = new StringBuilder("car:");
+    int i = this.carSeq + 1;
+    this.carSeq = i;
+    this.currentId = sb.append(i).toString();
+    this.lastMeta = null;
+    notifyListeners("car", carSnapshot(string));
+    this.main.removeCallbacks(this.progressTick);
+    if (exoPlayerExo.isPlaying()) {
+      this.main.postDelayed(this.progressTick, 500L);
+    }
+  }
+
+  private JSObject carSnapshot(String str) {
+    ExoPlayer exoPlayerExo = exo();
+    JSObject jSObjectSnapshot = snapshot();
+    try {
+      jSObjectSnapshot.put("item", (Object) new JSObject(str));
+    } catch (Exception unused) {
+      jSObjectSnapshot.put("item", (Object) new JSObject());
+    }
+    jSObjectSnapshot.put("hasNext", exoPlayerExo != null && exoPlayerExo.hasNextMediaItem());
+    jSObjectSnapshot.put("hasPrev", exoPlayerExo != null && exoPlayerExo.hasPreviousMediaItem());
+    return jSObjectSnapshot;
+  }
+
+  @PluginMethod
+  public void carNowPlaying(final PluginCall pluginCall) {
+    run(
+        pluginCall,
+        () -> {
+          SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+          ExoPlayer exoPlayerExo = exo();
+          String string = null;
+          MediaItem currentMediaItem =
+              exoPlayerExo == null ? null : exoPlayerExo.getCurrentMediaItem();
+          if (currentMediaItem != null && currentMediaItem.mediaMetadata.extras != null) {
+            string = currentMediaItem.mediaMetadata.extras.getString("amplify.item");
+          }
+          if (skipAwarePlayerSessionPlayer == null
+              || !skipAwarePlayerSessionPlayer.isNativeMode()
+              || string == null
+              || skipAwarePlayerSessionPlayer.isResumePending()) {
+            pluginCall.resolve(new JSObject());
+            return;
+          }
+          String str = this.currentId;
+          if (str == null || !str.startsWith("car:")) {
+            StringBuilder sb = new StringBuilder("car:");
+            int i = this.carSeq + 1;
+            this.carSeq = i;
+            this.currentId = sb.append(i).toString();
+          }
+          pluginCall.resolve(carSnapshot(string));
+          this.main.removeCallbacks(this.progressTick);
+          if (exoPlayerExo.isPlaying()) {
+            this.main.postDelayed(this.progressTick, 500L);
+          }
+        });
+  }
+
+  @PluginMethod
+  public void carSkip(final PluginCall pluginCall) {
+    final boolean zEquals = Boolean.TRUE.equals(pluginCall.getBoolean("next", true));
+    run(
+        pluginCall,
+        () -> {
+          ExoPlayer exoPlayerExo = exo();
+          SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+          if (skipAwarePlayerSessionPlayer == null
+              || !skipAwarePlayerSessionPlayer.isNativeMode()) {
+            pluginCall.reject("Not playing from the car");
+            return;
+          }
+          if (zEquals) {
+            if (exoPlayerExo.hasNextMediaItem()) {
+              exoPlayerExo.seekToNextMediaItem();
+            }
+          } else if (exoPlayerExo.getCurrentPosition() > 3000
+              || !exoPlayerExo.hasPreviousMediaItem()) {
+            exoPlayerExo.seekTo(0L);
+          } else {
+            exoPlayerExo.seekToPreviousMediaItem();
+          }
+          pluginCall.resolve();
+        });
+  }
+
+  @PluginMethod
+  public void setCarCatalog(final PluginCall pluginCall) {
+    final String string = pluginCall.getString("json");
+    if (string == null || string.isEmpty()) {
+      pluginCall.reject("No catalog");
+    } else {
+      new Thread(
+              () -> {
+                try {
+                  CarLibrary.saveCatalog(getContext(), string);
+                  this.main.post(
+                      () -> {
+                        PlaybackService playbackService = PlaybackService.instance;
+                        if (playbackService != null) {
+                          playbackService.onSnapshotChanged(true, false);
+                        }
+                      });
+                  pluginCall.resolve();
+                } catch (Exception e) {
+                  pluginCall.reject(String.valueOf(e.getMessage()));
+                }
+              })
+          .start();
+    }
+  }
+
+  @PluginMethod
+  public void setCarLibrary(final PluginCall pluginCall) {
+    final String string = pluginCall.getString("json");
+    if (string == null || string.isEmpty()) {
+      pluginCall.reject("No library");
+    } else {
+      new Thread(
+              () -> {
+                try {
+                  CarLibrary.saveLibrary(getContext(), string);
+                  this.main.post(
+                      () -> {
+                        PlaybackService playbackService = PlaybackService.instance;
+                        if (playbackService != null) {
+                          playbackService.onSnapshotChanged(false, true);
+                        }
+                      });
+                  pluginCall.resolve();
+                } catch (Exception e) {
+                  pluginCall.reject(String.valueOf(e.getMessage()));
+                }
+              })
+          .start();
+    }
+  }
+
+  @PluginMethod
+  public void setCarQueue(final PluginCall pluginCall) {
+    final String string = pluginCall.getString("forId", "");
+    final String string2 = pluginCall.getString("json", "[]");
+    run(
+        pluginCall,
+        () -> {
+          PlaybackService playbackService = PlaybackService.instance;
+          SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+          if (playbackService == null || skipAwarePlayerSessionPlayer == null) {
+            pluginCall.resolve();
+          } else {
+            playbackService.onPageQueue(
+                string,
+                string2,
+                pluginCall.getString("current"),
+                Boolean.TRUE.equals(pluginCall.getBoolean("follow", false)));
+            pluginCall.resolve();
+          }
+        });
+  }
+
+  @PluginMethod
+  public void carDebug(final PluginCall pluginCall) {
+    run(
+        pluginCall,
+        () -> {
+          PlaybackService playbackService = PlaybackService.instance;
+          JSObject jSObject = new JSObject();
+          jSObject.put(
+              "text",
+              playbackService == null ? "service not running" : playbackService.debugText());
+          pluginCall.resolve(jSObject);
+        });
+  }
+
+  @PluginMethod
+  public void setCarResume(final PluginCall pluginCall) {
+    final String string = pluginCall.getString("json");
+    if (string == null || string.isEmpty()) {
+      pluginCall.reject("No item");
+    } else {
+      run(
+          pluginCall,
+          () -> {
+            String str2;
+            PlaybackService playbackService = PlaybackService.instance;
+            SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+            boolean z = false;
+            boolean z2 =
+                skipAwarePlayerSessionPlayer != null
+                    && skipAwarePlayerSessionPlayer.isNativeMode()
+                    && skipAwarePlayerSessionPlayer.isResumePending();
+            if (playbackService != null
+                && (skipAwarePlayerSessionPlayer == null
+                    || !skipAwarePlayerSessionPlayer.isNativeMode()
+                    || z2)) {
+              ExoPlayer exoPlayerExo = exo();
+              MediaItem currentMediaItem =
+                  exoPlayerExo == null ? null : exoPlayerExo.getCurrentMediaItem();
+              if (!z2
+                  && currentMediaItem != null
+                  && (str2 = this.currentId) != null
+                  && str2.equals(currentMediaItem.mediaId)) {
+                z = true;
+              }
+              playbackService.rememberPageItem(
+                  string,
+                  null,
+                  z ? exoPlayerExo.getCurrentPosition() : -1L,
+                  z ? currentMediaItem.mediaId : null);
+              if (z2) {
+                playbackService.restoreLastPlayed(true);
+              }
+            }
+            pluginCall.resolve();
+          });
+    }
+  }
+
+  @PluginMethod
+  public void setCarLibraryPart(PluginCall pluginCall) {
+    String str = "";
+    String string = pluginCall.getString("data", "");
+    boolean zEquals = Boolean.TRUE.equals(pluginCall.getBoolean("first", false));
+    boolean zEquals2 = Boolean.TRUE.equals(pluginCall.getBoolean("last", false));
+    try {
+      Context context = getContext();
+      if (string != null) {
+        str = string;
+      }
+      CarLibrary.appendLibraryPart(context, str, zEquals, zEquals2);
+      if (zEquals2) {
+        this.main.post(
+            () -> {
+              PlaybackService playbackService = PlaybackService.instance;
+              if (playbackService != null) {
+                playbackService.onSnapshotChanged(false, true);
+              }
+            });
+      }
+      pluginCall.resolve();
+    } catch (Exception e) {
+      pluginCall.reject(String.valueOf(e.getMessage()));
+    }
+  }
+
+  @PluginMethod
+  public void carArtKeys(PluginCall pluginCall) {
+    JSArray jSArray = new JSArray();
+    File[] fileArrListFiles = ArtProvider.localArtDir(getContext()).listFiles();
+    if (fileArrListFiles != null) {
+      for (File file : fileArrListFiles) {
+        String name = file.getName();
+        if (name.endsWith(".jpg") && file.length() > 0) {
+          jSArray.put(name.substring(0, name.length() - 4));
+        }
+      }
+    }
+    JSObject jSObject = new JSObject();
+    jSObject.put("keys", (Object) jSArray);
+    pluginCall.resolve(jSObject);
+  }
+
+  /** Album art for the car, uploaded by the page as base64 JPEG (see carArtKeys). */
+  @PluginMethod
+  public void putCarArt(PluginCall call) {
+    String key = ArtProvider.safeKey(call.getString("key"));
+    String data = call.getString("data", "");
+    if (key.isEmpty() || data == null || data.isEmpty()) {
+      call.reject("Bad art");
+      return;
+    }
+    File dest = ArtProvider.localArt(getContext(), key);
+    File part = new File(dest.getPath() + ".part");
+    try {
+      try (FileOutputStream out = new FileOutputStream(part)) {
+        out.write(Base64.decode(data, Base64.DEFAULT));
+      }
+      if (!part.renameTo(dest)) {
+        part.delete();
+        call.reject("Rename failed");
+      } else {
+        call.resolve();
+      }
+    } catch (Exception e) {
+      part.delete();
+      call.reject("Write failed: " + e.getMessage());
+    }
+  }
+
+  @PluginMethod
+  public void takeCarHistory(PluginCall pluginCall) {
+    JSObject jSObject = new JSObject();
+    try {
+      jSObject.put("history", (Object) new JSArray(CarHistory.takeAll(getContext()).toString()));
+    } catch (Exception unused) {
+      jSObject.put("history", (Object) new JSArray());
+    }
+    pluginCall.resolve(jSObject);
+  }
+
   @PluginMethod
   public void takeCarProgress(PluginCall call) {
     JSObject o = new JSObject();
@@ -584,52 +967,67 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     call.resolve(o);
   }
 
-  // ---------------- events to the page ----------------
-
-  private JSObject snapshot() {
-    ExoPlayer p = exo();
-    JSObject o = new JSObject();
-    o.put("id", currentId);
-    if (p == null) return o;
-    long dur = p.getDuration();
-    o.put("position", Math.max(0, p.getCurrentPosition()) / 1000.0);
-    o.put("duration", dur == C.TIME_UNSET ? -1 : dur / 1000.0);
-    o.put("live", p.isCurrentMediaItemLive() || (dur == C.TIME_UNSET && !p.isCurrentMediaItemSeekable()));
-    o.put("isPlaying", p.isPlaying());
-    o.put("playWhenReady", p.getPlayWhenReady());
-    String st;
-    switch (p.getPlaybackState()) {
-      case Player.STATE_BUFFERING:
-        st = "buffering";
-        break;
-      case Player.STATE_READY:
-        st = "ready";
-        break;
-      case Player.STATE_ENDED:
-        st = "ended";
-        break;
-      default:
-        st = "idle";
+  public JSObject snapshot() {
+    String str;
+    ExoPlayer exoPlayerExo = exo();
+    JSObject jSObject = new JSObject();
+    jSObject.put("id", this.currentId);
+    if (exoPlayerExo == null) {
+      return jSObject;
     }
-    o.put("state", st);
-    return o;
+    SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
+    StreamTitle onAir =
+        skipAwarePlayerSessionPlayer == null ? null : skipAwarePlayerSessionPlayer.getOnAir();
+    String str2 = "";
+    jSObject.put("onAirTitle", onAir == null ? "" : onAir.title);
+    if (onAir != null) {
+      str2 = onAir.artist;
+    }
+    jSObject.put("onAirArtist", str2);
+    long duration = exoPlayerExo.getDuration();
+    jSObject.put("position", Math.max(0L, exoPlayerExo.getCurrentPosition()) / 1000.0d);
+    jSObject.put("duration", duration == -9223372036854775807L ? -1.0d : duration / 1000.0d);
+    jSObject.put(
+        "live",
+        exoPlayerExo.isCurrentMediaItemLive()
+            || (duration == -9223372036854775807L && !exoPlayerExo.isCurrentMediaItemSeekable()));
+    jSObject.put("isPlaying", exoPlayerExo.isPlaying());
+    jSObject.put("playWhenReady", exoPlayerExo.getPlayWhenReady());
+    int playbackState = exoPlayerExo.getPlaybackState();
+    if (playbackState == 2) {
+      str = "buffering";
+    } else if (playbackState == 3) {
+      str = "ready";
+    } else if (playbackState == 4) {
+      str = "ended";
+    } else {
+      str = "idle";
+    }
+    jSObject.put("state", str);
+    return jSObject;
   }
 
-  private void emitState(boolean external) {
-    if (currentId == null) return;
-    JSObject o = snapshot();
-    o.put("external", external);
-    notifyListeners("state", o);
+  public void emitState(boolean z) {
+    if (this.currentId == null) {
+      return;
+    }
+    JSObject jSObjectSnapshot = snapshot();
+    jSObjectSnapshot.put("external", z);
+    notifyListeners("state", jSObjectSnapshot);
   }
 
-  private void progressTick() {
-    ExoPlayer p = exo();
-    if (p == null || !p.isPlaying() || currentId == null) return;
+  public void progressTick() {
+    ExoPlayer exoPlayerExo = exo();
+    if (exoPlayerExo == null || !exoPlayerExo.isPlaying() || this.currentId == null) {
+      return;
+    }
     notifyListeners("progress", snapshot());
-    main.postDelayed(progressTick, 500);
+    this.main.postDelayed(this.progressTick, 500L);
   }
 
   private final class ExoListener implements Player.Listener {
+    private ExoListener() {}
+
     @Override
     public void onPlaybackStateChanged(int state) {
       emitState(false);
@@ -642,12 +1040,22 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       if (isPlaying) main.postDelayed(progressTick, 500);
     }
 
-    @Override
-    public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
-      // Anything other than a request (ours or the app's) is the system acting on its own:
-      // a call taking audio focus, headphones unplugged.
-      emitState(reason != Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST
-          && reason != Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM);
+    @Override // androidx.media3.common.Player.Listener
+    public void onPlayWhenReadyChanged(boolean z, int i) {
+      SkipAwarePlayer skipAwarePlayerSessionPlayer = AmplifyPlayerPlugin.this.sessionPlayer();
+      if (z
+          && skipAwarePlayerSessionPlayer != null
+          && skipAwarePlayerSessionPlayer.isNativeMode()
+          && (AmplifyPlayerPlugin.this.currentId == null
+              || !AmplifyPlayerPlugin.this.currentId.startsWith("car:"))) {
+        AmplifyPlayerPlugin.this.announceCar();
+      }
+      AmplifyPlayerPlugin.this.emitState((i == 1 || i == 5) ? false : true);
+    }
+
+    @Override // androidx.media3.common.Player.Listener
+    public void onMediaItemTransition(MediaItem mediaItem, int i) {
+      AmplifyPlayerPlugin.this.announceCar();
     }
 
     @Override

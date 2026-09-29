@@ -36,6 +36,19 @@
             </intent-filter>
         </service>
 
+        <!-- Home-screen widget: what is playing, with Previous / Play / Next. -->
+        <receiver
+            android:name=".NowPlayingWidget"
+            android:label="Amplify Now Playing"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_now_playing_info" />
+        </receiver>
+
         <!-- Android Auto: this is a media app, and its artwork comes through ArtProvider. -->
         <meta-data
             android:name="com.google.android.gms.car.application"
@@ -64,4 +77,5 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 </manifest>

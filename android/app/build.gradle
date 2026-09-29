@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def BUILD_OFFSET = 33
+ext.amplifyBuild = { ->
+    def run = System.getenv("GITHUB_RUN_NUMBER")
+    return run ? (run as Integer) + BUILD_OFFSET : 1
+}
+
 android {
     namespace = "com.markcoleman.amplify"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +13,10 @@ android {
         applicationId "com.markcoleman.amplify"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode ((System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer)
-        versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        // Build number = GitHub run number + BUILD_OFFSET. Builds 7-39 were made outside this repo,
+        // so the offset keeps new builds numbered above 39 and able to install over them.
+        versionCode amplifyBuild()
+        versionName "1.0." + amplifyBuild()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

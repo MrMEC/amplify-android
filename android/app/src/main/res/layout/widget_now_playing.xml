@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@+id/widget_root" android:background="@drawable/widget_bg" android:padding="10.0dip" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@+id/widget_art" android:background="@drawable/widget_art_bg" android:layout_width="56.0dip" android:layout_height="56.0dip" android:src="@mipmap/ic_launcher_round" android:scaleType="centerCrop" android:contentDescription="Cover" android:clipToOutline="true" />
+    <LinearLayout android:orientation="vertical" android:id="@+id/widget_text" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0" android:layout_marginStart="12.0dip" android:layout_marginEnd="6.0dip">
+        <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#fff5f6f8" android:ellipsize="end" android:id="@+id/widget_title" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="Amplify" android:maxLines="1" />
+        <TextView android:textSize="13.0sp" android:textColor="#bdffffff" android:ellipsize="end" android:id="@+id/widget_artist" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="Tap to open" android:maxLines="1" />
+    </LinearLayout>
+    <ImageButton android:id="@+id/widget_prev" android:background="@android:color/transparent" android:layout_width="40.0dip" android:layout_height="40.0dip" android:src="@drawable/ic_amplify_prev" android:scaleType="centerInside" android:contentDescription="Previous" />
+    <ImageButton android:id="@+id/widget_play" android:background="@drawable/widget_play_bg" android:layout_width="44.0dip" android:layout_height="44.0dip" android:src="@drawable/ic_amplify_play" android:scaleType="centerInside" android:contentDescription="Play" android:layout_marginStart="4.0dip" android:layout_marginEnd="4.0dip" />
+    <ImageButton android:id="@+id/widget_next" android:background="@android:color/transparent" android:layout_width="40.0dip" android:layout_height="40.0dip" android:src="@drawable/ic_amplify_next" android:scaleType="centerInside" android:contentDescription="Next" />
+</LinearLayout>

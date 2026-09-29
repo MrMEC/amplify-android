@@ -2,6 +2,7 @@ package com.markcoleman.amplify;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
+import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
@@ -16,29 +17,27 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 
 /**
  * Android Auto only loads artwork through content:// uris, never straight from the web. This
- * provider stands in for a web image: content://com.markcoleman.amplify.art/<base64 url>
- * downloads the image once into the cache and serves the file from there.
+ * provider stands in for a web image: content://com.markcoleman.amplify.art/<base64 url> downloads
+ * the image once into the cache and serves the file from there.
  */
 public final class ArtProvider extends ContentProvider {
-
   static final String AUTHORITY = "com.markcoleman.amplify.art";
-  private static final long MAX_BYTES = 6L * 1024 * 1024;
+  private static final long MAX_BYTES = 6291456;
 
-  /** The content:// stand-in for a web image, or null when there is nothing to show. */
+  @Override
+  public int delete(
+      @NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
+    return 0;
+  }
+
   @Nullable
-  static Uri uriFor(@Nullable String url) {
-    if (url == null) return null;
-    String u = url.trim();
-    if (u.isEmpty()) return null;
-    if (u.startsWith("content:") || u.startsWith("android.resource:")) return Uri.parse(u);
-    if (!u.startsWith("http://") && !u.startsWith("https://")) return null;
-    String enc =
-        Base64.encodeToString(
-            u.getBytes(StandardCharsets.UTF_8), Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
-    return new Uri.Builder().scheme("content").authority(AUTHORITY).appendPath(enc).build();
+  @Override
+  public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
+    return null;
   }
 
   @Override
@@ -48,10 +47,69 @@ public final class ArtProvider extends ContentProvider {
 
   @Nullable
   @Override
+  public Cursor query(
+      @NonNull Uri uri,
+      @Nullable String[] projection,
+      @Nullable String selection,
+      @Nullable String[] selectionArgs,
+      @Nullable String sortOrder) {
+    return null;
+  }
+
+  @Override
+  public int update(
+      @NonNull Uri uri,
+      @Nullable ContentValues values,
+      @Nullable String selection,
+      @Nullable String[] selectionArgs) {
+    return 0;
+  }
+
+  static Uri uriFor(String str) {
+    if (str == null) {
+      return null;
+    }
+    String strTrim = str.trim();
+    if (strTrim.isEmpty()) {
+      return null;
+    }
+    if (strTrim.startsWith("content:") || strTrim.startsWith("android.resource:")) {
+      return Uri.parse(strTrim);
+    }
+    if (strTrim.startsWith("local:")) {
+      String strSafeKey = safeKey(strTrim.substring(6));
+      if (strSafeKey.isEmpty()) {
+        return null;
+      }
+      return new Uri.Builder()
+          .scheme("content")
+          .authority("com.markcoleman.amplify.art")
+          .appendPath("local")
+          .appendPath(strSafeKey)
+          .build();
+    }
+    if (!strTrim.startsWith("http://") && !strTrim.startsWith("https://")) {
+      return null;
+    }
+    return new Uri.Builder()
+        .scheme("content")
+        .authority("com.markcoleman.amplify.art")
+        .appendPath(Base64.encodeToString(strTrim.getBytes(StandardCharsets.UTF_8), 11))
+        .build();
+  }
+
+  @Override // android.content.ContentProvider
   public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode)
       throws FileNotFoundException {
     String seg = uri.getLastPathSegment();
     if (seg == null) throw new FileNotFoundException("No image");
+    // content://…art/local/<key>: album art the page uploaded (see putCarArt)
+    List<String> path = uri.getPathSegments();
+    if (path.size() == 2 && "local".equals(path.get(0))) {
+      File f = localArt(getContext(), seg);
+      if (!f.exists() || f.length() == 0) throw new FileNotFoundException("Image unavailable");
+      return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY);
+    }
     String url;
     try {
       url = new String(Base64.decode(seg, Base64.URL_SAFE), StandardCharsets.UTF_8);
@@ -65,6 +123,22 @@ public final class ArtProvider extends ContentProvider {
     if (!f.exists() || f.length() == 0) throw new FileNotFoundException("Image unavailable");
     f.setLastModified(System.currentTimeMillis());
     return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY);
+  }
+
+  static String safeKey(String str) {
+    return str == null ? "" : str.replaceAll("[^A-Za-z0-9_-]", "");
+  }
+
+  static File localArtDir(Context context) {
+    File file = new File(context.getFilesDir(), "carart");
+    if (!file.exists()) {
+      file.mkdirs();
+    }
+    return file;
+  }
+
+  static File localArt(Context context, String str) {
+    return new File(localArtDir(context), safeKey(str) + ".jpg");
   }
 
   private static void download(String url, File dest) {
@@ -106,14 +180,17 @@ public final class ArtProvider extends ContentProvider {
     }
   }
 
-  private static String sha1(String s) {
+  private static String sha1(String str) {
     try {
-      byte[] d = MessageDigest.getInstance("SHA-1").digest(s.getBytes(StandardCharsets.UTF_8));
-      StringBuilder b = new StringBuilder();
-      for (byte x : d) b.append(String.format("%02x", x));
-      return b.toString();
-    } catch (Exception e) {
-      return String.valueOf(s.hashCode());
+      byte[] bArrDigest =
+          MessageDigest.getInstance("SHA-1").digest(str.getBytes(StandardCharsets.UTF_8));
+      StringBuilder sb = new StringBuilder();
+      for (byte b : bArrDigest) {
+        sb.append(String.format("%02x", Byte.valueOf(b)));
+      }
+      return sb.toString();
+    } catch (Exception unused) {
+      return String.valueOf(str.hashCode());
     }
   }
 
@@ -121,37 +198,5 @@ public final class ArtProvider extends ContentProvider {
   @Override
   public String getType(@NonNull Uri uri) {
     return "image/*";
-  }
-
-  @Nullable
-  @Override
-  public Cursor query(
-      @NonNull Uri uri,
-      @Nullable String[] projection,
-      @Nullable String selection,
-      @Nullable String[] selectionArgs,
-      @Nullable String sortOrder) {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
-    return null;
-  }
-
-  @Override
-  public int delete(
-      @NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
-    return 0;
-  }
-
-  @Override
-  public int update(
-      @NonNull Uri uri,
-      @Nullable ContentValues values,
-      @Nullable String selection,
-      @Nullable String[] selectionArgs) {
-    return 0;
   }
 }
