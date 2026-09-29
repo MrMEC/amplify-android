@@ -42,7 +42,22 @@ async def run(p, w, h, tag):
     await pg.goto('http://127.0.0.1:8778/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]') ? document.querySelector('.mobile-nav-btn[data-nav=video]').click() : document.querySelector('[data-nav=video]').click()"); await pg.wait_for_timeout(600)
     # a saved channel
-    await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()"); await pg.wait_for_timeout(900)
+    await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()")
+    if mobile:
+        # Mid-slide: the tab bar stays on top and the screen rises from behind it.
+        frames = []
+        for i in range(6):
+            await pg.wait_for_timeout(45)
+            frames.append(await pg.evaluate("""(()=>{var nav=document.getElementById('mobileNav'), scr=document.getElementById('nowPlayingScreen');
+              var nr=nav.getBoundingClientRect(), sr=scr.getBoundingClientRect();
+              var hit=document.elementFromPoint(nr.left+nr.width/2, nr.top+nr.height/2);
+              return {sheet:document.body.classList.contains('np-sheet'), navShown:getComputedStyle(nav).display!=='none' && !!hit && nav.contains(hit),
+                top:Math.round(sr.top), bottom:Math.round(sr.bottom), navTop:Math.round(nr.top)};})()"""))
+            if i == 2: await pg.screenshot(path=f'{SHOTS}/npch-{tag}-sliding.png')
+        mid = [f for f in frames if f['sheet']]
+        check(mid and all(f['navShown'] for f in frames) and all(f['top'] <= f['navTop'] for f in frames) and frames[-1]['bottom'] <= frames[-1]['navTop'] + 1 and any(f['top'] > 0 for f in mid),
+              f'{tag}: while sliding up the tab bar stays visible and the screen rises from behind it {frames}')
+    await pg.wait_for_timeout(900)
     cur = await pg.evaluate("window.__cur")
     await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})", cur); await pg.wait_for_timeout(900)
     if await pg.evaluate("document.body.classList.contains('np-video-full')"):
@@ -81,6 +96,19 @@ async def run(p, w, h, tag):
     await pg.evaluate("document.getElementById('npVideoMenuBtn').click()"); await pg.wait_for_timeout(500)
     if await pg.evaluate("document.body.classList.contains('np-video-full')"):
         await pg.evaluate("window.__emit('videotap',{})"); await pg.wait_for_timeout(600)
+    if mobile:
+        box = await pg.evaluate("(()=>{var r=document.getElementById('npCollectionGrid').getBoundingClientRect();return [r.left+r.width/2, r.top+40];})()")
+        await pg.evaluate("document.getElementById('npCollectionGrid').scrollTop=0")
+        cdp = await ctx.new_cdp_session(pg)
+        x, y = box
+        await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x, 'y': y}]})
+        for k in range(1, 8):
+            await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': x, 'y': y + k * 30}]})
+            await pg.wait_for_timeout(16)
+        await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
+        await pg.wait_for_timeout(600)
+        st = await pg.evaluate("[document.body.classList.contains('np-open'), document.getElementById('nowPlayingScreen').style.transform, document.body.classList.contains('np-sheet')]")
+        check(st[0] and not st[1] and not st[2], f'{tag}: pulling down on the channel list does not drag the screen away {st}')
     # tap another channel in the list
     await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#npCollectionGrid .tile-row'),function(r){return r.querySelector('.tile-name').textContent==='PBS';}).click()"); await pg.wait_for_timeout(900)
     g = await geom(pg)
@@ -99,6 +127,10 @@ async def run(p, w, h, tag):
     g = await geom(pg)
     check(g['heading'] and g['heading'].startswith('My Channels') and 'BBC News' in g['rows'], f'{tag}: adding it from the menu switches the list to My Channels {g["heading"]} {g["rows"]}')
     if mobile:
+        await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(40)
+        st = await pg.evaluate("[document.body.classList.contains('np-sheet'), getComputedStyle(document.getElementById('nowPlayingScreen')).display]")
+        check(not st[0] and st[1] == 'none', f'{tag}: the back button closes a channel at once, no slide down {st}')
+        await pg.evaluate("(()=>{var r=Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent==='CNN';}); if(r) r.click();})()"); await pg.wait_for_timeout(900)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
         st = await pg.evaluate("[document.body.classList.contains('np-open'), getComputedStyle(document.getElementById('nowPlayingScreen')).display]")
         check(not st[0] and st[1] == 'none', f'{tag}: tapping Home in the tab bar leaves Now Playing {st}')
