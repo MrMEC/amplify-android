@@ -31,19 +31,20 @@ async def geom(pg):
         related:getComputedStyle(document.getElementById('npRelated')).display};
     })()""")
 
-async def run(p, w, h, tag):
+async def run(p, w, h, tag, theme='dark'):
     b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     mobile = w < 900
     ctx = await b.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2, is_mobile=mobile, has_touch=mobile, color_scheme='dark', locale='en-US')
     await ctx.add_init_script(MOCK)
     await ctx.add_init_script("localStorage.setItem('radioPlayerVideoChannels', %s)" % repr(json.dumps(SEED)))
+    await ctx.add_init_script("localStorage.setItem('radioPlayerTheme', '%s')" % theme)
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.route('**/*', route)
     await pg.goto('http://127.0.0.1:8778/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]') ? document.querySelector('.mobile-nav-btn[data-nav=video]').click() : document.querySelector('[data-nav=video]').click()"); await pg.wait_for_timeout(600)
     # a saved channel
     await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()")
-    if mobile:
+    if mobile and theme == 'dark':
         # Mid-slide: the tab bar stays on top and the screen rises from behind it.
         frames = []
         for i in range(6):
@@ -70,7 +71,10 @@ async def run(p, w, h, tag):
     check(g['heading'] and g['heading'].startswith('My Channels') and len(g['rows']) == 18 and len(g['playing']) == 1 and g['related'] == 'none',
           f'{tag}: saved channel lists My Channels, current one highlighted, no Related Stations {g["heading"]} {g["rows"]} {g["playing"]}')
     await pg.screenshot(path=f'{SHOTS}/npch-{tag}-saved.png')
-    if mobile:
+    bg = await pg.evaluate("getComputedStyle(document.getElementById('nowPlayingScreen')).backgroundColor")
+    want = 'rgb(255, 255, 255)' if theme == 'light' else 'rgb(0, 0, 0)'
+    check(bg == want, f'{tag}: channel background is {"white" if theme == "light" else "black"} ({bg})')
+    if mobile and theme == 'dark':
         sc = await pg.evaluate("""(()=>{
           var nav=document.getElementById('mobileNav'), scr=document.getElementById('nowPlayingScreen'), grid=document.getElementById('npCollectionGrid');
           var v0=document.getElementById('npVideoWrap').getBoundingClientRect().top, c0=document.querySelector('.np-controls').getBoundingClientRect().top;
@@ -96,7 +100,7 @@ async def run(p, w, h, tag):
     await pg.evaluate("document.getElementById('npVideoMenuBtn').click()"); await pg.wait_for_timeout(500)
     if await pg.evaluate("document.body.classList.contains('np-video-full')"):
         await pg.evaluate("window.__emit('videotap',{})"); await pg.wait_for_timeout(600)
-    if mobile:
+    if mobile and theme == 'dark':
         box = await pg.evaluate("(()=>{var r=document.getElementById('npCollectionGrid').getBoundingClientRect();return [r.left+r.width/2, r.top+40];})()")
         await pg.evaluate("document.getElementById('npCollectionGrid').scrollTop=0")
         cdp = await ctx.new_cdp_session(pg)
@@ -126,7 +130,7 @@ async def run(p, w, h, tag):
     await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(500)
     g = await geom(pg)
     check(g['heading'] and g['heading'].startswith('My Channels') and 'BBC News' in g['rows'], f'{tag}: adding it from the menu switches the list to My Channels {g["heading"]} {g["rows"]}')
-    if mobile:
+    if mobile and theme == 'dark':
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(40)
         st = await pg.evaluate("[document.body.classList.contains('np-sheet'), getComputedStyle(document.getElementById('nowPlayingScreen')).display]")
         check(not st[0] and st[1] == 'none', f'{tag}: the back button closes a channel at once, no slide down {st}')
@@ -141,5 +145,6 @@ async def main():
     async with async_playwright() as p:
         await run(p, 390, 844, 'phone')
         await run(p, 1400, 900, 'desktop')
+        await run(p, 390, 844, 'phone-light', 'light')
     print('ALL PASSED' if not fails else f'FAILED {fails}')
 asyncio.run(main())
