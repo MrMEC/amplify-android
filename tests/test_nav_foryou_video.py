@@ -46,7 +46,7 @@ async def main():
         await pg.goto('http://127.0.0.1:8774/index.html'); await pg.wait_for_timeout(3000)
 
         navs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.mobile-nav-btn'),function(b){return b.dataset.nav+':'+b.textContent.trim();})")
-        check(navs == ['home:Home', 'library:Library', 'video:Video', 'podcasts:Podcasts', 'search:Search'], f'bottom nav {navs}')
+        check(navs == ['home:Home', 'library:Library', 'podcasts:Podcasts', 'video:Video', 'search:Search'], f'bottom nav {navs}')
         order = await pg.evaluate("""(()=>{var ids=['recentSection','forYouSection','homeTopHeading'];
           return ids.map(function(i){var e=document.getElementById(i);return e&&e.offsetParent?Math.round(e.getBoundingClientRect().top+scrollY):null;});})()""")
         check(order[0] is not None and order[1] is not None and order[0] < order[1] < order[2], f'For You sits under Continue Listening, above Top Stations {order}')
