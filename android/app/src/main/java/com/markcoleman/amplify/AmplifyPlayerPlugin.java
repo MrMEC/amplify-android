@@ -573,6 +573,91 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         .start();
   }
 
+  // ---- Movies and TV shows on the phone (see VideoLibrary) ----
+  @PluginMethod
+  public void pickVideoFolder(PluginCall call) {
+    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+    i.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+    startActivityForResult(call, i, "onVideoFolderPicked");
+  }
+
+  @ActivityCallback
+  private void onVideoFolderPicked(PluginCall call, ActivityResult result) {
+    if (call == null) return;
+    Intent data = result.getData();
+    if (result.getResultCode() != Activity.RESULT_OK || data == null || data.getData() == null) {
+      JSObject o = new JSObject();
+      o.put("cancelled", true);
+      call.resolve(o);
+      return;
+    }
+    Uri tree = data.getData();
+    ContentResolver cr = getContext().getContentResolver();
+    try {
+      // Kept, so the videos still play (and the folder can be scanned again) after a restart.
+      cr.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    } catch (Exception ignored) {
+    }
+    new Thread(
+            () -> {
+              try {
+                call.resolve(VideoLibrary.walk(cr, tree));
+              } catch (Exception e) {
+                call.reject("Could not read that folder: " + e.getMessage());
+              }
+            })
+        .start();
+  }
+
+  /** Lists a folder picked earlier again (new or removed videos). */
+  @PluginMethod
+  public void rescanVideoFolder(PluginCall call) {
+    String t = call.getString("treeUri");
+    if (t == null || t.isEmpty()) {
+      call.reject("No folder");
+      return;
+    }
+    ContentResolver cr = getContext().getContentResolver();
+    new Thread(
+            () -> {
+              try {
+                call.resolve(VideoLibrary.walk(cr, Uri.parse(t)));
+              } catch (Exception e) {
+                call.reject("That folder can't be read any more: " + e.getMessage());
+              }
+            })
+        .start();
+  }
+
+  /** A folder taken out of the library gives its read permission back. */
+  @PluginMethod
+  public void forgetVideoFolder(PluginCall call) {
+    String t = call.getString("treeUri");
+    if (t != null && !t.isEmpty()) {
+      try {
+        getContext()
+            .getContentResolver()
+            .releasePersistableUriPermission(Uri.parse(t), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      } catch (Exception ignored) {
+      }
+    }
+    call.resolve();
+  }
+
+  /** Length, picture size and a poster still for one video (off the main thread). */
+  @PluginMethod
+  public void videoInfo(PluginCall call) {
+    String u = call.getString("uri");
+    boolean thumb = !Boolean.FALSE.equals(call.getBoolean("thumb", true));
+    if (u == null || u.isEmpty()) {
+      call.reject("No uri");
+      return;
+    }
+    Context ctx = getContext();
+    new Thread(() -> call.resolve(VideoLibrary.info(ctx, u, thumb))).start();
+  }
+
   private static JSObject walkTree(ContentResolver cr, Uri tree) {
     String rootId = DocumentsContract.getTreeDocumentId(tree);
     String rootName = displayName(cr, DocumentsContract.buildDocumentUriUsingTree(tree, rootId));

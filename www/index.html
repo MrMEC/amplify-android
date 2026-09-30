@@ -2860,6 +2860,95 @@
   }
   .ch-sort-menu .ch-sort-check{ width:14px; display:inline-flex; justify-content:center; color:var(--accent); }
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
+  /* ---------- Video: movies and TV shows on the phone ---------- */
+  .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 -14px; }
+  .tile-grid > .video-tabs.vd-seasons{ margin:4px 0 -18px; }
+  .v-progress{ position:absolute; left:8px; right:8px; bottom:8px; height:4px; border-radius:2px; background:rgba(255,255,255,.35); overflow:hidden; z-index:2; }
+  .v-progress > span{ display:block; height:100%; background:var(--accent); border-radius:2px; }
+  .v-watched{
+    position:absolute; top:7px; right:7px; z-index:2; width:24px; height:24px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:12px;
+    background:var(--accent); color:#111; box-shadow:0 2px 8px rgba(0,0,0,.35);
+  }
+  /* Continue Watching: wide stills in a sideways row. */
+  .tile-grid > .cl-row.vw-row{ gap:14px; }
+  .vw-tile{ flex:0 0 auto; width:min(62vw, 260px); cursor:pointer; scroll-snap-align:start; min-width:0; }
+  .vw-thumb{ position:relative; width:100%; aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:var(--art-bg, var(--panel-2)); }
+  .vw-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .vw-tile .tile-name{ margin-top:8px; }
+  .vw-tile .tile-name, .vw-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  /* Movie and show posters: tall 2:3 covers in the grid. */
+  .tile.vposter .tile-art.vposter-art{ aspect-ratio:2/3; height:auto; position:relative; overflow:hidden; border-radius:10px; }
+  .tile.vposter .tile-art.vposter-art img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .vposter-fallback{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:10px; font-size:14px; font-weight:800; line-height:1.2; color:var(--text-dim);
+    background:linear-gradient(160deg, var(--panel-2), var(--panel));
+  }
+  .tile.vposter .tile-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  .tile-grid > .v-empty{ grid-column:1/-1; }
+  .tile-grid > .v-add-folder{ grid-column:1/-1; justify-self:start; margin-top:-18px; display:inline-flex; gap:8px; align-items:center; }
+  .tile-grid > .grid-section-label.v-folders-label{ margin-top:18px; }
+  .tile-grid > .v-folder-row{
+    grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:-26px 0 0;
+    padding:6px 0 6px 2px; border-bottom:1px solid var(--border);
+  }
+  .v-folder-name{ flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile-grid > .v-folder-actions{ grid-column:1/-1; display:flex; gap:10px; flex-wrap:wrap; margin-top:-22px; }
+  @media (max-width: 900px){
+    .tile-grid > .v-folder-row{ margin-top:-18px; }
+    .tile-grid > .v-folder-actions{ margin-top:-12px; }
+    .tile-grid > .v-add-folder{ margin-top:-10px; }
+  }
+  /* Details: backdrop, poster beside the title, then the actions. */
+  .tile-grid > .vd-wrap{ grid-column:1/-1; min-width:0; }
+  /* A video's page has its title beside the poster, so the heading row keeps only Back. */
+  body.vdetail-open #stationsHeading{ display:none; }
+  body.vdetail-open .tile-grid > .vd-wrap{ margin-top:-14px; }
+  .vd-hero{ position:relative; }
+  .vd-backdrop{ position:relative; width:100%; aspect-ratio:16/9; max-height:42vh; border-radius:14px; overflow:hidden; background:var(--panel-2); }
+  .vd-backdrop img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .vd-backdrop::after{ content:''; position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,0) 45%, rgba(0,0,0,.45)); }
+  .vd-head{ display:flex; align-items:flex-end; gap:16px; margin:-64px 14px 0; position:relative; z-index:1; }
+  .vd-poster{ position:relative; flex:0 0 auto; width:112px; aspect-ratio:2/3; border-radius:10px; overflow:hidden; background:var(--panel); box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .vd-poster img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .vd-text{ flex:1; min-width:0; padding-bottom:4px; }
+  .vd-title{ font-size:22px; font-weight:800; line-height:1.2; color:var(--text); }
+  .vd-meta{ margin-top:4px; font-size:13px; color:var(--text-dim); }
+  .vd-actions{ display:flex; align-items:center; gap:10px; margin:18px 0 0; flex-wrap:wrap; }
+  .vd-play{
+    display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:999px; border:none; cursor:pointer;
+    background:var(--accent); color:#111; font:inherit; font-size:14px; font-weight:800;
+  }
+  .vd-secondary{
+    display:inline-flex; align-items:center; padding:10px 18px; border-radius:999px; cursor:pointer;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text); font:inherit; font-size:13px; font-weight:700;
+  }
+  .vd-actions .vd-more{ margin-left:auto; }
+  .vd-progress{ display:flex; align-items:center; gap:12px; margin-top:16px; }
+  .vd-progress .v-progress{ position:relative; left:auto; right:auto; bottom:auto; flex:1; background:var(--panel-2); }
+  .vd-left{ font-size:12.5px; color:var(--text-dim); white-space:nowrap; }
+  .vd-watched{ margin-top:16px; font-size:13px; font-weight:700; color:var(--accent); display:flex; gap:7px; align-items:center; }
+  .vd-file{ margin-top:18px; font-size:12px; color:var(--text-faint); overflow-wrap:anywhere; }
+  /* Episode rows (a show's page, and the list under a video on Now Playing). */
+  .tile-grid > .vep-row, .np-related-grid .vep-row{ grid-column:1/-1; }
+  .vep-row{
+    display:flex; align-items:center; gap:14px; min-width:0; cursor:pointer;
+    padding:10px 4px; border-bottom:1px solid var(--border);
+  }
+  .tile-grid > .vep-row{ margin-top:-40px; }
+  .tile-grid > .grid-section-label + .vep-row, .tile-grid > .video-tabs + .vep-row{ margin-top:0; }
+  @media (max-width: 900px){ .tile-grid > .vep-row{ margin-top:-24px; } }
+  .vep-thumb{ position:relative; flex:0 0 auto; width:132px; aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:var(--panel-2); }
+  .vep-thumb.vep-poster{ width:52px; aspect-ratio:2/3; }
+  .vep-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .vep-thumb .v-progress{ left:5px; right:5px; bottom:5px; height:3px; }
+  .vep-text{ flex:1; min-width:0; }
+  .vep-title{ font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vep-sub{ margin-top:3px; font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vep-row.playing .vep-title{ color:var(--accent); }
+  .vep-row.playing .vep-thumb{ box-shadow:0 0 0 3px var(--accent); }
+  @media (max-width: 900px){ .vep-thumb{ width:112px; } }
   .tile.tile-row.ch-item .ch-grip{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
   .tile.tile-row.ch-item .ch-grip svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
   .tile.tile-row.ch-item.playing .tile-name{ color:var(--accent); }
@@ -6685,10 +6774,13 @@
       runNpSheet(true, function(){ closeNowPlaying(restoreScroll && !mobile); });
       return;
     }
+    var closingVideo = wasOpen && isLocalVideo(npTarget());
     nowPlayingScreen.style.display = 'none';
     browseView.style.display = '';
     document.body.classList.remove('np-open');
     npStation = null;
+    // Back on a video page, it shows where you got to (Resume, time left, watched).
+    if(closingVideo) refreshVideoPages();
     updateNowPlayingFavState();
     updateNpPlayBtn();
     if(restoreScroll && wasOpen){
@@ -6780,6 +6872,7 @@
   function renderNpCollection(station){
     npCollectionGrid.classList.remove('np-ch-list');
     if(isNpChannel(station)){ renderNpChannels(station); return; }
+    if(isLocalVideo(station)){ renderNpVideoList(station); return; }
     var col = collectionForStation(station);
     npCollectionGrid.innerHTML = '';
     if(!col){ npCollection.style.display = 'none'; return; }
@@ -7027,7 +7120,7 @@
     npVideoToggle.setAttribute('aria-pressed', npVideoOn ? 'true' : 'false');
     var vm = document.getElementById('npVideoMenuBtn');
     if(vm){
-      vm.style.display = show && isNpChannel(st) ? '' : 'none';
+      vm.style.display = show && (isNpChannel(st) || isLocalVideo(st)) ? '' : 'none';
       vm.innerHTML = (npVideoOn ? VIDEO_OFF_SVG : VIDEO_ON_SVG).replace('<svg ', '<svg class="menu-svg" ') +
         '<span>' + (npVideoOn ? 'Turn Off Video' : 'Turn On Video') + '</span>';
     }
@@ -7140,7 +7233,7 @@
   var videoLastSent = '', videoRaf = 0;
 
   function streamVideoCapable(st){
-    return !!(videoPlugin && streamVideo.has && st && isLiveStream(st) && currentStation &&
+    return !!(videoPlugin && streamVideo.has && st && (isLiveStream(st) || isLocalVideo(st)) && currentStation &&
       favKey(st) === favKey(currentStation));
   }
   function setStreamVideoOn(on){
@@ -7252,7 +7345,7 @@
   function pipWanted(){
     if(!currentStation || !audio || audio.paused) return false;
     if(npVideoOn) return true;
-    return !!(videoPlugin && streamVideo.has && isLiveStream(currentStation) && streamVideoOffKey !== favKey(currentStation));
+    return !!(videoPlugin && streamVideo.has && (isLiveStream(currentStation) || isLocalVideo(currentStation)) && streamVideoOffKey !== favKey(currentStation));
   }
   function syncPip(){
     if(!pipPlugin || typeof pipPlugin.setPip !== 'function' || pipActive) return;
@@ -7292,7 +7385,7 @@
 
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
-    if(isNpChannel(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
+    if(isNpChannel(station) || isLocalVideo(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
     if(isLocalTrack(station)){
       renderNpLibraryRelated(station);
       return;
@@ -7639,8 +7732,10 @@
     renderNpOnAir(st);
     renderNpSub(st);
     renderNpGenres(st);
-    nowPlayingScreen.classList.toggle('np-channel', isNpChannel(st));
-    document.body.classList.toggle('np-channel-open', isNpChannel(st));
+    // A TV channel and a video of your own share the video layout.
+    var videoLayout = isNpChannel(st) || isLocalVideo(st);
+    nowPlayingScreen.classList.toggle('np-channel', videoLayout);
+    document.body.classList.toggle('np-channel-open', videoLayout);
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
@@ -7655,6 +7750,11 @@
     npDeleteLabel.textContent = local ? 'Remove from library' : 'Delete this stream';
     npDeleteBtn.title = npDeleteLabel.textContent;
     npDeleteBtn.setAttribute('aria-label', npDeleteBtn.title);
+    // A video of your own: nothing to copy, delete or add to a playlist.
+    var vidItem = isLocalVideo(st);
+    if(vidItem){ npCopyBtn.style.display = 'none'; npMoreLikeBtn.style.display = 'none'; }
+    npDeleteBtn.style.display = vidItem ? 'none' : '';
+    npPlaylistBtn.style.display = vidItem ? 'none' : '';
     // Next and Previous are meaningless on a station, so they are hidden rather than left
     // sitting there permanently greyed out.
     syncNpStepVisibility();
@@ -8356,6 +8456,7 @@
   // working untouched) or a local file. Downstream code branches on these two helpers rather
   // than sniffing for stationuuid/urlToResolve.
   function trackType(t){
+    if(t && t.type === 'video') return 'video';
     if(t && t.type === 'local') return 'local';
     if(t && t.type === 'podcast') return 'podcast';
     return 'stream';
@@ -8372,6 +8473,7 @@
   // are equally available from a browser File and from Android's MediaStore -- so the same
   // IDs survive the eventual port rather than having to be regenerated.
   function favKey(s){
+    if(s && s.type === 'video') return 'video:' + (s.id || s.uri || s.name);
     if(s && s.type === 'local') return s.localId || ('local:' + (s.name || ''));
     // A podcast episode's identity is the feed's own guid -- stable across re-fetching the
     // show's episode list, unlike an index into whatever page iTunes happened to return.
@@ -8819,6 +8921,13 @@
       return;
     }
 
+    // A video of your own: its poster (from its folder, or a still from the video).
+    if(isLocalVideo(station)){
+      var vv = vlib().byId[station.id];
+      var vu = (vv && videoPosterUrl(vv)) || station.favicon;
+      if(vu) paint(vu);
+      return;
+    }
     // A podcast episode's art is whatever iTunes already handed us when the episode was
     // fetched (station.favicon carries it, same field a stream's own icon uses) -- there is
     // no directory lookup chain to run for it.
@@ -10393,12 +10502,25 @@
     videoAddHeaderBtnEl.style.display = '';
     renderVideoHome();
   }
+  // The Video page: Continue Watching (anything part-watched on the phone), then three tabs --
+  // Channels (My Channels), Movies and TV Shows (videos kept on the phone, see the video
+  // library below). The header's buttons follow the tab: Add Channels / Sort / Reorder for
+  // channels, Add a Folder / Sort for movies and shows.
   function renderVideoHome(){
     resetStationsGrid();
+    closeChannelSortMenu();
+    if(videoTab !== 'channels') videoChannelsEditing = false;
+    if(!videoChannelsEditing) appendContinueWatching();
+    appendVideoTabs();
+    videoAddHeaderBtnEl.title = videoTab === 'channels' ? 'Add channels' : 'Add a folder of videos';
+    videoAddHeaderBtnEl.setAttribute('aria-label', videoAddHeaderBtnEl.title);
+    if(videoTab === 'channels') renderChannelsTab();
+    else renderVideoLibraryTab(videoTab);
+  }
+  function renderChannelsTab(){
     var mine = visibleVideoChannels();
     videoReorderHeaderBtnEl.style.display = mine.length > 1 ? '' : 'none';
     videoSortHeaderBtnEl.style.display = mine.length > 1 && !videoChannelsEditing ? '' : 'none';
-    closeChannelSortMenu();
     updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing);
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
     if(!mine.length){
@@ -10460,19 +10582,26 @@
     var m = document.createElement('div');
     m.className = 'ch-sort-menu';
     m.setAttribute('role', 'menu');
-    [['category', 'By Category'], ['list', 'One List']].forEach(function(o){
+    var lib = videoTab !== 'channels';
+    var cur = lib ? (videoSortBy[videoTab] || 'recent') : channelSort;
+    (lib ? [['recent', 'Recently Added'], ['az', 'A to Z']] : [['category', 'By Category'], ['list', 'One List']]).forEach(function(o){
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'np-menu-item' + (channelSort === o[0] ? ' on' : '');
+      b.className = 'np-menu-item' + (cur === o[0] ? ' on' : '');
       b.setAttribute('role', 'menuitemradio');
-      b.setAttribute('aria-checked', channelSort === o[0] ? 'true' : 'false');
+      b.setAttribute('aria-checked', cur === o[0] ? 'true' : 'false');
       b.dataset.sort = o[0];
-      b.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (channelSort === o[0] ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
+      b.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (cur === o[0] ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
       b.lastChild.textContent = o[1];
       b.addEventListener('click', function(e){
         e.stopPropagation();
-        channelSort = o[0];
-        try{ localStorage.setItem(CHANNEL_SORT_KEY, channelSort); }catch(err){}
+        if(lib){
+          videoSortBy[videoTab] = o[0];
+          try{ localStorage.setItem(VIDEO_SORT_KEY, JSON.stringify(videoSortBy)); }catch(err){}
+        } else {
+          channelSort = o[0];
+          try{ localStorage.setItem(CHANNEL_SORT_KEY, channelSort); }catch(err){}
+        }
         closeChannelSortMenu();
         renderVideoHome();
       });
@@ -10570,7 +10699,10 @@
     if(!videoChannelsEditing) reorderVideoChannelsFromGrid();
     renderVideoHome();
   });
-  videoAddHeaderBtnEl.addEventListener('click', function(){ pushView(); openAddChannelsPage(); });
+  videoAddHeaderBtnEl.addEventListener('click', function(){
+    if(videoTab === 'channels'){ pushView(); openAddChannelsPage(); }
+    else addVideoFolder();
+  });
 
   // ---- fetching: the page first (GitHub serves these openly), the app's native fetch when a
   // host won't let a page read it (most playlist hosts) or the address is plain http.
@@ -11021,6 +11153,1054 @@
   function importVideoChannels(list){
     var n = 0;
     (Array.isArray(list) ? list : []).forEach(function(c){ if(c && c.url && addVideoChannel(c)) n++; });
+    return n;
+  }
+
+  // ---------- Video: movies and TV shows on the phone ----------
+  // Folders are picked with the system picker (AmplifyPlayerPlugin.pickVideoFolder); the videos
+  // stay where they are and the native player plays them from there. A scan lists every video
+  // with the pictures, subtitle files and .nfo files beside it. Each video is sorted into a
+  // movie or a TV episode by its name ("Show S01E02", "1x02", a "Season 1" folder) and gets a
+  // poster: a picture from its folder when there is one (poster.jpg, folder.jpg, or one named
+  // after the file), otherwise a still taken from the video itself (videoInfo, made once and
+  // kept in the app's files). Anything guessed wrong can be fixed from the title's menu
+  // (rename, movie or episode, poster); those fixes, and where you are in every video, are kept
+  // and go into Export.
+  var VIDEO_FOLDERS_KEY = 'radioPlayerVideoFolders';
+  var VIDEO_FILES_KEY = 'radioPlayerVideoFiles';
+  var VIDEO_INFO_KEY = 'radioPlayerVideoInfo';
+  var VIDEO_EDITS_KEY = 'radioPlayerVideoEdits';
+  var VIDEO_PROGRESS_KEY = 'radioPlayerVideoProgress';
+  var VIDEO_TAB_KEY = 'radioPlayerVideoTab';
+  var VIDEO_SORT_KEY = 'radioPlayerVideoSort';
+  function vload(key, fallback){
+    try{ var v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }catch(e){ return fallback; }
+  }
+  function vsave(key, value){
+    try{ localStorage.setItem(key, JSON.stringify(value)); return true; }catch(e){ return false; }
+  }
+  var videoFolders = vload(VIDEO_FOLDERS_KEY, []);     // [{ treeUri, name, addedAt }]
+  var videoFiles = vload(VIDEO_FILES_KEY, []);         // scanned files (videos and side files)
+  var videoInfo = vload(VIDEO_INFO_KEY, {});           // uri -> { d: seconds, w, h, t: still }
+  var videoEdits = vload(VIDEO_EDITS_KEY, {});         // id / 'show:'+key -> { title, kind, ... }
+  var videoProgress = vload(VIDEO_PROGRESS_KEY, {});   // id -> { pos, dur, at, watched }
+  var videoTab = vload(VIDEO_TAB_KEY, 'channels');
+  if(['channels', 'movies', 'shows'].indexOf(videoTab) === -1) videoTab = 'channels';
+  var videoSortBy = vload(VIDEO_SORT_KEY, { movies: 'recent', shows: 'recent' });
+  var videoLib = null;                                 // built from the above (buildVideoLibrary)
+  var onVideoDetailView = false;
+  if(!Array.isArray(videoFolders)) videoFolders = [];
+  if(!Array.isArray(videoFiles)) videoFiles = [];
+
+  function videoPlugin2(){
+    var Cap = window.Capacitor;
+    return (Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer) || null;
+  }
+  function capUrl(u){
+    if(!u) return '';
+    try{ if(window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function') return window.Capacitor.convertFileSrc(u); }catch(e){}
+    return u;
+  }
+  function isLocalVideo(t){ return !!t && t.type === 'video'; }
+
+  // ---- names
+  var VIDEO_EXT_RE = /\.(mp4|m4v|mkv|webm|mov|avi|wmv|flv|mpg|mpeg|ts|m2ts|3gp|ogv)$/i;
+  var QUALITY_RE = /[\s._\-\[(](2160p|1080p|720p|576p|480p|4k|uhd|hdr10?|dv|bluray|blu-ray|bdrip|brrip|web-?dl|webrip|web|hdtv|dvdrip|dvdscr|x264|x265|h\.?264|h\.?265|hevc|avc|xvid|divx|aac\d?|ac3|eac3|ddp?5\.1|dts(-hd)?|truehd|atmos|remux|proper|repack|extended|unrated|imax|10bit|multi|subs?)(?=$|[\s._\-\])])/i;
+  function baseName(n){ return String(n || '').replace(/\.[^.\/]+$/, ''); }
+  function tidyName(s){
+    s = String(s || '');
+    // Dots and underscores as spaces, unless the name has real spaces already ("Mr. Robot").
+    if(!/\s/.test(s) || /[._]\S+[._]\S+[._]/.test(s)) s = s.replace(/[._]+/g, ' ');
+    s = s.replace(/\[[^\]]*\]/g, ' ').replace(/\{[^}]*\}/g, ' ');
+    var q = QUALITY_RE.exec(' ' + s);
+    if(q && q.index > 0) s = s.slice(0, q.index - 1);
+    return s.replace(/\s+-\s*$/, '').replace(/[\s\-–:]+$/, '').replace(/^[\s\-–]+/, '').replace(/\s{2,}/g, ' ').trim();
+  }
+  function splitYear(title){
+    var m = /^(.*?)[\s(\[]*((?:19|20)\d{2})[)\]]?(?:\s.*)?$/.exec(title);
+    if(m && m[1].trim().length) return { title: m[1].replace(/[\s(\[\-]+$/, '').trim(), year: m[2] };
+    return { title: title, year: '' };
+  }
+  function showKeyOf(name){ return String(name || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, ''); }
+  var SEASON_DIR_RE = /^(?:season|series|staffel|saison|temporada|s)[\s._-]*(\d{1,2})$/i;
+  var SPECIALS_DIR_RE = /^(specials?|extras?|featurettes?|behind the scenes|trailers?|samples?)$/i;
+  // What a file is: { kind: 'episode', show, season, episode, epTitle } or { kind: 'movie', title, year }.
+  function parseVideoFile(f){
+    var parts = String(f.relPath || f.name).split('/');
+    var name = parts.pop();
+    var dirs = parts;                 // dirs[0] is the picked folder itself
+    var base = baseName(name);
+    var parent = dirs.length > 1 ? dirs[dirs.length - 1] : '';
+    var grand = dirs.length > 2 ? dirs[dirs.length - 2] : '';
+    var m = /^(.*?)[\s._\-\[(]*[Ss](\d{1,2})[\s._-]*[Ee](\d{1,3})(?:[\s._-]*(?:[Ee]|-)\d{1,3})*(.*)$/.exec(base) ||
+            /^(.*?)[\s._\-\[(]+(\d{1,2})x(\d{1,3})(.*)$/.exec(base);
+    var seasonDir = SEASON_DIR_RE.exec(parent);
+    if(!m && seasonDir){
+      var e = /(?:^|[\s._-])(?:e|ep|episode)[\s._-]*(\d{1,3})(?!\d)/i.exec(base) || /^(\d{1,3})(?!\d)[\s._-]*(.*)$/.exec(base);
+      if(e){
+        var rest = base.slice(e.index + e[0].length);
+        m = [base, '', seasonDir[1], e[1], /^\d/.test(base) ? (e[2] || '') : rest];
+      }
+    }
+    if(m){
+      var show = tidyName(m[1]);
+      // "Show/Season 1/S01E01.mkv" names the show only in its folders.
+      if(!show || /^(s\d+|season\s*\d+)$/i.test(show)) show = tidyName(seasonDir ? grand : parent) || tidyName(parent) || 'Unknown Show';
+      show = splitYear(show).title || show;
+      var epTitle = tidyName(String(m[4] || '').replace(/^[\s._\-–)\]]+/, ''));
+      return { kind: 'episode', show: show, season: parseInt(m[2], 10) || 0, episode: parseInt(m[3], 10) || 0, epTitle: epTitle,
+        showDir: dirs.slice(0, seasonDir ? dirs.length - 1 : dirs.length).join('/'), dir: dirs.join('/') };
+    }
+    // A movie: named by its file, or by its folder when the file is only "movie.mkv" and the like.
+    var t = tidyName(base);
+    if((!t || /^(movie|video|film|feature|main|title\s*\d*|\d+)$/i.test(t)) && parent) t = tidyName(parent);
+    var ty = splitYear(t);
+    if(!ty.year){ var py = splitYear(tidyName(parent)); if(py.year && showKeyOf(py.title) === showKeyOf(ty.title)) ty.year = py.year; }
+    return { kind: 'movie', title: ty.title || t || base, year: ty.year, dir: dirs.join('/') };
+  }
+  function isSampleOrExtra(f){
+    var parts = String(f.relPath || f.name).split('/');
+    var n = baseName(parts[parts.length - 1]);
+    if(/(^|[\s._-])sample($|[\s._-])/i.test(n) && (f.size || 0) < 300 * 1048576) return true;
+    for(var i = 1; i < parts.length - 1; i++) if(SPECIALS_DIR_RE.test(parts[i]) && !/^specials?$/i.test(parts[i])) return true;
+    return false;
+  }
+
+  // ---- building the library from the scan
+  function buildVideoLibrary(){
+    var imagesByDir = {}, subsByDir = {};
+    videoFiles.forEach(function(f){
+      if(f.video) return;
+      var parts = String(f.relPath || f.name).split('/');
+      var n = parts.pop();
+      var dir = parts.join('/');
+      var ext = (/\.([^.]+)$/.exec(n) || [])[1] || '';
+      ext = ext.toLowerCase();
+      var entry = { name: n, base: baseName(n).toLowerCase(), uri: f.uri };
+      if(/^(jpe?g|png|webp)$/.test(ext)) (imagesByDir[dir] = imagesByDir[dir] || []).push(entry);
+      else if(/^(srt|vtt|ass|ssa)$/.test(ext)) (subsByDir[dir] = subsByDir[dir] || []).push(entry);
+    });
+    function pic(dir, names){
+      var list = imagesByDir[dir] || [];
+      for(var i = 0; i < names.length; i++){
+        for(var j = 0; j < list.length; j++) if(list[j].base === names[i]) return list[j].uri;
+      }
+      return '';
+    }
+    var videosByDir = {};
+    videoFiles.forEach(function(f){
+      if(!f.video) return;
+      var parts = String(f.relPath || f.name).split('/'); parts.pop();
+      var d = parts.join('/');
+      videosByDir[d] = (videosByDir[d] || 0) + 1;
+    });
+    var movies = [], showsByKey = {}, byId = {};
+    videoFiles.forEach(function(f){
+      if(!f.video || isSampleOrExtra(f)) return;
+      var p = parseVideoFile(f);
+      // Keyed by where the file sits in its folder, which stays the same if the folder is
+      // picked again (or on another phone), unlike its content:// address.
+      var id = f.relPath || f.uri;
+      var ed = videoEdits[id] || {};
+      var kind = ed.kind || p.kind;
+      var info = videoInfo[f.uri] || {};
+      var b = baseName(f.name).toLowerCase();
+      var subs = (subsByDir[p.dir] || []).filter(function(sb){ return sb.base === b || sb.base.indexOf(b + '.') === 0; });
+      var item = { type: 'video', id: id, uri: f.uri, fileName: f.name, relPath: f.relPath, size: f.size || 0,
+        addedAt: f.lastModified || 0, duration: info.d || 0, width: info.w || 0, height: info.h || 0,
+        still: info.t || '', subs: subs.map(function(sb){ return { uri: sb.uri, name: sb.name }; }) };
+      if(kind === 'episode'){
+        var show = ed.show || p.show || tidyName(baseName(f.name));
+        var season = ed.season != null ? ed.season : (p.season || 1);
+        var ep = ed.episode != null ? ed.episode : (p.episode || 0);
+        var key = showKeyOf(show);
+        var s = showsByKey[key];
+        if(!s){
+          s = showsByKey[key] = { key: key, title: show, episodes: [], addedAt: 0, poster: '', backdrop: '', seasonPosters: {} };
+        }
+        var showDir = p.showDir || p.dir;
+        if(!s.poster) s.poster = pic(showDir, ['poster', 'folder', 'cover', 'show']);
+        if(!s.backdrop) s.backdrop = pic(showDir, ['fanart', 'backdrop', 'background', 'banner']);
+        var sp = pic(showDir, ['season' + (season < 10 ? '0' : '') + season + '-poster', 'season' + season + '-poster']) ||
+                 (p.dir !== showDir ? pic(p.dir, ['poster', 'folder', 'cover']) : '');
+        if(sp && !s.seasonPosters[season]) s.seasonPosters[season] = sp;
+        item.kind = 'episode'; item.show = s.title; item.showKey = key; item.season = season; item.episode = ep;
+        item.epTitle = ed.title || p.epTitle || '';
+        item.thumb = pic(p.dir, [b, b + '-thumb']);
+        s.episodes.push(item);
+        s.addedAt = Math.max(s.addedAt, item.addedAt);
+      } else {
+        item.kind = 'movie';
+        item.title = ed.title || p.title || tidyName(baseName(f.name));
+        item.year = ed.year != null ? ed.year : (p.year || '');
+        var alone = (videosByDir[p.dir] || 0) === 1;
+        item.poster = pic(p.dir, [b, b + '-poster']) || (alone ? pic(p.dir, ['poster', 'folder', 'cover', 'movie']) : '');
+        item.backdrop = pic(p.dir, [b + '-fanart', b + '-backdrop']) || (alone ? pic(p.dir, ['fanart', 'backdrop', 'background']) : '');
+        movies.push(item);
+      }
+      byId[id] = item;
+    });
+    var shows = Object.keys(showsByKey).map(function(k){
+      var s = showsByKey[k];
+      var ed = videoEdits['show:' + k] || {};
+      if(ed.title) s.title = ed.title;
+      s.episodes.forEach(function(e){ e.show = s.title; });
+      s.episodes.sort(function(a, b){ return (a.season - b.season) || (a.episode - b.episode) || a.fileName.localeCompare(b.fileName); });
+      s.seasons = [];
+      s.episodes.forEach(function(e){ if(s.seasons.indexOf(e.season) === -1) s.seasons.push(e.season); });
+      return s;
+    });
+    videoLib = { movies: movies, shows: shows, byId: byId, showsByKey: showsByKey };
+    return videoLib;
+  }
+  function vlib(){ return videoLib || buildVideoLibrary(); }
+  function invalidateVideoLib(){ videoLib = null; }
+
+  // ---- display helpers
+  function videoTitle(v){
+    if(!v) return '';
+    if(v.kind === 'episode') return v.epTitle || ('Episode ' + v.episode);
+    return v.title;
+  }
+  function episodeCode(v){ return 'S' + v.season + ' E' + v.episode; }
+  function formatRuntime(sec){
+    sec = Math.round(sec || 0);
+    if(!sec) return '';
+    var h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    if(m === 60){ h++; m = 0; }
+    return h ? (h + 'h' + (m ? ' ' + m + 'm' : '')) : (m + ' min');
+  }
+  function videoQuality(v){
+    var h = Math.min(v.width || 0, v.height || 0) ? Math.min(v.width, v.height) : 0;
+    if(!h) return '';
+    if(h >= 2000) return '4K';
+    if(h >= 1000) return '1080p';
+    if(h >= 700) return '720p';
+    return 'SD';
+  }
+  function videoPosterUrl(v){
+    if(!v) return '';
+    var custom = getCustomArtUrl('video:' + v.id);
+    if(custom) return custom;
+    if(v.kind === 'episode'){
+      var s = vlib().showsByKey[v.showKey];
+      var sc = s && getCustomArtUrl('vshow:' + s.key);
+      if(sc) return sc;
+      return capUrl((s && (s.seasonPosters[v.season] || s.poster)) || v.thumb) || stillUrl(v);
+    }
+    return capUrl(v.poster) || stillUrl(v);
+  }
+  function stillUrl(v){ return v && v.still ? capUrl(v.still) : ''; }
+  function episodeImageUrl(v){ return getCustomArtUrl('video:' + v.id) || capUrl(v.thumb) || stillUrl(v); }
+  function showPosterUrl(s){
+    var custom = getCustomArtUrl('vshow:' + s.key);
+    if(custom) return custom;
+    if(s.poster) return capUrl(s.poster);
+    for(var i = 0; i < s.episodes.length; i++){
+      var sp = s.seasonPosters[s.episodes[i].season];
+      if(sp) return capUrl(sp);
+    }
+    for(var j = 0; j < s.episodes.length; j++) if(s.episodes[j].still) return capUrl(s.episodes[j].still);
+    return '';
+  }
+  function showBackdropUrl(s){ return capUrl(s.backdrop) || ''; }
+  function movieBackdropUrl(v){ return capUrl(v.backdrop) || stillUrl(v) || ''; }
+
+  // ---- progress
+  function progressOf(v){ return (v && videoProgress[v.id]) || null; }
+  function progressFraction(v){
+    var p = progressOf(v);
+    if(!p) return 0;
+    if(p.watched) return 1;
+    var dur = p.dur || v.duration || 0;
+    return dur ? Math.max(0, Math.min(1, p.pos / dur)) : 0;
+  }
+  function isWatched(v){ var p = progressOf(v); return !!(p && p.watched); }
+  function isInProgress(v){ var p = progressOf(v); return !!(p && !p.watched && p.pos >= 30); }
+  var videoProgressSaveTimer = null;
+  function saveVideoProgressSoon(){
+    if(videoProgressSaveTimer) return;
+    videoProgressSaveTimer = setTimeout(function(){ videoProgressSaveTimer = null; vsave(VIDEO_PROGRESS_KEY, videoProgress); }, 1500);
+  }
+  function setVideoProgress(id, pos, dur){
+    if(!id) return;
+    var p = videoProgress[id] || {};
+    p.pos = Math.max(0, pos || 0);
+    if(dur) p.dur = dur;
+    p.at = Date.now();
+    // Past 90% counts as seen (the credits rarely get watched); going back before that undoes it.
+    var d = p.dur || 0;
+    p.watched = !!(d && p.pos >= d * 0.9);
+    videoProgress[id] = p;
+    saveVideoProgressSoon();
+  }
+  function markVideoWatched(v, watched){
+    var p = videoProgress[v.id] || {};
+    p.watched = !!watched;
+    p.pos = watched ? (p.dur || v.duration || 0) : 0;
+    p.dur = p.dur || v.duration || 0;
+    p.at = Date.now();
+    videoProgress[v.id] = p;
+    vsave(VIDEO_PROGRESS_KEY, videoProgress);
+  }
+
+  // What to watch next in a show: the episode after the last one watched (or the one in
+  // progress, or the first).
+  function nextEpisodeOf(s){
+    var eps = s.episodes, lastIdx = -1, lastAt = 0;
+    for(var i = 0; i < eps.length; i++){
+      var p = progressOf(eps[i]);
+      if(p && p.at > lastAt){ lastAt = p.at; lastIdx = i; }
+    }
+    if(lastIdx === -1) return eps[0] || null;
+    var last = eps[lastIdx];
+    if(!isWatched(last)) return last;
+    for(var j = lastIdx + 1; j < eps.length; j++) if(!isWatched(eps[j])) return eps[j];
+    return null;
+  }
+  // Continue Watching: part-watched videos, and the next episode of a show that was being
+  // watched, newest first.
+  function continueWatchingList(){
+    var lib = vlib(), out = [], seenShow = {};
+    var ids = Object.keys(videoProgress).filter(function(id){ return lib.byId[id]; })
+      .sort(function(a, b){ return (videoProgress[b].at || 0) - (videoProgress[a].at || 0); });
+    ids.forEach(function(id){
+      var v = lib.byId[id];
+      if(v.kind === 'episode'){
+        if(seenShow[v.showKey]) return;
+        seenShow[v.showKey] = true;
+        var n = nextEpisodeOf(lib.showsByKey[v.showKey]);
+        if(n) out.push(n);
+      } else if(isInProgress(v)) out.push(v);
+    });
+    return out.slice(0, 20);
+  }
+
+  // ---- scanning
+  var videoScanBusy = false;
+  function mergeScan(res){
+    var tree = res.treeUri || '';
+    videoFiles = videoFiles.filter(function(f){ return f.tree !== tree; });
+    (res.files || []).forEach(function(f){
+      videoFiles.push({ uri: f.uri, name: f.name, relPath: f.relPath, size: f.size || 0,
+        lastModified: f.lastModified || 0, video: !!f.video, tree: tree });
+    });
+    if(!vsave(VIDEO_FILES_KEY, videoFiles)) setStatus('The video list is too large to keep; some videos may need scanning again.', true);
+    invalidateVideoLib();
+  }
+  function addVideoFolder(){
+    var P = videoPlugin2();
+    if(!P || typeof P.pickVideoFolder !== 'function'){
+      setStatus('Adding a folder of videos works in the Android app.', true);
+      return;
+    }
+    if(videoScanBusy) return;
+    P.pickVideoFolder().then(function(res){
+      if(!res || res.cancelled) return;
+      videoScanBusy = true;
+      var tree = res.treeUri || '';
+      var existing = videoFolders.filter(function(f){ return f.treeUri === tree; })[0];
+      if(!existing) videoFolders.push({ treeUri: tree, name: res.folder || 'Videos', addedAt: Date.now() });
+      vsave(VIDEO_FOLDERS_KEY, videoFolders);
+      mergeScan(res);
+      videoScanBusy = false;
+      var lib = vlib();
+      var tree0 = res.treeUri || '';
+      var n = videoFiles.filter(function(f){ return f.tree === tree0 && f.video && !isSampleOrExtra(f); }).length;
+      setStatus(n ? ('Found ' + n + ' video' + (n === 1 ? '' : 's') + ' in ' + (res.folder || 'that folder') + '.') : ('No videos in ' + (res.folder || 'that folder') + '.'), !n);
+      if(n && videoTab === 'channels'){
+        videoTab = lib.shows.length && !lib.movies.length ? 'shows' : 'movies';
+        vsave(VIDEO_TAB_KEY, videoTab);
+      }
+      if(onVideoView) renderVideoHome();
+      fetchVideoInfoQueue();
+    })['catch'](function(err){
+      videoScanBusy = false;
+      setStatus((err && err.message) || 'That folder could not be read.', true);
+    });
+  }
+  function rescanVideoFolders(){
+    var P = videoPlugin2();
+    if(!P || typeof P.rescanVideoFolder !== 'function' || videoScanBusy || !videoFolders.length) return;
+    videoScanBusy = true;
+    setStatus('Checking your video folders…', false, true);
+    var failed = [];
+    var chain = Promise.resolve();
+    videoFolders.forEach(function(fo){
+      chain = chain.then(function(){
+        return P.rescanVideoFolder({ treeUri: fo.treeUri }).then(mergeScan, function(){ failed.push(fo.name); });
+      });
+    });
+    chain.then(function(){
+      videoScanBusy = false;
+      setStatus(failed.length ? ('Could not open ' + failed.join(', ') + '. Remove it and add it again.') : 'Your videos are up to date.', !!failed.length);
+      if(onVideoView) renderVideoHome();
+      fetchVideoInfoQueue();
+    });
+  }
+  function removeVideoFolder(tree){
+    var fo = videoFolders.filter(function(f){ return f.treeUri === tree; })[0];
+    if(!fo || !window.confirm('Take “' + fo.name + '” out of your videos? The files stay on your phone.')) return;
+    videoFolders = videoFolders.filter(function(f){ return f.treeUri !== tree; });
+    videoFiles = videoFiles.filter(function(f){ return f.tree !== tree; });
+    vsave(VIDEO_FOLDERS_KEY, videoFolders);
+    vsave(VIDEO_FILES_KEY, videoFiles);
+    invalidateVideoLib();
+    var P = videoPlugin2();
+    if(P && typeof P.forgetVideoFolder === 'function') P.forgetVideoFolder({ treeUri: tree })['catch'](function(){});
+    if(onVideoView) renderVideoHome();
+  }
+  // Length, size and a poster still for each video not seen before, two at a time, in the
+  // background; the page catches up as they arrive.
+  var videoInfoRunning = 0, videoInfoRenderTimer = null;
+  function fetchVideoInfoQueue(){
+    var P = videoPlugin2();
+    if(!P || typeof P.videoInfo !== 'function') return;
+    var todo = videoFiles.filter(function(f){ return f.video && !videoInfo[f.uri]; });
+    function next(){
+      if(!todo.length){ return; }
+      var f = todo.shift();
+      videoInfoRunning++;
+      P.videoInfo({ uri: f.uri }).then(function(r){
+        r = r || {};
+        videoInfo[f.uri] = { d: r.duration ? r.duration / 1000 : 0, w: r.width || 0, h: r.height || 0, t: r.thumb || '' };
+      }, function(){
+        videoInfo[f.uri] = { d: 0, w: 0, h: 0, t: '' };
+      }).then(function(){
+        videoInfoRunning--;
+        vsave(VIDEO_INFO_KEY, videoInfo);
+        invalidateVideoLib();
+        if(!videoInfoRenderTimer){
+          videoInfoRenderTimer = setTimeout(function(){
+            videoInfoRenderTimer = null;
+            if(onVideoView && !videoChannelsEditing) rerenderVideoKeepingScroll();
+            else if(onVideoDetailView && videoDetailRerender) rerenderVideoKeepingScroll();
+          }, 1200);
+        }
+        next();
+      });
+    }
+    for(var i = 0; i < 2 && todo.length; i++) next();
+  }
+  function refreshVideoPages(){
+    if(onVideoDetailView && videoDetailRerender) videoDetailRerender();
+    else if(onVideoView && !videoChannelsEditing) rerenderVideoKeepingScroll();
+  }
+  function rerenderVideoKeepingScroll(){
+    var y = window.scrollY;
+    if(onVideoView) renderVideoHome();
+    else if(videoDetailRerender) videoDetailRerender();
+    window.scrollTo(0, y);
+  }
+  setTimeout(fetchVideoInfoQueue, 4000);
+
+  // ---- the Video page: Continue Watching and the tabs
+  function appendVideoTabs(){
+    var tabs = document.createElement('div');
+    tabs.className = 'home-tabs video-tabs';
+    [['channels', 'Channels'], ['movies', 'Movies'], ['shows', 'TV Shows']].forEach(function(t){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'home-tab' + (videoTab === t[0] ? ' active' : '');
+      b.textContent = t[1];
+      b.dataset.vtab = t[0];
+      b.addEventListener('click', function(){
+        if(videoTab === t[0]) return;
+        videoTab = t[0];
+        vsave(VIDEO_TAB_KEY, videoTab);
+        renderVideoHome();
+      });
+      tabs.appendChild(b);
+    });
+    stationsGrid.appendChild(tabs);
+  }
+  function appendContinueWatching(){
+    var list = continueWatchingList();
+    if(!list.length) return;
+    appendGridSection('Continue Watching').classList.add('ch-row-label');
+    var row = document.createElement('div');
+    row.className = 'cl-row vw-row';
+    list.forEach(function(v){ row.appendChild(buildContinueTile(v)); });
+    stationsGrid.appendChild(row);
+  }
+  function progressBar(v){
+    var f = progressFraction(v);
+    if(!f || f >= 1) return null;
+    var bar = document.createElement('div');
+    bar.className = 'v-progress';
+    var fill = document.createElement('span');
+    fill.style.width = Math.round(f * 100) + '%';
+    bar.appendChild(fill);
+    return bar;
+  }
+  function vImg(url){
+    var img = document.createElement('img');
+    img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+    img.onerror = function(){ img.remove(); };
+    img.src = url;
+    return img;
+  }
+  function buildContinueTile(v){
+    var tile = document.createElement('div');
+    tile.className = 'vw-tile';
+    tile.dataset.key = 'video:' + v.id;
+    var art = document.createElement('div');
+    art.className = 'vw-thumb';
+    var url = v.kind === 'episode' ? episodeImageUrl(v) || videoPosterUrl(v) : (movieBackdropUrl(v) || videoPosterUrl(v));
+    if(url) art.appendChild(vImg(url));
+    var bar = progressBar(v);
+    if(bar) art.appendChild(bar);
+    tile.appendChild(art);
+    var n = document.createElement('div');
+    n.className = 'tile-name';
+    n.textContent = v.kind === 'episode' ? v.show : v.title;
+    tile.appendChild(n);
+    var sub = document.createElement('div');
+    sub.className = 'tile-sub';
+    sub.textContent = v.kind === 'episode' ? (episodeCode(v) + (v.epTitle ? ' · ' + v.epTitle : '')) : remainingText(v);
+    tile.appendChild(sub);
+    tile.addEventListener('click', function(){ playVideo(v); });
+    return tile;
+  }
+  function remainingText(v){
+    var p = progressOf(v);
+    var dur = (p && p.dur) || v.duration || 0;
+    if(!p || !dur) return v.year || '';
+    var left = Math.max(0, dur - p.pos);
+    return formatRuntime(left) + ' left';
+  }
+  function sortedVideoItems(tab){
+    var lib = vlib();
+    var list = tab === 'shows' ? lib.shows.slice() : lib.movies.slice();
+    var by = videoSortBy[tab] || 'recent';
+    function name(x){ return String(x.title || '').replace(/^(the|a|an)\s+/i, '').toLowerCase(); }
+    if(by === 'az') list.sort(function(a, b){ return name(a).localeCompare(name(b)); });
+    else list.sort(function(a, b){ return (b.addedAt || 0) - (a.addedAt || 0) || name(a).localeCompare(name(b)); });
+    return list;
+  }
+  function renderVideoLibraryTab(tab){
+    var items = sortedVideoItems(tab);
+    videoReorderHeaderBtnEl.style.display = 'none';
+    videoSortHeaderBtnEl.style.display = items.length > 1 ? '' : 'none';
+    if(!items.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-state v-empty';
+      var none = !videoFolders.length;
+      empty.textContent = none
+        ? 'Add a folder from your phone to watch your own ' + (tab === 'shows' ? 'TV shows' : 'movies') + ' here.'
+        : (tab === 'shows' ? 'No TV shows in your folders. Episodes are found by names like “Show S01E02” or a “Season 1” folder.' : 'No movies in your folders.');
+      stationsGrid.appendChild(empty);
+      var add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'settings-select v-add-folder';
+      add.innerHTML = '<i class="fa-solid fa-plus"></i> Add a Folder';
+      add.addEventListener('click', addVideoFolder);
+      stationsGrid.appendChild(add);
+    } else {
+      items.forEach(function(x){ stationsGrid.appendChild(tab === 'shows' ? buildShowTile(x) : buildMovieTile(x)); });
+    }
+    appendVideoFoldersSection();
+  }
+  function posterTile(key, url, title, sub, onClick){
+    var tile = document.createElement('div');
+    tile.className = 'tile vposter';
+    tile.dataset.key = key;
+    var art = document.createElement('div');
+    art.className = 'tile-art vposter-art';
+    var fallback = document.createElement('div');
+    fallback.className = 'vposter-fallback';
+    fallback.textContent = title;
+    art.appendChild(fallback);
+    if(url){ var img = vImg(url); art.appendChild(img); }
+    tile.appendChild(art);
+    var n = document.createElement('div');
+    n.className = 'tile-name';
+    n.textContent = title;
+    tile.appendChild(n);
+    if(sub){
+      var s = document.createElement('div');
+      s.className = 'tile-sub';
+      s.textContent = sub;
+      tile.appendChild(s);
+    }
+    tile.addEventListener('click', onClick);
+    return { tile: tile, art: art };
+  }
+  function buildMovieTile(v){
+    var t = posterTile('video:' + v.id, videoPosterUrl(v), v.title, [v.year, formatRuntime(v.duration)].filter(Boolean).join(' · '),
+      function(){ pushView(); openVideoMovie(v.id); });
+    if(currentStation && isLocalVideo(currentStation) && currentStation.id === v.id) t.tile.classList.add('playing');
+    var bar = progressBar(v);
+    if(bar) t.art.appendChild(bar);
+    if(isWatched(v)) t.art.appendChild(watchedBadge());
+    return t.tile;
+  }
+  function buildShowTile(s){
+    var seasons = s.seasons.length;
+    var sub = seasons > 1 ? (seasons + ' seasons') : (s.episodes.length + ' episode' + (s.episodes.length === 1 ? '' : 's'));
+    var t = posterTile('vshow:' + s.key, showPosterUrl(s), s.title, sub, function(){ pushView(); openVideoShow(s.key); });
+    if(s.episodes.every(isWatched)) t.art.appendChild(watchedBadge());
+    return t.tile;
+  }
+  function watchedBadge(){
+    var b = document.createElement('span');
+    b.className = 'v-watched';
+    b.title = 'Watched';
+    b.innerHTML = '<i class="fa-solid fa-check"></i>';
+    return b;
+  }
+  function appendVideoFoldersSection(){
+    if(!videoFolders.length) return;
+    appendGridSection('Folders').classList.add('ch-row-label', 'v-folders-label');
+    videoFolders.forEach(function(fo){
+      var row = document.createElement('div');
+      row.className = 'v-folder-row';
+      var name = document.createElement('div');
+      name.className = 'v-folder-name';
+      name.textContent = fo.name;
+      row.appendChild(name);
+      var rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'row-more-btn v-folder-remove';
+      rm.title = 'Remove folder';
+      rm.setAttribute('aria-label', 'Remove ' + fo.name);
+      rm.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      rm.addEventListener('click', function(e){ e.stopPropagation(); removeVideoFolder(fo.treeUri); });
+      row.appendChild(rm);
+      stationsGrid.appendChild(row);
+    });
+    var actions = document.createElement('div');
+    actions.className = 'v-folder-actions';
+    var again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'settings-select';
+    again.textContent = 'Scan Again';
+    again.addEventListener('click', rescanVideoFolders);
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'settings-select';
+    add.textContent = 'Add a Folder';
+    add.addEventListener('click', addVideoFolder);
+    actions.appendChild(again);
+    actions.appendChild(add);
+    stationsGrid.appendChild(actions);
+  }
+
+  // ---- detail pages
+  var videoDetailRerender = null;
+  function enterVideoDetail(title){
+    enterLibraryChrome();
+    onVideoDetailView = true;
+    setDetailBackToHistory(function(){ openVideoHome(); }, 'Video');
+    // The title is in the page itself, beside the poster.
+    stationsHeading.textContent = '';
+    document.body.classList.add('vdetail-open');
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    resetStationsGrid();
+  }
+  function vButton(label, cls, onClick){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.innerHTML = label;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function detailHero(backdropUrl, posterUrl, title, metaBits, overview){
+    var hero = document.createElement('div');
+    hero.className = 'vd-hero';
+    var bd = document.createElement('div');
+    bd.className = 'vd-backdrop';
+    if(backdropUrl) bd.appendChild(vImg(backdropUrl));
+    hero.appendChild(bd);
+    var row = document.createElement('div');
+    row.className = 'vd-head';
+    var poster = document.createElement('div');
+    poster.className = 'vd-poster';
+    var fb = document.createElement('div');
+    fb.className = 'vposter-fallback';
+    fb.textContent = title;
+    poster.appendChild(fb);
+    if(posterUrl) poster.appendChild(vImg(posterUrl));
+    row.appendChild(poster);
+    var text = document.createElement('div');
+    text.className = 'vd-text';
+    var h = document.createElement('div');
+    h.className = 'vd-title';
+    h.textContent = title;
+    text.appendChild(h);
+    if(metaBits.length){
+      var m = document.createElement('div');
+      m.className = 'vd-meta';
+      m.textContent = metaBits.join(' · ');
+      text.appendChild(m);
+    }
+    row.appendChild(text);
+    hero.appendChild(row);
+    return { hero: hero, text: text, poster: poster };
+  }
+  function openVideoMovie(id){
+    var v = vlib().byId[id];
+    if(!v){ openVideoHome(); return; }
+    enterVideoDetail(v.title);
+    videoDetailRerender = function(){ var y = window.scrollY; openVideoMovie(id); window.scrollTo(0, y); };
+    var h = detailHero(movieBackdropUrl(v), videoPosterUrl(v), v.title,
+      [v.year, formatRuntime(v.duration), videoQuality(v)].filter(Boolean));
+    var wrap = document.createElement('div');
+    wrap.className = 'vd-wrap';
+    wrap.appendChild(h.hero);
+    var actions = document.createElement('div');
+    actions.className = 'vd-actions';
+    var resume = isInProgress(v);
+    actions.appendChild(vButton('<i class="fa-solid fa-play"></i><span>' + (resume ? 'Resume' : 'Play') + '</span>', 'vd-play', function(){ playVideo(v); }));
+    if(resume) actions.appendChild(vButton('<span>Start Over</span>', 'vd-secondary', function(){ playVideo(v, { fromStart: true }); }));
+    actions.appendChild(buildVideoMoreBtn(v, 'movie'));
+    wrap.appendChild(actions);
+    var bar = progressBar(v);
+    if(bar){
+      var pw = document.createElement('div');
+      pw.className = 'vd-progress';
+      pw.appendChild(bar);
+      var left = document.createElement('span');
+      left.className = 'vd-left';
+      left.textContent = remainingText(v);
+      pw.appendChild(left);
+      wrap.appendChild(pw);
+    } else if(isWatched(v)){
+      var w = document.createElement('div');
+      w.className = 'vd-watched';
+      w.innerHTML = '<i class="fa-solid fa-check"></i> Watched';
+      wrap.appendChild(w);
+    }
+    var file = document.createElement('div');
+    file.className = 'vd-file';
+    file.textContent = v.relPath || v.fileName;
+    wrap.appendChild(file);
+    stationsGrid.appendChild(wrap);
+  }
+  var videoShowSeason = {};
+  function openVideoShow(key){
+    var s = vlib().showsByKey[key];
+    if(!s){ openVideoHome(); return; }
+    enterVideoDetail(s.title);
+    videoDetailRerender = function(){ var y = window.scrollY; openVideoShow(key); window.scrollTo(0, y); };
+    var eps = s.episodes;
+    var seasons = s.seasons;
+    var next = nextEpisodeOf(s);
+    var season = videoShowSeason[key] != null && seasons.indexOf(videoShowSeason[key]) !== -1 ? videoShowSeason[key] : (next ? next.season : seasons[0]);
+    var runtime = 0, n = 0;
+    eps.forEach(function(e){ if(e.duration){ runtime += e.duration; n++; } });
+    var meta = [seasons.length > 1 ? seasons.length + ' seasons' : 'Season ' + seasons[0], eps.length + ' episode' + (eps.length === 1 ? '' : 's')];
+    var h = detailHero(showBackdropUrl(s) || (eps[0] && stillUrl(eps[0])), showPosterUrl(s), s.title, meta);
+    var wrap = document.createElement('div');
+    wrap.className = 'vd-wrap';
+    wrap.appendChild(h.hero);
+    var actions = document.createElement('div');
+    actions.className = 'vd-actions';
+    if(next){
+      var started = isInProgress(next);
+      actions.appendChild(vButton('<i class="fa-solid fa-play"></i><span>' + (started ? 'Resume ' : (next === eps[0] && !progressOf(next) ? 'Play ' : 'Next: ')) + episodeCode(next) + '</span>', 'vd-play', function(){ playVideo(next); }));
+    } else {
+      actions.appendChild(vButton('<i class="fa-solid fa-play"></i><span>Play from the Start</span>', 'vd-play', function(){ playVideo(eps[0], { fromStart: true }); }));
+    }
+    actions.appendChild(buildVideoMoreBtn(s, 'show'));
+    wrap.appendChild(actions);
+    stationsGrid.appendChild(wrap);
+    if(seasons.length > 1){
+      var tabs = document.createElement('div');
+      tabs.className = 'home-tabs video-tabs vd-seasons';
+      seasons.forEach(function(sn){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'home-tab' + (sn === season ? ' active' : '');
+        b.textContent = sn ? 'Season ' + sn : 'Specials';
+        b.addEventListener('click', function(){ videoShowSeason[key] = sn; videoDetailRerender(); });
+        tabs.appendChild(b);
+      });
+      stationsGrid.appendChild(tabs);
+    } else {
+      appendGridSection(season ? 'Season ' + season : 'Episodes').classList.add('ch-row-label');
+    }
+    eps.filter(function(e){ return e.season === season; }).forEach(function(e){ stationsGrid.appendChild(buildEpisodeRow(e)); });
+  }
+  function buildEpisodeRow(e){
+    var row = document.createElement('div');
+    row.className = 'vep-row';
+    row.dataset.key = 'video:' + e.id;
+    if(currentStation && isLocalVideo(currentStation) && currentStation.id === e.id) row.classList.add('playing');
+    var th = document.createElement('div');
+    th.className = 'vep-thumb';
+    var url = episodeImageUrl(e);
+    if(url) th.appendChild(vImg(url));
+    var bar = progressBar(e);
+    if(bar) th.appendChild(bar);
+    row.appendChild(th);
+    var text = document.createElement('div');
+    text.className = 'vep-text';
+    var t = document.createElement('div');
+    t.className = 'vep-title';
+    t.textContent = e.episode + '. ' + (e.epTitle || ('Episode ' + e.episode));
+    text.appendChild(t);
+    var sub = document.createElement('div');
+    sub.className = 'vep-sub';
+    var bits = [];
+    if(isWatched(e)) bits.push('✓ Watched');
+    else if(isInProgress(e)) bits.push(remainingText(e));
+    else if(e.duration) bits.push(formatRuntime(e.duration));
+    sub.textContent = bits.join(' · ');
+    text.appendChild(sub);
+    row.appendChild(text);
+    row.appendChild(buildVideoMoreBtn(e, 'episode'));
+    row.addEventListener('click', function(){ playVideo(e); });
+    return row;
+  }
+
+  // ---- fixing what the names got wrong: one menu per title
+  var videoMenu = null;
+  function closeVideoMenu(){ if(videoMenu){ videoMenu.remove(); videoMenu = null; } }
+  document.addEventListener('click', function(e){ if(videoMenu && !videoMenu.contains(e.target)) closeVideoMenu(); });
+  window.addEventListener('scroll', closeVideoMenu, { passive: true });
+  function buildVideoMoreBtn(x, what){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'row-more-btn vd-more';
+    b.title = 'More';
+    b.setAttribute('aria-label', 'More');
+    b.setAttribute('aria-haspopup', 'true');
+    b.innerHTML = '<span class="icon-ellipsis-v" aria-hidden="true"></span>';
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(videoMenu){ closeVideoMenu(); return; }
+      openVideoMenu(b, x, what);
+    });
+    return b;
+  }
+  function openVideoMenu(anchor, x, what){
+    closeVideoMenu();
+    var m = document.createElement('div');
+    m.className = 'ch-sort-menu v-menu';
+    m.setAttribute('role', 'menu');
+    function item(label, fn){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'np-menu-item';
+      b.setAttribute('role', 'menuitem');
+      b.textContent = label;
+      b.addEventListener('click', function(e){ e.stopPropagation(); closeVideoMenu(); fn(); });
+      m.appendChild(b);
+    }
+    function refresh(){ invalidateVideoLib(); if(videoDetailRerender) videoDetailRerender(); }
+    if(what === 'show'){
+      item('Mark All Watched', function(){ x.episodes.forEach(function(e){ markVideoWatched(e, true); }); refresh(); });
+      item('Mark All Unwatched', function(){ x.episodes.forEach(function(e){ markVideoWatched(e, false); }); refresh(); });
+      item('Rename Show', function(){
+        var t = window.prompt('Show name', x.title);
+        if(t == null || !t.trim()) return;
+        var ed = videoEdits['show:' + x.key] || {};
+        ed.title = t.trim();
+        videoEdits['show:' + x.key] = ed;
+        vsave(VIDEO_EDITS_KEY, videoEdits);
+        refresh();
+      });
+      item('Change Poster', function(){
+        openArtUrlDialogFor({ key: 'vshow:' + x.key, title: 'Poster', refresh: refresh });
+      });
+    } else {
+      item(isWatched(x) ? 'Mark Unwatched' : 'Mark Watched', function(){ markVideoWatched(x, !isWatched(x)); refresh(); });
+      item(what === 'movie' ? 'Rename' : 'Rename Episode', function(){
+        var t = window.prompt(what === 'movie' ? 'Movie title' : 'Episode title', what === 'movie' ? x.title : (x.epTitle || ''));
+        if(t == null) return;
+        var ed = videoEdits[x.id] || {};
+        ed.title = t.trim();
+        videoEdits[x.id] = ed;
+        vsave(VIDEO_EDITS_KEY, videoEdits);
+        refresh();
+      });
+      if(what === 'movie'){
+        item('This Is a TV Episode', function(){
+          var show = window.prompt('Which show is it from?', '');
+          if(show == null || !show.trim()) return;
+          var se = window.prompt('Season and episode (for example 1 2)', '1 1');
+          var nums = String(se || '').match(/\d+/g) || [];
+          var ed = videoEdits[x.id] || {};
+          ed.kind = 'episode'; ed.show = show.trim();
+          ed.season = parseInt(nums[0] || '1', 10); ed.episode = parseInt(nums[1] || '1', 10);
+          delete ed.title;
+          videoEdits[x.id] = ed;
+          vsave(VIDEO_EDITS_KEY, videoEdits);
+          invalidateVideoLib();
+          goBack();
+        });
+      } else {
+        item('This Is a Movie', function(){
+          var ed = videoEdits[x.id] || {};
+          ed.kind = 'movie';
+          delete ed.show; delete ed.season; delete ed.episode;
+          videoEdits[x.id] = ed;
+          vsave(VIDEO_EDITS_KEY, videoEdits);
+          refresh();
+        });
+      }
+      item(what === 'movie' ? 'Change Poster' : 'Change Picture', function(){
+        openArtUrlDialogFor({ key: 'video:' + x.id, title: what === 'movie' ? 'Poster' : 'Episode Picture', refresh: refresh });
+      });
+    }
+    document.body.appendChild(m);
+    var r = anchor.getBoundingClientRect();
+    var top = r.bottom + 6;
+    m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+    m.style.top = Math.round(top) + 'px';
+    var mr = m.getBoundingClientRect();
+    if(mr.bottom > window.innerHeight - 10) m.style.top = Math.max(8, Math.round(r.top - mr.height - 6)) + 'px';
+    videoMenu = m;
+  }
+
+  // ---- playing
+  function videoToTrack(v){
+    var t = { type: 'video', id: v.id, uri: v.uri, videoKind: v.kind, favicon: videoPosterUrl(v), duration: v.duration || 0 };
+    if(v.kind === 'episode'){
+      t.name = v.show;
+      t.show = v.show; t.showKey = v.showKey; t.season = v.season; t.episode = v.episode; t.epTitle = v.epTitle;
+    } else {
+      t.name = v.title; t.year = v.year;
+    }
+    return t;
+  }
+  function playVideo(v, opts){
+    if(!v) return;
+    if(opts && opts.fromStart) setVideoProgress(v.id, 0, v.duration);
+    var t = videoToTrack(v);
+    playStation(t);
+    openNowPlaying(t, true);
+  }
+  function playLocalVideo(t){
+    if(!isQueueCurrent(t)) clearQueue();
+    currentStation = t;
+    attemptInProgress = true;
+    updatePlayerMeta(t, 'Loading…');
+    document.querySelectorAll('.tile, .row-item, .vep-row').forEach(function(el){
+      el.classList.toggle('playing', el.dataset.key === favKey(t));
+    });
+    function stillWanted(){ return currentStation === t; }
+    tryPlayUrl(t.uri).then(function(){
+      if(!stillWanted()) return;
+      var p = videoProgress[t.id];
+      if(p && !p.watched && p.pos > 5){
+        var at = p.pos;
+        var seek = function(){ try{ audio.currentTime = at; }catch(e){} audio.removeEventListener('loadedmetadata', seek); };
+        if(audio.readyState >= 1) seek(); else audio.addEventListener('loadedmetadata', seek);
+      }
+      onPlaybackSuccess(t);
+    })['catch'](function(err){
+      if(!stillWanted()) return;
+      attemptInProgress = false;
+      showPlaybackFailure(t, t.uri, err);
+    });
+  }
+  function subtitleForVideo(t){
+    if(t.videoKind === 'episode') return episodeCode(t) + (t.epTitle ? ' · ' + t.epTitle : '');
+    return [t.year, formatRuntime(t.duration)].filter(Boolean).join(' · ') || 'Movie';
+  }
+  // Where you are, every few seconds while it plays, and on pause / end.
+  var lastVideoSave = 0;
+  function noteVideoPosition(force){
+    var t = currentStation;
+    if(!t || !isLocalVideo(t) || attemptInProgress) return;
+    var now = Date.now();
+    if(!force && now - lastVideoSave < 4000) return;
+    lastVideoSave = now;
+    var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
+    var pos = audio.currentTime || 0;
+    if(!pos && !force) return;
+    setVideoProgress(t.id, pos, dur);
+  }
+  audio.addEventListener('timeupdate', function(){ noteVideoPosition(false); });
+  audio.addEventListener('pause', function(){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); });
+  window.addEventListener('pagehide', function(){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); });
+  document.addEventListener('visibilitychange', function(){ if(document.hidden){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); } });
+  function onLocalVideoEnded(){
+    var t = currentStation;
+    var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
+    setVideoProgress(t.id, dur, dur);
+    vsave(VIDEO_PROGRESS_KEY, videoProgress);
+    if(typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
+    setPlayingUI(false);
+    syncSeekBar();
+    updateMediaSessionState();
+  }
+  // The list under a video's controls on Now Playing: the rest of the season for an episode,
+  // other movies for a movie.
+  function renderNpVideoList(t){
+    npCollectionGrid.innerHTML = '';
+    npCollectionGrid.classList.remove('grid-songs');
+    npCollectionGrid.classList.add('np-ch-list');
+    var lib = vlib(), list = [], heading = '';
+    if(t.videoKind === 'episode'){
+      var s = lib.showsByKey[t.showKey];
+      if(s){
+        list = s.episodes.filter(function(e){ return e.season === t.season; });
+        heading = s.seasons.length > 1 ? 'Season ' + t.season : 'Episodes';
+      }
+    } else {
+      list = sortedVideoItems('movies').filter(function(m){ return m.id !== t.id; });
+      heading = 'More Movies';
+    }
+    if(!list.length){ npCollection.style.display = 'none'; return; }
+    npCollection.style.display = '';
+    npCollectionHeading.textContent = heading;
+    list.forEach(function(v){
+      var row = v.kind === 'episode' ? buildEpisodeRow(v) : buildNpMovieRow(v);
+      npCollectionGrid.appendChild(row);
+    });
+  }
+  function buildNpMovieRow(v){
+    var row = document.createElement('div');
+    row.className = 'vep-row vep-movie';
+    row.dataset.key = 'video:' + v.id;
+    var th = document.createElement('div');
+    th.className = 'vep-thumb vep-poster';
+    var url = videoPosterUrl(v);
+    if(url) th.appendChild(vImg(url));
+    var bar = progressBar(v);
+    if(bar) th.appendChild(bar);
+    row.appendChild(th);
+    var text = document.createElement('div');
+    text.className = 'vep-text';
+    var tt = document.createElement('div');
+    tt.className = 'vep-title';
+    tt.textContent = v.title;
+    text.appendChild(tt);
+    var sub = document.createElement('div');
+    sub.className = 'vep-sub';
+    sub.textContent = [v.year, isWatched(v) ? '✓ Watched' : (isInProgress(v) ? remainingText(v) : formatRuntime(v.duration))].filter(Boolean).join(' · ');
+    text.appendChild(sub);
+    row.appendChild(text);
+    row.addEventListener('click', function(){ playVideo(v); });
+    return row;
+  }
+  // Backup: the folders' names, fixes and where you are in each video (the files stay on the
+  // phone; a restored folder list is a reminder to add those folders again).
+  function exportVideoLibrary(){
+    return { folders: videoFolders.map(function(f){ return { name: f.name }; }), edits: videoEdits, progress: videoProgress };
+  }
+  function importVideoLibrary(data){
+    if(!data || typeof data !== 'object') return 0;
+    var n = 0;
+    if(data.edits && typeof data.edits === 'object'){
+      Object.keys(data.edits).forEach(function(k){ if(!videoEdits[k]){ videoEdits[k] = data.edits[k]; n++; } });
+      vsave(VIDEO_EDITS_KEY, videoEdits);
+    }
+    if(data.progress && typeof data.progress === 'object'){
+      Object.keys(data.progress).forEach(function(k){
+        var a = videoProgress[k], b = data.progress[k];
+        if(!a || (b && b.at > a.at)){ videoProgress[k] = b; n++; }
+      });
+      vsave(VIDEO_PROGRESS_KEY, videoProgress);
+    }
+    invalidateVideoLib();
     return n;
   }
 
@@ -11598,7 +12778,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A playlist is Playlists' own item, so its back button always returns there -- same
@@ -12195,7 +13375,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A true back button: it returns to wherever the search was opened from (Home's For You
@@ -14718,26 +15898,32 @@
   var seekDragging = false;
   function npSeekApplies(){
     var st = npTarget();
-    return !!(st && (isLocalTrack(st) || isPodcastTrack(st)));
+    return !!(st && (isLocalTrack(st) || isPodcastTrack(st) || isLocalVideo(st)));
   }
   // Skip back/forward live inside .np-controls now, immediately either side of Play (see the
   // HTML), the same slot Previous/Next occupy for a local track -- so, like those, each is
   // shown or hidden individually rather than through a wrapping container.
   function syncNpPodcastControls(){
     var st = npTarget();
-    var show = !!(st && isPodcastTrack(st));
+    var show = !!(st && (isPodcastTrack(st) || isLocalVideo(st)));
     npSkipBackBtn.style.display = show ? '' : 'none';
     npSkipFwdBtn.style.display = show ? '' : 'none';
+    // A video skips 10 seconds either way; a podcast back 15, forward 30.
+    var vid = isLocalVideo(st);
+    npSkipBackBtn.title = vid ? 'Back 10 seconds' : 'Back 15 seconds';
+    npSkipFwdBtn.title = vid ? 'Forward 10 seconds' : 'Forward 30 seconds';
+    npSkipBackBtn.setAttribute('aria-label', npSkipBackBtn.title);
+    npSkipFwdBtn.setAttribute('aria-label', npSkipFwdBtn.title);
   }
   npSkipBackBtn.addEventListener('click', function(){
     if(!npIsCurrent()) return;
-    try{ audio.currentTime = Math.max(0, (audio.currentTime || 0) - 15); }catch(e){}
+    try{ audio.currentTime = Math.max(0, (audio.currentTime || 0) - (isLocalVideo(npTarget()) ? 10 : 15)); }catch(e){}
     syncSeekBar();
   });
   npSkipFwdBtn.addEventListener('click', function(){
     if(!npIsCurrent()) return;
     var dur = isFinite(audio.duration) ? audio.duration : Infinity;
-    try{ audio.currentTime = Math.min(dur, (audio.currentTime || 0) + 30); }catch(e){}
+    try{ audio.currentTime = Math.min(dur, (audio.currentTime || 0) + (isLocalVideo(npTarget()) ? 10 : 30)); }catch(e){}
     syncSeekBar();
   });
   // Paints the played part of the bar white (see "Now Playing: filled progress").
@@ -14796,6 +15982,7 @@
   // A local track runs out; a stream never does. Stopping cleanly beats leaving the UI
   // showing a paused track at its own end. A real next/previous queue is Phase 3.
   audio.addEventListener('ended', function(){
+    if(currentStation && isLocalVideo(currentStation)){ onLocalVideoEnded(); return; }
     if(currentStation && isPodcastTrack(currentStation)){
       savePodcastProgress(currentStation, audio.duration || currentStation.duration || 0, audio.duration || currentStation.duration || 0);
       // Whatever the listener lined up plays next; with nothing lined up an episode just ends.
@@ -16000,7 +17187,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     onHomeView = false;
@@ -17536,6 +18723,7 @@
 
   function renderNpSub(st){
     npSub.innerHTML = '';
+    if(isLocalVideo(st)){ npSub.classList.remove('np-sub-linked'); npSub.textContent = subtitleForVideo(st); return; }
     npSub.classList.toggle('np-sub-linked', isLocalTrack(st));
     // A podcast episode's subtitle names the show it belongs to -- the same way in as an
     // artist link below, so the show is reachable without leaving Now Playing to hunt for it
@@ -17755,7 +18943,7 @@
   function syncNpStepVisibility(){
     var st = npTarget();
     var local = isLocalTrack(st);
-    var stream = !!st && !local && !isPodcastTrack(st);
+    var stream = !!st && !local && !isPodcastTrack(st) && !isLocalVideo(st);
     // The two always come as a pair so Play stays centred in the row: a station showing
     // Next for its Up Next gets a Previous beside it too, disabled (see updateStepButtons).
     var showSteps = local || (stream && npIsCurrent() && (upNext.length || isQueueCurrent(st)
@@ -18792,7 +19980,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -18857,7 +20045,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -19284,7 +20472,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false;
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A genre's station list is Genres' own category, so its back button always returns
@@ -19440,7 +20628,7 @@
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
-    if(onVideoView || onAddChannelsView) return 'video';
+    if(onVideoView || onAddChannelsView || onVideoDetailView) return 'video';
     // For You (and its searches) lives on Home now.
     if(onHomeView || activeHomeSection || onStationsHomeView || activeCustomSearchId) return 'home';
     return null;
@@ -20041,6 +21229,7 @@
       podcastSubscriptions: podcastSubs,
       podcastCategories: podcastCategories,
       videoChannels: videoChannels,
+      videoLibrary: exportVideoLibrary(),
       exportedAt: new Date().toISOString()
     };
     var text = JSON.stringify(payload, null, 2);
@@ -20182,6 +21371,7 @@
         });
         if(searchAdded) saveCustomSearches();
         var channelsAdded = importVideoChannels(data.videoChannels);
+        importVideoLibrary(data.videoLibrary);
 
         // Playlists are matched by name (case-insensitive): a name that doesn't exist here
         // yet is created outright with its imported stations, while a name that already
@@ -20410,6 +21600,7 @@
     if(reconnectState && reconnectState.station !== track) cancelReconnect();
     if(isLocalTrack(track)) return playLocalTrack(track);
     if(isPodcastTrack(track)) return playPodcastEpisode(track);
+    if(isLocalVideo(track)) return playLocalVideo(track);
     return playStreamStation(track);
   }
 
@@ -20491,6 +21682,8 @@
     }
     updatePlayerMeta(station, barSubFor(station));
     setPlayingUI(true);
+    // A video of your own goes to Continue Watching on the Video page, not Continue Listening.
+    if(isLocalVideo(station)) return;
     recordArtistPlay(station);
     recordRecent(station);
   }
@@ -20505,7 +21698,7 @@
   var reconnectState = null;   // { station, attempt, timer, waitingForNetwork }
   var streamGaveUp = false;    // the attempts ran out; Play starts the station again
   var stallTimer = null;
-  function isLiveStream(t){ return !!t && !isLocalTrack(t) && !isPodcastTrack(t); }
+  function isLiveStream(t){ return !!t && !isLocalTrack(t) && !isPodcastTrack(t) && t.type !== 'video'; }
   function cancelReconnect(){
     if(reconnectState && reconnectState.timer) clearTimeout(reconnectState.timer);
     reconnectState = null;
@@ -20686,6 +21879,7 @@
     return station && station.country ? displayCountry(station.country) : '';
   }
   function subtitleFor(station){
+    if(isLocalVideo(station)) return subtitleForVideo(station);
     if(isLocalTrack(station)) return subtitleForLocal(station);
     if(isPodcastTrack(station)) return subtitleForPodcast(station);
     var bits = [];
