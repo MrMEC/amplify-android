@@ -32,7 +32,12 @@ async def wiki_route(r):
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(u).query)
         pages = []
         if 'gsrsearch' in qs: pages = SEARCH.get(qs['gsrsearch'][0], [])
-        elif 'titles' in qs: pages = [TITLES[qs['titles'][0]]] if qs['titles'][0] in TITLES else []
+        elif 'titles' in qs:
+            tt = qs['titles'][0]
+            pages = [TITLES[tt]] if tt in TITLES else [p for lst in SEARCH.values() for p in lst if p['title'] == tt][:1]
+        # Like the real API: posters (non-free images) only come back with pilicense=any.
+        if qs.get('pilicense', [''])[0] != 'any':
+            pages = [{k: v for k, v in p.items() if k != 'thumbnail'} for p in pages]
         body = {'query': {'pages': {str(p['pageid']): p for p in pages}}} if pages else {}
         return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps(body))
     if 'upload.wikimedia.org/' in u:
@@ -45,6 +50,8 @@ async def main():
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
         await ctx.add_init_script(MOCK)
         await ctx.add_init_script(EXT)
+        # A show matched by the last build, saved without its poster.
+        await ctx.add_init_script("if(!localStorage.getItem('radioPlayerVideoWiki')) localStorage.setItem('radioPlayerVideoWiki', JSON.stringify({'show:friends':{ok:true,title:'Friends',desc:'American television sitcom',extract:'Old text.',poster:'',url:'https://en.wikipedia.org/wiki/Friends',at:1}}))")
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e) + ' @ ' + (e.stack or '')[:300]))
         await pg.route('**/*', wiki_route)
         await pg.goto('http://127.0.0.1:8782/index.html'); await pg.wait_for_timeout(2500)
@@ -62,7 +69,7 @@ async def main():
         a = rec('Arrival')
         check(a and a.get('ok') and a['title'] == 'Arrival (film)', f'Arrival: the film, not the album {a and a.get("title")}')
         fr = rec('show:friends')
-        check(fr and fr.get('ok') and fr['title'] == 'Friends', f'Friends: the sitcom, not the song {fr and fr.get("title")}')
+        check(fr and fr.get('ok') and fr['title'] == 'Friends' and 'wiki-friends' in (fr.get('poster') or ''), f'Friends, matched before without a poster, now has its poster {fr}')
         imgs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){var i=t.querySelector('img');return t.querySelector('.tile-name').textContent+'='+(i?i.getAttribute('src'):'');})")
         check(any(x.startswith('The Matrix=') and 'wiki-matrix' in x for x in imgs) and any(x.startswith('Inception=/c/inception-poster') for x in imgs),
               f'posters: Wikipedia for The Matrix, the folder poster still wins for Inception {imgs}')
@@ -74,9 +81,14 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/vwiki-shows.png')
         # description on the show page
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){return t.querySelector('.tile-name').textContent==='The Office';}).click()"); await pg.wait_for_timeout(500)
-        ov = await pg.evaluate("[document.querySelector('.vd-overview-text') && document.querySelector('.vd-overview-text').textContent, document.querySelector('.vd-overview a') && document.querySelector('.vd-overview a').getAttribute('href')]")
-        check(ov[0] and ov[0].startswith('The Office is') and 'wikipedia.org/wiki/The_Office' in (ov[1] or ''), f'show page: description with a Wikipedia link {ov}')
+        ov = await pg.evaluate("[document.querySelector('.vd-overview-text') && document.querySelector('.vd-overview-text').textContent, !!document.querySelector('.vd-overview-more'), getComputedStyle(document.querySelector('.vd-overview-text')).webkitLineClamp]")
+        check(ov[0] and ov[0].startswith('The Office is') and ov[1] and ov[2] == '5', f'show page: a short preview (5 lines) with More {ov}')
         await pg.screenshot(path=f'{SHOTS}/vwiki-show.png')
+        await pg.evaluate("document.querySelector('.vd-overview-more').click()"); await pg.wait_for_timeout(600)
+        md = await pg.evaluate("[document.getElementById('artistBioOverlay').classList.contains('open'), document.getElementById('artistBioName').textContent, document.getElementById('artistBioText').textContent, document.getElementById('artistBioCredit').getAttribute('href'), !!document.querySelector('#artistBioAvatar img')]")
+        check(md[0] and md[1] == 'The Office' and md[2].startswith('The Office is') and 'The_Office' in (md[3] or '') and md[4], f'More opens the description in the modal, with poster and Wikipedia link {md}')
+        await pg.screenshot(path=f'{SHOTS}/vwiki-modal.png')
+        await pg.evaluate("document.getElementById('artistBioCloseBtn').click()"); await pg.wait_for_timeout(300)
         await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(400)
         # fix a movie's info with the picker
         await pg.evaluate("document.querySelector('.video-tabs [data-vtab=movies]').click()"); await pg.wait_for_timeout(300)

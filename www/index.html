@@ -2932,8 +2932,9 @@
   .vd-watched{ margin-top:16px; font-size:13px; font-weight:700; color:var(--accent); display:flex; gap:7px; align-items:center; }
   .vd-file{ margin-top:18px; font-size:12px; color:var(--text-faint); overflow-wrap:anywhere; }
   .vd-overview{ margin-top:18px; }
-  .vd-overview-text{ font-size:14px; line-height:1.55; color:var(--text-dim); white-space:pre-line; }
-  .vd-overview .artist-bio-credit{ margin-top:8px; }
+  .vd-overview .vd-overview-text{ margin:0 0 6px; text-align:left; }
+  .artist-bio-avatar.vbio-poster{ border-radius:8px; aspect-ratio:2/3; height:auto; overflow:hidden; }
+  .artist-bio-avatar.vbio-poster img{ width:100%; height:100%; object-fit:cover; display:block; }
   /* Episode rows (a show's page, and the list under a video on Now Playing). */
   .tile-grid > .vep-row, .np-related-grid .vep-row{ grid-column:1/-1; }
   .vep-row{
@@ -11704,7 +11705,7 @@
   }
   function vImg(url){
     var img = document.createElement('img');
-    img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+    img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
     img.onerror = function(){ img.remove(); };
     img.src = url;
     return img;
@@ -11947,7 +11948,7 @@
       w.innerHTML = '<i class="fa-solid fa-check"></i> Watched';
       wrap.appendChild(w);
     }
-    var ov = wikiOverview(wikiRecord(v, 'movie'));
+    var ov = wikiOverview(wikiRecord(v, 'movie'), v.title, videoPosterUrl(v));
     if(ov) wrap.appendChild(ov);
     var file = document.createElement('div');
     file.className = 'vd-file';
@@ -11982,7 +11983,7 @@
     }
     actions.appendChild(buildVideoMoreBtn(s, 'show'));
     wrap.appendChild(actions);
-    var sov = wikiOverview(wikiRecord(s, 'show'));
+    var sov = wikiOverview(wikiRecord(s, 'show'), s.title, showPosterUrl(s));
     if(sov) wrap.appendChild(sov);
     stationsGrid.appendChild(wrap);
     if(seasons.length > 1){
@@ -12439,10 +12440,13 @@
   }
   function pageToRecord(p){
     var img = (p.thumbnail && p.thumbnail.source) || (p.original && p.original.source) || '';
-    return { ok: true, title: p.title, desc: p.description || '', extract: firstParagraphs(p.extract),
+    return { ok: true, v: VIDEO_WIKI_VERSION, title: p.title, desc: p.description || '', extract: firstParagraphs(p.extract),
       poster: img, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(String(p.title).replace(/ /g, '_')), at: Date.now() };
   }
-  var WIKI_PAGE_PROPS = '&prop=pageimages%7Cdescription%7Cextracts&piprop=thumbnail%7Coriginal&pithumbsize=600&exintro=1&explaintext=1&exlimit=10&redirects=1';
+  // pilicense=any: a film or show's poster is almost always a non-free image, which the API
+  // leaves out unless asked for.
+  var WIKI_PAGE_PROPS = '&prop=pageimages%7Cdescription%7Cextracts&piprop=thumbnail%7Coriginal&pithumbsize=600&pilicense=any&exintro=1&explaintext=1&exlimit=10&redirects=1';
+  var VIDEO_WIKI_VERSION = 2;
   function findVideoWiki(t){
     var q = t.kind === 'show' ? (t.title + ' TV series') : (t.title + (t.year ? ' ' + t.year : '') + ' film');
     var url = WIKI_API + '?action=query&format=json&origin=*&generator=search&gsrlimit=8' + WIKI_PAGE_PROPS + '&gsrsearch=' + encodeURIComponent(q);
@@ -12473,8 +12477,21 @@
     vsave(VIDEO_WIKI_KEY, videoWiki);
     afterVideoWikiChange();
   }
+  function refreshVideoWikiArticle(t, old){
+    var url = WIKI_API + '?action=query&format=json&origin=*' + WIKI_PAGE_PROPS + '&titles=' + encodeURIComponent(old.title);
+    return wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(data){
+      var pages = (data && data.query && data.query.pages) || {};
+      var p = pages[Object.keys(pages)[0]];
+      if(!p || p.missing != null) return null;
+      var rec = pageToRecord(p);
+      if(old.manual) rec.manual = true;
+      return rec;
+    })['catch'](function(){ return null; });
+  }
   function lookUpVideoWiki(t){
-    return findVideoWiki(t).then(function(rec){
+    var old = videoWiki[t.wkey];
+    var job = old && old.ok && old.title && old.v !== VIDEO_WIKI_VERSION ? refreshVideoWikiArticle(t, old) : findVideoWiki(t);
+    return job.then(function(rec){
       if(rec){ videoWiki[t.wkey] = rec; vsave(VIDEO_WIKI_KEY, videoWiki); }
       return rec;
     });
@@ -12493,7 +12510,11 @@
     if(videoWikiRunning || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
     var lib = vlib(), todo = [];
     var week = 7 * 24 * 3600 * 1000;
-    function need(t){ var r = videoWiki[t.wkey]; return !r || (!r.ok && !r.manual && Date.now() - (r.at || 0) > week); }
+    function need(t){
+      var r = videoWiki[t.wkey];
+      if(r && r.ok && r.v !== VIDEO_WIKI_VERSION) return true;   // matched before posters came through
+      return !r || (!r.ok && !r.manual && Date.now() - (r.at || 0) > week);
+    }
     lib.movies.forEach(function(m){ var t = wikiTarget(m, 'movie'); if(need(t)) todo.push(t); });
     lib.shows.forEach(function(s){ var t = wikiTarget(s, 'show'); if(need(t)) todo.push(t); });
     if(!todo.length) return;
@@ -12543,22 +12564,42 @@
       artistInfoNote.textContent = 'Couldn\u2019t reach Wikipedia. Check the connection and try again.';
     });
   }
-  function wikiOverview(rec){
+  // The same as an artist's bio: a short preview on the page, "More" opens the whole
+  // introduction in the bio modal (with the poster and the Wikipedia link).
+  function wikiOverview(rec, name, posterUrl){
     if(!rec || !rec.extract) return null;
     var box = document.createElement('div');
     box.className = 'vd-overview';
-    var p = document.createElement('div');
-    p.className = 'vd-overview-text';
-    p.textContent = rec.extract;
+    var p = document.createElement('p');
+    p.className = 'artist-hero-bio-text vd-overview-text';
+    p.textContent = String(rec.extract).split(/\n+/)[0];
     box.appendChild(p);
-    var a = document.createElement('a');
-    a.className = 'artist-bio-credit';
-    a.href = rec.url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.textContent = 'From Wikipedia';
-    box.appendChild(a);
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'artist-hero-bio-source vd-overview-more';
+    more.textContent = 'More';
+    more.setAttribute('aria-haspopup', 'dialog');
+    more.onclick = function(){ openVideoBioModal(rec, name, posterUrl); };
+    box.appendChild(more);
     return box;
+  }
+  function openVideoBioModal(rec, name, posterUrl){
+    var seq = ++artistBioSeq;
+    artistBioName.textContent = name;
+    artistBioAvatar.innerHTML = '';
+    artistBioAvatar.classList.add('vbio-poster');
+    if(posterUrl) artistBioAvatar.appendChild(vImg(posterUrl));
+    artistBioText.textContent = rec.extract || '';
+    artistBioText.scrollTop = 0;
+    artistBioCredit.hidden = !rec.url;
+    if(rec.url) artistBioCredit.href = rec.url;
+    artistBioOverlay.classList.add('open');
+    artistBioCloseBtn.focus();
+    if(!rec.title) return;
+    fullArtistBio(rec.title).then(function(text){
+      if(seq !== artistBioSeq || !artistBioOverlay.classList.contains('open')) return;
+      if(text && text.length > (rec.extract || '').length) artistBioText.textContent = text;
+    });
   }
 
   // Backup: the folders' names, fixes and where you are in each video (the files stay on the
@@ -18646,6 +18687,7 @@
     var seq = ++artistBioSeq;
     artistBioName.textContent = entry.name;
     artistBioAvatar.innerHTML = '';
+    artistBioAvatar.classList.remove('vbio-poster');
     renderArtistArt(artistBioAvatar, entry);
     artistBioText.textContent = rec.bio || '';
     artistBioText.scrollTop = 0;
