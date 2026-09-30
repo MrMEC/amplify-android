@@ -53,6 +53,8 @@ async def main():
         check(tvis == 'none', f'no arrow in portrait ({tvis})')
         await pg.set_viewport_size({'width': 844, 'height': 390}); await pg.wait_for_timeout(900)
         g0 = await geo(pg)
+        bk = await pg.evaluate("getComputedStyle(document.getElementById('npBackBtn')).display")
+        check(bk == 'none', f'no down arrow at the top left ({bk})')
         check(not g0['open'] and g0['row']['h'] == 0, f'closed by default {g0["row"]}')
         check(g0['tog']['r'] > 800 and g0['tog']['b'] > 350, f'arrow at the bottom right {g0["tog"]}')
         await pg.screenshot(path=f'{SHOTS}/lf-closed.png')
