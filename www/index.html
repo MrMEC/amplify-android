@@ -2853,9 +2853,13 @@
   .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; }
   @media (max-width: 900px){ .tile-grid > .grid-section-label.ch-row-label{ margin:-6px 0 -18px; } .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; } }
   .tile.tile-row.ch-item .tile-art{ border-radius:8px; }
-  .ch-sort{ grid-column:1/-1; display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:-6px 0 -6px; }
-  .ch-sort-label{ font-size:13px; font-weight:600; color:var(--text-dim); }
-  .ch-sort .settings-select{ min-width:130px; }
+  .clear-search-btn .hdr-svg{ width:13px; height:12px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.8; stroke-linecap:round; stroke-linejoin:round; }
+  .ch-sort-menu{
+    position:fixed; z-index:420; min-width:180px; padding:6px; border-radius:12px;
+    background:var(--panel); border:1px solid var(--border); box-shadow:var(--shadow);
+  }
+  .ch-sort-menu .ch-sort-check{ width:14px; display:inline-flex; justify-content:center; color:var(--accent); }
+  .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   .tile.tile-row.ch-item .ch-grip{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
   .tile.tile-row.ch-item .ch-grip svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
   .tile.tile-row.ch-item.playing .tile-name{ color:var(--accent); }
@@ -4526,6 +4530,9 @@
           </button>
           <button type="button" class="clear-search-btn" id="videoAddHeaderBtn" style="display:none;" title="Add channels">
             <i class="fa-solid fa-plus"></i><span class="btn-text">Add Channels</span>
+          </button>
+          <button type="button" class="clear-search-btn" id="videoSortHeaderBtn" style="display:none;" title="Sort" aria-label="Sort" aria-haspopup="true" aria-expanded="false">
+            <svg class="hdr-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h4"/><path d="M18 5v14M15 16l3 3 3-3"/></svg><span class="btn-text">Sort</span>
           </button>
           <button type="button" class="clear-search-btn" id="videoReorderHeaderBtn" style="display:none;" title="Reorder">
             <i class="fa-solid fa-pen"></i><span class="btn-text">Reorder</span>
@@ -10311,6 +10318,8 @@
   var videoReorderHeaderBtnEl = document.getElementById('videoReorderHeaderBtn');
   window.videoAddHeaderBtnEl = videoAddHeaderBtnEl;
   window.videoReorderHeaderBtnEl = videoReorderHeaderBtnEl;
+  var videoSortHeaderBtnEl = document.getElementById('videoSortHeaderBtn');
+  window.videoSortHeaderBtnEl = videoSortHeaderBtnEl;
   var videoChannelsEditing = false;
 
   function findVideoChannel(url){
@@ -10380,10 +10389,12 @@
     resetStationsGrid();
     var mine = visibleVideoChannels();
     videoReorderHeaderBtnEl.style.display = mine.length > 1 ? '' : 'none';
+    videoSortHeaderBtnEl.style.display = mine.length > 1 && !videoChannelsEditing ? '' : 'none';
+    closeChannelSortMenu();
     updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing);
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
     if(!mine.length){
-      appendGridSection('My Channels', 0);
+      appendGridSection('My Channels');
       var empty = document.createElement('div');
       empty.className = 'empty-state';
       empty.textContent = 'No channels yet. Tap \u201cAdd Channels\u201d to find free TV channels.';
@@ -10392,7 +10403,7 @@
     }
     // Reordering is one list of everything, as the same stacked rows, dragged into order.
     if(videoChannelsEditing){
-      appendGridSection('My Channels', mine.length).classList.add('ch-row-label');
+      appendGridSection('My Channels').classList.add('ch-row-label');
       mine.forEach(function(ch){
         var row = buildEntityTile({
           key: 'channel:' + ch.url, reorderId: ch.url, entity: 'video-channel', name: ch.name, row: true,
@@ -10408,9 +10419,8 @@
       });
       return;
     }
-    stationsGrid.appendChild(buildChannelSortRow());
     if(channelSort === 'list'){
-      appendGridSection('My Channels', mine.length).classList.add('ch-row-label');
+      appendGridSection('My Channels').classList.add('ch-row-label');
       mine.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
       return;
     }
@@ -10427,29 +10437,54 @@
     var other = byName[''];
     if(other){ groups.splice(groups.indexOf(other), 1); groups.push(other); }
     groups.forEach(function(g){
-      appendGridSection(g.name || (groups.length > 1 ? 'Other' : 'My Channels'), g.list.length).classList.add('ch-row-label');
+      appendGridSection(g.name || (groups.length > 1 ? 'Other' : 'My Channels')).classList.add('ch-row-label');
       g.list.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
     });
   }
-  function buildChannelSortRow(){
-    var row = document.createElement('div');
-    row.className = 'ch-sort';
-    var label = document.createElement('span');
-    label.className = 'ch-sort-label';
-    label.textContent = 'Sort by';
-    row.appendChild(label);
-    var sel = selectEl([['category', 'Category'], ['list', 'List']], channelSort, function(v){
-      channelSort = v === 'list' ? 'list' : 'category';
-      try{ localStorage.setItem(CHANNEL_SORT_KEY, channelSort); }catch(e){}
-      renderVideoHome();
-    }, 'Sort by');
-    sel.id = 'channelSortSelect';
-    row.appendChild(sel);
-    return row;
+  // The sort icon in the header: a small menu, By Category or One List, the current one ticked.
+  var channelSortMenu = null;
+  function closeChannelSortMenu(){
+    if(channelSortMenu){ channelSortMenu.remove(); channelSortMenu = null; }
+    if(typeof videoSortHeaderBtnEl !== 'undefined' && videoSortHeaderBtnEl) videoSortHeaderBtnEl.setAttribute('aria-expanded', 'false');
   }
-  // One channel as a full-width row: logo, name (and "Not working" under it when it last
-  // failed), and the More button (Favorite, Play Next, Add to Queue, Remove) as its only icon.
-  // Tapping plays it and opens Now Playing, where the picture is.
+  function openChannelSortMenu(){
+    closeChannelSortMenu();
+    var m = document.createElement('div');
+    m.className = 'ch-sort-menu';
+    m.setAttribute('role', 'menu');
+    [['category', 'By Category'], ['list', 'One List']].forEach(function(o){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'np-menu-item' + (channelSort === o[0] ? ' on' : '');
+      b.setAttribute('role', 'menuitemradio');
+      b.setAttribute('aria-checked', channelSort === o[0] ? 'true' : 'false');
+      b.dataset.sort = o[0];
+      b.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (channelSort === o[0] ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
+      b.lastChild.textContent = o[1];
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        channelSort = o[0];
+        try{ localStorage.setItem(CHANNEL_SORT_KEY, channelSort); }catch(err){}
+        closeChannelSortMenu();
+        renderVideoHome();
+      });
+      m.appendChild(b);
+    });
+    document.body.appendChild(m);
+    var r = videoSortHeaderBtnEl.getBoundingClientRect();
+    m.style.top = Math.round(r.bottom + 8) + 'px';
+    m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+    channelSortMenu = m;
+    videoSortHeaderBtnEl.setAttribute('aria-expanded', 'true');
+  }
+  videoSortHeaderBtnEl.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(channelSortMenu) closeChannelSortMenu(); else openChannelSortMenu();
+  });
+  document.addEventListener('click', function(e){
+    if(channelSortMenu && !channelSortMenu.contains(e.target)) closeChannelSortMenu();
+  });
+  window.addEventListener('scroll', closeChannelSortMenu, { passive: true });
   // Now Playing is in channel mode for a TV channel: one played from Video, or one in My Channels.
   function isNpChannel(st){
     if(!st || !isLiveStream(st)) return false;
@@ -11139,7 +11174,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -11584,7 +11619,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -12181,7 +12216,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -15982,7 +16017,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -16593,7 +16628,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -17130,7 +17165,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -18776,7 +18811,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -18840,7 +18875,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -19270,7 +19305,7 @@
     libraryAddHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';

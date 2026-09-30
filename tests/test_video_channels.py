@@ -158,7 +158,7 @@ async def main():
         t = await my_tiles(pg)
         labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;})")
         rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row').length===0 && document.querySelectorAll('#stationsGrid > .tile.tile-row.ch-item').length")
-        check(labels == ['News2', 'Other3'] and rows_ok == 5, f'back to Video: stacked rows under a heading per category, uncategorised last {labels} rows={rows_ok}')
+        check(labels == ['News', 'Other'] and rows_ok == 5, f'back to Video: stacked rows under a heading per category, uncategorised last {labels} rows={rows_ok}')
         check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'PBS', 'Link One', 'Link Three'], f'each row keeps the order added {[x["name"] for x in t]}')
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='BBC News';}).click()"); await pg.wait_for_timeout(900)
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
@@ -171,17 +171,25 @@ async def main():
         check(lk2 == 'Remove from My Channels', f'a saved channel offers Remove from My Channels ({lk2})')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')
-        setsort = "(v)=>{var s=document.getElementById('channelSortSelect');s.value=v;s.dispatchEvent(new Event('change'));}"
+        setsort = "(v)=>{document.getElementById('videoSortHeaderBtn').click(); document.querySelector('.ch-sort-menu [data-sort='+v+']').click();}"
+        icons = await pg.evaluate("(()=>{var s=document.getElementById('videoSortHeaderBtn'), r=document.getElementById('videoReorderHeaderBtn');return [getComputedStyle(s).display!=='none', !!(s.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING), Math.round(s.getBoundingClientRect().top)===Math.round(r.getBoundingClientRect().top), !document.querySelector('#stationsGrid select')];})()")
+        check(all(icons), f'a sort icon sits in the header, left of the edit icon, no dropdown on the page {icons}')
+        await pg.evaluate("document.getElementById('videoSortHeaderBtn').click()"); await pg.wait_for_timeout(200)
+        items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.ch-sort-menu .np-menu-item'),function(b){return b.textContent+(b.classList.contains('on')?'*':'');})")
+        check(items == ['By Category*', 'One List'], f'the sort icon offers By Category / One List, current ticked {items}')
+        await pg.screenshot(path=f'{SHOTS}/ch-sort-menu.png')
+        await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(200)
+        check(not await pg.evaluate("!!document.querySelector('.ch-sort-menu')"), 'tapping elsewhere closes it')
         lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;})"
         await pg.evaluate(setsort, 'list'); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(await pg.evaluate(lbls) == ['My Channels5'] and t == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Sort by List: one list in your order {t}')
+        check(await pg.evaluate(lbls) == ['My Channels'] and t == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Sort by List: one list in your order {t}')
         await pg.screenshot(path=f'{SHOTS}/ch-my-list.png')
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
-        check(await pg.evaluate(lbls) == ['My Channels5'], 'the sort choice is kept')
+        check(await pg.evaluate(lbls) == ['My Channels'], 'the sort choice is kept')
         await pg.evaluate(setsort, 'category'); await pg.wait_for_timeout(300)
-        check(await pg.evaluate(lbls) == ['News2', 'Other3'], 'Sort by Category brings the headings back')
+        check(await pg.evaluate(lbls) == ['News', 'Other'], 'Sort by Category brings the headings back')
 
         await pg.evaluate("document.getElementById('videoReorderHeaderBtn').click()"); await pg.wait_for_timeout(300)
         drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile.tile-draggable').length")
