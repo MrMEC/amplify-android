@@ -3476,9 +3476,17 @@
 
     /* The full Now Playing screen owns the whole phone: no tab bar, no mini player, no
        search sheet, no fade. Its own bottom padding only has to clear nothing now. */
-    body.np-open .mobile-scroll-fade,
-    body.np-open .player-bar,
-    body.np-open .search-sheet{ display:none; }
+    body.np-open .mobile-scroll-fade{ display:none; }
+    /* Music, radio and podcasts keep the mini player (above the tab bar) on Now Playing, and
+       Search opens its box over it; a channel (which has its own list to scroll) and
+       landscape / full-screen video have neither. */
+    body.np-open.np-channel-open .player-bar,
+    body.np-open.rotate-lock .player-bar, body.np-open.rotate-lock .search-sheet,
+    body.np-video-full .player-bar, body.np-video-full .search-sheet{ display:none; }
+    body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full):not(.np-channel-open) .now-playing-screen{
+      padding-bottom:calc(var(--player-bar-h, 62px) + 40px);
+    }
+    body.np-sheet:not(.np-channel-open):not(.rotate-lock):not(.np-video-full) .player-bar{ z-index:1001; }
     body.np-open .now-playing-screen, body.np-sheet .now-playing-screen{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
     /* The tab bar stays with Now Playing (upright; landscape and full-screen video keep the
        whole screen). The screen ends at the bar's top edge, rises out from behind it and drops
@@ -19452,8 +19460,9 @@
       var btn = e.target.closest('.mobile-nav-btn');
       if(!btn) return;
       var dest = btn.dataset.nav;
-      // The tab bar shows over a channel's Now Playing: any tab leaves it for that section.
-      if(document.body.classList.contains('np-open')) closeNowPlaying(false);
+      // The tab bar shows over Now Playing: any tab but Search leaves it for that section.
+      // Search opens its box over Now Playing; running the search is what leaves it.
+      if(document.body.classList.contains('np-open') && dest !== 'search') closeNowPlaying(false);
       if(dest === 'search'){
         // INTENDED, do not change: on a phone, choosing Search never puts focus in the box
         // (not on the first tap, not on a repeat tap). Focus summons the on-screen keyboard
