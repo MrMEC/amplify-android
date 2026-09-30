@@ -1562,7 +1562,35 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     video.setCues(sb.length() == 0 ? null : sb.toString());
   }
 
+  private String icyNameFor;
+
+  /** A stream's own name (the icy-name header), so a pasted link can be titled properly. */
+  private void emitStreamName(Tracks tracks) {
+    if (currentId == null || currentId.equals(icyNameFor)) return;
+    for (Tracks.Group g : tracks.getGroups()) {
+      for (int i = 0; i < g.length; i++) {
+        Format f = g.getTrackFormat(i);
+        if (f.metadata == null) continue;
+        for (int j = 0; j < f.metadata.length(); j++) {
+          androidx.media3.common.Metadata.Entry e = f.metadata.get(j);
+          if (e instanceof androidx.media3.extractor.metadata.icy.IcyHeaders) {
+            String name = ((androidx.media3.extractor.metadata.icy.IcyHeaders) e).name;
+            if (name != null && !name.trim().isEmpty()) {
+              icyNameFor = currentId;
+              JSObject o = new JSObject();
+              o.put("id", currentId);
+              o.put("name", name.trim());
+              notifyListeners("streamname", o);
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+
   private void onTracks(Tracks tracks) {
+    emitStreamName(tracks);
     boolean v = tracks.containsType(C.TRACK_TYPE_VIDEO);
     if (v == hasVideo) return;
     hasVideo = v;
