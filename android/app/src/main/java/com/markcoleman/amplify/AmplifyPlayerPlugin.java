@@ -744,9 +744,30 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     }
     JSObject o = new JSObject();
     o.put("folder", rootName);
+    o.put("treeUri", tree.toString());
     o.put("files", files);
     o.put("truncated", truncated);
     return o;
+  }
+
+  /** Lists a music folder picked earlier again, to pick up songs added or removed since. */
+  @PluginMethod
+  public void rescanMusicFolder(PluginCall call) {
+    String t = call.getString("treeUri");
+    if (t == null || t.isEmpty()) {
+      call.reject("No folder");
+      return;
+    }
+    ContentResolver cr = getContext().getContentResolver();
+    new Thread(
+            () -> {
+              try {
+                call.resolve(walkTree(cr, Uri.parse(t)));
+              } catch (Exception e) {
+                call.reject("That folder can't be read any more: " + e.getMessage());
+              }
+            })
+        .start();
   }
 
   @Nullable

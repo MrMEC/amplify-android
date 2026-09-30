@@ -1876,8 +1876,8 @@
      ones .fa-solid would otherwise set. While backfillPodcastShowMeta('manual') is out checking
      every followed show for a newer episode, it spins with the same rotation as the loading
      spinner above, so a spin already means "working" everywhere else in the app. */
-  #podcastRefreshHeaderBtn .refresh-glyph{ display:inline-block; font-style:normal; line-height:1; font-size:13px; }
-  #podcastRefreshHeaderBtn.refreshing .refresh-glyph{ animation: spinner-rotate .8s linear infinite; }
+  #podcastRefreshHeaderBtn .refresh-glyph, .media-refresh-btn .refresh-glyph{ display:inline-block; font-style:normal; line-height:1; font-size:13px; }
+  #podcastRefreshHeaderBtn.refreshing .refresh-glyph, .media-refresh-btn.refreshing .refresh-glyph{ animation: spinner-rotate .8s linear infinite; }
   #podcastRefreshHeaderBtn:disabled{ opacity:.6; cursor:default; }
 
   .empty-state{ text-align:center; color:var(--text-faint); padding:50px 20px; font-size:13.5px; grid-column:1/-1; }
@@ -2861,7 +2861,8 @@
   .ch-sort-menu .ch-sort-check{ width:14px; display:inline-flex; justify-content:center; color:var(--accent); }
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
-  .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 -14px; }
+  .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
+  .tile-grid > .video-tabs + .grid-section-label, .tile-grid > .video-tabs + .grid-section-label.ch-row-label{ margin-top:4px; }
   .tile-grid > .video-tabs.vd-seasons{ margin:4px 0 -18px; }
   .v-progress{ position:absolute; left:8px; right:8px; bottom:8px; height:4px; border-radius:2px; background:rgba(255,255,255,.35); overflow:hidden; z-index:2; }
   .v-progress > span{ display:block; height:100%; background:var(--accent); border-radius:2px; }
@@ -4628,6 +4629,9 @@
                only while its own home page (openMyLibraryHome/openStationsHome/openPlaylistsHome/
                openGenresHome) is on screen -- see enterLibraryChrome and the other page-reset
                call sites, which hide all of them by default. -->
+          <button type="button" class="clear-search-btn media-refresh-btn" id="libraryRefreshHeaderBtn" style="display:none;" title="Scan your music folders again" aria-label="Scan your music folders again">
+            <i class="refresh-glyph" aria-hidden="true">&#8635;</i><span class="btn-text">Refresh</span>
+          </button>
           <button type="button" class="clear-search-btn" id="libraryAddHeaderBtn" style="display:none;" title="Add music files">
             <i class="fa-solid fa-plus"></i><span class="btn-text">Add Music</span>
           </button>
@@ -4636,6 +4640,9 @@
           </button>
           <button type="button" class="clear-search-btn" id="forYouReorderHeaderBtn" style="display:none;" title="Reorder">
             <i class="fa-solid fa-pen"></i><span class="btn-text">Reorder</span>
+          </button>
+          <button type="button" class="clear-search-btn media-refresh-btn" id="videoRefreshHeaderBtn" style="display:none;" title="Scan your video folders again" aria-label="Scan your video folders again">
+            <i class="refresh-glyph" aria-hidden="true">&#8635;</i><span class="btn-text">Refresh</span>
           </button>
           <button type="button" class="clear-search-btn" id="videoAddHeaderBtn" style="display:none;" title="Add channels">
             <i class="fa-solid fa-plus"></i><span class="btn-text">Add Channels</span>
@@ -6076,6 +6083,7 @@
   var addToCategoryCloseBtn = document.getElementById('addToCategoryCloseBtn');
   var addToCategoryNewBtn = document.getElementById('addToCategoryNewBtn');
   var libraryAddHeaderBtn = document.getElementById('libraryAddHeaderBtn');
+  var libraryRefreshHeaderBtn = document.getElementById('libraryRefreshHeaderBtn');
   var forYouAddHeaderBtn = document.getElementById('forYouAddHeaderBtn');
   var forYouReorderHeaderBtn = document.getElementById('forYouReorderHeaderBtn');
   var playlistsAddHeaderBtn = document.getElementById('playlistsAddHeaderBtn');
@@ -8012,6 +8020,17 @@
         title: 'Album Cover',
         suggest: { kind: 'album', artist: st.artist || '', album: st.album },
         refresh: function(){ refreshAlbumArt(akey); }
+      });
+      return;
+    }
+    // A video of your own: a movie's poster, or (for an episode) its show's poster.
+    if(isLocalVideo(st)){
+      var ep = st.videoKind === 'episode';
+      openArtUrlDialogFor({
+        key: ep ? 'vshow:' + st.showKey : favKey(st),
+        name: ep ? (st.show + ' TV show poster') : (st.name + (st.year ? ' ' + st.year : '') + ' movie poster'),
+        title: 'Poster',
+        refresh: function(){ invalidateVideoLib(); refreshStationArt(st); refreshVideoPages(); }
       });
       return;
     }
@@ -10364,6 +10383,8 @@
     // Page-level equivalent of the sidebar's old + next to "My Library" (now removed).
     libraryAddHeaderBtn.style.display = '';
     libraryAddHeaderBtn.onclick = openAddMusicDialog;
+    // Refresh: in the app, scan the music folders again for songs added or removed.
+    libraryRefreshHeaderBtn.style.display = NATIVE_APP ? '' : 'none';
     resetStationsGrid();
 
     var rows = [
@@ -10464,6 +10485,9 @@
   window.videoReorderHeaderBtnEl = videoReorderHeaderBtnEl;
   var videoSortHeaderBtnEl = document.getElementById('videoSortHeaderBtn');
   window.videoSortHeaderBtnEl = videoSortHeaderBtnEl;
+  var videoRefreshHeaderBtnEl = document.getElementById('videoRefreshHeaderBtn');
+  window.videoRefreshHeaderBtnEl = videoRefreshHeaderBtnEl;
+  videoRefreshHeaderBtnEl.addEventListener('click', function(){ rescanVideoFolders(); });
   var videoChannelsEditing = false;
 
   function findVideoChannel(url){
@@ -10545,6 +10569,7 @@
     else renderVideoLibraryTab(videoTab);
   }
   function renderChannelsTab(){
+    videoRefreshHeaderBtnEl.style.display = 'none';
     var mine = visibleVideoChannels();
     videoReorderHeaderBtnEl.style.display = mine.length > 1 ? '' : 'none';
     videoSortHeaderBtnEl.style.display = mine.length > 1 && !videoChannelsEditing ? '' : 'none';
@@ -11550,7 +11575,10 @@
     var P = videoPlugin2();
     if(!P || typeof P.rescanVideoFolder !== 'function' || videoScanBusy || !videoFolders.length) return;
     videoScanBusy = true;
+    videoRefreshHeaderBtnEl.classList.add('refreshing');
     setStatus('Checking your video folders…', false, true);
+    function videoSet(){ var o = {}; videoFiles.forEach(function(f){ if(f.video && !isSampleOrExtra(f)) o[f.relPath] = true; }); return o; }
+    var before = videoSet();
     var failed = [];
     var chain = Promise.resolve();
     videoFolders.forEach(function(fo){
@@ -11560,7 +11588,11 @@
     });
     chain.then(function(){
       videoScanBusy = false;
-      setStatus(failed.length ? ('Could not open ' + failed.join(', ') + '. Remove it and add it again.') : 'Your videos are up to date.', !!failed.length);
+      videoRefreshHeaderBtnEl.classList.remove('refreshing');
+      var after = videoSet(), added = 0, removed = 0;
+      Object.keys(after).forEach(function(k){ if(!before[k]) added++; });
+      Object.keys(before).forEach(function(k){ if(!after[k]) removed++; });
+      setStatus(failed.length ? ('Could not open ' + failed.join(', ') + '. Remove it and add it again.') : changeSummary(added, removed, 'video'), !!failed.length);
       if(onVideoView) renderVideoHome();
       fetchVideoInfoQueue();
     });
@@ -11709,6 +11741,8 @@
     var items = sortedVideoItems(tab);
     videoReorderHeaderBtnEl.style.display = 'none';
     videoSortHeaderBtnEl.style.display = items.length > 1 ? '' : 'none';
+    videoRefreshHeaderBtnEl.style.display = videoFolders.length ? '' : 'none';
+    videoRefreshHeaderBtnEl.classList.toggle('refreshing', videoScanBusy);
     if(!items.length){
       var empty = document.createElement('div');
       empty.className = 'empty-state v-empty';
@@ -12033,7 +12067,7 @@
         refresh();
       });
       item('Change Poster', function(){
-        openArtUrlDialogFor({ key: 'vshow:' + x.key, title: 'Poster', refresh: refresh });
+        openArtUrlDialogFor({ key: 'vshow:' + x.key, title: 'Poster', name: x.title + ' TV show poster', refresh: refresh });
       });
     } else {
       item(isWatched(x) ? 'Mark Unwatched' : 'Mark Watched', function(){ markVideoWatched(x, !isWatched(x)); refresh(); });
@@ -12072,7 +12106,9 @@
         });
       }
       item(what === 'movie' ? 'Change Poster' : 'Change Picture', function(){
-        openArtUrlDialogFor({ key: 'video:' + x.id, title: what === 'movie' ? 'Poster' : 'Episode Picture', refresh: refresh });
+        openArtUrlDialogFor({ key: 'video:' + x.id, title: what === 'movie' ? 'Poster' : 'Episode Picture',
+          name: what === 'movie' ? (x.title + (x.year ? ' ' + x.year : '') + ' movie poster') : (x.show + ' ' + episodeCode(x) + (x.epTitle ? ' ' + x.epTitle : '')),
+          refresh: refresh });
       });
     }
     document.body.appendChild(m);
@@ -12534,10 +12570,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -12979,10 +13015,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -13576,10 +13612,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -17384,10 +17420,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -17995,10 +18031,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -18532,10 +18568,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -19840,6 +19876,7 @@
     }
     P.pickMusicFolder().then(function(res){
       if(!res || res.cancelled) return;
+      rememberMusicFolder(res.treeUri, res.folder);
       setStatus('Reading ' + (res.folder || 'folder') + '…', false, true);
       var stubs = (res.files || []).map(function(f){
         return {
@@ -19867,6 +19904,108 @@
       showImportPanel('error', { title: 'Import failed', count: 'Nothing was added', detail: msg });
     });
   }
+
+  // ---- Refresh: the music folders picked in the app, scanned again. New songs are added;
+  // songs whose files are gone from the folder leave the library. Songs added one file at a
+  // time (or in a browser) have no folder to check and are left alone.
+  var MUSIC_FOLDERS_KEY = 'radioPlayerMusicFolders';
+  var musicFolders = [];
+  try{ musicFolders = JSON.parse(localStorage.getItem(MUSIC_FOLDERS_KEY) || '[]') || []; }catch(e){ musicFolders = []; }
+  function rememberMusicFolder(tree, name){
+    if(!tree) return;
+    if(musicFolders.some(function(f){ return f.treeUri === tree; })) return;
+    musicFolders.push({ treeUri: tree, name: name || 'Music' });
+    try{ localStorage.setItem(MUSIC_FOLDERS_KEY, JSON.stringify(musicFolders)); }catch(e){}
+  }
+  // Folders picked before this list existed are found from where their songs live.
+  function musicFolderTrees(){
+    var set = {};
+    musicFolders.forEach(function(f){ set[f.treeUri] = true; });
+    libraryTracks.forEach(function(t){
+      var u = t.srcUri || '', i = u.indexOf('/document/');
+      if(i > 0 && u.indexOf('/tree/') > 0) set[u.slice(0, i)] = true;
+    });
+    return Object.keys(set);
+  }
+  function changeSummary(added, removed, noun){
+    if(!added && !removed) return 'Everything is up to date.';
+    var bits = [];
+    if(added) bits.push(added + ' new ' + noun + (added === 1 ? '' : 's') + ' added');
+    if(removed) bits.push(removed + ' ' + noun + (removed === 1 ? '' : 's') + ' removed');
+    return bits.join(', ') + '.';
+  }
+  function nativeMusicStubs(res){
+    return (res.files || []).map(function(f){
+      return {
+        name: f.name, size: f.size || 0, type: f.type || '', lastModified: f.lastModified || 0,
+        amplifyRelPath: normalizeRelPath(f.relPath || f.name),
+        amplifyLoad: function(){ return nativeFileFromEntry(f); },
+        amplifyEntry: f
+      };
+    });
+  }
+  var musicRefreshBusy = false;
+  function refreshMusicLibrary(){
+    var Cap = window.Capacitor;
+    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    if(!P || typeof P.rescanMusicFolder !== 'function'){ setStatus('Refresh works in the Android app.', true); return; }
+    if(musicRefreshBusy || importInProgress) return;
+    var trees = musicFolderTrees();
+    if(!trees.length){
+      setStatus('There are no music folders to check. Add a folder with the + button first.', true);
+      return;
+    }
+    musicRefreshBusy = true;
+    libraryRefreshHeaderBtn.classList.add('refreshing');
+    setStatus('Checking your music folders…', false, true);
+    var removed = 0, failed = 0, toImport = [];
+    var chain = Promise.resolve();
+    trees.forEach(function(tree){
+      chain = chain.then(function(){
+        return P.rescanMusicFolder({ treeUri: tree }).then(function(res){
+          var present = {};
+          (res.files || []).forEach(function(f){ present[f.uri] = true; });
+          var gone = libraryTracks.filter(function(t){ return t.srcUri && t.srcUri.indexOf(tree + '/document/') === 0 && !present[t.srcUri]; });
+          var stubs = nativeMusicStubs(res);
+          var fresh = stubs.filter(isAudioFile).filter(function(st){
+            return !libraryById[makeLocalTrackId(relPathOf(st), st.size, st.lastModified)];
+          });
+          if(fresh.length){
+            var artIndex = buildFolderArtIndex(stubs);
+            Object.keys(artIndex).forEach(function(d){ fresh.push(artIndex[d]); });
+          }
+          toImport = toImport.concat(fresh);
+          return gone.reduce(function(p, t){
+            return p.then(function(){ return removeLocalTrack(t).then(function(){ removed++; }, function(){}); });
+          }, Promise.resolve());
+        }, function(){ failed++; });
+      });
+    });
+    chain.then(function(){
+      var audioNew = toImport.filter(isAudioFile);
+      var art = toImport.filter(function(x){ return !isAudioFile(x); });
+      if(!audioNew.length) return null;
+      return Promise.all(art.map(function(st){ return nativeFileFromEntry(st.amplifyEntry)['catch'](function(){ return null; }); }))
+        .then(function(artFiles){ return importLocalFiles(audioNew.concat(artFiles.filter(Boolean)), { fromFolder: true }); })
+        .then(function(){ return audioNew.length; });
+    }).then(function(importedCount){
+      musicRefreshBusy = false;
+      libraryRefreshHeaderBtn.classList.remove('refreshing');
+      renderLibraryList();
+      refreshLibraryView();
+      // With new songs the import reports its own result; otherwise say what changed.
+      if(!importedCount){
+        setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song'), !!failed);
+      } else if(removed){
+        setStatus(changeSummary(importedCount, removed, 'song'), false);
+      }
+    })['catch'](function(err){
+      musicRefreshBusy = false;
+      libraryRefreshHeaderBtn.classList.remove('refreshing');
+      setStatus((err && err.message) || 'Your music folders could not be checked.', true);
+    });
+  }
+  libraryRefreshHeaderBtn.addEventListener('click', refreshMusicLibrary);
 
   function openAddMusicDialog(){
     addMusicFolderBtn.disabled = !HAS_FOLDER_PICKER;
@@ -20179,10 +20318,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -20243,10 +20382,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
@@ -20673,10 +20812,10 @@
     podcastTabs.style.display = 'none';
     podcastFollowBtn.style.display = 'none';
     podcastShowCategoriesBtn.style.display = 'none';
-    libraryAddHeaderBtn.style.display = 'none';
+    libraryAddHeaderBtn.style.display = 'none'; libraryRefreshHeaderBtn.style.display = 'none';
     forYouAddHeaderBtn.style.display = 'none';
     forYouReorderHeaderBtn.style.display = 'none';
-    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
+    if(window.videoAddHeaderBtnEl){ videoAddHeaderBtnEl.style.display = 'none'; videoReorderHeaderBtnEl.style.display = 'none'; videoSortHeaderBtnEl.style.display = 'none'; videoRefreshHeaderBtnEl.style.display = 'none'; closeChannelSortMenu(); }
     playlistsAddHeaderBtn.style.display = 'none';
     playlistsReorderHeaderBtn.style.display = 'none';
     genresReorderHeaderBtn.style.display = 'none';
