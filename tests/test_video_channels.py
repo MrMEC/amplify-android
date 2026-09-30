@@ -156,8 +156,8 @@ async def main():
 
         await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(700)
         t = await my_tiles(pg)
-        labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;})")
-        rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row').length===0 && document.querySelectorAll('#stationsGrid > .tile.tile-row.ch-item').length")
+        labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return x!=='Continue Watching';})")
+        rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row:not(.vw-row)').length===0 && document.querySelectorAll('#stationsGrid > .tile.tile-row.ch-item').length")
         check(labels == ['News', 'Other'] and rows_ok == 5, f'back to Video: stacked rows under a heading per category, uncategorised last {labels} rows={rows_ok}')
         check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'PBS', 'Link One', 'Link Three'], f'each row keeps the order added {[x["name"] for x in t]}')
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='BBC News';}).click()"); await pg.wait_for_timeout(900)
@@ -180,7 +180,7 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/ch-sort-menu.png')
         await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(200)
         check(not await pg.evaluate("!!document.querySelector('.ch-sort-menu')"), 'tapping elsewhere closes it')
-        lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;})"
+        lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return x!=='Continue Watching';})"
         await pg.evaluate(setsort, 'list'); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
         check(await pg.evaluate(lbls) == ['My Channels'] and t == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Sort by List: one list in your order {t}')

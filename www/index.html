@@ -2877,6 +2877,11 @@
   .vw-thumb{ position:relative; width:100%; aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:var(--art-bg, var(--panel-2)); }
   .vw-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .vw-tile .tile-name{ margin-top:8px; }
+  .vw-thumb .vw-more{ top:4px; right:2px; z-index:3; }
+  .vw-thumb.vw-logo{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); }
+  .vw-thumb.vw-logo .tile-art{ width:auto; height:70%; aspect-ratio:1/1; max-width:none; border-radius:10px; overflow:hidden; box-shadow:none; }
+  .vw-thumb.vw-logo .tile-art img{ width:100%; height:100%; object-fit:cover; }
+  .vw-home-grid .vw-tile{ width:min(62vw, 260px); }
   .vw-tile .tile-name, .vw-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
   /* Movie and show posters: tall 2:3 covers in the grid. */
   .tile.vposter .tile-art.vposter-art{ aspect-ratio:2/3; height:auto; position:relative; overflow:hidden; border-radius:10px; }
@@ -4541,6 +4546,13 @@
           </section>
         </div>
       </div>
+      <!-- Continue Watching: part-watched movies, next episodes and channels watched lately. -->
+      <div class="home-section" id="continueWatchingHomeSection" style="display:none;" data-empty="1">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="continueWatchingHomeHeading" role="button" tabindex="0">Continue Watching<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid vw-home-grid" id="continueWatchingHomeGrid"></div>
+      </div>
       <!-- For You: the listener's saved searches, as a row of covers under Continue Listening
            (it used to live on the Stations page, now gone). The heading opens the For You page,
            where searches are added and reordered. -->
@@ -4549,6 +4561,13 @@
           <h2 class="home-heading-link" id="forYouHomeHeading" role="button" tabindex="0">For You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
         </div>
         <div class="tile-grid" id="forYouGrid"></div>
+      </div>
+      <!-- My Channels, as a row under For You; the heading opens Video > Channels. -->
+      <div class="home-section" id="channelsHomeSection" style="display:none;" data-empty="1">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="channelsHomeHeading" role="button" tabindex="0">My Channels<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid" id="channelsHomeGrid"></div>
       </div>
       <!-- Only on a stacked home: the tab used to name this panel, and with the tabs gone
            it needs a heading of its own. -->
@@ -6813,6 +6832,7 @@
       return;
     }
     var closingVideo = wasOpen && isLocalVideo(npTarget());
+    if(closingVideo) renderContinueWatchingHome();
     nowPlayingScreen.style.display = 'none';
     browseView.style.display = '';
     document.body.classList.remove('np-open');
@@ -9317,6 +9337,8 @@
       makeHomeRow(recentGrid);
       makeHomeRow(latestPodcastsGrid);
       makeHomeRow(forYouGrid);
+      makeHomeRow(cwHomeGrid);
+      makeHomeRow(channelsHomeGrid);
       makeHomeRow(recentSongsGrid);
       makeHomeRow(stationsGrid);
       homeTabs.style.display = 'none';
@@ -9327,6 +9349,8 @@
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
       recentSection.style.display = '';
       forYouSection.style.display = '';
+      cwHomeSection.style.display = cwHomeSection.dataset.empty ? 'none' : '';
+      channelsHomeSection.style.display = channelsHomeSection.dataset.empty ? 'none' : '';
       stationsGrid.style.display = '';
       syncFavReorderView();
       syncHomeRows();
@@ -9342,6 +9366,8 @@
       topArtistsSection.style.display = 'none';
       latestPodcastsSection.style.display = 'none';
       forYouSection.style.display = 'none';
+      cwHomeSection.style.display = 'none';
+      channelsHomeSection.style.display = 'none';
       stationsGrid.style.display = '';
       return;
     }
@@ -9359,6 +9385,8 @@
     topArtistsSection.style.display = 'none';
     latestPodcastsSection.style.display = 'none';
     forYouSection.style.display = 'none';
+    cwHomeSection.style.display = 'none';
+    channelsHomeSection.style.display = 'none';
     syncFavReorderView();
     syncHomeRows();
   }
@@ -9403,6 +9431,47 @@
   // back button comes back here); the heading opens the For You page for adding / reordering.
   var forYouSection = document.getElementById('forYouSection');
   var forYouGrid = document.getElementById('forYouGrid');
+  // ---------- Continue Watching and My Channels (home) ----------
+  var cwHomeSection = document.getElementById('continueWatchingHomeSection');
+  var cwHomeGrid = document.getElementById('continueWatchingHomeGrid');
+  var channelsHomeSection = document.getElementById('channelsHomeSection');
+  var channelsHomeGrid = document.getElementById('channelsHomeGrid');
+  function renderContinueWatchingHome(){
+    if(!cwHomeGrid) return;
+    cwHomeGrid.innerHTML = '';
+    var list = continueWatchingEntries();
+    list.forEach(function(e){ cwHomeGrid.appendChild(buildContinueEntryTile(e)); });
+    cwHomeSection.dataset.empty = list.length ? '' : '1';
+    if(document.body.classList.contains('home-stacked') && onHomeView) cwHomeSection.style.display = list.length ? '' : 'none';
+    syncHomeRows();
+  }
+  function renderChannelsHome(){
+    if(!channelsHomeGrid) return;
+    channelsHomeGrid.innerHTML = '';
+    var mine = visibleVideoChannels();
+    mine.forEach(function(ch){
+      var st = channelToStation(ch);
+      var t = buildEntityTile({ key: favKey(st), entity: 'channel-home', name: ch.name, artFrom: st, onClick: function(){ playChannel(ch); } });
+      if(currentStation && favKey(currentStation) === favKey(st)) t.classList.add('playing');
+      channelsHomeGrid.appendChild(t);
+    });
+    channelsHomeSection.dataset.empty = mine.length ? '' : '1';
+    if(document.body.classList.contains('home-stacked') && onHomeView) channelsHomeSection.style.display = mine.length ? '' : 'none';
+    syncHomeRows();
+  }
+  (function(){
+    function link(id, go){
+      var h = document.getElementById(id);
+      if(!h) return;
+      h.addEventListener('click', go);
+      h.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); go(); }
+      });
+    }
+    link('continueWatchingHomeHeading', function(){ pushView(); openVideoHome(); });
+    link('channelsHomeHeading', function(){ videoTab = 'channels'; vsave(VIDEO_TAB_KEY, videoTab); pushView(); openVideoHome(); });
+  })();
+
   function renderForYouHomeSection(){
     if(!forYouGrid) return;
     forYouGrid.innerHTML = '';
@@ -9492,6 +9561,8 @@
     renderTopArtistsSection();
     renderLatestPodcastsSection();
     renderForYouHomeSection();
+    renderContinueWatchingHome();
+    renderChannelsHome();
     // One list, in the order things were played: songs, stations and podcast episodes
     // together (Recent Songs used to be a list of its own).
     recentGrid.innerHTML = '';
@@ -9776,6 +9847,8 @@
   // ---------- "Your Stations" custom searches ----------
   function renderCustomSearchList(){
     renderForYouHomeSection();
+    renderContinueWatchingHome();
+    renderChannelsHome();
     customSearchList.innerHTML = '';
     if(!customSearches.length){
       customSearchList.innerHTML = '<div class="aside-empty">Add a search to pin it here.</div>';
@@ -10482,6 +10555,7 @@
   function saveVideoChannels(){
     try{ localStorage.setItem(VIDEO_CHANNELS_KEY, JSON.stringify(videoChannels)); }catch(e){}
     if(typeof syncNpChannelLink === 'function') syncNpChannelLink();
+    if(typeof renderChannelsHome === 'function') renderChannelsHome();
   }
   var videoAddHeaderBtnEl = document.getElementById('videoAddHeaderBtn');
   var videoReorderHeaderBtnEl = document.getElementById('videoReorderHeaderBtn');
@@ -11521,22 +11595,59 @@
     for(var j = lastIdx + 1; j < eps.length; j++) if(!isWatched(eps[j])) return eps[j];
     return null;
   }
-  // Continue Watching: part-watched videos, and the next episode of a show that was being
-  // watched, newest first.
-  function continueWatchingList(){
+  // Continue Watching: part-watched movies, the next episode of a show being watched, and
+  // channels watched lately -- newest first. Anything removed from the list stays off it until
+  // it is watched again.
+  var CHANNEL_HISTORY_KEY = 'radioPlayerChannelHistory';
+  var CW_HIDDEN_KEY = 'radioPlayerContinueWatchingHidden';
+  var channelHistory = vload(CHANNEL_HISTORY_KEY, []);   // [{ url, name, logo, cats, country, src, id, at }]
+  var cwHidden = vload(CW_HIDDEN_KEY, {});                // key -> when it was removed
+  if(!Array.isArray(channelHistory)) channelHistory = [];
+  function recordChannelWatch(st){
+    var url = st && (st.urlToResolve || st.url);
+    if(!url) return;
+    var c = findVideoChannel(url) || st.channel || {};
+    channelHistory = channelHistory.filter(function(h){ return h.url !== url; });
+    channelHistory.unshift({ url: url, name: c.name || st.name, logo: c.logo || st.favicon || '', cats: c.cats || [],
+      country: c.country || '', src: c.src || 'link', id: c.id || '', at: Date.now() });
+    if(channelHistory.length > 30) channelHistory.length = 30;
+    vsave(CHANNEL_HISTORY_KEY, channelHistory);
+    refreshContinueWatching();
+  }
+  function cwKey(e){
+    if(e.kind === 'channel') return 'channel:' + e.ch.url;
+    return e.v.kind === 'episode' ? 'show:' + e.v.showKey : 'video:' + e.v.id;
+  }
+  function continueWatchingEntries(){
     var lib = vlib(), out = [], seenShow = {};
     var ids = Object.keys(videoProgress).filter(function(id){ return lib.byId[id]; })
       .sort(function(a, b){ return (videoProgress[b].at || 0) - (videoProgress[a].at || 0); });
     ids.forEach(function(id){
-      var v = lib.byId[id];
+      var v = lib.byId[id], at = videoProgress[id].at || 0;
       if(v.kind === 'episode'){
         if(seenShow[v.showKey]) return;
         seenShow[v.showKey] = true;
         var n = nextEpisodeOf(lib.showsByKey[v.showKey]);
-        if(n) out.push(n);
-      } else if(isInProgress(v)) out.push(v);
+        if(n) out.push({ kind: 'video', v: n, at: at });
+      } else if(isInProgress(v)) out.push({ kind: 'video', v: v, at: at });
     });
+    channelHistory.forEach(function(h){ out.push({ kind: 'channel', ch: h, at: h.at || 0 }); });
+    out = out.filter(function(e){ var hid = cwHidden[cwKey(e)]; return !(hid && hid >= e.at); });
+    out.sort(function(a, b){ return b.at - a.at; });
     return out.slice(0, 20);
+  }
+  function continueWatchingList(){
+    return continueWatchingEntries().filter(function(e){ return e.kind === 'video'; }).map(function(e){ return e.v; });
+  }
+  function removeFromContinueWatching(e){
+    cwHidden[cwKey(e)] = Date.now();
+    vsave(CW_HIDDEN_KEY, cwHidden);
+    refreshContinueWatching();
+  }
+  // Both places the list shows: the Video page and Home.
+  function refreshContinueWatching(){
+    if(typeof renderContinueWatchingHome === 'function') renderContinueWatchingHome();
+    if(onVideoView && !videoChannelsEditing) rerenderVideoKeepingScroll();
   }
 
   // ---- scanning
@@ -11685,13 +11796,78 @@
     stationsGrid.appendChild(tabs);
   }
   function appendContinueWatching(){
-    var list = continueWatchingList();
+    var list = continueWatchingEntries();
     if(!list.length) return;
     appendGridSection('Continue Watching').classList.add('ch-row-label');
     var row = document.createElement('div');
     row.className = 'cl-row vw-row';
-    list.forEach(function(v){ row.appendChild(buildContinueTile(v)); });
+    list.forEach(function(e){ row.appendChild(buildContinueEntryTile(e)); });
     stationsGrid.appendChild(row);
+  }
+  // One Continue Watching tile: a video (its still or poster, how far along) or a channel
+  // (its logo), with the three-dot menu in the top right corner like Continue Listening's.
+  function buildContinueEntryTile(e){
+    var tile = e.kind === 'channel' ? buildContinueChannelTile(e.ch) : buildContinueTile(e.v);
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'tile-fav tile-more vw-more';
+    more.title = 'More';
+    more.setAttribute('aria-label', 'More');
+    more.setAttribute('aria-haspopup', 'true');
+    more.innerHTML = '<span class="icon-ellipsis-v" aria-hidden="true"></span>';
+    more.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if(videoMenu){ closeVideoMenu(); return; }
+      openContinueMenu(more, e);
+    });
+    tile.querySelector('.vw-thumb').appendChild(more);
+    return tile;
+  }
+  function openContinueMenu(anchor, e){
+    closeVideoMenu();
+    var m = document.createElement('div');
+    m.className = 'ch-sort-menu v-menu';
+    m.setAttribute('role', 'menu');
+    function item(label, fn){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'np-menu-item';
+      b.setAttribute('role', 'menuitem');
+      b.textContent = label;
+      b.addEventListener('click', function(ev){ ev.stopPropagation(); closeVideoMenu(); fn(); });
+      m.appendChild(b);
+    }
+    if(e.kind === 'video') item('Mark Watched', function(){ markVideoWatched(e.v, true); invalidateVideoLib(); refreshContinueWatching(); });
+    item('Remove from Continue Watching', function(){ removeFromContinueWatching(e); });
+    document.body.appendChild(m);
+    var r = anchor.getBoundingClientRect();
+    m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+    m.style.top = Math.round(r.bottom + 4) + 'px';
+    var mr = m.getBoundingClientRect();
+    if(mr.bottom > window.innerHeight - 10) m.style.top = Math.max(8, Math.round(r.top - mr.height - 4)) + 'px';
+    videoMenu = m;
+  }
+  function buildContinueChannelTile(ch){
+    var tile = document.createElement('div');
+    tile.className = 'vw-tile vw-channel';
+    tile.dataset.key = favKey(channelToStation(ch));
+    var art = document.createElement('div');
+    art.className = 'vw-thumb vw-logo';
+    var inner = document.createElement('div');
+    inner.className = 'tile-art';
+    renderStationArt(inner, channelToStation(ch));
+    art.appendChild(inner);
+    tile.appendChild(art);
+    var n = document.createElement('div');
+    n.className = 'tile-name';
+    n.textContent = ch.name;
+    tile.appendChild(n);
+    var sub = document.createElement('div');
+    sub.className = 'tile-sub';
+    sub.textContent = channelRowName(ch) || 'Channel';
+    tile.appendChild(sub);
+    tile.addEventListener('click', function(){ playChannel(ch); });
+    return tile;
   }
   function progressBar(v){
     var f = progressFraction(v);
@@ -22220,8 +22396,9 @@
     }
     updatePlayerMeta(station, barSubFor(station));
     setPlayingUI(true);
-    // A video of your own goes to Continue Watching on the Video page, not Continue Listening.
-    if(isLocalVideo(station)) return;
+    // A video of your own, or a TV channel, goes to Continue Watching, not Continue Listening.
+    if(isLocalVideo(station)){ refreshContinueWatching(); return; }
+    if(isNpChannel(station)){ recordChannelWatch(station); return; }
     recordArtistPlay(station);
     recordRecent(station);
   }
