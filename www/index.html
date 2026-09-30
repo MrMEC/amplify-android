@@ -3956,6 +3956,41 @@
     background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.3); color:#fff;
   }
   body.rotate-lock .skip-glyph{ font-size:24px; }
+  /* Favourites row (landscape only). The screen becomes a column: the player above takes
+     whatever height is left, so opening the row shrinks the cover and details to make room
+     rather than pushing anything off screen. The row's height is what animates; the player
+     follows it frame by frame. */
+  .np-land-favs, .np-land-toggle{ display:none; }
+  body.rotate-lock .now-playing-screen{ flex-direction:column; --lf-size:clamp(52px, 19vh, 84px); --lf-ease:cubic-bezier(.2,.8,.2,1); }
+  body.rotate-lock .np-hero{ flex:1 1 0; min-height:0; height:auto; }
+  body.rotate-lock .np-land-favs{
+    display:block; flex:0 0 auto; height:0; margin:0 -26px; overflow:hidden;
+    transition:height .34s var(--lf-ease), margin-top .34s var(--lf-ease);
+  }
+  body.rotate-lock .now-playing-screen.lf-open .np-land-favs{ height:var(--lf-size); margin-top:18px; }
+  .np-land-favs-row{
+    display:flex; gap:12px; height:100%; padding:0 26px; box-sizing:border-box;
+    overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  }
+  .np-land-favs-row::-webkit-scrollbar{ display:none; }
+  .np-land-fav{
+    flex:0 0 auto; width:var(--lf-size); height:var(--lf-size); padding:0; border:none;
+    border-radius:10px; overflow:hidden; background:rgba(255,255,255,.12); cursor:pointer;
+    box-shadow:0 6px 16px rgba(0,0,0,.28); position:relative;
+  }
+  .np-land-fav > *{ width:100%; height:100%; }
+  .np-land-fav img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .np-land-fav.playing::after{ content:''; position:absolute; inset:0; border-radius:10px; box-shadow:inset 0 0 0 2px #fff; }
+  body.rotate-lock:not(.np-video-full) .np-land-toggle.has-favs{
+    display:flex; align-items:center; justify-content:center;
+    position:absolute; right:18px; bottom:18px; z-index:3;
+    width:44px; height:44px; padding:0; border:none; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; cursor:pointer;
+    transition:bottom .34s var(--lf-ease), background .15s ease;
+  }
+  body.rotate-lock .now-playing-screen.lf-open .np-land-toggle{ bottom:calc(18px + var(--lf-size) + 18px); }
+  .np-land-toggle svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; transition:transform .34s var(--lf-ease); }
+  .now-playing-screen.lf-open .np-land-toggle svg{ transform:rotate(180deg); }
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
     body.rotate-lock .sidebar-top{ display:none !important; }
@@ -4972,6 +5007,14 @@
           </div>
         </div>
       </div>
+
+      <!-- Landscape only: a row of favourite covers under the player, opened by the arrow. -->
+      <div class="np-land-favs" id="npLandFavs" aria-hidden="true">
+        <div class="np-land-favs-row" id="npLandFavsRow"></div>
+      </div>
+      <button type="button" class="np-land-toggle" id="npLandToggle" aria-expanded="false" aria-label="Show favorites" title="Favorites">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
 
       <!-- Everything below the artwork sits on the tint the artwork faded into. -->
       <div class="np-below">
@@ -9295,6 +9338,7 @@
   // closes the screen again on the way back if it was the one that opened it.
   // max-height is what actually tells a landscape phone apart from a landscape tablet or a
   // narrow desktop window, both of which stay plenty tall even sideways.
+  var renderLandFavs = function(){};
   if(window.matchMedia){
     var rotateLockQuery = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 926px)');
     var rotateLockOpenedNp = false;
@@ -9316,7 +9360,51 @@
       }
       document.body.classList.toggle('rotate-lock', active);
     };
+    // The favourites row always starts closed in landscape.
+    var npLandToggle = document.getElementById('npLandToggle');
+    var npLandFavsRow = document.getElementById('npLandFavsRow');
+    var landFavs = function(){
+      return favorites.filter(function(f){ return !isArtistFav(f) && !isAlbumFav(f); });
+    };
+    renderLandFavs = function(){
+      var list = landFavs();
+      npLandToggle.classList.toggle('has-favs', list.length > 0);
+      if(!list.length) setLandFavsOpen(false);
+      if(!nowPlayingScreen.classList.contains('lf-open')) return;
+      var cur = currentStation ? favKey(currentStation) : null;
+      npLandFavsRow.innerHTML = '';
+      list.forEach(function(f){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'np-land-fav' + (favKey(f) === cur ? ' playing' : '');
+        b.dataset.key = favKey(f);
+        b.setAttribute('aria-label', 'Play ' + stripExclusively(f.name || ''));
+        var art = document.createElement('div');
+        b.appendChild(art);
+        renderStationArt(art, f);
+        b.addEventListener('click', function(){
+          if(isLocalVideo(f)) playVideo(f); else playEntity(f);
+        });
+        npLandFavsRow.appendChild(b);
+      });
+    };
+    var setLandFavsOpen = function(open){
+      nowPlayingScreen.classList.toggle('lf-open', open);
+      npLandToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      npLandToggle.setAttribute('aria-label', open ? 'Hide favorites' : 'Show favorites');
+      document.getElementById('npLandFavs').setAttribute('aria-hidden', open ? 'false' : 'true');
+    };
+    npLandToggle.addEventListener('click', function(e){
+      e.stopPropagation();
+      setLandFavsOpen(!nowPlayingScreen.classList.contains('lf-open'));
+      renderLandFavs();
+    });
+    rotateLockQuery.addEventListener && rotateLockQuery.addEventListener('change', function(){
+      if(!rotateLockQuery.matches) setLandFavsOpen(false);
+      renderLandFavs();
+    });
     syncRotateLock();
+    renderLandFavs();
     if(rotateLockQuery.addEventListener) rotateLockQuery.addEventListener('change', syncRotateLock);
     else if(rotateLockQuery.addListener) rotateLockQuery.addListener(syncRotateLock); // older Safari
   }
@@ -9788,6 +9876,7 @@
       });
     }
     applyHomeTab();
+    if(renderLandFavs) renderLandFavs();
   }
 
   // ---------- genre nav ----------
@@ -22795,6 +22884,7 @@
     syncSeekBar();
     updateStepButtons();
     if(queuePanelOpen) renderQueuePanel();
+    if(renderLandFavs) renderLandFavs();
     if(nowPlayingScreen.style.display === 'flex'){
       // The screen is pinned to whatever it was opened for; once something else is
       // playing, that pin is stale, so it follows the new track rather than sitting
