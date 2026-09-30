@@ -17,9 +17,6 @@ REC = """
 (function(){ var P=window.Capacitor.Plugins.AmplifyPlayer; window.__pip=[];
   window.Capacitor.Plugins.AmplifyPlayer=new Proxy({}, {get:function(t,k){
     if(k==='setPip') return function(a){ window.__pip.push(a); return Promise.resolve({}); };
-    if(k==='streamDetails') return function(){ return Promise.resolve({playlistTags:12, playlistSegments:6, entries:[
-      {time:'09:01:02', kind:'Playlist', text:'#EXT-X-DATERANGE:ID="p1",START-DATE="2026-09-30T13:00:00Z",X-TITLE="Some Movie"'},
-      {time:'09:01:05', kind:'In the stream', text:'TXXX: description=title, value=Some Movie (1987)'}]}); };
     return P[k]; }});
 })();
 """
@@ -90,14 +87,6 @@ async def main():
         check(st[0] == 'flex' and st[1], f'on a channel too, Search only opens the box {st}')
         await pg.screenshot(path=f'{SHOTS}/np-channel-search.png')
         await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(400)
-        await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(200)
-        sd = await pg.evaluate("getComputedStyle(document.getElementById('npStreamDetailsBtn')).display")
-        check(sd != 'none', f'a playing channel offers Stream Details ({sd})')
-        await pg.evaluate("document.getElementById('npStreamDetailsBtn').click()"); await pg.wait_for_timeout(400)
-        rows = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.v-details-text'),function(x){return x.textContent;})")
-        check(len(rows) == 2 and 'Some Movie (1987)' in rows[0], f'Stream Details lists what the stream sent, newest first {rows}')
-        await pg.screenshot(path=f'{SHOTS}/np-stream-details.png')
-        await pg.evaluate("document.querySelector('.v-details-actions .vd-play').click()"); await pg.wait_for_timeout(200)
         heading = await pg.evaluate("document.getElementById('npCollectionHeading').textContent")
         check(heading == 'My Channels', f'no count over the channel list ({heading!r})')
         last = await pg.evaluate("window.__pip.slice(-1)[0]")

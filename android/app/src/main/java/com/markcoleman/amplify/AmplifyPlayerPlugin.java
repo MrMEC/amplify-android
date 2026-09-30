@@ -86,7 +86,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private final Handler main = new Handler(Looper.getMainLooper());
   private final List<Runnable> pending = new ArrayList();
   private final Player.Listener exoListener = new ExoListener();
-  private final StreamProbe probe = new StreamProbe();
   // Video: whether what is loaded carries a picture, its size, and the view that shows it.
   private boolean hasVideo;
   private int videoW, videoH;
@@ -252,7 +251,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             if (textOff != null) tp.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, textOff);
             exoPlayerExo.setTrackSelectionParameters(tp.build());
             if (this.video != null) this.video.setCues(null);
-            probe.clear();
             this.currentId = string2;
             // A new item: whether it has a picture is for its own tracks to say.
             this.hasVideo = false;
@@ -1487,20 +1485,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     return name;
   }
 
-  /** What the playing stream has said about itself (see StreamProbe). */
-  @PluginMethod
-  public void streamDetails(PluginCall call) {
-    run(
-        call,
-        () -> {
-          try {
-            probe.noteManifest(exo().getCurrentManifest());
-          } catch (Exception ignored) {
-          }
-          call.resolve(probe.toJson());
-        });
-  }
-
   /** The audio and subtitle tracks of what's playing, and which are on. */
   @PluginMethod
   public void videoTracks(PluginCall call) {
@@ -1615,19 +1599,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     @Override
     public void onCues(CueGroup cueGroup) {
       AmplifyPlayerPlugin.this.onCues(cueGroup);
-    }
-
-    @Override
-    public void onMetadata(androidx.media3.common.Metadata metadata) {
-      probe.noteMetadata(metadata);
-    }
-
-    @Override
-    public void onTimelineChanged(androidx.media3.common.Timeline timeline, int reason) {
-      try {
-        probe.noteManifest(exo().getCurrentManifest());
-      } catch (Exception ignored) {
-      }
     }
 
     private ExoListener() {}

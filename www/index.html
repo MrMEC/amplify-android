@@ -2957,16 +2957,6 @@
   .v-menu-head{ padding:8px 12px 4px; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
   .v-menu-note{ padding:4px 12px 8px; font-size:12.5px; color:var(--text-dim); }
   .v-tracks-menu{ max-height:70vh; overflow-y:auto; min-width:220px; }
-  .v-details-panel{ left:16px; right:16px; top:12vh; max-width:560px; margin:0 auto; max-height:72vh; display:flex; flex-direction:column; padding:14px; }
-  .v-details-title{ font-size:16px; font-weight:800; color:var(--text); padding:2px 4px 6px; }
-  .v-details-panel .v-menu-note{ padding:0 4px 10px; }
-  .v-details-list{ flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
-  .v-details-row{ padding:8px 10px; border-radius:10px; background:var(--panel-2); }
-  .v-details-meta{ font-size:11px; font-weight:700; color:var(--text-faint); }
-  .v-details-text{ margin-top:3px; font-size:12.5px; color:var(--text); font-family:ui-monospace, Menlo, Consolas, monospace; overflow-wrap:anywhere; white-space:pre-wrap; }
-  .v-details-foot{ margin-top:10px; padding:0 4px; font-size:11.5px; color:var(--text-faint); }
-  .v-details-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
-  .v-details-actions .vd-play, .v-details-actions .vd-secondary{ padding:8px 14px; font-size:12.5px; }
   .np-next-up{
     display:flex; align-items:center; gap:10px; width:100%; margin:10px 0 0; padding:10px 12px; border-radius:14px;
     background:var(--panel-2); border:1px solid var(--border);
@@ -4915,10 +4905,6 @@
                   <button type="button" class="np-menu-item" id="npChannelLink" role="menuitem" style="display:none;"></button>
                   <!-- A channel's video on/off lives here instead of the pill above the controls. -->
                   <button type="button" class="np-menu-item" id="npVideoMenuBtn" role="menuitem" style="display:none;"></button>
-                  <!-- A live stream or channel: what the stream itself says about what's on. -->
-                  <button type="button" class="np-menu-item" id="npStreamDetailsBtn" role="menuitem" style="display:none;">
-                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>Stream Details</span>
-                  </button>
                   <!-- A video of your own: subtitles and audio language. -->
                   <button type="button" class="np-menu-item" id="npTracksBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h2M11 11h6"/></svg><span>Subtitles &amp; Audio</span>
@@ -12370,84 +12356,7 @@
       setTimeout(openTracksMenu, 0);
     });
   }
-  // ---- Stream Details: everything a live stream has said about itself since it started
-  // (titles inside the stream, schedule tags in its playlist), to see whether a channel names
-  // what it is showing.
-  var npStreamDetailsBtn = document.getElementById('npStreamDetailsBtn');
-  function openStreamDetails(){
-    var P = videoPlugin2();
-    if(!P || typeof P.streamDetails !== 'function') return;
-    P.streamDetails().then(function(r){
-      r = r || {};
-      closeVideoMenu();
-      var m = document.createElement('div');
-      m.className = 'ch-sort-menu v-menu v-details-panel';
-      m.setAttribute('role', 'dialog');
-      var h = document.createElement('div');
-      h.className = 'v-details-title';
-      h.textContent = 'Stream Details';
-      m.appendChild(h);
-      var st = currentStation;
-      var intro = document.createElement('div');
-      intro.className = 'v-menu-note';
-      var list = r.entries || [];
-      intro.textContent = list.length
-        ? 'What ' + (st ? stripExclusively(st.name) : 'this stream') + ' has sent about itself since it started:'
-        : 'Nothing yet: this stream hasn\u2019t sent any titles or schedule information since it started. Leave it playing a few minutes and check again.';
-      m.appendChild(intro);
-      var box = document.createElement('div');
-      box.className = 'v-details-list';
-      list.slice().reverse().forEach(function(e){
-        var row = document.createElement('div');
-        row.className = 'v-details-row';
-        var meta = document.createElement('div');
-        meta.className = 'v-details-meta';
-        meta.textContent = e.time + ' \u00b7 ' + e.kind;
-        var txt = document.createElement('div');
-        txt.className = 'v-details-text';
-        txt.textContent = e.text;
-        row.appendChild(meta); row.appendChild(txt);
-        box.appendChild(row);
-      });
-      m.appendChild(box);
-      var foot = document.createElement('div');
-      foot.className = 'v-details-foot';
-      foot.textContent = 'Playlist: ' + (r.playlistTags || 0) + ' tags, ' + (r.playlistSegments || 0) + ' segments';
-      m.appendChild(foot);
-      var actions = document.createElement('div');
-      actions.className = 'v-details-actions';
-      var again = document.createElement('button');
-      again.type = 'button'; again.className = 'vd-secondary'; again.textContent = 'Check Again';
-      again.addEventListener('click', function(e){ e.stopPropagation(); openStreamDetails(); });
-      var copy = document.createElement('button');
-      copy.type = 'button'; copy.className = 'vd-secondary'; copy.textContent = 'Copy';
-      copy.addEventListener('click', function(e){
-        e.stopPropagation();
-        var text = list.map(function(x){ return x.time + ' ' + x.kind + ': ' + x.text; }).join('\n') || 'Nothing sent.';
-        try{ navigator.clipboard.writeText(text); copy.textContent = 'Copied'; }catch(err){}
-      });
-      var done = document.createElement('button');
-      done.type = 'button'; done.className = 'vd-play'; done.textContent = 'Close';
-      done.addEventListener('click', function(e){ e.stopPropagation(); closeVideoMenu(); });
-      actions.appendChild(again); actions.appendChild(copy); actions.appendChild(done);
-      m.appendChild(actions);
-      m.addEventListener('click', function(e){ e.stopPropagation(); });
-      document.body.appendChild(m);
-      videoMenu = m;
-    })['catch'](function(){});
-  }
-  if(npStreamDetailsBtn){
-    npStreamDetailsBtn.addEventListener('click', function(e){
-      e.stopPropagation();
-      closeNpMenu();
-      setTimeout(openStreamDetails, 0);
-    });
-  }
   function syncNpTracksBtn(st){
-    if(npStreamDetailsBtn){
-      var live = !!st && isLiveStream(st) && !!videoPlugin2() && !!currentStation && favKey(st) === favKey(currentStation);
-      npStreamDetailsBtn.style.display = live ? '' : 'none';
-    }
     if(npTracksBtn) npTracksBtn.style.display = isLocalVideo(st) && !!videoPlugin2() ? '' : 'none';
   }
 
