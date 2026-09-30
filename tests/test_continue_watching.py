@@ -12,7 +12,8 @@ from playwright.async_api import async_playwright
 
 CH = [{'id': 'iptv:ABCNews.us', 'name': 'ABC News Live', 'url': 'https://abc.example/live1080.m3u8', 'logo': '', 'country': 'US', 'cats': ['news'], 'catNames': ['News'], 'src': 'iptv', 'addedAt': 1},
       {'id': 'freetv:pbs', 'name': 'PBS', 'url': 'https://pbs.example/live.m3u8', 'logo': '', 'country': 'USA', 'cats': [], 'catNames': [], 'src': 'freetv', 'addedAt': 2}]
-RECENT = [{'name': 'Jazz FM', 'url': 'https://jazz.example/s', 'url_resolved': 'https://jazz.example/s', 'urlToResolve': 'https://jazz.example/s', 'favicon': '', 'tags': 'jazz', 'country': 'US', 'stationuuid': 'j1'}]
+RECENT = [{'name': 'PBS', 'urlToResolve': 'https://pbs.example/live.m3u8', 'favicon': '', 'tags': '', 'country': 'USA', 'stationuuid': None},
+          {'name': 'Jazz FM', 'url': 'https://jazz.example/s', 'url_resolved': 'https://jazz.example/s', 'urlToResolve': 'https://jazz.example/s', 'favicon': '', 'tags': 'jazz', 'country': 'US', 'stationuuid': 'j1'}]
 
 async def tnames(pg, sel):
     return await pg.evaluate("(s)=>Array.prototype.map.call(document.querySelectorAll(s),function(t){return t.textContent;})", sel)
@@ -44,6 +45,9 @@ async def main():
         check(vis['channelsHomeSection'][1] and chs == ['ABC News Live', 'PBS'] and vis['channelsHomeSection'][2] > vis['forYouSection'][2],
               f'Home: My Channels row under For You {chs} {order}')
         check(not vis['continueWatchingHomeSection'][1], 'Continue Watching stays hidden while there is nothing to continue')
+        cl = await tnames(pg, '#recentGrid .tile-name')
+        rec0 = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerRecent')||'[]').map(function(r){return r.name;})")
+        check(cl == ['Jazz FM'] and rec0 == ['Jazz FM'], f'a channel left in Continue Listening by an older build is taken out {cl} {rec0}')
         await pg.screenshot(path=f'{SHOTS}/cw-home-channels.png', full_page=True)
         # a movie, part watched
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(500)
