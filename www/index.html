@@ -2931,6 +2931,9 @@
   .vd-left{ font-size:12.5px; color:var(--text-dim); white-space:nowrap; }
   .vd-watched{ margin-top:16px; font-size:13px; font-weight:700; color:var(--accent); display:flex; gap:7px; align-items:center; }
   .vd-file{ margin-top:18px; font-size:12px; color:var(--text-faint); overflow-wrap:anywhere; }
+  .vd-overview{ margin-top:18px; }
+  .vd-overview-text{ font-size:14px; line-height:1.55; color:var(--text-dim); white-space:pre-line; }
+  .vd-overview .artist-bio-credit{ margin-top:8px; }
   /* Episode rows (a show's page, and the list under a video on Now Playing). */
   .tile-grid > .vep-row, .np-related-grid .vep-row{ grid-column:1/-1; }
   .vep-row{
@@ -11438,9 +11441,14 @@
       var s = vlib().showsByKey[v.showKey];
       var sc = s && getCustomArtUrl('vshow:' + s.key);
       if(sc) return sc;
-      return capUrl((s && (s.seasonPosters[v.season] || s.poster)) || v.thumb) || stillUrl(v);
+      var folderPic = s && (s.seasonPosters[v.season] || s.poster);
+      if(folderPic) return capUrl(folderPic);
+      var sw = s && wikiRecord(s, 'show');
+      return (sw && sw.poster) || capUrl(v.thumb) || stillUrl(v);
     }
-    return capUrl(v.poster) || stillUrl(v);
+    if(v.poster) return capUrl(v.poster);
+    var mw = wikiRecord(v, 'movie');
+    return (mw && mw.poster) || stillUrl(v);
   }
   function stillUrl(v){ return v && v.still ? capUrl(v.still) : ''; }
   function episodeImageUrl(v){ return getCustomArtUrl('video:' + v.id) || capUrl(v.thumb) || stillUrl(v); }
@@ -11448,6 +11456,8 @@
     var custom = getCustomArtUrl('vshow:' + s.key);
     if(custom) return custom;
     if(s.poster) return capUrl(s.poster);
+    var sw = wikiRecord(s, 'show');
+    if(sw && sw.poster) return sw.poster;
     for(var i = 0; i < s.episodes.length; i++){
       var sp = s.seasonPosters[s.episodes[i].season];
       if(sp) return capUrl(sp);
@@ -11738,6 +11748,7 @@
     return list;
   }
   function renderVideoLibraryTab(tab){
+    runVideoWikiQueue();
     var items = sortedVideoItems(tab);
     videoReorderHeaderBtnEl.style.display = 'none';
     videoSortHeaderBtnEl.style.display = items.length > 1 ? '' : 'none';
@@ -11936,6 +11947,8 @@
       w.innerHTML = '<i class="fa-solid fa-check"></i> Watched';
       wrap.appendChild(w);
     }
+    var ov = wikiOverview(wikiRecord(v, 'movie'));
+    if(ov) wrap.appendChild(ov);
     var file = document.createElement('div');
     file.className = 'vd-file';
     file.textContent = v.relPath || v.fileName;
@@ -11969,6 +11982,8 @@
     }
     actions.appendChild(buildVideoMoreBtn(s, 'show'));
     wrap.appendChild(actions);
+    var sov = wikiOverview(wikiRecord(s, 'show'));
+    if(sov) wrap.appendChild(sov);
     stationsGrid.appendChild(wrap);
     if(seasons.length > 1){
       var tabs = document.createElement('div');
@@ -12069,6 +12084,7 @@
       item('Change Poster', function(){
         openArtUrlDialogFor({ key: 'vshow:' + x.key, title: 'Poster', name: x.title + ' TV show poster', refresh: refresh });
       });
+      item('Fix Show Info', function(){ openVideoWikiDialog(x, 'show'); });
     } else {
       item(isWatched(x) ? 'Mark Unwatched' : 'Mark Watched', function(){ markVideoWatched(x, !isWatched(x)); refresh(); });
       item(what === 'movie' ? 'Rename' : 'Rename Episode', function(){
@@ -12105,6 +12121,7 @@
           refresh();
         });
       }
+      if(what === 'movie') item('Fix Movie Info', function(){ openVideoWikiDialog(x, 'movie'); });
       item(what === 'movie' ? 'Change Poster' : 'Change Picture', function(){
         openArtUrlDialogFor({ key: 'video:' + x.id, title: what === 'movie' ? 'Poster' : 'Episode Picture',
           name: what === 'movie' ? (x.title + (x.year ? ' ' + x.year : '') + ' movie poster') : (x.show + ' ' + episodeCode(x) + (x.epTitle ? ' ' + x.epTitle : '')),
@@ -12391,6 +12408,158 @@
   }
   document.getElementById('npNextUpPlay').addEventListener('click', function(){ var go = nextUpTarget; cancelNextUp(); startNextEpisode(go); });
   document.getElementById('npNextUpCancel').addEventListener('click', cancelNextUp);
+
+  // ---- Wikipedia: a poster and a description for every movie and show
+  // Looked up once each (search, then the best article: same title, a film for a movie or a
+  // TV series for a show, the year when there is one) and kept. A wrong match is fixed from
+  // the title's menu with the same article picker the artist pages use.
+  var VIDEO_WIKI_KEY = 'radioPlayerVideoWiki';
+  var videoWiki = vload(VIDEO_WIKI_KEY, {});
+  var SCREEN_RE = /\b(film|movie|television|tv series|tv show|sitcom|miniseries|mini-series|web series|anime|docuseries|series)\b/i;
+  function looksLikeScreenWork(text){ return SCREEN_RE.test(String(text || '')); }
+  function wikiTarget(x, kind){
+    return kind === 'show'
+      ? { kind: 'show', wkey: 'show:' + x.key, title: x.title, year: '' }
+      : { kind: 'movie', wkey: 'movie:' + x.id, title: x.title, year: x.year || '' };
+  }
+  function wikiRecord(x, kind){ var r = videoWiki[wikiTarget(x, kind).wkey]; return r && r.ok ? r : null; }
+  function normTitle(t){
+    return String(t || '').toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').replace(/&/g, 'and')
+      .replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9]+/g, '');
+  }
+  function firstParagraphs(text){
+    var parts = String(text || '').split(/\n+/).map(function(x){ return x.trim(); }).filter(Boolean);
+    var out = '';
+    for(var i = 0; i < parts.length; i++){
+      if(out && (out.length + parts[i].length) > 900) break;
+      out += (out ? '\n\n' : '') + parts[i];
+      if(out.length > 500) break;
+    }
+    return out;
+  }
+  function pageToRecord(p){
+    var img = (p.thumbnail && p.thumbnail.source) || (p.original && p.original.source) || '';
+    return { ok: true, title: p.title, desc: p.description || '', extract: firstParagraphs(p.extract),
+      poster: img, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(String(p.title).replace(/ /g, '_')), at: Date.now() };
+  }
+  var WIKI_PAGE_PROPS = '&prop=pageimages%7Cdescription%7Cextracts&piprop=thumbnail%7Coriginal&pithumbsize=600&exintro=1&explaintext=1&exlimit=10&redirects=1';
+  function findVideoWiki(t){
+    var q = t.kind === 'show' ? (t.title + ' TV series') : (t.title + (t.year ? ' ' + t.year : '') + ' film');
+    var url = WIKI_API + '?action=query&format=json&origin=*&generator=search&gsrlimit=8' + WIKI_PAGE_PROPS + '&gsrsearch=' + encodeURIComponent(q);
+    return wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(data){
+      if(!data) return null;   // no answer: try again another time
+      var pages = (data.query && data.query.pages) || {};
+      var want = normTitle(t.title), best = null, bestScore = -1;
+      Object.keys(pages).forEach(function(k){
+        var p = pages[k];
+        var d = p.description || '';
+        if(/disambiguation|topics referred to by the same term/i.test(d)) return;
+        var nt = normTitle(p.title);
+        var titleScore = nt === want ? 3 : (want && nt.indexOf(want) === 0 ? 1 : 0);
+        if(!titleScore) return;
+        var kindOk = t.kind === 'show'
+          ? /television|tv series|tv show|sitcom|miniseries|mini-series|web series|anime|docuseries|series/i.test(d + ' ' + p.title)
+          : /\bfilm\b|\bmovie\b/i.test(d + ' ' + p.title);
+        if(!kindOk) return;
+        var yearOk = t.year && (d.indexOf(t.year) !== -1 || String(p.title).indexOf(t.year) !== -1);
+        var score = titleScore * 2 + (yearOk ? 3 : 0) + (p.thumbnail ? 1 : 0) - (p.index || 0) * 0.1;
+        if(score > bestScore){ bestScore = score; best = p; }
+      });
+      return best ? pageToRecord(best) : { ok: false, at: Date.now() };
+    })['catch'](function(){ return null; });
+  }
+  function setVideoWiki(t, rec){
+    videoWiki[t.wkey] = rec;
+    vsave(VIDEO_WIKI_KEY, videoWiki);
+    afterVideoWikiChange();
+  }
+  function lookUpVideoWiki(t){
+    return findVideoWiki(t).then(function(rec){
+      if(rec){ videoWiki[t.wkey] = rec; vsave(VIDEO_WIKI_KEY, videoWiki); }
+      return rec;
+    });
+  }
+  var videoWikiRunning = false, videoWikiRenderTimer = null;
+  function afterVideoWikiChange(){
+    if(videoWikiRenderTimer) return;
+    videoWikiRenderTimer = setTimeout(function(){
+      videoWikiRenderTimer = null;
+      if(onVideoView && !videoChannelsEditing) rerenderVideoKeepingScroll();
+      else if(onVideoDetailView && videoDetailRerender) videoDetailRerender();
+    }, 900);
+  }
+  // Everything not looked up yet (and, a week later, anything not found), one at a time.
+  function runVideoWikiQueue(){
+    if(videoWikiRunning || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    var lib = vlib(), todo = [];
+    var week = 7 * 24 * 3600 * 1000;
+    function need(t){ var r = videoWiki[t.wkey]; return !r || (!r.ok && !r.manual && Date.now() - (r.at || 0) > week); }
+    lib.movies.forEach(function(m){ var t = wikiTarget(m, 'movie'); if(need(t)) todo.push(t); });
+    lib.shows.forEach(function(s){ var t = wikiTarget(s, 'show'); if(need(t)) todo.push(t); });
+    if(!todo.length) return;
+    videoWikiRunning = true;
+    (function next(){
+      var t = todo.shift();
+      if(!t){ videoWikiRunning = false; return; }
+      lookUpVideoWiki(t).then(function(rec){
+        if(rec && rec.ok) afterVideoWikiChange();
+        setTimeout(next, 250);
+      });
+    })();
+  }
+  setTimeout(runVideoWikiQueue, 3000);
+  function videoWikiCurrentTitle(t){ var r = videoWiki[t.wkey]; return r && r.ok ? r.title : ''; }
+  function openVideoWikiDialog(x, kind){
+    var t = wikiTarget(x, kind);
+    artistInfoEntry = { key: t.wkey, name: t.title, video: t };
+    artistInfoNote.textContent = '';
+    document.getElementById('artistInfoTitle').textContent = kind === 'show' ? 'Show info' : 'Movie info';
+    document.getElementById('artistInfoLede').textContent = 'Choose the Wikipedia article about this ' + (kind === 'show' ? 'show' : 'movie') + '.';
+    artistInfoInput.value = t.title + (t.year ? ' ' + t.year : '') + (kind === 'show' ? ' TV series' : ' film');
+    var rec = videoWiki[t.wkey];
+    artistInfoResetBtn.hidden = !(rec && rec.manual);
+    artistInfoOverlay.classList.add('open');
+    searchArtistInfo(artistInfoInput.value);
+  }
+  function chooseVideoArticle(title, row){
+    var entry = artistInfoEntry;
+    if(!entry || !entry.video) return;
+    row.classList.add('busy');
+    var url = WIKI_API + '?action=query&format=json&origin=*' + WIKI_PAGE_PROPS + '&titles=' + encodeURIComponent(title);
+    wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(data){
+      var pages = (data && data.query && data.query.pages) || {};
+      var p = pages[Object.keys(pages)[0]];
+      if(!p || p.missing != null){
+        row.classList.remove('busy');
+        artistInfoNote.textContent = 'That article could not be loaded. Try another one.';
+        return;
+      }
+      closeArtistInfoDialog();
+      var rec = pageToRecord(p);
+      rec.manual = true;
+      setVideoWiki(entry.video, rec);
+    })['catch'](function(){
+      row.classList.remove('busy');
+      artistInfoNote.textContent = 'Couldn\u2019t reach Wikipedia. Check the connection and try again.';
+    });
+  }
+  function wikiOverview(rec){
+    if(!rec || !rec.extract) return null;
+    var box = document.createElement('div');
+    box.className = 'vd-overview';
+    var p = document.createElement('div');
+    p.className = 'vd-overview-text';
+    p.textContent = rec.extract;
+    box.appendChild(p);
+    var a = document.createElement('a');
+    a.className = 'artist-bio-credit';
+    a.href = rec.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = 'From Wikipedia';
+    box.appendChild(a);
+    return box;
+  }
 
   // Backup: the folders' names, fixes and where you are in each video (the files stay on the
   // phone; a restored folder list is a reminder to add those folders again).
@@ -18277,7 +18446,8 @@
   var artistInfoEntry = null;
   var artistInfoSeq = 0;
   var artistInfoTimer = null;
-  function wikiCandidates(q){
+  function wikiCandidates(q, prefer){
+    prefer = prefer || looksMusical;
     var url = WIKI_API + '?action=query&format=json&origin=*&generator=search&gsrlimit=10'
       + '&prop=pageimages%7Cdescription&piprop=thumbnail&pithumbsize=120&gsrsearch=' + encodeURIComponent(q);
     return wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(data){
@@ -18285,8 +18455,8 @@
       var list = Object.keys(pages).map(function(k){ return pages[k]; })
         .filter(function(p){ return !/topics referred to by the same term|disambiguation/i.test(p.description || ''); })
         .sort(function(a, b){ return a.index - b.index; });
-      var musical = list.filter(function(p){ return looksMusical(p.description); });
-      var rest = list.filter(function(p){ return !looksMusical(p.description); });
+      var musical = list.filter(function(p){ return prefer(p.description); });
+      var rest = list.filter(function(p){ return !prefer(p.description); });
       return musical.concat(rest).slice(0, 8);
     })['catch'](function(){ return null; });
   }
@@ -18306,7 +18476,7 @@
       artistInfoList.innerHTML = '<div class="artist-info-empty">No articles found. Try another spelling.</div>';
       return;
     }
-    var current = currentArticleTitle(artistInfoEntry.key);
+    var current = artistInfoEntry.video ? videoWikiCurrentTitle(artistInfoEntry.video) : currentArticleTitle(artistInfoEntry.key);
     pages.forEach(function(p){
       var row = document.createElement('button');
       row.type = 'button';
@@ -18330,7 +18500,7 @@
       text.appendChild(name); text.appendChild(desc);
       row.appendChild(img); row.appendChild(text);
       if(isCurrent){ var ck = document.createElement('i'); ck.className = 'fa-solid fa-check'; ck.setAttribute('aria-hidden', 'true'); row.appendChild(ck); }
-      row.onclick = function(){ chooseArtistArticle(p.title, row); };
+      row.onclick = function(){ if(artistInfoEntry && artistInfoEntry.video) chooseVideoArticle(p.title, row); else chooseArtistArticle(p.title, row); };
       artistInfoList.appendChild(row);
     });
   }
@@ -18339,10 +18509,13 @@
     q = String(q || '').trim();
     if(!q){ artistInfoList.innerHTML = ''; return; }
     artistInfoList.innerHTML = '<div class="artist-info-empty">Searching\u2026</div>';
-    wikiCandidates(q).then(function(pages){ if(seq === artistInfoSeq) renderArtistInfoRows(pages); });
+    var prefer = artistInfoEntry && artistInfoEntry.video ? looksLikeScreenWork : null;
+    wikiCandidates(q, prefer).then(function(pages){ if(seq === artistInfoSeq) renderArtistInfoRows(pages); });
   }
   function openArtistInfoDialog(entry){
     artistInfoEntry = entry;
+    document.getElementById('artistInfoTitle').textContent = 'Artist info';
+    document.getElementById('artistInfoLede').textContent = 'Choose the article about this artist.';
     artistInfoNote.textContent = '';
     artistInfoInput.value = sanitizeArtistName(entry.name);
     var rec = artistMeta[entry.key];
@@ -18398,12 +18571,20 @@
   document.getElementById('artistInfoNoneBtn').onclick = function(){
     var entry = artistInfoEntry;
     if(!entry) return;
+    if(entry.video){ closeArtistInfoDialog(); setVideoWiki(entry.video, { ok: false, manual: true, at: Date.now() }); return; }
     closeArtistInfoDialog();
     applyArtistInfo(entry, { key: entry.key, query: entry.name, ok: false, manual: true, name: '', bio: '', photoUrl: '', sourceUrl: '', description: '', ts: Date.now() });
   };
   artistInfoResetBtn.onclick = function(){
     var entry = artistInfoEntry;
     if(!entry) return;
+    if(entry.video){
+      closeArtistInfoDialog();
+      delete videoWiki[entry.video.wkey];
+      vsave(VIDEO_WIKI_KEY, videoWiki);
+      lookUpVideoWiki(entry.video).then(function(){ afterVideoWikiChange(); });
+      return;
+    }
     closeArtistInfoDialog();
     // Forget the hand-made choice and look it up afresh.
     var stale = { key: entry.key, query: entry.name, ok: false, manual: false, ts: 0 };

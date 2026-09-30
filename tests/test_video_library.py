@@ -184,7 +184,7 @@ async def main():
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){return t.querySelector('.tile-name').textContent==='The Matrix';}).click()"); await pg.wait_for_timeout(600)
         await pg.evaluate("document.querySelector('.vd-actions .vd-more').click()"); await pg.wait_for_timeout(200)
         items = await names(pg, '.v-menu .np-menu-item')
-        check(items == ['Mark Watched', 'Rename', 'This Is a TV Episode', 'Change Poster'], f'a movie menu offers the fixes {items}')
+        check(items == ['Mark Watched', 'Rename', 'This Is a TV Episode', 'Fix Movie Info', 'Change Poster'], f'a movie menu offers the fixes {items}')
         await pg.screenshot(path=f'{SHOTS}/vlib-menu.png')
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.v-menu .np-menu-item'),function(b){return b.textContent==='Rename';}).click()"); await pg.wait_for_timeout(500)
         t = await pg.evaluate("document.querySelector('.vd-title').textContent")
