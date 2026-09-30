@@ -2949,6 +2949,18 @@
   .vep-row.playing .vep-title{ color:var(--accent); }
   .vep-row.playing .vep-thumb{ box-shadow:0 0 0 3px var(--accent); }
   @media (max-width: 900px){ .vep-thumb{ width:112px; } }
+  .v-menu-head{ padding:8px 12px 4px; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); }
+  .v-menu-note{ padding:4px 12px 8px; font-size:12.5px; color:var(--text-dim); }
+  .v-tracks-menu{ max-height:70vh; overflow-y:auto; min-width:220px; }
+  .np-next-up{
+    display:flex; align-items:center; gap:10px; width:100%; margin:10px 0 0; padding:10px 12px; border-radius:14px;
+    background:var(--panel-2); border:1px solid var(--border);
+  }
+  .np-next-up[hidden]{ display:none; }
+  .np-next-up-text{ flex:1; min-width:0; display:flex; flex-direction:column; text-align:left; }
+  .np-next-up-label{ font-size:11.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--accent); }
+  .np-next-up-title{ font-size:13.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .np-next-up .vd-play, .np-next-up .vd-secondary{ padding:8px 14px; font-size:12.5px; flex-shrink:0; }
   .tile.tile-row.ch-item .ch-grip{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
   .tile.tile-row.ch-item .ch-grip svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
   .tile.tile-row.ch-item.playing .tile-name{ color:var(--accent); }
@@ -4882,6 +4894,10 @@
                   <button type="button" class="np-menu-item" id="npChannelLink" role="menuitem" style="display:none;"></button>
                   <!-- A channel's video on/off lives here instead of the pill above the controls. -->
                   <button type="button" class="np-menu-item" id="npVideoMenuBtn" role="menuitem" style="display:none;"></button>
+                  <!-- A video of your own: subtitles and audio language. -->
+                  <button type="button" class="np-menu-item" id="npTracksBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h2M11 11h6"/></svg><span>Subtitles &amp; Audio</span>
+                  </button>
                   <button type="button" class="np-menu-item" id="npArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit cover art</span>
                   </button>
@@ -4902,6 +4918,12 @@
                 <span id="npSeekElapsed">0:00</span>
                 <span id="npSeekTotal">0:00</span>
               </div>
+            </div>
+            <!-- When an episode ends: the next one, counting down, with Play Now and Cancel. -->
+            <div class="np-next-up" id="npNextUp" hidden>
+              <div class="np-next-up-text"><span class="np-next-up-label" id="npNextUpLabel">Up Next</span><span class="np-next-up-title" id="npNextUpTitle"></span></div>
+              <button type="button" class="vd-play np-next-up-play" id="npNextUpPlay">Play Now</button>
+              <button type="button" class="vd-secondary" id="npNextUpCancel">Cancel</button>
             </div>
             <!-- What plays after this, and the way into the queue. The same panel also opens by
                  swiping left anywhere on this screen. -->
@@ -5609,7 +5631,11 @@
     real.then(function(url){
       if(!wanted()) return;
       self._sent = true;
-      return P.load({ id: id, url: url, play: !self._paused, start: self._startAt || 0, rate: self._rate, volume: self._muted ? 0 : self._vol })
+      var args = { id: id, url: url, play: !self._paused, start: self._startAt || 0, rate: self._rate, volume: self._muted ? 0 : self._vol };
+      // Extra options for this one load (a video's subtitle files, subtitles on or off).
+      var extra = self._loadExtra; self._loadExtra = null;
+      if(extra) for(var k in extra) if(Object.prototype.hasOwnProperty.call(extra, k)) args[k] = extra[k];
+      return P.load(args)
         .then(function(r){ try{ window.dispatchEvent(new Event('amplify-native-loaded')); }catch(e){} return r; });
     })['catch'](function(e){
       if(!wanted() || (e && e.name === 'AbortError')) return;
@@ -7755,6 +7781,7 @@
     if(vidItem){ npCopyBtn.style.display = 'none'; npMoreLikeBtn.style.display = 'none'; }
     npDeleteBtn.style.display = vidItem ? 'none' : '';
     npPlaylistBtn.style.display = vidItem ? 'none' : '';
+    syncNpTracksBtn(st);
     // Next and Previous are meaningless on a station, so they are hidden rather than left
     // sitting there permanently greyed out.
     syncNpStepVisibility();
@@ -12085,6 +12112,14 @@
       el.classList.toggle('playing', el.dataset.key === favKey(t));
     });
     function stillWanted(){ return currentStation === t; }
+    cancelNextUp();
+    var v0 = vlib().byId[t.id];
+    try{
+      audio._loadExtra = {
+        subs: ((v0 && v0.subs) || []).map(function(sb){ var l = subtitleLang(sb.name, v0.fileName); return { uri: sb.uri, name: sb.name, label: l.label, language: l.code }; }),
+        textOff: videoSubsOff
+      };
+    }catch(e){}
     tryPlayUrl(t.uri).then(function(){
       if(!stillWanted()) return;
       var p = videoProgress[t.id];
@@ -12181,6 +12216,146 @@
     row.addEventListener('click', function(){ playVideo(v); });
     return row;
   }
+  // ---- subtitles and audio language
+  var VIDEO_SUBS_OFF_KEY = 'radioPlayerVideoSubsOff';
+  var videoSubsOff = vload(VIDEO_SUBS_OFF_KEY, false) === true;
+  var LANG_NAMES = { en: 'English', eng: 'English', es: 'Spanish', spa: 'Spanish', fr: 'French', fre: 'French', fra: 'French',
+    de: 'German', ger: 'German', deu: 'German', it: 'Italian', ita: 'Italian', pt: 'Portuguese', por: 'Portuguese',
+    nl: 'Dutch', ja: 'Japanese', jpn: 'Japanese', ko: 'Korean', kor: 'Korean', zh: 'Chinese', chi: 'Chinese', ru: 'Russian', rus: 'Russian' };
+  // "Movie.en.forced.srt" -> English (forced); "Movie.srt" -> Subtitles.
+  function subtitleLang(subName, videoName){
+    var b = baseName(subName), vb = baseName(videoName || '');
+    var rest = b.toLowerCase().indexOf(vb.toLowerCase()) === 0 ? b.slice(vb.length) : b;
+    var tokens = rest.split(/[._\s-]+/).filter(Boolean).map(function(x){ return x.toLowerCase(); });
+    var code = '', extras = [];
+    tokens.forEach(function(tk){
+      if(LANG_NAMES[tk] && !code) code = tk;
+      else if(/^(forced|sdh|cc|hi)$/.test(tk)) extras.push(tk === 'forced' ? 'forced' : 'SDH');
+    });
+    var label = code ? LANG_NAMES[code] : 'Subtitles';
+    if(extras.length) label += ' (' + extras.join(', ') + ')';
+    return { code: code.length === 3 ? ({ eng: 'en', spa: 'es', fre: 'fr', fra: 'fr', ger: 'de', deu: 'de', ita: 'it', por: 'pt', jpn: 'ja', kor: 'ko', chi: 'zh', rus: 'ru' })[code] || code : code, label: label };
+  }
+  var npTracksBtn = document.getElementById('npTracksBtn');
+  function openTracksMenu(){
+    var P = videoPlugin2();
+    if(!P || typeof P.videoTracks !== 'function') return;
+    P.videoTracks().then(function(r){
+      r = r || {};
+      closeVideoMenu();
+      var m = document.createElement('div');
+      m.className = 'ch-sort-menu v-menu v-tracks-menu';
+      m.setAttribute('role', 'menu');
+      function head(label){
+        var h = document.createElement('div');
+        h.className = 'v-menu-head';
+        h.textContent = label;
+        m.appendChild(h);
+      }
+      function opt(label, on, fn){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'np-menu-item' + (on ? ' on' : '');
+        b.setAttribute('role', 'menuitemradio');
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (on ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
+        b.lastChild.textContent = label;
+        b.addEventListener('click', function(e){ e.stopPropagation(); closeVideoMenu(); fn(); });
+        m.appendChild(b);
+      }
+      var text = r.text || [], aud = r.audio || [];
+      var anyText = text.some(function(t){ return t.selected; });
+      head('Subtitles');
+      opt('Off', r.textOff || !anyText, function(){
+        videoSubsOff = true; vsave(VIDEO_SUBS_OFF_KEY, true);
+        P.selectVideoTrack({ type: 'text', off: true })['catch'](function(){});
+      });
+      text.forEach(function(t){
+        opt(t.label, !r.textOff && t.selected, function(){
+          videoSubsOff = false; vsave(VIDEO_SUBS_OFF_KEY, false);
+          P.selectVideoTrack({ type: 'text', group: t.group, track: t.track })['catch'](function(){});
+        });
+      });
+      if(!text.length){
+        var none = document.createElement('div');
+        none.className = 'v-menu-note';
+        none.textContent = 'This video has no subtitles.';
+        m.appendChild(none);
+      }
+      if(aud.length > 1){
+        head('Audio');
+        aud.forEach(function(t){
+          opt(t.label, t.selected, function(){ P.selectVideoTrack({ type: 'audio', group: t.group, track: t.track })['catch'](function(){}); });
+        });
+      }
+      document.body.appendChild(m);
+      var mr = m.getBoundingClientRect();
+      m.style.left = Math.max(8, Math.round((window.innerWidth - mr.width) / 2)) + 'px';
+      m.style.top = Math.max(8, Math.round((window.innerHeight - mr.height) / 2)) + 'px';
+      videoMenu = m;
+    })['catch'](function(){});
+  }
+  if(npTracksBtn){
+    npTracksBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      closeNpMenu();
+      setTimeout(openTracksMenu, 0);
+    });
+  }
+  function syncNpTracksBtn(st){
+    if(npTracksBtn) npTracksBtn.style.display = isLocalVideo(st) && !!videoPlugin2() ? '' : 'none';
+  }
+
+  // ---- the next episode, after a short countdown
+  var npNextUp = document.getElementById('npNextUp');
+  var nextUpTimer = null, nextUpTarget = null, nextUpLeft = 0;
+  var NEXT_UP_SECONDS = 10;
+  function episodeAfter(t){
+    if(!t || t.videoKind !== 'episode') return null;
+    var s = vlib().showsByKey[t.showKey];
+    if(!s) return null;
+    for(var i = 0; i < s.episodes.length; i++){
+      if(s.episodes[i].id === t.id) return s.episodes[i + 1] || null;
+    }
+    return null;
+  }
+  function cancelNextUp(){
+    if(nextUpTimer){ clearInterval(nextUpTimer); nextUpTimer = null; }
+    nextUpTarget = null;
+    if(npNextUp) npNextUp.hidden = true;
+  }
+  function paintNextUp(){
+    if(!npNextUp || !nextUpTarget) return;
+    document.getElementById('npNextUpLabel').textContent = 'Up next in ' + nextUpLeft;
+    document.getElementById('npNextUpTitle').textContent = episodeCode(nextUpTarget) + (nextUpTarget.epTitle ? ' \u00b7 ' + nextUpTarget.epTitle : '');
+  }
+  function playNextEpisodeAfter(t){
+    var n = episodeAfter(t);
+    if(!n) return false;
+    cancelNextUp();
+    nextUpTarget = n;
+    nextUpLeft = NEXT_UP_SECONDS;
+    setPlayingUI(false);
+    syncSeekBar();
+    if(npNextUp) npNextUp.hidden = false;
+    paintNextUp();
+    nextUpTimer = setInterval(function(){
+      nextUpLeft--;
+      if(nextUpLeft <= 0){ var go = nextUpTarget; cancelNextUp(); startNextEpisode(go); return; }
+      paintNextUp();
+    }, 1000);
+    return true;
+  }
+  function startNextEpisode(v){
+    if(!v) return;
+    var npOpen = nowPlayingScreen.style.display === 'flex';
+    var t = videoToTrack(v);
+    playStation(t);
+    if(npOpen) openNowPlaying(t, false);
+  }
+  document.getElementById('npNextUpPlay').addEventListener('click', function(){ var go = nextUpTarget; cancelNextUp(); startNextEpisode(go); });
+  document.getElementById('npNextUpCancel').addEventListener('click', cancelNextUp);
+
   // Backup: the folders' names, fixes and where you are in each video (the files stay on the
   // phone; a restored folder list is a reminder to add those folders again).
   function exportVideoLibrary(){
@@ -21598,6 +21773,7 @@
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
     if(reconnectState && reconnectState.station !== track) cancelReconnect();
+    cancelNextUp();
     if(isLocalTrack(track)) return playLocalTrack(track);
     if(isPodcastTrack(track)) return playPodcastEpisode(track);
     if(isLocalVideo(track)) return playLocalVideo(track);

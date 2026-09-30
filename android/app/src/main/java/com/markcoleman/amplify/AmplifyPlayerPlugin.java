@@ -27,12 +27,18 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.TrackSelectionOverride;
+import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
+import androidx.media3.common.text.Cue;
+import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaController;
@@ -213,6 +219,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     Double dValueOf = Double.valueOf(1.0d);
     final Double d = pluginCall.getDouble("rate", dValueOf);
     final Double d2 = pluginCall.getDouble("volume", dValueOf);
+    // A video of your own can bring subtitle files from beside it, and says whether subtitles
+    // should show.
+    final JSArray subs = pluginCall.getArray("subs");
+    final Boolean textOff = pluginCall.getBoolean("textOff", null);
     if (string == null || string.isEmpty()) {
       pluginCall.reject("No url");
     } else {
@@ -229,6 +239,18 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             if (string.toLowerCase().contains(".m3u8")) {
               mediaId.setMimeType("application/x-mpegURL");
             }
+            List<MediaItem.SubtitleConfiguration> side = subtitleConfigs(subs);
+            if (!side.isEmpty()) mediaId.setSubtitleConfigurations(side);
+            // Each item starts from its own tracks: no track picked by hand for the last one.
+            TrackSelectionParameters.Builder tp =
+                exoPlayerExo
+                    .getTrackSelectionParameters()
+                    .buildUpon()
+                    .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO);
+            if (textOff != null) tp.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, textOff);
+            exoPlayerExo.setTrackSelectionParameters(tp.build());
+            if (this.video != null) this.video.setCues(null);
             this.currentId = string2;
             // A new item: whether it has a picture is for its own tracks to say.
             this.hasVideo = false;
@@ -1387,6 +1409,138 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         });
   }
 
+  private static List<MediaItem.SubtitleConfiguration> subtitleConfigs(@Nullable JSArray subs) {
+    List<MediaItem.SubtitleConfiguration> out = new ArrayList<>();
+    if (subs == null) return out;
+    for (int i = 0; i < subs.length(); i++) {
+      try {
+        org.json.JSONObject o = subs.getJSONObject(i);
+        String uri = o.optString("uri", "");
+        String name = o.optString("name", "");
+        if (uri.isEmpty()) continue;
+        String lower = name.toLowerCase(Locale.ROOT);
+        String mime =
+            lower.endsWith(".vtt")
+                ? MimeTypes.TEXT_VTT
+                : (lower.endsWith(".ass") || lower.endsWith(".ssa"))
+                    ? MimeTypes.TEXT_SSA
+                    : MimeTypes.APPLICATION_SUBRIP;
+        MediaItem.SubtitleConfiguration.Builder b =
+            new MediaItem.SubtitleConfiguration.Builder(Uri.parse(uri))
+                .setMimeType(mime)
+                .setId("side" + i)
+                .setLabel(o.optString("label", "Subtitles"))
+                .setSelectionFlags(i == 0 ? C.SELECTION_FLAG_DEFAULT : 0);
+        String lang = o.optString("language", "");
+        if (!lang.isEmpty()) b.setLanguage(lang);
+        out.add(b.build());
+      } catch (Exception ignored) {
+        // A subtitle entry that can't be read is left out; the video still plays.
+      }
+    }
+    return out;
+  }
+
+  private static String trackLabel(Format f, int n, boolean audio) {
+    String lang = f.language;
+    String name = null;
+    if (lang != null && !lang.isEmpty() && !"und".equals(lang)) {
+      try {
+        name = Locale.forLanguageTag(lang).getDisplayLanguage();
+      } catch (Exception ignored) {
+      }
+      if (name == null || name.isEmpty()) name = lang;
+    }
+    String label = f.label;
+    if (label != null && !label.isEmpty()) {
+      if (name == null || label.toLowerCase(Locale.ROOT).contains(name.toLowerCase(Locale.ROOT))) {
+        name = label;
+      } else {
+        name = name + " (" + label + ")";
+      }
+    }
+    if (name == null || name.isEmpty()) name = (audio ? "Audio " : "Subtitles ") + n;
+    if (audio && f.channelCount >= 6) name += " 5.1";
+    return name;
+  }
+
+  /** The audio and subtitle tracks of what's playing, and which are on. */
+  @PluginMethod
+  public void videoTracks(PluginCall call) {
+    run(
+        call,
+        () -> {
+          ExoPlayer p = exo();
+          JSArray audio = new JSArray(), text = new JSArray();
+          int na = 0, nt = 0;
+          java.util.List<Tracks.Group> groups = p.getCurrentTracks().getGroups();
+          for (int gi = 0; gi < groups.size(); gi++) {
+            Tracks.Group g = groups.get(gi);
+            int type = g.getType();
+            if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_TEXT) continue;
+            for (int ti = 0; ti < g.length; ti++) {
+              if (!g.isTrackSupported(ti)) continue;
+              boolean isAudio = type == C.TRACK_TYPE_AUDIO;
+              JSObject t = new JSObject();
+              t.put("group", gi);
+              t.put("track", ti);
+              t.put("label", trackLabel(g.getTrackFormat(ti), isAudio ? ++na : ++nt, isAudio));
+              t.put("selected", g.isTrackSelected(ti));
+              (isAudio ? audio : text).put(t);
+            }
+          }
+          JSObject o = new JSObject();
+          o.put("audio", audio);
+          o.put("text", text);
+          o.put(
+              "textOff",
+              p.getTrackSelectionParameters().disabledTrackTypes.contains(C.TRACK_TYPE_TEXT));
+          call.resolve(o);
+        });
+  }
+
+  /** Picks an audio or subtitle track ({type, group, track}), or turns subtitles off. */
+  @PluginMethod
+  public void selectVideoTrack(PluginCall call) {
+    String type = call.getString("type", "text");
+    boolean off = Boolean.TRUE.equals(call.getBoolean("off", false));
+    int group = call.getInt("group", -1);
+    int track = call.getInt("track", 0);
+    run(
+        call,
+        () -> {
+          ExoPlayer p = exo();
+          int t = "audio".equals(type) ? C.TRACK_TYPE_AUDIO : C.TRACK_TYPE_TEXT;
+          TrackSelectionParameters.Builder b = p.getTrackSelectionParameters().buildUpon();
+          if (off) {
+            b.setTrackTypeDisabled(t, true);
+          } else {
+            java.util.List<Tracks.Group> groups = p.getCurrentTracks().getGroups();
+            if (group < 0 || group >= groups.size()) {
+              call.reject("No such track");
+              return;
+            }
+            b.setTrackTypeDisabled(t, false)
+                .setOverrideForType(
+                    new TrackSelectionOverride(groups.get(group).getMediaTrackGroup(), track));
+          }
+          p.setTrackSelectionParameters(b.build());
+          if (off && t == C.TRACK_TYPE_TEXT && video != null) video.setCues(null);
+          call.resolve();
+        });
+  }
+
+  private void onCues(CueGroup cues) {
+    if (video == null) return;
+    StringBuilder sb = new StringBuilder();
+    for (Cue c : cues.cues) {
+      if (c.text == null) continue;
+      if (sb.length() > 0) sb.append('\n');
+      sb.append(c.text);
+    }
+    video.setCues(sb.length() == 0 ? null : sb.toString());
+  }
+
   private void onTracks(Tracks tracks) {
     boolean v = tracks.containsType(C.TRACK_TYPE_VIDEO);
     if (v == hasVideo) return;
@@ -1419,6 +1573,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     @Override
     public void onVideoSizeChanged(VideoSize videoSize) {
       onVideoSize(videoSize);
+    }
+
+    @Override
+    public void onCues(CueGroup cueGroup) {
+      AmplifyPlayerPlugin.this.onCues(cueGroup);
     }
 
     private ExoListener() {}

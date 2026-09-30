@@ -34,11 +34,17 @@ IMG = {'Videos/Movies/Inception (2010)/poster.jpg': 'inception-poster.jpg', 'Vid
 MAP = {('content://doc/' + k.replace('/', '%2F')): '/c/' + v for k, v in IMG.items()}
 EXT = """
 (function(){ var P=window.Capacitor.Plugins.AmplifyPlayer; var FILES=%s, MAP=%s;
-  window.__vcalls=[];
+  window.__vcalls=[]; window.__loadArgs=[];
+  var L=P.load; 
   window.Capacitor.convertFileSrc=function(u){ if(MAP[u]) return MAP[u]; if(/^file:.*still-/.test(u)) return '/c/'+u.split('/').pop(); return u; };
   window.Capacitor.Plugins.AmplifyPlayer=new Proxy({}, {get:function(t,k){
+    if(k==='load') return function(a){ window.__loadArgs.push(a); return P.load(a); };
     if(k==='pickVideoFolder') return function(){ window.__vcalls.push(['pick']); return Promise.resolve({folder:'Videos', treeUri:'%s', files:FILES, truncated:false}); };
     if(k==='rescanVideoFolder') return function(a){ window.__vcalls.push(['rescan',a.treeUri]); return Promise.resolve({folder:'Videos', treeUri:a.treeUri, files:FILES}); };
+    if(k==='videoTracks') return function(){ window.__vcalls.push(['tracks']); return Promise.resolve({textOff:false,
+        text:[{group:2,track:0,label:'English',selected:true},{group:3,track:0,label:'Spanish',selected:false}],
+        audio:[{group:0,track:0,label:'English 5.1',selected:true},{group:1,track:0,label:'Commentary',selected:false}]}); };
+    if(k==='selectVideoTrack') return function(a){ window.__vcalls.push(['select',a]); return Promise.resolve({}); };
     if(k==='forgetVideoFolder') return function(a){ window.__vcalls.push(['forget',a.treeUri]); return Promise.resolve({}); };
     if(k==='videoInfo') return function(a){ window.__vcalls.push(['info',a.uri]);
       var ep=/S0\\dE|1x0|Season/.test(decodeURIComponent(a.uri)); var mx=/Matrix/.test(a.uri);
@@ -183,6 +189,38 @@ async def main():
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.v-menu .np-menu-item'),function(b){return b.textContent==='Rename';}).click()"); await pg.wait_for_timeout(500)
         t = await pg.evaluate("document.querySelector('.vd-title').textContent")
         check(t == 'The Matrix Reloaded', f'Rename sticks ({t})')
+        # subtitles and next episode: Breaking Bad S1 E1
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
+        await tab(pg, 'shows')
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){return t.querySelector('.tile-name').textContent==='Breaking Bad';}).click()"); await pg.wait_for_timeout(600)
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.vd-seasons .home-tab'),function(b){return b.textContent==='Season 1';}).click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelectorAll('#stationsGrid .vep-row')[1].click()"); await pg.wait_for_timeout(900)
+        args = await pg.evaluate("window.__loadArgs && window.__loadArgs.slice(-1)[0]")
+        check(args and args.get('subs') and args['subs'][0]['name'].endswith('.srt') and args.get('textOff') is False,
+              f'an episode with an .srt beside it loads with that subtitle file, subtitles on {args and {k: args[k] for k in ("subs","textOff") if k in args}}')
+        await state(pg, {'duration': 2820, 'position': 5})
+        await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(200)
+        vis = await pg.evaluate("getComputedStyle(document.getElementById('npTracksBtn')).display")
+        check(vis != 'none', 'Now Playing menu offers Subtitles & Audio for a video')
+        await pg.evaluate("document.getElementById('npTracksBtn').click()"); await pg.wait_for_timeout(400)
+        items = await names(pg, '.v-tracks-menu .v-menu-head, .v-tracks-menu .np-menu-item')
+        check(items == ['Subtitles', 'Off', 'English', 'Spanish', 'Audio', 'English 5.1', 'Commentary'], f'subtitle and audio choices {items}')
+        await pg.screenshot(path=f'{SHOTS}/vlib-tracks.png')
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.v-tracks-menu .np-menu-item'),function(b){return b.textContent==='Off';}).click()"); await pg.wait_for_timeout(300)
+        sel = await pg.evaluate("window.__vcalls.filter(function(c){return c[0]==='select';}).slice(-1)[0]")
+        pref = await pg.evaluate("localStorage.getItem('radioPlayerVideoSubsOff')")
+        check(sel and sel[1].get('off') and pref == 'true', f'Off turns subtitles off and is remembered {sel} {pref}')
+        # ends -> Up Next countdown -> Play Now
+        await state(pg, {'state': 'ended', 'isPlaying': False, 'playWhenReady': False, 'position': 2820, 'duration': 2820})
+        await pg.wait_for_timeout(1300)
+        nu = await pg.evaluate("[document.getElementById('npNextUp').hidden, document.getElementById('npNextUpLabel').textContent, document.getElementById('npNextUpTitle').textContent]")
+        check(not nu[0] and nu[1].startswith('Up next in') and nu[2] == 'S2 E1 · Seven Thirty-Seven', f'at the end, the next episode counts down {nu}')
+        await pg.screenshot(path=f'{SHOTS}/vlib-nextup.png')
+        await pg.evaluate("document.getElementById('npNextUpPlay').click()"); await pg.wait_for_timeout(800)
+        last = await pg.evaluate("window.__calls.filter(function(c){return c[0]==='load';}).slice(-1)[0]")
+        args = await pg.evaluate("window.__loadArgs.slice(-1)[0]")
+        check(last and 'S02E01' in last[1] and args.get('textOff') is True, f'Play Now starts it (subtitles still off) {last}')
+        check(await pg.evaluate("document.getElementById('npNextUp').hidden"), 'the countdown card goes away')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('ALL PASSED' if not fails else f'FAILED {fails}')

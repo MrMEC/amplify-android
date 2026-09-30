@@ -2,11 +2,14 @@ package com.markcoleman.amplify;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -32,6 +35,8 @@ final class VideoOverlay {
   private final Listener listener;
   private FrameLayout box;
   private TextureView texture;
+  private TextView captions;
+  @Nullable private CharSequence cueText;
   private ExoPlayer boundTo;
   private int videoW, videoH;
   private float pixelRatio = 1f;
@@ -74,6 +79,18 @@ final class VideoOverlay {
     fit();
   }
 
+  /** The subtitle line(s) showing now, or null for none. */
+  void setCues(@Nullable CharSequence text) {
+    cueText = text;
+    if (captions == null) return;
+    if (text == null || text.length() == 0) {
+      captions.setVisibility(View.GONE);
+      return;
+    }
+    captions.setText(text);
+    captions.setVisibility(View.VISIBLE);
+  }
+
   void release() {
     hide();
     if (box != null && box.getParent() instanceof ViewGroup) {
@@ -101,6 +118,22 @@ final class VideoOverlay {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
             Gravity.CENTER));
+    // Subtitles: drawn here, over the picture, since nothing of the page can sit on top of it.
+    captions = new TextView(activity);
+    captions.setTextColor(Color.WHITE);
+    captions.setGravity(Gravity.CENTER);
+    captions.setShadowLayer(6f, 0f, 1f, Color.BLACK);
+    captions.setBackgroundColor(0x88000000);
+    int pad = Math.round(6 * activity.getResources().getDisplayMetrics().density);
+    captions.setPadding(pad, pad / 3, pad, pad / 3);
+    captions.setVisibility(View.GONE);
+    FrameLayout.LayoutParams cp =
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+    cp.bottomMargin = pad * 2;
+    box.addView(captions, cp);
     box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> fit());
     parent.addView(box, new ViewGroup.LayoutParams(1, 1));
     return true;
@@ -133,6 +166,11 @@ final class VideoOverlay {
     if (box == null || texture == null) return;
     int bw = box.getWidth(), bh = box.getHeight();
     if (bw <= 0 || bh <= 0) return;
+    if (captions != null) {
+      // Sized to the picture: small in the box on Now Playing, larger full screen.
+      captions.setTextSize(TypedValue.COMPLEX_UNIT_PX, Math.max(11f, Math.min(bw, bh) / 18f));
+      captions.setMaxWidth(Math.round(bw * 0.9f));
+    }
     int tw = bw, th = bh;
     if (videoW > 0 && videoH > 0) {
       float aspect = videoW * pixelRatio / videoH;
