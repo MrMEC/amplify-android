@@ -2825,6 +2825,7 @@
   /* A live stream's picture is drawn natively on top of this box, so nothing of the page can
      sit on it: no button (a tap on the picture toggles full screen instead). */
   .now-playing-screen.np-video-stream .np-video-full-btn{ display:none; }
+  body.in-pip .np-video-full-btn{ display:none; }
   /* Full screen: the video alone on black, edge to edge; the app's own chrome is hidden
      (the system bars are hidden natively). The button moves to the top right to exit. */
   /* The art box is its own stacking context (z-index:0), which would keep the video's z-index
@@ -3471,11 +3472,19 @@
 
     /* The full Now Playing screen owns the whole phone: no tab bar, no mini player, no
        search sheet, no fade. Its own bottom padding only has to clear nothing now. */
-    body.np-open .mobile-nav,
     body.np-open .mobile-scroll-fade,
     body.np-open .player-bar,
     body.np-open .search-sheet{ display:none; }
     body.np-open .now-playing-screen, body.np-sheet .now-playing-screen{ padding-bottom:calc(32px + env(safe-area-inset-bottom, 0px)); }
+    /* The tab bar stays with Now Playing (upright; landscape and full-screen video keep the
+       whole screen). The screen ends at the bar's top edge, rises out from behind it and drops
+       back behind it (np-sheet is the slide, which otherwise sits above everything). */
+    body.np-open.rotate-lock .mobile-nav, body.np-video-full .mobile-nav, body.in-pip .mobile-nav{ display:none; }
+    body.np-sheet:not(.rotate-lock):not(.np-video-full) .mobile-nav{ z-index:1001; }
+    body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{
+      bottom:var(--mnav-total); padding-bottom:32px;
+    }
+    body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .np-backdrop-clip{ height:calc(100vh - var(--mnav-total)); }
     /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
        controls still: only the channel list under them scrolls. (Not in landscape or full
        screen, which have the whole screen to themselves.) */
@@ -7090,7 +7099,11 @@
   // car took playback back: the page follows.
   audio.addEventListener('loadstart', function(){ if(npVideoOn && !audio.videoActive) resetNpVideoUi(); });
   audio.addEventListener('videoexternal', function(){ if(npVideoOn) resetNpVideoUi(); });
-  document.addEventListener('visibilitychange', function(){ if(document.hidden && npVideoOn && !npVideoStream) setNpVideo(false); });
+  document.addEventListener('visibilitychange', function(){
+    // Not when leaving shrinks the video into a floating window instead.
+    if(typeof pipActive !== 'undefined' && (pipActive || /^true/.test(pipAllowedSent || ''))) return;
+    if(document.hidden && npVideoOn && !npVideoStream) setNpVideo(false);
+  });
 
   // ---------- Live stream video ----------
   // A live stream that carries a picture (an IPTV channel pasted into search, say) uses the
@@ -7129,7 +7142,7 @@
     syncStreamVideo();
   }
   function streamVideoShowing(){
-    return npVideoOn && npVideoStream && streamVideo.has && !document.hidden &&
+    return npVideoOn && npVideoStream && streamVideo.has && (!document.hidden || pipActive) &&
       nowPlayingScreen.style.display === 'flex' && !npClosing() &&
       !!npStation && streamVideoCapable(npStation);
   }
@@ -7211,6 +7224,55 @@
       syncStreamVideo();
     });
     document.addEventListener('visibilitychange', syncStreamVideo);
+  }
+
+  // ---------- Picture-in-picture ----------
+  // Leaving the app while a video plays (a channel, a stream with a picture, a podcast episode's
+  // video) shrinks it into a floating window. The app is told whether that should happen (and
+  // the picture's shape) whenever it changes; when the window opens, Now Playing shows the
+  // picture full screen (opening Now Playing and turning the picture on first if need be), and
+  // when it closes everything goes back the way it was.
+  var pipAllowedSent = null, pipActive = false, pipUndo = null;
+  var pipPlugin = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer) || null;
+  function pipWanted(){
+    if(!currentStation || !audio || audio.paused) return false;
+    if(npVideoOn) return true;
+    return !!(videoPlugin && streamVideo.has && isLiveStream(currentStation) && streamVideoOffKey !== favKey(currentStation));
+  }
+  function syncPip(){
+    if(!pipPlugin || typeof pipPlugin.setPip !== 'function' || pipActive) return;
+    var allowed = pipWanted();
+    var w = 16, h = 9;
+    if(npVideoStream || !npVideoOn){ if(streamVideo.w > 0 && streamVideo.h > 0){ w = streamVideo.w; h = streamVideo.h; } }
+    else if(npVideo.videoWidth > 0 && npVideo.videoHeight > 0){ w = npVideo.videoWidth; h = npVideo.videoHeight; }
+    var key = allowed + ':' + w + 'x' + h;
+    if(key === pipAllowedSent) return;
+    pipAllowedSent = key;
+    pipPlugin.setPip({ allowed: allowed, width: w, height: h })['catch'](function(){});
+  }
+  if(pipPlugin && typeof pipPlugin.addListener === 'function'){
+    setInterval(syncPip, 1000);
+    pipPlugin.addListener('pip', function(ev){
+      var active = !!(ev && ev.active);
+      if(active === pipActive) return;
+      pipActive = active;
+      document.body.classList.toggle('in-pip', active);
+      if(active){
+        pipUndo = { openedNp: false, full: false };
+        var npShowing = nowPlayingScreen.style.display === 'flex' && !npClosing();
+        if(!npShowing && currentStation){ openNowPlaying(currentStation, false); pipUndo.openedNp = true; }
+        if(!npVideoOn) setNpVideo(true);
+        if(npVideoOn && !npVideoFull){ enterVideoFull(false); pipUndo.full = true; }
+        if(npVideoStream) syncStreamVideo();
+      } else {
+        var u = pipUndo || {};
+        pipUndo = null;
+        if(u.full && npVideoFull) exitVideoFull();
+        if(u.openedNp && nowPlayingScreen.style.display === 'flex') closeNowPlaying(false);
+        pipAllowedSent = null;
+        syncPip();
+      }
+    });
   }
 
   function renderNpRelated(station){
@@ -10408,12 +10470,7 @@
       npCollectionGrid.innerHTML = '';
       if(!list.length){ npCollection.style.display = 'none'; return; }
       npCollection.style.display = '';
-      npCollectionHeading.innerHTML = '';
-      npCollectionHeading.appendChild(document.createTextNode(heading));
-      var c = document.createElement('span');
-      c.className = 'grid-section-count';
-      c.textContent = ' ' + list.length;
-      npCollectionHeading.appendChild(c);
+      npCollectionHeading.textContent = heading;
       list.forEach(function(ch){ npCollectionGrid.appendChild(buildChannelRow(ch, { saved: saved })); });
     }
     if(findVideoChannel(url)){ show('My Channels', visibleVideoChannels(), true); return; }

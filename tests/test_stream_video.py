@@ -102,7 +102,7 @@ async def app_mode(b, w, h, tag):
     overlaps = mr['t'] < st['y'] + st['h'] and mr['b'] > st['y'] and mr['r'] > st['x'] and mr['l'] < st['x'] + st['w']
     check((not vm.get('show')) if overlaps else vm.get('show'), f'[{tag}] menu {"over" if overlaps else "clear of"} the picture -> shown={vm.get("show")}')
     await pg.evaluate(STANDIN); await pg.screenshot(path=f'{SHOTS}/{tag}-np-menu.png')
-    await pg.keyboard.press('Escape'); await pg.mouse.click(w/2, h-40); await pg.wait_for_timeout(300)
+    await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
     if (await pg.evaluate("getComputedStyle(document.getElementById('npMenu')).display")) != 'none':
         await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
     check((await pg.evaluate('window.__view')).get('show'), f'[{tag}] picture back once the menu closes')

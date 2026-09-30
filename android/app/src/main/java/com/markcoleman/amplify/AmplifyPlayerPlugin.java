@@ -1,6 +1,7 @@
 package com.markcoleman.amplify;
 
 import android.app.Activity;
+import android.app.PictureInPictureParams;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -10,10 +11,12 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.util.Base64;
+import android.util.Rational;
 import android.view.Window;
 import android.view.WindowManager;
 import androidx.activity.result.ActivityResult;
@@ -1140,6 +1143,73 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
    * Podcast video, which plays in the page (build 45): full screen hides the system bars (and holds
    * landscape when asked), and the screen stays on while a video shows.
    */
+  // ---- Picture-in-picture ----
+  // The page says when leaving the app should shrink the video into a floating window: while a
+  // video is playing (a channel, a stream with a picture, or a podcast episode's video). Android
+  // 12+ does it by itself on the home gesture (auto-enter); older versions are asked from
+  // MainActivity.onUserLeaveHint. The page is told when the window opens and closes ("pip"), and
+  // shows the picture full screen while it is open.
+  private volatile boolean pipAllowed = false;
+
+  private int pipW = 16, pipH = 9;
+
+  boolean pipAllowed() {
+    return pipAllowed;
+  }
+
+  @Nullable
+  PictureInPictureParams pipParams() {
+    if (Build.VERSION.SDK_INT < 26) return null;
+    // Android refuses shapes wider than 2.39:1 or taller than 1:2.39.
+    float r = (float) pipW / Math.max(1, pipH);
+    int w = pipW, h = Math.max(1, pipH);
+    if (r > 2.39f) {
+      w = 239;
+      h = 100;
+    } else if (r < 1 / 2.39f) {
+      w = 100;
+      h = 239;
+    }
+    PictureInPictureParams.Builder b =
+        new PictureInPictureParams.Builder().setAspectRatio(new Rational(w, h));
+    if (Build.VERSION.SDK_INT >= 31) {
+      b.setAutoEnterEnabled(pipAllowed);
+      b.setSeamlessResizeEnabled(true);
+    }
+    return b.build();
+  }
+
+  @PluginMethod
+  public void setPip(PluginCall call) {
+    pipAllowed = Boolean.TRUE.equals(call.getBoolean("allowed", false));
+    Integer w = call.getInt("width"), h = call.getInt("height");
+    if (w != null && h != null && w > 0 && h > 0) {
+      pipW = w;
+      pipH = h;
+    }
+    Activity activity = getActivity();
+    if (activity == null || Build.VERSION.SDK_INT < 26) {
+      call.resolve();
+      return;
+    }
+    activity.runOnUiThread(
+        () -> {
+          try {
+            PictureInPictureParams params = pipParams();
+            if (params != null) activity.setPictureInPictureParams(params);
+          } catch (Exception ignored) {
+            // A phone that has picture-in-picture turned off for the app refuses; nothing to do.
+          }
+          call.resolve();
+        });
+  }
+
+  void onPipChanged(boolean active) {
+    JSObject o = new JSObject();
+    o.put("active", active);
+    notifyListeners("pip", o);
+  }
+
   @PluginMethod
   public void setVideoUi(PluginCall call) {
     boolean fullscreen = Boolean.TRUE.equals(call.getBoolean("fullscreen", false));
