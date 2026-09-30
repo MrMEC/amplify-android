@@ -65,6 +65,12 @@ async def main():
         check('ABC News Live' not in rec, f'channels stay out of Continue Listening {rec}')
         order = await pg.evaluate("['recentSection','continueWatchingHomeSection','forYouSection'].map(function(i){var e=document.getElementById(i);return [getComputedStyle(e).display!=='none', Math.round(e.getBoundingClientRect().top)];})")
         check(order[1][0] and order[0][1] < order[1][1] < order[2][1], f'Home: Continue Watching under Continue Listening, above For You {order}')
+        sz = await pg.evaluate("""(()=>{var r=function(s){var e=document.querySelector(s);if(!e)return null;var b=e.getBoundingClientRect();return [Math.round(b.width),Math.round(b.height)];};
+          return {cl:r('#recentSection .tile .tile-art'), ch:r('#continueWatchingHomeGrid .vw-channel .vw-thumb'), mv:r('#continueWatchingHomeGrid .vw-tile:not(.vw-channel) .vw-thumb')};})()""")
+        check(sz['ch'] and sz['cl'] and abs(sz['ch'][0] - sz['cl'][0]) <= 1 and abs(sz['ch'][1] - sz['cl'][1]) <= 1, f'a channel is the size of a Continue Listening cover {sz}')
+        check(sz['mv'] and sz['mv'][0] > sz['ch'][0] + 60, f'movies keep the wide frame {sz}')
+        await pg.evaluate("document.getElementById('recentSection').scrollIntoView()"); await pg.wait_for_timeout(300)
+        await pg.screenshot(path=f'{SHOTS}/cw-home-sizes.png')
         await pg.evaluate("document.getElementById('continueWatchingHomeSection').scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{SHOTS}/cw-home.png')
         # remove the channel with its menu

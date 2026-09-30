@@ -2886,6 +2886,13 @@
   /* Once the logo is in, the generated colour behind it gives way to the plain tile. */
   .vw-thumb.vw-logo .tile-art:has(img){ background:var(--panel-2) !important; }
   .vw-home-grid .vw-tile{ width:min(62vw, 260px); }
+  /* A channel is a station logo, so it takes a Continue Listening cover's size and shape;
+     movies and episodes keep the wide video frame. */
+  .vw-tile.vw-channel, .vw-home-grid .vw-tile.vw-channel{ width:150px; }
+  .vw-tile.vw-channel .vw-thumb{ aspect-ratio:1/1; }
+  @media (max-width: 900px){
+    .vw-tile.vw-channel, .vw-home-grid .vw-tile.vw-channel{ width:min(132px, calc((100vw - 46px - 32px) / 2.35)); }
+  }
   .vw-tile .tile-name, .vw-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
   /* Movie and show posters: tall 2:3 covers in the grid. */
   .tile.vposter .tile-art.vposter-art{ aspect-ratio:2/3; height:auto; position:relative; overflow:hidden; border-radius:10px; }
