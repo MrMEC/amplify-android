@@ -10014,8 +10014,18 @@
     }
 
     // ---------- data ----------
+    // 'album': by album title (as My Library > Albums lists them). 'artist': by artist, then
+    // album title within each artist (opened from My Library > Artists).
+    var order = 'album';
     function load(){
       albums = buildAlbumIndex().filter(function(a){ return a.tracks.length; });
+      if(order === 'artist'){
+        albums.sort(function(a, b){
+          var aa = alphaSortKey(a.artist), ba = alphaSortKey(b.artist);
+          if(aa !== ba) return alphaCompare(aa, ba);
+          return alphaCompare(alphaSortKey(a.album), alphaSortKey(b.album));
+        });
+      }
       albumIndex = {};
       albums.forEach(function(a, n){ albumIndex[a.key] = n; });
       empty.style.display = albums.length ? 'none' : '';
@@ -10025,6 +10035,22 @@
       for(var k in live){ live[k].remove(); live[k]._album = null; pool.push(live[k]); }
       live = {};
       capIndex = -1;
+    }
+    // The first album by an artist: one under their own name, else a compilation they're
+    // on, else (an artist with only stations) whichever album comes next alphabetically.
+    function indexOfArtist(artistKey, artistName){
+      if(!artistKey) return -1;
+      var i;
+      for(i = 0; i < albums.length; i++) if(artistMatchKey(albums[i].artist) === artistKey) return i;
+      for(i = 0; i < albums.length; i++){
+        if(albums[i].tracks.some(function(t){ return artistMatchKey((t.artist || '').trim() || UNKNOWN_ARTIST) === artistKey; })) return i;
+      }
+      if(artistName){
+        var nk = alphaSortKey(artistName);
+        for(i = 0; i < albums.length; i++) if(alphaCompare(alphaSortKey(albums[i].artist), nk) >= 0) return i;
+        return albums.length - 1;
+      }
+      return -1;
     }
     function indexOfKey(key){
       if(!key) return -1;
@@ -10041,11 +10067,18 @@
     if(ro) ro.observe(root);
 
     return {
-      // Opens on the given album (or where it was last left).
-      open: function(centerKey){
+      // Opens on the given album (or where it was last left). opts.order picks the running
+      // order; opts.artistKey (with opts.artistName) opens on that artist's first album.
+      open: function(centerKey, opts){
+        opts = opts || {};
+        var newOrder = opts.order === 'artist' ? 'artist' : 'album';
+        // "Where it was last left" means that album, which moves when the order changes.
+        var lastKey = albums[Math.round(target)] ? albums[Math.round(target)].key : null;
         isOpen = true;
+        order = newOrder;
         load();
-        var i = indexOfKey(centerKey);
+        var i = opts.artistKey ? indexOfArtist(opts.artistKey, opts.artistName) : indexOfKey(centerKey);
+        if(i === -1) i = indexOfKey(lastKey);
         if(i === -1) i = clampIndex(Math.round(target));
         pos = target = albums.length ? i : 0;
         vel = 0;
@@ -10080,8 +10113,9 @@
       },
       syncPlaying: syncPlaying,
       isOpen: function(){ return isOpen; },
+      order: function(){ return order; },
       // For tests and debugging.
-      _state: function(){ return { pos: pos, target: target, n: albums.length, center: albums[Math.round(pos)] ? albums[Math.round(pos)].album : null,
+      _state: function(full){ return { order: order, list: full ? albums.map(function(a){ return a.album + ' / ' + a.artist; }) : undefined, pos: pos, target: target, n: albums.length, center: albums[Math.round(pos)] ? albums[Math.round(pos)].album : null,
         live: Object.keys(live).length, flipped: flipped, S: S, thumbs: thumbCache.size }; }
     };
   }
@@ -10109,10 +10143,13 @@
         if(document.body.classList.contains('np-open')){
           rotateLockOpenedNp = false;
         } else {
-          // Turning the phone while looking at My Library's Albums goes straight to Cover
-          // Flow, starting on the album at the top of the list as it was.
-          coverFlowFromLibrary = albumsDirectoryKeyInView();
-          if(coverFlowFromLibrary !== null && albumInViewPortrait) coverFlowFromLibrary = albumInViewPortrait;
+          // Turning the phone while looking at My Library's Albums or Artists goes straight to
+          // Cover Flow, starting where the top of the list was: albums in album order, or in
+          // artist order on that artist's first album.
+          coverFlowFromLibrary = libraryDirectoryInView();
+          if(coverFlowFromLibrary && albumInViewPortrait && albumInViewPortrait.order === coverFlowFromLibrary.order){
+            coverFlowFromLibrary = albumInViewPortrait;
+          }
           rotateLockOpenedNp = true;
           openNowPlaying();
         }
@@ -10123,11 +10160,13 @@
         }
       }
       document.body.classList.toggle('rotate-lock', active);
-      if(coverFlowFromLibrary !== null) setLandAlbumsOpen(true, coverFlowFromLibrary || null);
+      if(coverFlowFromLibrary){
+        setLandAlbumsOpen(true, coverFlowFromLibrary.key || null, coverFlowFromLibrary);
+      }
     };
-    // Which album was at the top of the Albums list while the phone was upright. Read during
-    // scrolling, because by the time the rotation is reported the list has already reflowed
-    // to the wide layout and the same scroll position shows different albums.
+    // Which album or artist was at the top of the list while the phone was upright. Read
+    // during scrolling, because by the time the rotation is reported the list has already
+    // reflowed to the wide layout and the same scroll position shows different tiles.
     var albumInViewPortrait = null, albumInViewQueued = false;
     window.addEventListener('scroll', function(){
       if(albumInViewQueued) return;
@@ -10135,20 +10174,28 @@
       requestAnimationFrame(function(){
         albumInViewQueued = false;
         if(document.body.classList.contains('rotate-lock') || innerWidth > innerHeight) return;
-        albumInViewPortrait = albumsDirectoryKeyInView() || null;
+        var seen = libraryDirectoryInView();
+        albumInViewPortrait = (seen && (seen.key || seen.artistKey)) ? seen : null;
       });
     }, { passive: true });
-    // '' when the Albums directory is showing but no tile could be read; null when it isn't.
-    var albumsDirectoryKeyInView = function(){
-      if(activeLibrarySection !== 'albums' || activeAlbumKey || activeArtistKey) return null;
+    // { order, key } for the Albums list or { order, artistKey, artistName } for Artists,
+    // from the first tile still on screen; null when neither list is showing.
+    var libraryDirectoryInView = function(){
+      if(activeAlbumKey || activeArtistKey) return null;
       if(document.body.classList.contains('album-open')) return null;
-      var tiles = stationsGrid.querySelectorAll(".tile[data-entity='album']");
+      var entity = activeLibrarySection === 'albums' ? 'album' : activeLibrarySection === 'artists' ? 'artist' : null;
+      if(!entity) return null;
+      var tiles = stationsGrid.querySelectorAll(".tile[data-entity='" + entity + "']");
       if(!tiles.length) return null;
+      var tile = null;
       for(var i = 0; i < tiles.length; i++){
         var r = tiles[i].getBoundingClientRect();
-        if(r.bottom > 60 && r.height) return String(tiles[i].dataset.key || '').replace(/^album:/, '');
+        if(r.bottom > 60 && r.height){ tile = tiles[i]; break; }
       }
-      return '';
+      var raw = tile ? String(tile.dataset.key || '') : '';
+      if(entity === 'album') return { order: 'album', key: raw.replace(/^album:/, '') };
+      var nameEl = tile && tile.querySelector('.tile-name');
+      return { order: 'artist', artistKey: raw.replace(/^artist:/, ''), artistName: nameEl ? nameEl.textContent : '' };
     };
     // The favourites row always starts closed in landscape.
     var npLandToggle = document.getElementById('npLandToggle');
@@ -10194,14 +10241,15 @@
     var npLandAlbums = document.getElementById('npLandAlbums');
     var npLandAlbumsBtn = document.getElementById('npLandAlbumsBtn');
     coverFlow = createCoverFlow(npLandAlbums);
-    var setLandAlbumsOpen = function(open, centerKey){
+    var setLandAlbumsOpen = function(open, centerKey, opts){
       var was = nowPlayingScreen.classList.contains('la-open');
       nowPlayingScreen.classList.toggle('la-open', open);
       if(open && !was){
         // Opens on whatever album is playing, else where it was last left.
         var key = centerKey || null;
-        if(!key && currentStation && isLocalTrack(currentStation) && libraryById[favKey(currentStation)]) key = albumKeyFor(currentStation);
-        coverFlow.open(key);
+        var fromArtists = !!(opts && opts.order === 'artist');
+        if(!key && !fromArtists && currentStation && isLocalTrack(currentStation) && libraryById[favKey(currentStation)]) key = albumKeyFor(currentStation);
+        coverFlow.open(key, opts || { order: 'album' });
       } else if(!open && was){
         coverFlow.close();
       }
