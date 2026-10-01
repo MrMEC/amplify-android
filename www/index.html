@@ -4112,10 +4112,12 @@
   body.ui-playing .cf-track.playing .cf-track-no span{ animation:la-bars 1.1s ease-in-out infinite; }
   body.ui-playing .cf-track.playing .cf-track-no span:nth-child(2){ animation-delay:-.6s; }
   body.ui-playing .cf-track.playing .cf-track-no span:nth-child(3){ animation-delay:-.3s; }
-  .cf-track-body{ flex:1 1 auto; min-width:0; }
-  .cf-track-title{ font-size:14px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-track-body{ display:block; flex:1 1 auto; min-width:0; overflow:hidden; }
+  /* Block, so a long title stops at the edge of its column with an ellipsis instead of running
+     on under the song's length. */
+  .cf-track-title{ display:block; font-size:14px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cf-track.playing .cf-track-title{ color:var(--accent, #fff); font-weight:600; }
-  .cf-track-artist{ font-size:12px; line-height:16px; color:rgba(255,255,255,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-track-artist{ display:block; font-size:12px; line-height:16px; color:rgba(255,255,255,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cf-track-time{ flex:0 0 auto; font-size:12.5px; color:rgba(255,255,255,.45); font-variant-numeric:tabular-nums; }
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
@@ -9480,8 +9482,10 @@
     var ROT = 66;                 // degrees a side cover is turned in
     var THUMB = 384;              // thumbnail edge, px
     var THUMB_CACHE_MAX = 90;     // thumbnails kept before the oldest are released
-    var SPRING_K = 165;           // spring stiffness (1/s^2)
-    var FLING_TIME = 0.30;        // seconds of glide a fling's velocity is projected over
+    var SPRING_K = 165;           // snap spring stiffness (1/s^2): taps, steps, the final settle
+    var GLIDE_TIME = 0.42;        // seconds a gentle fling glides for; harder ones glide longer
+    var GLIDE_BOOST = 2.5;        // up to this much further again for the hardest flicks
+    var MAX_FLING = 160;          // albums per second
     var TAP_SLOP = 8;             // px a press may wander and still be a tap
     var EDGE = 0.09;              // share of the width at each side that steps one album
 
@@ -9512,8 +9516,9 @@
     root.appendChild(panel);
     host.appendChild(root);
 
-    var albums = [];
+    var albums = [], albumIndex = {};
     var pos = 0, vel = 0, target = 0;
+    var glide = null;             // { t0, p0, v0, a, T } while a fling is coasting
     var running = false, raf = 0, lastT = 0;
     var isOpen = false;
     var W = 0, H = 0, S = 0, C = 0, G = 0, D = 0, coverTop = 0;
@@ -9667,14 +9672,18 @@
     }
     function pumpThumbs(){
       while(thumbBusy < 3 && thumbWaiting.length){
-        var best = -1, bestD = Infinity;
+        // Jobs for covers a fast scroll has already carried away are dropped unseen.
+        thumbWaiting = thumbWaiting.filter(function(jb){
+          var ix = albumIndex[jb.al.key];
+          return ix !== undefined && Math.abs(ix - pos) <= 16;
+        });
+        if(!thumbWaiting.length) break;
+        var best = 0, bestD = Infinity;
         for(var j = 0; j < thumbWaiting.length; j++){
-          var idx = albums.indexOf(thumbWaiting[j].al);
-          var dist = idx === -1 ? Infinity : Math.abs(idx - pos);
+          var dist = Math.abs(albumIndex[thumbWaiting[j].al.key] - pos);
           if(dist < bestD){ bestD = dist; best = j; }
         }
         var job = thumbWaiting.splice(best, 1)[0];
-        if(bestD === Infinity || bestD > 16) continue;   // scrolled out of reach meanwhile
         thumbBusy++;
         makeThumb(job.al).then(function(job){ return function(entry){
           thumbBusy--;
@@ -9760,6 +9769,22 @@
       if(!drag){
         // Critically damped spring, integrated in small steps so a slow frame cannot
         // make it overshoot or wobble.
+        if(glide){
+          // A fling coasts with steady braking, worked out from the clock rather than frame by
+          // frame, so it runs the same at any frame rate and stops dead on its album.
+          var t = (now - glide.t0) / 1000;
+          if(t >= glide.T){
+            pos = target; vel = 0; glide = null;
+            render();
+            running = false;
+            return;
+          }
+          pos = glide.p0 + glide.v0 * t - 0.5 * glide.a * t * t;
+          vel = glide.v0 - glide.a * t;
+          render();
+          raf = requestAnimationFrame(tick);
+          return;
+        }
         var c = 2 * Math.sqrt(SPRING_K);
         var steps = Math.ceil(dt / 0.004), h = dt / steps;
         for(var s = 0; s < steps; s++){
@@ -9780,6 +9805,7 @@
     function goTo(i, keepVelocity){
       if(!albums.length) return;
       target = clampIndex(i);
+      glide = null;
       if(!keepVelocity) vel = vel * 0.5;
       startLoop();
     }
@@ -9790,11 +9816,15 @@
 
     // ---------- touch ----------
     var drag = null;    // { id, x0, y0, pos0, moved, samples }
-    function pxPerAlbum(){ return Math.max(24, G * 1.7); }
+    // About one side cover's width of finger travel per album, so a drag moves the row at
+    // the speed the covers themselves pass by.
+    function pxPerAlbum(){ return Math.max(16, G * 1.05); }
+    // Past either end the row gives a little and then stops giving: at most RUBBER albums.
+    var RUBBER = 1.2;
     function rubber(p){
       var max = albums.length - 1;
-      if(p < 0) return p * 0.35;
-      if(p > max) return max + (p - max) * 0.35;
+      if(p < 0) return -RUBBER * (1 - Math.exp(p / RUBBER));
+      if(p > max) return max + RUBBER * (1 - Math.exp(-(p - max) / RUBBER));
       return p;
     }
     root.addEventListener('pointerdown', function(e){
@@ -9814,7 +9844,7 @@
         if(flipped !== null) unflip();
         // Picks up from wherever an animation had got to, with no jump.
         drag.pos0 = pos; drag.x0 = e.clientX; dx = 0;
-        vel = 0;
+        vel = 0; glide = null;
       }
       var raw = drag.pos0 - dx / pxPerAlbum();
       pos = rubber(raw);
@@ -9835,9 +9865,22 @@
       var sm = d.samples, a = sm[0], b = sm[sm.length - 1];
       var v = (b[0] - a[0]) > 8 ? (b[1] - a[1]) / ((b[0] - a[0]) / 1000) : 0;
       if(performance.now() - b[0] > 80) v = 0;       // held still before letting go
-      v = Math.max(-40, Math.min(40, v));
+      v = Math.max(-MAX_FLING, Math.min(MAX_FLING, v));
+      // The row carries on at the finger's own speed and brakes steadily from there. A harder
+      // flick coasts for longer as well as faster, so one flick can cross a long library.
+      var reach = GLIDE_TIME * (1 + Math.min(Math.abs(v) / 25, GLIDE_BOOST));
       vel = v;
-      target = clampIndex(Math.round(pos + v * FLING_TIME));
+      glide = null;
+      target = clampIndex(Math.round(pos + v * reach));
+      // The braking is fitted to where it actually stops (a whole album, or the end of the
+      // library) so it arrives at exactly zero speed: no overshoot, no creep, no snap.
+      var dist = target - pos;
+      if(Math.abs(v) > 1 && dist * v > 0 && Math.abs(dist) > 0.02){
+        var T = 2 * dist / v;
+        // Nearly there already (flung into the end): it just eases the last bit in.
+        if(T < 0.18){ T = 0.18; v = 2 * dist / T; }
+        glide = { t0: performance.now(), p0: pos, v0: v, a: v / T, T: T };
+      }
       startLoop();
     }
     root.addEventListener('pointerup', function(e){ endDrag(e, false); });
@@ -9901,8 +9944,6 @@
           ar.className = 'cf-track-artist';
           ar.textContent = t.artist;
           b.querySelector('.cf-track-body').appendChild(ar);
-          b.querySelector('.cf-track-title').style.display = 'block';
-          ar.style.display = 'block';
         }
         b.querySelector('.cf-track-time').textContent = t.duration ? formatTime(t.duration) : '';
         b.addEventListener('click', function(ev){
@@ -9975,6 +10016,8 @@
     // ---------- data ----------
     function load(){
       albums = buildAlbumIndex().filter(function(a){ return a.tracks.length; });
+      albumIndex = {};
+      albums.forEach(function(a, n){ albumIndex[a.key] = n; });
       empty.style.display = albums.length ? 'none' : '';
       caption.style.display = albums.length ? '' : 'none';
     }

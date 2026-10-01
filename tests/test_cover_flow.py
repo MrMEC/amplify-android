@@ -19,7 +19,7 @@ _mark = '  var coverFlow = null;\n'
 assert _src.count(_mark) == 1
 open(root + '/index.html', 'w').write(_src.replace(_mark, _mark + HOOK))
 
-N = 30
+N = 60
 M = root + '/Music'
 tone = f'{root}/tone.mp3'
 subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
@@ -40,7 +40,10 @@ for i in range(N):
         cmd = ['ffmpeg', '-loglevel', 'error', '-y', '-i', tone]
         if with_art:
             cmd += ['-i', art, '-map', '0:a', '-map', '1:v', '-c:v', 'png', '-disposition:v', 'attached_pic']
-        cmd += ['-c:a', 'copy', '-id3v2_version', '3', '-metadata', f'title=Song {t + 1} of {i:02d}',
+        title = f'Song {t + 1} of {i:02d}'
+        if i == 0 and t == 2:
+            title = 'Against All Odds (Take A Look At Me Now) [Live At Madison Square Garden 2026]'
+        cmd += ['-c:a', 'copy', '-id3v2_version', '3', '-metadata', f'title={title}',
                 '-metadata', f'artist=Artist {i:02d}', '-metadata', f'album={name}', '-metadata', f'track={t + 1}', p]
         subprocess.run(cmd, check=True)
 
@@ -163,24 +166,47 @@ async def main():
         await pg.wait_for_timeout(150)
         await pg.mouse.up()
         check(all(frames[k] < frames[k + 1] for k in range(len(frames) - 1)) and frames[-1] > 5.5, f'covers follow the finger {[round(f, 2) for f in frames]}')
+        check(frames[-1] - 5 >= 3.5, f'dragging moves about one album per side-cover width ({frames[-1] - 5:.2f} albums for 168px)')
         await pg.screenshot(path=f'{shots}/cf-dragging.png')
         await settle(pg)
         st = await pg.evaluate(ST)
         check(st['pos'] == st['target'] and st['pos'] == int(st['pos']), f'settles exactly on an album ({st["pos"]})')
         slow_end = st['pos']
 
-        # --- A quick fling travels further and glides (in-between frames, no jump).
-        await pg.mouse.move(600, 150); await pg.mouse.down()
-        for k in range(1, 6):
-            await pg.mouse.move(600 - k * 40, 150); await pg.wait_for_timeout(12)
-        await pg.mouse.up()
-        glide = await pg.evaluate("new Promise(function(res){var o=[];var t0=performance.now();(function f(){o.push(__t.cf()._state().pos);if(performance.now()-t0<700)requestAnimationFrame(f);else res(o);})();})")
+        # --- A quick fling travels a long way, easing down from the finger's speed with no jump.
+        async def fling(x0, dx, n=5, wait=12):
+            await pg.mouse.move(x0, 150); await pg.mouse.down()
+            for k in range(1, n + 1):
+                await pg.mouse.move(x0 + k * dx, 150); await pg.wait_for_timeout(wait)
+            await pg.mouse.up()
+            return await pg.evaluate("new Promise(function(res){var o=[];var t0=performance.now();(function f(){var s=__t.cf()._state();o.push([s.pos,s.target,performance.now()]);if(performance.now()-t0<2600)requestAnimationFrame(f);else res(o);})();})")
+        g = await fling(600, -40)
         await settle(pg)
         st = await pg.evaluate(ST)
-        steps = [abs(glide[k + 1] - glide[k]) for k in range(len(glide) - 1)]
-        check(st['pos'] - slow_end >= 4, f'fling carries momentum ({slow_end} -> {st["pos"]})')
-        check(max(steps) < 1.2 and len([s for s in steps if s > 0.001]) > 8, f'glides smoothly (largest frame step {max(steps):.2f})')
+        ps = [x[0] for x in g]; tgt = g[0][1]
+        steps = [ps[k + 1] - ps[k] for k in range(len(ps) - 1)]
+        moving = [x for x in steps if abs(x) > 0.001]
+        check(st['pos'] - slow_end >= 12, f'a quick fling crosses many albums ({slow_end} -> {st["pos"]})')
+        check(max(steps) < 4 and len(moving) > 20, f'glides frame by frame (largest step {max(steps):.2f}, {len(moving)} moving frames)')
+        # Speed per second, averaged over a few frames so uneven frame timing doesn't count.
+        sp = []
+        for k in range(3, len(g) - 4, 4):
+            dtt = (g[k + 4][2] - g[k][2]) / 1000
+            if dtt > 0: sp.append((g[k + 4][0] - g[k][0]) / dtt)
+        n3 = max(1, len(sp) // 3)
+        thirds = [sum(sp[i * n3:(i + 1) * n3]) / n3 for i in range(3)]
+        check(thirds[0] > thirds[1] > thirds[2] and max(sp) <= sp[0] * 1.2,
+              f'only slows down once released (average speed by thirds {[round(x, 1) for x in thirds]})')
+        check(max(ps) <= tgt + 0.001 and st['pos'] == tgt, f'stops exactly on its album without running past ({max(ps):.3f} vs {tgt})')
         check(st['pos'] == int(st['pos']), 'snaps to an album after a fling')
+        await pg.screenshot(path=f'{shots}/cf-after-fling.png')
+
+        # --- A hard fling toward the end stops at the last album, not past it.
+        g = await fling(700, -70, n=6, wait=10)
+        await settle(pg, 2500)
+        st = await pg.evaluate(ST)
+        mx = max(x[0] for x in g)
+        check(st['pos'] == N - 1 and mx <= N - 1 + 0.001, f'hard fling reaches the end without overshooting ({st["pos"]}, max {mx:.3f})')
 
         # --- Dragging past the end bands back.
         await pg.evaluate("__t.cf()._state()")
@@ -238,6 +264,21 @@ async def main():
         vis = await pg.evaluate("getComputedStyle(document.querySelector('.cf-cover.cf-center')).visibility")
         check(st['flipped'] is None and vis == 'visible', 'tapping the header turns it back')
 
+        # --- A long song title stops short of its length with an ellipsis.
+        for k in range(4):
+            await pg.evaluate("document.querySelector('.cf').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft'}))")
+            await pg.wait_for_timeout(60)
+        await settle(pg)
+        await pg.evaluate("document.querySelector('.cf').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))")
+        await pg.wait_for_timeout(700)
+        row = await pg.evaluate("""(function(){ var b=document.querySelectorAll('.cf-track')[2]; var t=b.querySelector('.cf-track-title'), d=b.querySelector('.cf-track-time');
+          var rt=t.getBoundingClientRect(), rd=d.getBoundingClientRect();
+          return {title:t.textContent.slice(0,20), tr:Math.round(rt.right), dl:Math.round(rd.left), clipped:t.scrollWidth>t.clientWidth, ell:getComputedStyle(t).textOverflow, rowR:Math.round(b.getBoundingClientRect().right), timeR:Math.round(rd.right)}; })()""")
+        check(row['title'].startswith('Against') and row['clipped'] and row['ell'] == 'ellipsis' and row['tr'] <= row['dl'] and row['timeR'] <= row['rowR'],
+              f'long title ends in an ellipsis before the time {row}')
+        await pg.screenshot(path=f'{shots}/cf-long-title.png')
+        await pg.evaluate("document.querySelector('.cf-panel-head').click()"); await pg.wait_for_timeout(700)
+
         # --- Favourites row open: Cover Flow shrinks to fit above it (none here, so check sizing on resize).
         s_before = (await pg.evaluate(ST))['S']
         await pg.set_viewport_size({'width': 800, 'height': 360}); await pg.wait_for_timeout(600)
@@ -246,7 +287,7 @@ async def main():
         await pg.set_viewport_size({'width': 844, 'height': 390}); await pg.wait_for_timeout(600)
 
         # --- Many albums, few layers: thumbnails capped, pool bounded while sweeping the whole list.
-        for k in range(29):
+        for k in range(N - 1):
             await pg.evaluate("document.querySelector('.cf').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight'}))")
             await pg.wait_for_timeout(40)
         await settle(pg, 1500)
