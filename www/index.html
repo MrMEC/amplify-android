@@ -4082,6 +4082,8 @@
   .cf-cap{ position:absolute; inset:0; opacity:0; transition:opacity .22s ease; }
   .cf-cap.on{ opacity:1; }
   .cf-cap-title, .cf-cap-artist{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* A soft shadow keeps the caption readable over the reflections that now run behind it. */
+  .cf-cap{ text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 10px rgba(0,0,0,.75); }
   .cf-cap-title{ color:#fff; font-weight:700; font-size:15px; line-height:20px; }
   .cf-cap-artist{ color:rgba(255,255,255,.6); font-size:13px; line-height:18px; margin-top:2px; }
   .cf-empty{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -9490,6 +9492,7 @@
     var MAX_FLING = 160;          // albums per second
     var TAP_SLOP = 8;             // px a press may wander and still be a tap
     var EDGE = 0.09;              // share of the width at each side that steps one album
+    var COVER_SCALE = 1.15;       // covers relative to the size the caption is placed for
 
     var root = document.createElement('div');
     root.className = 'cf';
@@ -9533,17 +9536,22 @@
     function measure(){
       W = root.clientWidth; H = root.clientHeight;
       if(!W || !H) return false;
-      S = Math.round(Math.max(60, Math.min(H * 0.5, W * 0.34)));
+      // The caption keeps the place it was given when the covers were laid out as one block
+      // with it (cover, the visible part of its reflection, caption), centred together.
+      var S0 = Math.round(Math.max(60, Math.min(H * 0.5, W * 0.34)));
+      var top0 = Math.round(Math.max(10, (H - (S0 * 1.4 + 46)) / 2));
+      caption.style.top = Math.round(top0 + S0 * 1.4 + 4) + 'px';
+      // The covers themselves are a size larger and centred on the screen's own middle,
+      // their reflections running down behind the caption.
+      S = Math.round(Math.min(S0 * COVER_SCALE, H - 24));
       C = S * 0.64;               // centre to first side cover
       G = S * 0.2;                // between consecutive side covers
       D = S * 0.62;               // how far back the sides sit
-      // The cover, the visible part of its reflection (the lower 38%), then the caption.
-      coverTop = Math.round(Math.max(10, (H - (S * 1.4 + 46)) / 2));
+      coverTop = Math.round((H - S) / 2);
       stage.style.top = coverTop + 'px';
       stage.style.perspective = Math.round(S * 3.3) + 'px';
       stage.style.perspectiveOrigin = '50% ' + Math.round(S / 2) + 'px';
       stage.style.height = S + 'px';
-      caption.style.top = Math.round(coverTop + S * 1.4 + 4) + 'px';
       for(var k in live) sizeCover(live[k]);
       pool.forEach(sizeCover);
       return true;
@@ -9820,7 +9828,8 @@
     var drag = null;    // { id, x0, y0, pos0, moved, samples }
     // About one side cover's width of finger travel per album, so a drag moves the row at
     // the speed the covers themselves pass by.
-    function pxPerAlbum(){ return Math.max(16, G * 1.05); }
+    // Kept at the speed it had before the covers grew, so larger covers don't scroll slower.
+    function pxPerAlbum(){ return Math.max(16, G * 1.05 / COVER_SCALE); }
     // Past either end the row gives a little and then stops giving: at most RUBBER albums.
     var RUBBER = 1.2;
     function rubber(p){

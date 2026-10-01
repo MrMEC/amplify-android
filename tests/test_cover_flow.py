@@ -159,7 +159,13 @@ async def main():
         cap = await pg.evaluate("Array.from(document.querySelectorAll('.cf-cap.on')).map(function(e){return e.innerText;})")
         check(cap == ['Album 05\nArtist 05'], f'caption names the centre album {cap}')
         capbox = await pg.evaluate("document.querySelector('.cf-cap.on').getBoundingClientRect().top")
-        check(capbox > c['b'] + c['w'] * 0.2, f'caption under the reflection ({capbox} vs cover bottom {c["b"]})')
+        # Caption and buttons stay exactly where they were before the covers grew (at 844x390:
+        # caption top 313, Now Playing button 726..770 x 328..372, arrow hidden with no favourites).
+        btn = await pg.evaluate("(function(){var r=document.getElementById('npLandAlbumsBtn').getBoundingClientRect();return [Math.round(r.left),Math.round(r.right),Math.round(r.top),Math.round(r.bottom)];})()")
+        check(capbox == 313 and btn == [782, 826, 328, 372] or capbox == 313 and btn == [726, 770, 328, 372], f'caption and button positions unchanged (caption top {capbox}, button {btn})')
+        host = await pg.evaluate("(function(){var r=document.getElementById('npLandAlbums').getBoundingClientRect();return [Math.round(r.top),Math.round(r.bottom)];})()")
+        mid = (c['t'] + c['b']) / 2
+        check(c['w'] >= 220 and abs(mid - (host[0] + host[1]) / 2) <= 1.5, f'covers larger (was 195px, now {c["w"]}px) and centred on the screen (cover middle {mid}, screen middle {(host[0] + host[1]) / 2})')
         check(all(x['img'] for x in cv if abs(x['i'] - 5) <= 3), 'nearby covers have their art')
         await pg.screenshot(path=f'{shots}/cf-open.png')
 
