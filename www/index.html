@@ -9636,6 +9636,7 @@
       el.dataset.i = String(i);
       el._album = albums[i];
       el._side = null; el._z = undefined; el._sh = undefined;
+      el._tk = thumbKey(albums[i]);
       var face = el._face, reflImg = el._refl;
       var old = face.querySelector('img');
       if(old) old.remove();
@@ -9711,14 +9712,22 @@
     var thumbCache = new Map();   // album key -> { url, own }
     var thumbWaiting = [];        // { al, cb }
     var thumbBusy = 0;
+    // A thumbnail is for an album *and* the cover it was made from, so changing or removing a
+    // custom cover makes a fresh one rather than showing the old picture from the cache.
+    function thumbKey(al){
+      var src = artSourceForTracks(al.tracks);
+      var custom = src ? customArtFor(src) : '';
+      return al.key + '\n' + (custom || '');
+    }
     function requestThumb(al, cb){
-      var hit = thumbCache.get(al.key);
+      var tk = thumbKey(al);
+      var hit = thumbCache.get(tk);
       if(hit){
-        thumbCache.delete(al.key); thumbCache.set(al.key, hit);    // most recently used
+        thumbCache.delete(tk); thumbCache.set(tk, hit);    // most recently used
         cb(hit.url);
         return;
       }
-      thumbWaiting.push({ al: al, cb: cb });
+      thumbWaiting.push({ al: al, cb: cb, tk: tk });
       pumpThumbs();
     }
     var thumbPause = 0;
@@ -9746,7 +9755,7 @@
         makeThumb(job.al).then(function(job){ return function(entry){
           thumbBusy--;
           if(entry){
-            thumbCache.set(job.al.key, entry);
+            thumbCache.set(job.tk, entry);
             trimThumbs();
           }
           job.cb(entry ? entry.url : null);
@@ -10200,6 +10209,15 @@
         render();
       },
       syncPlaying: syncPlaying,
+      // A cover was changed (or removed): any cover on screen now showing the wrong picture
+      // is drawn again. The panel's own art isn't shown, so the tracklist needs nothing.
+      artChanged: function(){
+        if(!isOpen) return;
+        for(var k in live){
+          var el = live[k];
+          if(el._album && el._tk !== thumbKey(el._album)) bindCover(el, +k);
+        }
+      },
       isOpen: function(){ return isOpen; },
       order: function(){ return order; },
       // For tests and debugging.
@@ -10359,6 +10377,9 @@
       rotateLockOpenedNp = true;
     };
     coverFlow = createCoverFlow(npLandAlbums, { onAlbumOpened: openAlbumBehind });
+    var _cfSetArt = setCustomArtUrl, _cfClearArt = clearCustomArtUrl;
+    setCustomArtUrl = function(){ var r = _cfSetArt.apply(this, arguments); coverFlow.artChanged(); return r; };
+    clearCustomArtUrl = function(){ var r = _cfClearArt.apply(this, arguments); coverFlow.artChanged(); return r; };
     var setLandAlbumsOpen = function(open, centerKey, opts){
       var was = nowPlayingScreen.classList.contains('la-open');
       nowPlayingScreen.classList.toggle('la-open', open);

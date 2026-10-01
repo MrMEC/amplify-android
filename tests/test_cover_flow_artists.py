@@ -14,7 +14,9 @@ os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
 HOOK = ("window.__t = { cf: function(){ return coverFlow; }, runLibrarySection: runLibrarySection, tracks: function(){ return libraryTracks; },"
-        " openNp: function(){ openNowPlaying(); }, hist: function(){ return viewHistory.map(function(v){ return v.label; }); } };\n")
+        " openNp: function(){ openNowPlaying(); }, hist: function(){ return viewHistory.map(function(v){ return v.label; }); },"
+        " setArt: function(album, url){ var t = libraryTracks.filter(function(x){ return x.album === album; })[0]; return setCustomArtUrl('album:' + albumKeyFor(t), url); },"
+        " clearArt: function(album){ var t = libraryTracks.filter(function(x){ return x.album === album; })[0]; return clearCustomArtUrl('album:' + albumKeyFor(t)); } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
 assert _src.count(_mark) == 1
@@ -226,6 +228,39 @@ async def main():
         await rotate(pg, False)
         up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open'), document.querySelectorAll(\".tile[data-entity='artist']\").length > 0]")
         check(up == [False, False, True], f'browsing without turning an album over returns to the list {up}')
+
+        # Changing an album's cover shows in Cover Flow: while it's open, and when reopened.
+        import base64, zlib, struct
+        def png(r, g, b):
+            raw = b''.join(b'\x00' + bytes([r, g, b]) * 16 for _ in range(16))
+            ch = lambda t, d: struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+            return 'data:image/png;base64,' + base64.b64encode(b'\x89PNG\r\n\x1a\n' + ch(b'IHDR', struct.pack('>IIBBBBB', 16, 16, 8, 2, 0, 0, 0)) + ch(b'IDAT', zlib.compress(raw)) + ch(b'IEND', b'')).decode()
+        CENTRE = """(function(){ var c=document.querySelector('#npLandAlbums .cf-cover.cf-center'); if(!c) return null;
+          var f=c.querySelector('.cf-face img'), r=c.querySelector('.cf-refl-img img');
+          function px(img){ if(!img || !img.complete) return null; var cv=document.createElement('canvas'); cv.width=cv.height=4; var g=cv.getContext('2d'); g.drawImage(img,0,0,4,4); return Array.from(g.getImageData(1,1,1,1).data).slice(0,3); }
+          return { face: px(f), refl: px(r), n: c.querySelectorAll('.cf-face img').length }; })()"""
+        await pg.evaluate("__t.runLibrarySection('artists')"); await pg.wait_for_timeout(800)
+        await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
+        await rotate(pg, True)
+        await pg.wait_for_timeout(1500)
+        before = await pg.evaluate(CENTRE)
+        await pg.evaluate(f"__t.setArt('Beta', {json.dumps(png(220, 20, 30))})"); await pg.wait_for_timeout(1500)
+        after = await pg.evaluate(CENTRE)
+        red = lambda p: p and p[0] > 180 and p[1] < 60 and p[2] < 70
+        check(before and not red(before['face']) and red(after['face']) and red(after['refl']) and after['n'] == 1,
+              f'a new cover shows at once while Cover Flow is open, on the cover and its reflection ({before} -> {after})')
+        await pg.screenshot(path=f'{shots}/cfa-new-art.png')
+        await rotate(pg, False)
+        await pg.evaluate(f"__t.setArt('Beta', {json.dumps(png(20, 40, 230))})"); await pg.wait_for_timeout(300)
+        await pg.evaluate("__t.runLibrarySection('artists')"); await pg.wait_for_timeout(800)
+        await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
+        await rotate(pg, True); await pg.wait_for_timeout(1500)
+        blue = await pg.evaluate(CENTRE)
+        check(blue and blue['face'] and blue['face'][2] > 180 and blue['face'][0] < 60, f'a cover changed while Cover Flow was closed shows when it opens ({blue})')
+        await pg.evaluate("__t.clearArt('Beta')"); await pg.wait_for_timeout(1500)
+        orig = await pg.evaluate(CENTRE)
+        check(orig and orig['face'] == before['face'], f'removing the custom cover brings the original back ({orig} vs {before})')
+        await rotate(pg, False)
 
         # My Library > Albums still opens in album order.
         await pg.evaluate("__t.runLibrarySection('albums')"); await pg.wait_for_timeout(800)
