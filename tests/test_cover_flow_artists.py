@@ -13,7 +13,8 @@ shots = '/tmp/claude-0/t/shots'
 os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
-HOOK = "window.__t = { cf: function(){ return coverFlow; }, runLibrarySection: runLibrarySection, tracks: function(){ return libraryTracks; } };\n"
+HOOK = ("window.__t = { cf: function(){ return coverFlow; }, runLibrarySection: runLibrarySection, tracks: function(){ return libraryTracks; },"
+        " openNp: function(){ openNowPlaying(); }, hist: function(){ return viewHistory.map(function(v){ return v.label; }); } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
 assert _src.count(_mark) == 1
@@ -177,6 +178,54 @@ async def main():
         check(st['order'] == 'album' and titles[:5] == ['Alpha', 'Beta', 'Green', 'Jazz', 'Mid'], f'Albums button opens in album order {titles[:4]}')
         check(st['list'][int(st['pos'])] == want, f'...on the same album it was showing ({st["list"][int(st["pos"])]})')
         await rotate(pg, False)
+
+        # Turning an album over opens its page behind Cover Flow; a second one replaces it;
+        # upright again, the page is showing and Back returns to the Artists list.
+        await pg.evaluate("__t.runLibrarySection('artists')"); await pg.wait_for_timeout(800)
+        await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
+        await rotate(pg, True)
+        key = lambda k: pg.evaluate("document.querySelector('.cf').dispatchEvent(new KeyboardEvent('keydown',{key:'" + k + "'}))")
+        NPSTATE = "[document.body.classList.contains('np-open'), document.body.classList.contains('np-sheet'), document.getElementById('nowPlayingScreen').style.display]"
+        before = await pg.evaluate(NPSTATE)
+        await key('Enter'); await pg.wait_for_timeout(800)
+        after_np = await pg.evaluate(NPSTATE)
+        vis = await pg.evaluate("getComputedStyle(document.getElementById('nowPlayingScreen')).display")
+        land = await pg.evaluate("[document.body.classList.contains('rotate-lock'), document.getElementById('nowPlayingScreen').classList.contains('la-open'), document.body.classList.contains('album-open'), document.getElementById('albumHeroName').textContent, !!document.querySelector('.cf-panel.open')]")
+        check(land[:3] == [True, True, True] and land[3] == 'Beta' and land[4] and after_np == before and vis == 'flex',
+              f'tapping the centre album opens its page behind Cover Flow, which stays up {land} {before} -> {after_np}')
+        await pg.screenshot(path=f'{shots}/cfa-flip-behind.png')
+        await key('Escape'); await pg.wait_for_timeout(500)
+        await key('ArrowRight'); await pg.wait_for_timeout(700)
+        await key('Enter'); await pg.wait_for_timeout(800)
+        name = await pg.evaluate("document.getElementById('albumHeroName').textContent")
+        hist = await pg.evaluate("__t.hist()")
+        check(name == 'Zulu' and hist.count('Beta') == 0, f'a second album replaces the first, not stacked behind it ({name}, history {hist})')
+        await rotate(pg, False)
+        up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open'), document.getElementById('albumHeroName').textContent, Math.round(document.getElementById('albumHero').getBoundingClientRect().height), window.scrollY, document.querySelectorAll('.song-row').length]")
+        check(not up[0] and up[1] and up[2] == 'Zulu' and up[3] > 100 and up[5] == 2, f'upright, the album page is showing {up}')
+        await pg.screenshot(path=f'{shots}/cfa-upright-album.png')
+        back = await pg.evaluate("document.getElementById('detailBackLabel') ? document.getElementById('detailBackLabel').textContent : ''")
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(900)
+        after = await pg.evaluate("[document.body.classList.contains('album-open'), document.querySelectorAll(\".tile[data-entity='artist']\").length]")
+        check(back == 'Artists' and not after[0] and after[1] > 30, f'Back ({back!r}) returns to the Artists list {after}')
+
+        # Now Playing opened by hand before turning: upright again after an album was turned
+        # over, the album page shows rather than Now Playing.
+        await pg.evaluate("__t.openNp()"); await pg.wait_for_timeout(700)
+        await rotate(pg, True)
+        await pg.evaluate("document.getElementById('npLandAlbumsBtn').click()"); await pg.wait_for_timeout(900)
+        await key('Enter'); await pg.wait_for_timeout(800)
+        await rotate(pg, False)
+        up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open')]")
+        check(up == [False, True], f'album page shows even when Now Playing had been opened by hand {up}')
+
+        # Just looking (no album turned over) still returns to the list as before.
+        await pg.evaluate("__t.runLibrarySection('artists')"); await pg.wait_for_timeout(800)
+        await rotate(pg, True)
+        await key('ArrowRight'); await pg.wait_for_timeout(600)
+        await rotate(pg, False)
+        up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open'), document.querySelectorAll(\".tile[data-entity='artist']\").length > 0]")
+        check(up == [False, False, True], f'browsing without turning an album over returns to the list {up}')
 
         # My Library > Albums still opens in album order.
         await pg.evaluate("__t.runLibrarySection('albums')"); await pg.wait_for_timeout(800)

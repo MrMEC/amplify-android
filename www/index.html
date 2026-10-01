@@ -6329,6 +6329,7 @@
   var nowPlayingScreen = document.getElementById('nowPlayingScreen');
   var npBackBtn = document.getElementById('npBackBtn');
   var savedBrowseScrollY = 0;
+  var openingBehindNowPlaying = false;
   var npArt = document.getElementById('npArt');
   var npName = document.getElementById('npName');
   var npSub = document.getElementById('npSub');
@@ -9478,7 +9479,8 @@
   // Only the covers that can be on screen exist in the DOM (a recycled pool), and their art
   // is drawn once into small JPEG thumbnails held in a capped cache, so a library of several
   // hundred albums costs the same as one of twenty.
-  function createCoverFlow(host){
+  function createCoverFlow(host, hooks){
+    hooks = hooks || {};
     var ROT = 66;                 // degrees a side cover is turned in
     var THUMB = 384;              // thumbnail edge, px
     var THUMB_CACHE_MAX = 90;     // thumbnails kept before the oldest are released
@@ -9925,6 +9927,7 @@
       var al = albums[i], el = live[i];
       if(!al || !el) return;
       flipped = i;
+      if(hooks.onAlbumOpened){ try{ hooks.onAlbumOpened(al); }catch(e){} }
       panel.querySelector('.cf-panel-title').textContent = al.album;
       panel.querySelector('.cf-panel-artist').textContent = al.artist;
       var list = panel.querySelector('.cf-tracks');
@@ -10247,7 +10250,29 @@
     // slides the favourites row shut so the screen settles into the page in one movement.
     var npLandAlbums = document.getElementById('npLandAlbums');
     var npLandAlbumsBtn = document.getElementById('npLandAlbumsBtn');
-    coverFlow = createCoverFlow(npLandAlbums);
+    // Turning an album over in Cover Flow also opens its album page behind the landscape
+    // screen, so turning the phone upright lands on it. Turning over another album replaces
+    // that page rather than stacking a second one in Back's history.
+    var coverFlowPageKey = null;
+    var openAlbumBehind = function(al){
+      if(!al || !document.body.classList.contains('rotate-lock')) return;
+      var replacing = !!coverFlowPageKey && activeAlbumKey === coverFlowPageKey;
+      if(replacing && activeAlbumKey === al.key) return;
+      // Where the list underneath was scrolled to, for Back to return to (the page itself
+      // reads as scrolled to the top while the landscape screen covers it).
+      var listScroll = savedBrowseScrollY;
+      openingBehindNowPlaying = true;
+      if(replacing) navReplaying = true;
+      try{ openAlbumPage(al.key, null); }
+      finally { openingBehindNowPlaying = false; navReplaying = false; }
+      if(!replacing && viewHistory.length) viewHistory[viewHistory.length - 1].scroll = listScroll;
+      coverFlowPageKey = al.key;
+      savedBrowseScrollY = 0;
+      // Upright again, the landscape screen gives way to the page, even if Now Playing had
+      // been opened by hand before the turn.
+      rotateLockOpenedNp = true;
+    };
+    coverFlow = createCoverFlow(npLandAlbums, { onAlbumOpened: openAlbumBehind });
     var setLandAlbumsOpen = function(open, centerKey, opts){
       var was = nowPlayingScreen.classList.contains('la-open');
       nowPlayingScreen.classList.toggle('la-open', open);
@@ -18979,7 +19004,8 @@
     hideAlbumHero();
     hideSearchTabs();
     cancelPlaylistStationsEditing();
-    closeNowPlaying();
+    // A page opened behind the landscape screen (an album from Cover Flow) leaves it up.
+    if(!openingBehindNowPlaying) closeNowPlaying();
     window.scrollTo(0, 0);
     closeDrawer();
     activeGenre = null;
