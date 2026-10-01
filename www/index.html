@@ -8693,9 +8693,9 @@
   // A stored favourite outlives the library read that would list its tracks, so the stand-in
   // carries enough to draw a tile and open the page once the index is back.
   function albumEntryForFav(fav){
-    var list = buildAlbumIndex();
+    var list = buildAlbumIndex(), key = resolveAlbumKey(fav.albumKey);
     for(var i = 0; i < list.length; i++){
-      if(list[i].key === fav.albumKey) return list[i];
+      if(list[i].key === key) return list[i];
     }
     return { key: fav.albumKey, album: fav.name || '', artist: fav.artist || '', tracks: [] };
   }
@@ -9060,7 +9060,8 @@
   function customArtFor(track){
     var own = getCustomArtUrl(favKey(track));
     if(own || !isLocalTrack(track) || !String(track.album || '').trim()) return own;
-    return getCustomArtUrl('album:' + albumKeyFor(track));
+    var key = albumKeyFor(track), legacy = legacyAlbumKeyFor(track);
+    return getCustomArtUrl('album:' + key) || (legacy !== key ? getCustomArtUrl('album:' + legacy) : null);
   }
   function refreshAlbumArt(akey){
     var tracks = libraryTracks.filter(function(t){ return albumKeyFor(t) === akey; });
@@ -15878,6 +15879,79 @@
       if(t.contentKey) libraryByContent[t.contentKey] = t;
       if(t.metaKey) libraryByMeta[t.metaKey] = t;
     });
+    compilationVersion++;
+  }
+
+  // ---------- cover fingerprint ----------
+  // Size plus the first and last 8KB of the picture: equal for songs carrying the same cover
+  // (the same embedded image, or the same cover.jpg beside them), different otherwise.
+  // Compilations are recognised by it.
+  var ART_SIG_BYTES = 8 * 1024;
+  function artSigOf(blob){
+    if(!blob || !blob.size || !blob.slice) return Promise.resolve('');
+    var head = Math.min(ART_SIG_BYTES, blob.size);
+    var tailStart = Math.max(head, blob.size - ART_SIG_BYTES);
+    function bytes(b){
+      if(b.arrayBuffer) return b.arrayBuffer();
+      return new Promise(function(res, rej){
+        var r = new FileReader();
+        r.onload = function(){ res(r.result); };
+        r.onerror = rej;
+        r.readAsArrayBuffer(b);
+      });
+    }
+    return Promise.all([bytes(blob.slice(0, head)), bytes(blob.slice(tailStart))]).then(function(parts){
+      var a = new Uint8Array(parts[0]), b = new Uint8Array(parts[1]);
+      var all = new Uint8Array(a.length + b.length);
+      all.set(a, 0); all.set(b, a.length);
+      return 'a' + fnvContentKey(blob.size, all).slice(2);
+    })['catch'](function(){ return ''; });
+  }
+  // Songs imported before covers were fingerprinted get one in the background, a batch at a
+  // time, saved back so it only ever happens once. Albums regroup when it finishes.
+  var artSigBackfillRunning = false;
+  function backfillArtSigs(){
+    if(artSigBackfillRunning) return;
+    var todo = libraryTracks.filter(function(t){ return t.hasArt && !t.artSig && !t.artSigNone; });
+    if(!todo.length) return;
+    artSigBackfillRunning = true;
+    var changed = false, i = 0;
+    function batch(){
+      var slice = todo.slice(i, i + 40);
+      i += 40;
+      if(!slice.length){
+        artSigBackfillRunning = false;
+        if(changed){
+          compilationVersion++;
+          // renderLibraryList also republishes the Android Auto library.
+          renderLibraryList();
+          refreshLibraryView();
+        }
+        return;
+      }
+      var blobs = [];
+      idbDo([LIB_STORE_ART], 'readonly', function(tx){
+        var store = tx.objectStore(LIB_STORE_ART);
+        slice.forEach(function(t, k){
+          var r = store.get(t.localId);
+          r.onsuccess = function(){ blobs[k] = r.result; };
+        });
+        return null;
+      }).then(function(){
+        return Promise.all(slice.map(function(t, k){ return artSigOf(blobs && blobs[k]); }));
+      }).then(function(sigs){
+        slice.forEach(function(t, k){
+          if(sigs[k]) t.artSig = sigs[k]; else t.artSigNone = true;
+        });
+        changed = true;
+        return idbDo([LIB_STORE_TRACKS], 'readwrite', function(tx){
+          var store = tx.objectStore(LIB_STORE_TRACKS), last = null;
+          slice.forEach(function(t){ last = store.put(t); });
+          return last;
+        });
+      })['catch'](function(){}).then(function(){ setTimeout(batch, 0); });
+    }
+    batch();
   }
 
   // ---------- content identity ----------
@@ -16031,6 +16105,7 @@
       renderFavoritesList();
       renderRecentList();
       renderRecentSection();
+      setTimeout(backfillArtSigs, 1500);
       return libraryTracks;
     })['catch'](function(err){
       // The streaming half of the app is unaffected, and so is Artists, which is mostly
@@ -16296,7 +16371,10 @@
           } else if(artFile){
             artBlob = artFile; // a File is already a Blob; stored as-is
           }
-          return storeTrack(record, file, artBlob).then(function(){
+          return artSigOf(artBlob).then(function(sig){
+            if(sig) record.artSig = sig;
+            return storeTrack(record, file, artBlob);
+          }).then(function(){
             libraryTracks.push(record);
             libraryById[record.localId] = record;
             if(record.contentKey) libraryByContent[record.contentKey] = record;
@@ -17138,11 +17216,80 @@
     return Object.prototype.hasOwnProperty.call(artistIndexBurst, key) ? artistIndexBurst[key] : null;
   }
 
-  function albumKeyFor(track){
+  // The per-artist key every album had before compilations were grouped. Still used to find
+  // custom covers and favourites saved against it.
+  function legacyAlbumKeyFor(track){
     var album = (track.album || '').trim();
     // Two separately-normalised halves rather than one concatenated string, so an
     // artist/album pair can never collide with a different pair that happens to join the same.
     return artistMatchKey(track.artist || UNKNOWN_ARTIST) + '|' + artistMatchKey(album || SINGLES_ALBUM);
+  }
+
+  // ---------- compilations ----------
+  // Songs in one folder that share an album name and cover but not an artist are one album
+  // (a soundtrack, a "Now" record), listed once under Various Artists rather than split into
+  // a one-song album per performer. The folder keeps two unrelated "Greatest Hits" apart, and
+  // the cover keeps two different records that happen to share a name and a folder apart.
+  var VARIOUS_ARTISTS = 'Various Artists';
+  var compilationById = null, compilationSig = '', compilationVersion = 0;
+  function compilationGroupOf(track){
+    var album = (track.album || '').trim();
+    if(!album || !isLocalTrack(track)) return '';
+    return dirOfRelPath(normalizeRelPath(track.relPath || '')) + '\n' + artistMatchKey(album);
+  }
+  function compilationMap(){
+    var sig = libraryTracks.length + '|' + compilationVersion;
+    if(compilationById && sig === compilationSig) return compilationById;
+    var groups = {};
+    libraryTracks.forEach(function(t){
+      var g = compilationGroupOf(t);
+      if(g) (groups[g] = groups[g] || []).push(t);
+    });
+    var map = {};
+    Object.keys(groups).forEach(function(g){
+      var tracks = groups[g], artists = {}, arts = {}, nArtists = 0, nArts = 0;
+      tracks.forEach(function(t){
+        var a = artistMatchKey(t.artist || UNKNOWN_ARTIST);
+        if(!artists[a]){ artists[a] = true; nArtists++; }
+        // A cover not yet fingerprinted (older imports, until the background pass reaches
+        // them) is taken as matching; the pass regroups if it turns out not to.
+        if(t.artSig && !arts[t.artSig]){ arts[t.artSig] = true; nArts++; }
+      });
+      if(nArtists < 2 || nArts > 1) return;
+      var nl = g.indexOf('\n');
+      var key = 'va|' + g.slice(nl + 1) + '|' + g.slice(0, nl);
+      tracks.forEach(function(t){ map[favKey(t)] = key; });
+    });
+    compilationById = map;
+    compilationSig = sig;
+    return map;
+  }
+  function isCompilationKey(key){ return String(key || '').indexOf('va|') === 0; }
+
+  function albumKeyFor(track){
+    if(track && track.localId){
+      var c = compilationMap()[favKey(track)];
+      if(c) return c;
+    }
+    return legacyAlbumKeyFor(track);
+  }
+  // An album key saved before a regroup (a favourite, an open page, a car shortcut) resolves
+  // to whatever album its songs belong to now.
+  function resolveAlbumKey(key){
+    if(!key) return key;
+    for(var i = 0; i < libraryTracks.length; i++){
+      if(albumKeyFor(libraryTracks[i]) === key) return key;
+    }
+    for(var j = 0; j < libraryTracks.length; j++){
+      var t = libraryTracks[j];
+      if(legacyAlbumKeyFor(t) === key) return albumKeyFor(t);
+      if(isCompilationKey(key)){
+        var g = compilationGroupOf(t);
+        var nl = g.indexOf('\n');
+        if(g && 'va|' + g.slice(nl + 1) + '|' + g.slice(0, nl) === key) return albumKeyFor(t);
+      }
+    }
+    return key;
   }
   function buildAlbumIndex(tracks){
     var source = tracks || libraryTracks;
@@ -17151,10 +17298,12 @@
       if(isBlacklisted(t)) return;
       var key = albumKeyFor(t);
       if(!map[key]){
+        var various = isCompilationKey(key);
         map[key] = {
           key: key,
           album: (t.album || '').trim() || SINGLES_ALBUM,
-          artist: (t.artist || '').trim() || UNKNOWN_ARTIST,
+          artist: various ? VARIOUS_ARTISTS : ((t.artist || '').trim() || UNKNOWN_ARTIST),
+          various: various,
           tracks: []
         };
       }
@@ -18042,6 +18191,7 @@
 
     if(album){
       var al = null, list = buildAlbumIndex();
+      album = resolveAlbumKey(album);
       for(var i = 0; i < list.length; i++){ if(list[i].key === album){ al = list[i]; break; } }
       return entry(al ? al.album : 'Album', function(){ openAlbumPage(album, artist); });
     }
@@ -19135,6 +19285,8 @@
   }
 
   function renderAlbumPage(key){
+    key = resolveAlbumKey(key);
+    if(activeAlbumKey) activeAlbumKey = key;
     var albums = buildAlbumIndex();
     var album = null;
     for(var i = 0; i < albums.length; i++){
@@ -19179,7 +19331,7 @@
     stationsGrid.classList.add('grid-album');
     album.tracks.forEach(function(t, i){
       stationsGrid.appendChild(buildSongRow(t, {
-        number: t.trackNo || (i + 1), hideSub: true,
+        number: t.trackNo || (i + 1), hideSub: !album.various, subArtistOnly: album.various,
         // Playing a track from an album queues that album, so Next runs on through it.
         queueList: album.tracks, queueLabel: album.album
       }));
@@ -19199,7 +19351,7 @@
     // The artist is a route out of here, not a caption, wherever there is a page to go to.
     albumHeroArtist.innerHTML = '';
     var artistKey = artistMatchKey(album.artist);
-    if(artistKey && findArtistEntry(artistKey)){
+    if(!album.various && artistKey && findArtistEntry(artistKey)){
       var link = document.createElement('button');
       link.type = 'button';
       link.className = 'album-hero-artist';
@@ -21679,7 +21831,7 @@
     // The artist and the album are the page's own heading on an album page, so repeating
     // them under every title is noise.
     if(!o.hideSub && track.artist) parts.push(track.artist);
-    if(!o.hideSub && track.album) parts.push(track.album);
+    if(!o.hideSub && !o.subArtistOnly && track.album) parts.push(track.album);
     if(parts.length){
       var sub = document.createElement('div');
       sub.className = 'song-row-sub';
@@ -23307,7 +23459,7 @@
           if(isPodcastTrack(f)) return carEpisode(f, prog);
           if(isLocalTrack(f)) return carSong(f);
           if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
-          if(f && f.type === 'album') return { t: 'album', key: f.albumKey || '', title: f.name || f.album || '' };
+          if(f && f.type === 'album') return { t: 'album', key: resolveAlbumKey(f.albumKey || ''), title: f.name || f.album || '' };
           return carStation(f);
         }));
         lists.recentSongs = compact(recentStations.filter(isLocalTrack).map(carSong));
@@ -23553,9 +23705,15 @@
       // Each artist's albums, taken from the index above (already in album order) rather than
       // indexing every artist's songs again.
       var albumsOf = {};
+      // A compilation is listed under every artist on it.
       albums.forEach(function(al){
-        var ak = al.key.slice(0, al.key.indexOf('|'));
-        (albumsOf[ak] = albumsOf[ak] || []).push(al);
+        var seen = {};
+        al.tracks.forEach(function(t){
+          var ak = artistMatchKey((t.artist || '').trim() || UNKNOWN_ARTIST);
+          if(seen[ak]) return;
+          seen[ak] = true;
+          (albumsOf[ak] = albumsOf[ak] || []).push(al);
+        });
       });
       var artists = buildArtistIndex().map(function(entry){
         var own = albumsOf[entry.key] || [];
