@@ -4041,9 +4041,82 @@
   body.rotate-lock .now-playing-screen.la-open{ background:#000 !important; }
   body.rotate-lock .np-hero{ transition:opacity .35s ease, visibility 0s linear 0s; }
   body.rotate-lock .now-playing-screen.la-open .np-hero{ opacity:0; visibility:hidden; pointer-events:none; transition:opacity .35s ease, visibility 0s linear .35s; }
-  body.rotate-lock:not(.np-video-full) .now-playing-screen.la-open .np-land-albums{
+  /* The Albums page holds Cover Flow. It fades in with the black, and gives up the bottom of
+     the screen to the favourites row when that is open (riding the row's own animation). */
+  body.rotate-lock:not(.np-video-full) .np-land-albums{
     display:block; position:absolute; top:0; left:0; right:0; bottom:0; z-index:1;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition:opacity .35s ease, visibility 0s linear .35s, bottom .34s var(--lf-ease);
   }
+  body.rotate-lock:not(.np-video-full) .now-playing-screen.la-open .np-land-albums{
+    opacity:1; visibility:visible; pointer-events:auto;
+    transition:opacity .35s ease .08s, visibility 0s linear 0s, bottom .34s var(--lf-ease);
+  }
+  body.rotate-lock .now-playing-screen.lf-open .np-land-albums{ bottom:calc(var(--lf-size) + 18px + 8px); }
+  body.rotate-lock .np-land-favs{ position:relative; z-index:2; }
+
+  /* ---------- Cover Flow ---------- */
+  .cf{ position:absolute; inset:0; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none;
+       -webkit-tap-highlight-color:transparent; outline:none; }
+  /* Flat on purpose: the perspective lives here, but covers are stacked by z-index (nearest
+     the middle on top), exactly as Cover Flow does, rather than depth-sorted -- and a 3D
+     stage plane would sit in front of the pushed-back covers and swallow their taps. */
+  .cf-stage{ position:absolute; left:0; right:0; top:0; height:0; pointer-events:none; }
+  .cf-cover{ pointer-events:auto; }
+  .cf-cover{
+    position:absolute; left:50%; top:0; transform-style:flat; will-change:transform;
+    backface-visibility:hidden; -webkit-backface-visibility:hidden; contain:layout style;
+  }
+  .cf-face{
+    position:absolute; inset:0; overflow:hidden; background-size:cover; background-position:center;
+    -webkit-box-reflect:below 1px linear-gradient(to bottom, transparent 0%, transparent 62%, rgba(255,255,255,.22) 80%, rgba(255,255,255,.62) 100%);
+  }
+  .cf-face img{ width:100%; height:100%; object-fit:cover; display:block; -webkit-user-drag:none; pointer-events:none; }
+  /* Darkens a cover the further it sits from the middle, a little more on its outer edge. */
+  .cf-shade{ position:absolute; inset:0; pointer-events:none; opacity:0;
+    background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
+  .cf-cover.cf-left .cf-shade{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
+  /* Kept off the bottom edge so it never dims the cover's own reflection. */
+  .cf-cover.cf-center .cf-face{ box-shadow:0 -4px 22px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
+  .cf-caption{ position:absolute; left:50%; width:min(52%, 440px); transform:translateX(-50%); height:44px; pointer-events:none; text-align:center; }
+  .cf-cap{ position:absolute; inset:0; opacity:0; transition:opacity .22s ease; }
+  .cf-cap.on{ opacity:1; }
+  .cf-cap-title, .cf-cap-artist{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-cap-title{ color:#fff; font-weight:700; font-size:15px; line-height:20px; }
+  .cf-cap-artist{ color:rgba(255,255,255,.6); font-size:13px; line-height:18px; margin-top:2px; }
+  .cf-empty{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:rgba(255,255,255,.55); font-size:14px; pointer-events:none; }
+  /* The back of the centre cover: its tracklist. */
+  .cf-panel{
+    position:absolute; left:50%; top:50%; display:none; flex-direction:column; overflow:hidden;
+    background:#1c1c1f; border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.08);
+    backface-visibility:hidden; -webkit-backface-visibility:hidden; z-index:5000; touch-action:pan-y;
+  }
+  .cf-panel.open{ display:flex; }
+  .cf-panel-head{ flex:0 0 auto; padding:12px 16px 10px; border-bottom:1px solid rgba(255,255,255,.08); cursor:pointer; }
+  .cf-panel-title{ color:#fff; font-weight:700; font-size:15px; line-height:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-panel-artist{ color:rgba(255,255,255,.6); font-size:12.5px; line-height:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-tracks{ flex:1 1 auto; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .cf-tracks::-webkit-scrollbar{ display:none; }
+  .cf-track{ display:flex; align-items:center; gap:12px; width:100%; padding:9px 16px; border:none; background:none;
+    color:#fff; text-align:left; font:inherit; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05); }
+  .cf-track:active{ background:rgba(255,255,255,.06); }
+  .cf-track-no{ flex:0 0 20px; text-align:right; color:rgba(255,255,255,.45); font-size:13px; font-variant-numeric:tabular-nums;
+    display:flex; justify-content:flex-end; align-items:flex-end; height:14px; gap:2px; }
+  .cf-track-no span{ display:none; width:3px; height:100%; border-radius:1px; background:var(--accent, #fff); transform-origin:bottom; }
+  .cf-track.playing .cf-track-no{ font-size:0; }
+  .cf-track.playing .cf-track-no span{ display:block; }
+  .cf-track.playing .cf-track-no span:nth-child(1){ transform:scaleY(.5); }
+  .cf-track.playing .cf-track-no span:nth-child(2){ transform:scaleY(1); }
+  .cf-track.playing .cf-track-no span:nth-child(3){ transform:scaleY(.7); }
+  body.ui-playing .cf-track.playing .cf-track-no span{ animation:la-bars 1.1s ease-in-out infinite; }
+  body.ui-playing .cf-track.playing .cf-track-no span:nth-child(2){ animation-delay:-.6s; }
+  body.ui-playing .cf-track.playing .cf-track-no span:nth-child(3){ animation-delay:-.3s; }
+  .cf-track-body{ flex:1 1 auto; min-width:0; }
+  .cf-track-title{ font-size:14px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-track.playing .cf-track-title{ color:var(--accent, #fff); font-weight:600; }
+  .cf-track-artist{ font-size:12px; line-height:16px; color:rgba(255,255,255,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cf-track-time{ flex:0 0 auto; font-size:12.5px; color:rgba(255,255,255,.45); font-variant-numeric:tabular-nums; }
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
     body.rotate-lock .sidebar-top{ display:none !important; }
@@ -9390,6 +9463,587 @@
     return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
   }
 
+  // ================================================================
+  // Cover Flow (landscape Albums)
+  // ================================================================
+  // The local albums as a row of covers in 3D: one facing forward in the middle, the rest
+  // turned in and stacked tight down each side, each standing on its own reflection. Built on
+  // CSS 3D transforms (one compositor layer per cover) driven by a small physics loop:
+  //   - pos is a float album index (2.4 = between the 3rd and 4th album);
+  //   - dragging maps finger travel straight to pos, with rubber-banding past either end;
+  //   - on release the fling velocity projects a resting album, and a critically damped
+  //     spring carries pos there, starting from the finger's own speed, so it never jolts.
+  // Only the covers that can be on screen exist in the DOM (a recycled pool), and their art
+  // is drawn once into small JPEG thumbnails held in a capped cache, so a library of several
+  // hundred albums costs the same as one of twenty.
+  function createCoverFlow(host){
+    var ROT = 66;                 // degrees a side cover is turned in
+    var THUMB = 384;              // thumbnail edge, px
+    var THUMB_CACHE_MAX = 90;     // thumbnails kept before the oldest are released
+    var SPRING_K = 165;           // spring stiffness (1/s^2)
+    var FLING_TIME = 0.30;        // seconds of glide a fling's velocity is projected over
+    var TAP_SLOP = 8;             // px a press may wander and still be a tap
+    var EDGE = 0.09;              // share of the width at each side that steps one album
+
+    var root = document.createElement('div');
+    root.className = 'cf';
+    root.tabIndex = -1;
+    var stage = document.createElement('div');
+    stage.className = 'cf-stage';
+    var caption = document.createElement('div');
+    caption.className = 'cf-caption';
+    var caps = [0, 1].map(function(){
+      var c = document.createElement('div');
+      c.className = 'cf-cap';
+      c.innerHTML = '<div class="cf-cap-title"></div><div class="cf-cap-artist"></div>';
+      caption.appendChild(c);
+      return c;
+    });
+    var empty = document.createElement('div');
+    empty.className = 'cf-empty';
+    empty.textContent = 'No albums in your library yet';
+    empty.style.display = 'none';
+    var panel = document.createElement('div');
+    panel.className = 'cf-panel';
+    panel.innerHTML = '<div class="cf-panel-head"><div class="cf-panel-title"></div><div class="cf-panel-artist"></div></div><div class="cf-tracks"></div>';
+    root.appendChild(stage);
+    root.appendChild(caption);
+    root.appendChild(empty);
+    root.appendChild(panel);
+    host.appendChild(root);
+
+    var albums = [];
+    var pos = 0, vel = 0, target = 0;
+    var running = false, raf = 0, lastT = 0;
+    var isOpen = false;
+    var W = 0, H = 0, S = 0, C = 0, G = 0, D = 0, coverTop = 0;
+    var pool = [];                // recycled cover elements
+    var live = {};                // album index -> element
+    var capIndex = -1, capOn = 0;
+    var flipped = null;           // album index whose tracklist is showing
+
+    // ---------- geometry ----------
+    function measure(){
+      W = root.clientWidth; H = root.clientHeight;
+      if(!W || !H) return false;
+      S = Math.round(Math.max(60, Math.min(H * 0.5, W * 0.34)));
+      C = S * 0.64;               // centre to first side cover
+      G = S * 0.2;                // between consecutive side covers
+      D = S * 0.62;               // how far back the sides sit
+      // The cover, the visible part of its reflection (the lower 38%), then the caption.
+      coverTop = Math.round(Math.max(10, (H - (S * 1.4 + 46)) / 2));
+      stage.style.top = coverTop + 'px';
+      stage.style.perspective = Math.round(S * 3.3) + 'px';
+      stage.style.perspectiveOrigin = '50% ' + Math.round(S / 2) + 'px';
+      stage.style.height = S + 'px';
+      caption.style.top = Math.round(coverTop + S * 1.4 + 4) + 'px';
+      for(var k in live) sizeCover(live[k]);
+      pool.forEach(sizeCover);
+      return true;
+    }
+    function sizeCover(el){
+      el.style.width = S + 'px';
+      el.style.height = S + 'px';
+      el.style.marginLeft = (-S / 2) + 'px';
+    }
+    // Where album i sits for the current pos.
+    function place(el, i){
+      var d = i - pos, ad = Math.abs(d), sgn = d < 0 ? -1 : 1;
+      var near = Math.min(ad, 1);
+      var x = ad < 1 ? d * C : sgn * (C + (ad - 1) * G);
+      var z = -near * D;
+      var r = -sgn * near * ROT;
+      el.style.transform = 'translate3d(' + x.toFixed(2) + 'px,0,' + z.toFixed(2) + 'px) rotateY(' + r.toFixed(2) + 'deg)';
+      el.style.zIndex = String(1000 - Math.round(ad * 10));
+      var shade = Math.min(0.62, near * 0.2 + Math.max(0, ad - 1) * 0.085);
+      el._shade.style.opacity = shade.toFixed(3);
+      var side = ad < 0.5 ? 'c' : (d < 0 ? 'l' : 'r');
+      if(el._side !== side){
+        el._side = side;
+        el.classList.toggle('cf-center', side === 'c');
+        el.classList.toggle('cf-left', side === 'l');
+      }
+    }
+
+    // ---------- the pool ----------
+    function visibleRange(){
+      var reach = G > 0 ? Math.ceil((W / 2 - C) / G) + 2 : 4;
+      reach = Math.max(2, Math.min(reach, 14));
+      var c = Math.round(pos);
+      return [Math.max(0, c - reach), Math.min(albums.length - 1, c + reach)];
+    }
+    function takeCover(){
+      var el = pool.pop();
+      if(el) return el;
+      el = document.createElement('div');
+      el.className = 'cf-cover';
+      var face = document.createElement('div');
+      face.className = 'cf-face';
+      var shade = document.createElement('div');
+      shade.className = 'cf-shade';
+      face.appendChild(shade);
+      el.appendChild(face);
+      el._face = face; el._shade = shade;
+      sizeCover(el);
+      return el;
+    }
+    function bindCover(el, i){
+      el.dataset.i = String(i);
+      el._album = albums[i];
+      el._side = null;
+      var face = el._face;
+      var old = face.querySelector('img');
+      if(old) old.remove();
+      var al = albums[i];
+      var src = artSourceForTracks(al.tracks) || { name: al.album };
+      face.className = 'cf-face';
+      face.style.background = '';
+      applyPlaceholderArt(face, favKey(src));
+      requestThumb(al, function(url){
+        if(el._album !== al || !url) return;
+        var img = document.createElement('img');
+        img.alt = '';
+        img.decoding = 'async';
+        img.onload = function(){ if(el._album === al) face.style.background = '#000'; };
+        img.src = url;
+        face.insertBefore(img, face.firstChild);
+      });
+    }
+    function render(){
+      if(!albums.length || !S) return;
+      var rg = visibleRange();
+      for(var k in live){
+        var n = +k;
+        if(n < rg[0] || n > rg[1]){
+          var gone = live[k];
+          delete live[k];
+          gone.remove();
+          gone._album = null;
+          pool.push(gone);
+        }
+      }
+      for(var i = rg[0]; i <= rg[1]; i++){
+        var el = live[i];
+        if(!el){
+          el = takeCover();
+          bindCover(el, i);
+          live[i] = el;
+          stage.appendChild(el);
+        }
+        place(el, i);
+      }
+      setCaption(clampIndex(Math.round(pos)));
+    }
+    function clampIndex(i){ return Math.max(0, Math.min(albums.length - 1, i)); }
+
+    // ---------- caption ----------
+    function setCaption(i){
+      if(i === capIndex || !albums[i]) return;
+      capIndex = i;
+      capOn = 1 - capOn;
+      var c = caps[capOn];
+      c.firstChild.textContent = albums[i].album;
+      c.lastChild.textContent = albums[i].artist;
+      caps[capOn].classList.add('on');
+      caps[1 - capOn].classList.remove('on');
+    }
+
+    // ---------- thumbnails ----------
+    // Art is drawn once into a small square JPEG; the 3D layers then hold a few hundred KB
+    // instead of full-size decoded covers. Requests are served nearest-the-middle first, a
+    // few at a time, and dropped if their cover has scrolled away by the time they come up.
+    var thumbCache = new Map();   // album key -> { url, own }
+    var thumbWaiting = [];        // { al, cb }
+    var thumbBusy = 0;
+    function requestThumb(al, cb){
+      var hit = thumbCache.get(al.key);
+      if(hit){
+        thumbCache.delete(al.key); thumbCache.set(al.key, hit);    // most recently used
+        cb(hit.url);
+        return;
+      }
+      thumbWaiting.push({ al: al, cb: cb });
+      pumpThumbs();
+    }
+    function pumpThumbs(){
+      while(thumbBusy < 3 && thumbWaiting.length){
+        var best = -1, bestD = Infinity;
+        for(var j = 0; j < thumbWaiting.length; j++){
+          var idx = albums.indexOf(thumbWaiting[j].al);
+          var dist = idx === -1 ? Infinity : Math.abs(idx - pos);
+          if(dist < bestD){ bestD = dist; best = j; }
+        }
+        var job = thumbWaiting.splice(best, 1)[0];
+        if(bestD === Infinity || bestD > 16) continue;   // scrolled out of reach meanwhile
+        thumbBusy++;
+        makeThumb(job.al).then(function(job){ return function(entry){
+          thumbBusy--;
+          if(entry){
+            thumbCache.set(job.al.key, entry);
+            trimThumbs();
+          }
+          job.cb(entry ? entry.url : null);
+          pumpThumbs();
+        }; }(job));
+      }
+    }
+    function trimThumbs(){
+      while(thumbCache.size > THUMB_CACHE_MAX){
+        var oldest = thumbCache.keys().next().value;
+        var e = thumbCache.get(oldest);
+        thumbCache.delete(oldest);
+        if(e && e.own){ try{ URL.revokeObjectURL(e.url); }catch(err){} }
+      }
+    }
+    function sourceArtUrl(al){
+      var src = artSourceForTracks(al.tracks);
+      if(!src) return Promise.resolve(null);
+      var custom = customArtFor(src);
+      if(custom) return Promise.resolve(secureUrl(custom));
+      if(!isLocalTrack(src)) return Promise.resolve(null);
+      return localArtUrl(src).then(function(u){ return u || albumMateArtUrl(src); });
+    }
+    function makeThumb(al){
+      return sourceArtUrl(al).then(function(url){
+        if(!url) return null;
+        return new Promise(function(resolve){
+          var img = new Image();
+          // A remote custom cover may refuse to be read back from a canvas; it is then
+          // used as it is rather than thumbnailed.
+          if(!/^(blob|data):/.test(url)) img.crossOrigin = 'anonymous';
+          img.onload = function(){
+            try{
+              var c = document.createElement('canvas');
+              c.width = THUMB; c.height = THUMB;
+              var w = img.naturalWidth, h = img.naturalHeight, side = Math.min(w, h);
+              var g = c.getContext('2d');
+              g.imageSmoothingQuality = 'high';
+              g.drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, THUMB, THUMB);
+              c.toBlob(function(b){
+                resolve(b ? { url: URL.createObjectURL(b), own: true } : { url: url, own: false });
+              }, 'image/jpeg', 0.86);
+            }catch(e){ resolve({ url: url, own: false }); }
+          };
+          img.onerror = function(){
+            if(img.crossOrigin){
+              var plain = new Image();
+              plain.onload = function(){ resolve({ url: url, own: false }); };
+              plain.onerror = function(){ resolve(null); };
+              plain.src = url;
+            } else resolve(null);
+          };
+          img.src = url;
+        });
+      })['catch'](function(){ return null; });
+    }
+    function forgetThumbs(){
+      thumbCache.forEach(function(e){ if(e.own){ try{ URL.revokeObjectURL(e.url); }catch(err){} } });
+      thumbCache.clear();
+      thumbWaiting = [];
+    }
+
+    // ---------- physics ----------
+    function startLoop(){
+      if(running) return;
+      running = true;
+      lastT = performance.now();
+      raf = requestAnimationFrame(tick);
+    }
+    function stopLoop(){
+      running = false;
+      cancelAnimationFrame(raf);
+    }
+    function tick(now){
+      if(!running) return;
+      var dt = Math.min(0.034, Math.max(0.001, (now - lastT) / 1000));
+      lastT = now;
+      if(!drag){
+        // Critically damped spring, integrated in small steps so a slow frame cannot
+        // make it overshoot or wobble.
+        var c = 2 * Math.sqrt(SPRING_K);
+        var steps = Math.ceil(dt / 0.004), h = dt / steps;
+        for(var s = 0; s < steps; s++){
+          var a = -SPRING_K * (pos - target) - c * vel;
+          vel += a * h;
+          pos += vel * h;
+        }
+        if(Math.abs(pos - target) < 0.0006 && Math.abs(vel) < 0.01){
+          pos = target; vel = 0;
+          render();
+          running = false;
+          return;
+        }
+      }
+      render();
+      raf = requestAnimationFrame(tick);
+    }
+    function goTo(i, keepVelocity){
+      if(!albums.length) return;
+      target = clampIndex(i);
+      if(!keepVelocity) vel = vel * 0.5;
+      startLoop();
+    }
+    function step(dir){
+      if(flipped !== null){ unflip(); return; }
+      goTo(target + dir, true);
+    }
+
+    // ---------- touch ----------
+    var drag = null;    // { id, x0, y0, pos0, moved, samples }
+    function pxPerAlbum(){ return Math.max(24, G * 1.7); }
+    function rubber(p){
+      var max = albums.length - 1;
+      if(p < 0) return p * 0.35;
+      if(p > max) return max + (p - max) * 0.35;
+      return p;
+    }
+    root.addEventListener('pointerdown', function(e){
+      if(!isOpen || e.button > 0) return;
+      if(panel.contains(e.target)) return;
+      if(drag) return;
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, pos0: pos, moved: false,
+               samples: [[performance.now(), pos]] };
+      try{ root.setPointerCapture(e.pointerId); }catch(err){}
+    });
+    root.addEventListener('pointermove', function(e){
+      if(!drag || e.pointerId !== drag.id) return;
+      var dx = e.clientX - drag.x0;
+      if(!drag.moved){
+        if(Math.abs(dx) < TAP_SLOP && Math.abs(e.clientY - drag.y0) < TAP_SLOP) return;
+        drag.moved = true;
+        if(flipped !== null) unflip();
+        // Picks up from wherever an animation had got to, with no jump.
+        drag.pos0 = pos; drag.x0 = e.clientX; dx = 0;
+        vel = 0;
+      }
+      var raw = drag.pos0 - dx / pxPerAlbum();
+      pos = rubber(raw);
+      var now = performance.now();
+      drag.samples.push([now, raw]);
+      while(drag.samples.length > 2 && now - drag.samples[0][0] > 90) drag.samples.shift();
+      startLoop();
+    });
+    function endDrag(e, cancelled){
+      if(!drag || e.pointerId !== drag.id) return;
+      var d = drag;
+      drag = null;
+      try{ root.releasePointerCapture(e.pointerId); }catch(err){}
+      if(!d.moved){
+        if(!cancelled) handleTap(e.clientX, e.clientY);
+        return;
+      }
+      var sm = d.samples, a = sm[0], b = sm[sm.length - 1];
+      var v = (b[0] - a[0]) > 8 ? (b[1] - a[1]) / ((b[0] - a[0]) / 1000) : 0;
+      if(performance.now() - b[0] > 80) v = 0;       // held still before letting go
+      v = Math.max(-40, Math.min(40, v));
+      vel = v;
+      target = clampIndex(Math.round(pos + v * FLING_TIME));
+      startLoop();
+    }
+    root.addEventListener('pointerup', function(e){ endDrag(e, false); });
+    root.addEventListener('pointercancel', function(e){ endDrag(e, true); });
+    root.addEventListener('click', function(e){ e.stopPropagation(); });
+    root.addEventListener('wheel', function(e){
+      if(!isOpen) return;
+      e.preventDefault();
+      var dlt = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      wheelAcc += dlt;
+      if(Math.abs(wheelAcc) >= 40){ step(wheelAcc > 0 ? 1 : -1); wheelAcc = 0; }
+    }, { passive: false });
+    var wheelAcc = 0;
+    root.addEventListener('keydown', function(e){
+      if(e.key === 'ArrowLeft'){ step(-1); e.preventDefault(); }
+      else if(e.key === 'ArrowRight'){ step(1); e.preventDefault(); }
+      else if(e.key === 'Enter' || e.key === ' '){ toggleFlip(); e.preventDefault(); }
+      else if(e.key === 'Escape' && flipped !== null){ unflip(); e.preventDefault(); }
+    });
+
+    function handleTap(x, y){
+      if(flipped !== null){ unflip(); return; }
+      var r = root.getBoundingClientRect();
+      var fx = (x - r.left) / r.width;
+      var hitEl = document.elementFromPoint(x, y);
+      var cover = hitEl && hitEl.closest ? hitEl.closest('.cf-cover') : null;
+      var centre = Math.round(target);
+      if(cover && root.contains(cover) && +cover.dataset.i === centre && Math.abs(pos - centre) < 0.3){
+        toggleFlip();
+        return;
+      }
+      if(fx < EDGE){ step(-1); return; }
+      if(fx > 1 - EDGE){ step(1); return; }
+      if(cover && root.contains(cover)){ goTo(+cover.dataset.i); return; }
+    }
+
+    // ---------- the tracklist (back of the cover) ----------
+    function toggleFlip(){
+      if(flipped !== null) unflip(); else flip(Math.round(target));
+    }
+    function flip(i){
+      var al = albums[i], el = live[i];
+      if(!al || !el) return;
+      flipped = i;
+      panel.querySelector('.cf-panel-title').textContent = al.album;
+      panel.querySelector('.cf-panel-artist').textContent = al.artist;
+      var list = panel.querySelector('.cf-tracks');
+      list.innerHTML = '';
+      al.tracks.forEach(function(t, n){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cf-track';
+        b.dataset.key = favKey(t);
+        b.innerHTML = '<span class="cf-track-no"></span><span class="cf-track-body"><span class="cf-track-title"></span></span><span class="cf-track-time"></span>';
+        var no = b.querySelector('.cf-track-no');
+        no.appendChild(document.createTextNode(String(t.trackNo || (n + 1))));
+        for(var k = 0; k < 3; k++) no.appendChild(document.createElement('span'));
+        b.querySelector('.cf-track-title').textContent = t.name || t.fileName || '';
+        if(al.various && t.artist){
+          var ar = document.createElement('span');
+          ar.className = 'cf-track-artist';
+          ar.textContent = t.artist;
+          b.querySelector('.cf-track-body').appendChild(ar);
+          b.querySelector('.cf-track-title').style.display = 'block';
+          ar.style.display = 'block';
+        }
+        b.querySelector('.cf-track-time').textContent = t.duration ? formatTime(t.duration) : '';
+        b.addEventListener('click', function(ev){
+          ev.stopPropagation();
+          playTrackInList(al.tracks, t, al.album);
+          syncPlaying();
+        });
+        list.appendChild(b);
+      });
+      syncPlaying();
+      var pw = Math.round(Math.min(W * 0.62, Math.max(S * 1.45, 300)));
+      var ph = Math.round(Math.min(H - 20, Math.max(S, 64 + al.tracks.length * 44)));
+      panel.style.width = pw + 'px';
+      panel.style.height = ph + 'px';
+      panel.style.marginLeft = (-pw / 2) + 'px';
+      panel.style.marginTop = (-ph / 2) + 'px';
+      list.scrollTop = 0;
+      // Half a turn on the cover, then the tracklist turns the rest of the way in, growing to
+      // its own size: the card flipping over.
+      var base = el.style.transform;
+      el.animate([{ transform: base }, { transform: base + ' rotateY(-90deg)' }],
+        { duration: 170, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+      setTimeout(function(){
+        if(flipped !== i) return;
+        el.style.visibility = 'hidden';
+        panel.classList.add('open');
+        var sc = (S / pw).toFixed(3);
+        panel.animate([
+          { transform: 'perspective(' + (S * 3.3) + 'px) rotateY(90deg) scale(' + sc + ')' },
+          { transform: 'perspective(' + (S * 3.3) + 'px) rotateY(0deg) scale(1)' }
+        ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        caption.style.opacity = '0';
+      }, 170);
+      caption.style.transition = 'opacity .2s ease';
+    }
+    function unflip(){
+      if(flipped === null) return;
+      var i = flipped;
+      flipped = null;
+      var el = live[i];
+      var pw = panel.offsetWidth || S;
+      var done = function(){
+        panel.classList.remove('open');
+        caption.style.opacity = '';
+        if(!el) return;
+        el.style.visibility = '';
+        el.getAnimations().forEach(function(a){ a.cancel(); });
+        var base = el.style.transform;
+        el.animate([{ transform: base + ' rotateY(90deg)' }, { transform: base }],
+          { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      };
+      if(!panel.classList.contains('open')){ done(); return; }
+      var a = panel.animate([
+        { transform: 'perspective(' + (S * 3.3) + 'px) rotateY(0deg) scale(1)' },
+        { transform: 'perspective(' + (S * 3.3) + 'px) rotateY(-90deg) scale(' + (S / pw).toFixed(3) + ')' }
+      ], { duration: 170, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+      a.onfinish = function(){ a.cancel(); done(); };
+    }
+    panel.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+    panel.addEventListener('click', function(e){ e.stopPropagation(); });
+    panel.querySelector('.cf-panel-head').addEventListener('click', function(e){ e.stopPropagation(); unflip(); });
+    function syncPlaying(){
+      if(!panel.classList.contains('open') && flipped === null) return;
+      var cur = currentStation ? favKey(currentStation) : null;
+      panel.querySelectorAll('.cf-track').forEach(function(b){
+        b.classList.toggle('playing', b.dataset.key === cur);
+      });
+    }
+
+    // ---------- data ----------
+    function load(){
+      albums = buildAlbumIndex().filter(function(a){ return a.tracks.length; });
+      empty.style.display = albums.length ? 'none' : '';
+      caption.style.display = albums.length ? '' : 'none';
+    }
+    function clearLive(){
+      for(var k in live){ live[k].remove(); live[k]._album = null; pool.push(live[k]); }
+      live = {};
+      capIndex = -1;
+    }
+    function indexOfKey(key){
+      if(!key) return -1;
+      key = resolveAlbumKey(key);
+      for(var i = 0; i < albums.length; i++) if(albums[i].key === key) return i;
+      return -1;
+    }
+
+    var ro = window.ResizeObserver ? new ResizeObserver(function(){
+      if(!isOpen) return;
+      if(flipped !== null) unflip();
+      if(measure()) render();
+    }) : null;
+    if(ro) ro.observe(root);
+
+    return {
+      // Opens on the given album (or where it was last left).
+      open: function(centerKey){
+        isOpen = true;
+        load();
+        var i = indexOfKey(centerKey);
+        if(i === -1) i = clampIndex(Math.round(target));
+        pos = target = albums.length ? i : 0;
+        vel = 0;
+        clearLive();
+        measure();
+        render();
+        try{ root.focus({ preventScroll: true }); }catch(e){}
+      },
+      close: function(){
+        if(flipped !== null){
+          flipped = null;
+          panel.classList.remove('open');
+          caption.style.opacity = '';
+          for(var k in live){ live[k].style.visibility = ''; live[k].getAnimations().forEach(function(a){ a.cancel(); }); }
+        }
+        isOpen = false;
+        drag = null;
+        stopLoop();
+      },
+      // The library changed underneath (an import, a rescan): keep the same album in front.
+      refresh: function(){
+        var keep = albums[Math.round(target)] ? albums[Math.round(target)].key : null;
+        forgetThumbs();
+        if(!isOpen) return;
+        load();
+        var i = indexOfKey(keep);
+        pos = target = albums.length ? (i === -1 ? clampIndex(Math.round(target)) : i) : 0;
+        vel = 0;
+        if(flipped !== null) unflip();
+        clearLive();
+        render();
+      },
+      syncPlaying: syncPlaying,
+      isOpen: function(){ return isOpen; },
+      // For tests and debugging.
+      _state: function(){ return { pos: pos, target: target, n: albums.length, center: albums[Math.round(pos)] ? albums[Math.round(pos)].album : null,
+        live: Object.keys(live).length, flipped: flipped, S: S, thumbs: thumbCache.size }; }
+    };
+  }
+  var coverFlow = null;
+
   // ---------- phone rotated to landscape ----------
   // The layout -- a sidebar down one side, grids that wrap top to bottom -- has nowhere
   // sensible to go sideways on a phone, so rather than trying to reflow it the whole app is
@@ -9407,10 +10061,15 @@
     var syncRotateLock = function(){
       var active = rotateLockQuery.matches;
       var wasActive = document.body.classList.contains('rotate-lock');
+      var coverFlowFromLibrary = null;
       if(active && !wasActive){
         if(document.body.classList.contains('np-open')){
           rotateLockOpenedNp = false;
         } else {
+          // Turning the phone while looking at My Library's Albums goes straight to Cover
+          // Flow, starting on the album at the top of the list as it was.
+          coverFlowFromLibrary = albumsDirectoryKeyInView();
+          if(coverFlowFromLibrary !== null && albumInViewPortrait) coverFlowFromLibrary = albumInViewPortrait;
           rotateLockOpenedNp = true;
           openNowPlaying();
         }
@@ -9421,6 +10080,32 @@
         }
       }
       document.body.classList.toggle('rotate-lock', active);
+      if(coverFlowFromLibrary !== null) setLandAlbumsOpen(true, coverFlowFromLibrary || null);
+    };
+    // Which album was at the top of the Albums list while the phone was upright. Read during
+    // scrolling, because by the time the rotation is reported the list has already reflowed
+    // to the wide layout and the same scroll position shows different albums.
+    var albumInViewPortrait = null, albumInViewQueued = false;
+    window.addEventListener('scroll', function(){
+      if(albumInViewQueued) return;
+      albumInViewQueued = true;
+      requestAnimationFrame(function(){
+        albumInViewQueued = false;
+        if(document.body.classList.contains('rotate-lock') || innerWidth > innerHeight) return;
+        albumInViewPortrait = albumsDirectoryKeyInView() || null;
+      });
+    }, { passive: true });
+    // '' when the Albums directory is showing but no tile could be read; null when it isn't.
+    var albumsDirectoryKeyInView = function(){
+      if(activeLibrarySection !== 'albums' || activeAlbumKey || activeArtistKey) return null;
+      if(document.body.classList.contains('album-open')) return null;
+      var tiles = stationsGrid.querySelectorAll(".tile[data-entity='album']");
+      if(!tiles.length) return null;
+      for(var i = 0; i < tiles.length; i++){
+        var r = tiles[i].getBoundingClientRect();
+        if(r.bottom > 60 && r.height) return String(tiles[i].dataset.key || '').replace(/^album:/, '');
+      }
+      return '';
     };
     // The favourites row always starts closed in landscape.
     var npLandToggle = document.getElementById('npLandToggle');
@@ -9465,8 +10150,18 @@
     // slides the favourites row shut so the screen settles into the page in one movement.
     var npLandAlbums = document.getElementById('npLandAlbums');
     var npLandAlbumsBtn = document.getElementById('npLandAlbumsBtn');
-    var setLandAlbumsOpen = function(open){
+    coverFlow = createCoverFlow(npLandAlbums);
+    var setLandAlbumsOpen = function(open, centerKey){
+      var was = nowPlayingScreen.classList.contains('la-open');
       nowPlayingScreen.classList.toggle('la-open', open);
+      if(open && !was){
+        // Opens on whatever album is playing, else where it was last left.
+        var key = centerKey || null;
+        if(!key && currentStation && isLocalTrack(currentStation) && libraryById[favKey(currentStation)]) key = albumKeyFor(currentStation);
+        coverFlow.open(key);
+      } else if(!open && was){
+        coverFlow.close();
+      }
       npLandAlbums.setAttribute('aria-hidden', open ? 'false' : 'true');
       npLandAlbumsBtn.setAttribute('aria-label', open ? 'Back to Now Playing' : 'Albums');
       npLandAlbumsBtn.title = open ? 'Now Playing' : 'Albums';
@@ -16810,11 +17505,14 @@
       return tryPlayUrl(libraryPlaybackUrl).then(function(){
         onPlaybackSuccess(track);
       })['catch'](function(err){
+        // A song already replaced by another must not report over it.
+        if(currentStation !== track) return;
         attemptInProgress = false;
         setPlayingUI(false);
         updatePlayerMeta(track, 'Could not play this file (' + ((err && err.message) || 'unsupported format') + ').', true);
       });
     })['catch'](function(err){
+      if(currentStation !== track) return;
       attemptInProgress = false;
       setPlayingUI(false);
       updatePlayerMeta(track, 'Could not read this file from the library (' + ((err && err.message) || 'storage error') + ').', true);
@@ -18704,6 +19402,7 @@
 
   function refreshLibraryView(){
     syncLibraryNotice();
+    if(coverFlow) coverFlow.refresh();
     if(!activeLibrarySection) return;
     if(activeAlbumKey){ renderAlbumPage(activeAlbumKey); return; }
     if(activeArtistKey){ renderArtistPage(activeArtistKey); return; }
@@ -23210,6 +23909,7 @@
   function setPlayingUI(isPlaying){
     uiIsPlaying = isPlaying;
     document.body.classList.toggle('ui-playing', !!isPlaying);
+    if(coverFlow) coverFlow.syncPlaying();
     playPauseBtn.innerHTML = isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
     updateNpPlayBtn();
     syncHeroPlayPills();

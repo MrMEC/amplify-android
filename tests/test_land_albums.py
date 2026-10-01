@@ -77,7 +77,7 @@ async def main():
           while(w.nextNode()){var n=w.currentNode;if(!n.textContent.trim())continue;var e=n.parentElement;var c=getComputedStyle(e);
             var r=e.getBoundingClientRect();if(c.visibility!=='hidden'&&r.width>0&&r.height>0){var op=1;for(var x=e;x;x=x.parentElement){op*=parseFloat(getComputedStyle(x).opacity);}if(op>0.01)out.push(n.textContent.trim());}}
           return out;})()""")
-        check(txt == '' and not vis_text, f'blank: no labels ({vis_text[:5]})')
+        check(vis_text == ['No albums in your library yet'], f'with no albums, Cover Flow says so and nothing else ({vis_text[:5]})')
         await pg.screenshot(path=f'{SHOTS}/la-page.png')
 
         # bars move while playing, stand still when paused
