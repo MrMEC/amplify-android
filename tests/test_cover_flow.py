@@ -154,8 +154,10 @@ async def main():
         sh = [x['shade'] for x in right]
         check(all(sh[k] <= sh[k + 1] for k in range(len(sh) - 1)) and sh[0] > 0, f'darker further out {sh}')
         check(c['zi'] > max(x['zi'] for x in left + right), 'centre on top')
-        refl = await pg.evaluate("getComputedStyle(document.querySelector('#npLandAlbums .cf-face')).webkitBoxReflect")
-        check(refl.startswith('below 1px'), f'reflection 1px below ({refl[:40]})')
+        refl = await pg.evaluate("""(function(){ var cv=document.querySelector('#npLandAlbums .cf-cover.cf-center'); var f=cv.querySelector('.cf-face').getBoundingClientRect(), r=cv.querySelector('.cf-refl').getBoundingClientRect();
+          return {gap: Math.round(r.top - f.bottom), h: Math.round(r.height), w: Math.round(r.width), fw: Math.round(f.width), img: !!cv.querySelector('.cf-refl-img img'), flip: getComputedStyle(cv.querySelector('.cf-refl-img')).transform, boxReflect: getComputedStyle(cv.querySelector('.cf-face')).webkitBoxReflect}; })()""")
+        check(refl['gap'] == 1 and refl['w'] == refl['fw'] and refl['img'] and refl['flip'].startswith('matrix(1, 0, 0, -1') and refl['boxReflect'] in ('none', '', None),
+              f'mirror reflection 1px below each cover, as its own element {refl}')
         cap = await pg.evaluate("Array.from(document.querySelectorAll('.cf-cap.on')).map(function(e){return e.innerText;})")
         check(cap == ['Album 05\nArtist 05'], f'caption names the centre album {cap}')
         capbox = await pg.evaluate("document.querySelector('.cf-cap.on').getBoundingClientRect().top")
@@ -165,7 +167,9 @@ async def main():
         check(capbox == 313 and btn == [782, 826, 328, 372] or capbox == 313 and btn == [726, 770, 328, 372], f'caption and button positions unchanged (caption top {capbox}, button {btn})')
         host = await pg.evaluate("(function(){var r=document.getElementById('npLandAlbums').getBoundingClientRect();return [Math.round(r.top),Math.round(r.bottom)];})()")
         mid = (c['t'] + c['b']) / 2
-        check(c['w'] >= 220 and abs(mid - (host[0] + host[1]) / 2) <= 1.5, f'covers larger (was 195px, now {c["w"]}px) and centred on the screen (cover middle {mid}, screen middle {(host[0] + host[1]) / 2})')
+        gap = capbox - c['b']
+        check(200 <= c['w'] <= 210 and c['t'] < 36 and 0.38 * c['w'] <= gap <= 0.46 * c['w'],
+              f'covers a little larger (was 195px, now {c["w"]}px), higher (top was 36, now {c["t"]}), with the original room above the caption ({gap}px, was 82)')
         check(all(x['img'] for x in cv if abs(x['i'] - 5) <= 3), 'nearby covers have their art')
         await pg.screenshot(path=f'{shots}/cf-open.png')
 

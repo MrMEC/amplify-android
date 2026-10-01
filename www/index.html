@@ -4069,17 +4069,29 @@
   }
   .cf-face{
     position:absolute; inset:0; overflow:hidden; background-size:cover; background-position:center;
-    -webkit-box-reflect:below 1px linear-gradient(to bottom, transparent 0%, transparent 62%, rgba(255,255,255,.22) 80%, rgba(255,255,255,.62) 100%);
+    /* Static (every cover has it), so moving into the middle never repaints a large blur. */
+    box-shadow:0 -4px 18px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
   }
-  .cf-face img{ width:100%; height:100%; object-fit:cover; display:block; -webkit-user-drag:none; pointer-events:none; }
-  /* Darkens a cover the further it sits from the middle, a little more on its outer edge. */
-  .cf-shade{ position:absolute; inset:0; pointer-events:none; opacity:0;
+  .cf-face img, .cf-refl-img img{ width:100%; height:100%; object-fit:cover; display:block; -webkit-user-drag:none; pointer-events:none; }
+  /* The reflection is a real element rather than -webkit-box-reflect with a mask, which
+     re-rasterised on every frame of a scroll on phones. Only the part that shows (the 40%
+     nearest the cover) exists; it fades into the black floor with a plain overlay. */
+  .cf-refl{ position:absolute; left:0; right:0; top:calc(100% + 1px); height:40%; overflow:hidden; pointer-events:none; }
+  .cf-refl-img{ position:absolute; left:0; right:0; top:0; height:250%; transform:scaleY(-1); transform-origin:50% 50%;
+    background-size:cover; background-position:center; }
+  /* The mirrored picture stops short of the reflection's bottom edge and the fade is solid
+     black from there down, so no sliver of the picture can show along that edge when a
+     cover sits on a fractional pixel. */
+  .cf-refl-clip{ position:absolute; left:1px; right:1px; top:0; bottom:14%; overflow:hidden; }
+  .cf-refl-clip .cf-refl-img{ height:calc(250% / 0.86); }
+  .cf-refl-fade{ position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,.42) 0%, rgba(0,0,0,.8) 42%, #000 84%); }
+  /* Darkens a cover and its reflection the further it sits from the middle, a little more
+     on its outer edge. */
+  .cf-shade{ position:absolute; left:0; right:0; top:0; height:calc(140% + 1px); pointer-events:none; opacity:0;
     background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
   .cf-cover.cf-left .cf-shade{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
-  /* Kept off the bottom edge so it never dims the cover's own reflection. */
-  .cf-cover.cf-center .cf-face{ box-shadow:0 -4px 22px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
   .cf-caption{ position:absolute; left:50%; width:min(52%, 440px); transform:translateX(-50%); height:44px; pointer-events:none; text-align:center; }
-  .cf-cap{ position:absolute; inset:0; opacity:0; transition:opacity .22s ease; }
+  .cf-cap{ position:absolute; inset:0; opacity:0; transition:opacity .22s ease; will-change:opacity; }
   .cf-cap.on{ opacity:1; }
   .cf-cap-title, .cf-cap-artist{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* A soft shadow keeps the caption readable over the reflections that now run behind it. */
@@ -9492,7 +9504,8 @@
     var MAX_FLING = 160;          // albums per second
     var TAP_SLOP = 8;             // px a press may wander and still be a tap
     var EDGE = 0.09;              // share of the width at each side that steps one album
-    var COVER_SCALE = 1.15;       // covers relative to the size the caption is placed for
+    var COVER_SCALE = 1.06;       // covers relative to the size the caption is placed for
+    var REFL_GAP = 0.42;          // cover bottom to caption, as a share of the cover (the visible reflection)
 
     var root = document.createElement('div');
     root.className = 'cf';
@@ -9541,13 +9554,14 @@
       var S0 = Math.round(Math.max(60, Math.min(H * 0.5, W * 0.34)));
       var top0 = Math.round(Math.max(10, (H - (S0 * 1.4 + 46)) / 2));
       caption.style.top = Math.round(top0 + S0 * 1.4 + 4) + 'px';
-      // The covers themselves are a size larger and centred on the screen's own middle,
-      // their reflections running down behind the caption.
-      S = Math.round(Math.min(S0 * COVER_SCALE, H - 24));
+      // The covers are a little larger and sit higher, keeping the same room for their
+      // reflection between them and the caption as before.
+      var capTop = top0 + S0 * 1.4 + 4;
+      S = Math.round(Math.min(S0 * COVER_SCALE, (capTop - 8) / (1 + REFL_GAP)));
       C = S * 0.64;               // centre to first side cover
       G = S * 0.2;                // between consecutive side covers
       D = S * 0.62;               // how far back the sides sit
-      coverTop = Math.round((H - S) / 2);
+      coverTop = Math.max(8, Math.round(capTop - S * REFL_GAP - S));
       stage.style.top = coverTop + 'px';
       stage.style.perspective = Math.round(S * 3.3) + 'px';
       stage.style.perspectiveOrigin = '50% ' + Math.round(S / 2) + 'px';
@@ -9568,10 +9582,13 @@
       var x = ad < 1 ? d * C : sgn * (C + (ad - 1) * G);
       var z = -near * D;
       var r = -sgn * near * ROT;
-      el.style.transform = 'translate3d(' + x.toFixed(2) + 'px,0,' + z.toFixed(2) + 'px) rotateY(' + r.toFixed(2) + 'deg)';
-      el.style.zIndex = String(1000 - Math.round(ad * 10));
+      el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,' + z.toFixed(1) + 'px) rotateY(' + r.toFixed(2) + 'deg)';
+      // Stacking only changes when a cover passes the halfway point, so it is written then
+      // and not on every frame (a z-index change restacks every layer).
+      var zi = 1000 - Math.abs(i - Math.round(pos)) * 2 - (d < 0 ? 1 : 0);
+      if(el._z !== zi){ el._z = zi; el.style.zIndex = String(zi); }
       var shade = Math.min(0.62, near * 0.2 + Math.max(0, ad - 1) * 0.085);
-      el._shade.style.opacity = shade.toFixed(3);
+      if(el._sh === undefined || Math.abs(el._sh - shade) > 0.004){ el._sh = shade; el._shade.style.opacity = shade.toFixed(3); }
       var side = ad < 0.5 ? 'c' : (d < 0 ? 'l' : 'r');
       if(el._side !== side){
         el._side = side;
@@ -9582,7 +9599,7 @@
 
     // ---------- the pool ----------
     function visibleRange(){
-      var reach = G > 0 ? Math.ceil((W / 2 - C) / G) + 2 : 4;
+      var reach = G > 0 ? Math.ceil((W / 2 - C) / G) + 1 : 4;
       reach = Math.max(2, Math.min(reach, 14));
       var c = Math.round(pos);
       return [Math.max(0, c - reach), Math.min(albums.length - 1, c + reach)];
@@ -9594,34 +9611,57 @@
       el.className = 'cf-cover';
       var face = document.createElement('div');
       face.className = 'cf-face';
+      var refl = document.createElement('div');
+      refl.className = 'cf-refl';
+      var reflImg = document.createElement('div');
+      reflImg.className = 'cf-refl-img';
+      var fade = document.createElement('div');
+      fade.className = 'cf-refl-fade';
+      var clip = document.createElement('div');
+      clip.className = 'cf-refl-clip';
+      clip.appendChild(reflImg);
+      refl.appendChild(clip);
+      refl.appendChild(fade);
       var shade = document.createElement('div');
       shade.className = 'cf-shade';
-      face.appendChild(shade);
       el.appendChild(face);
-      el._face = face; el._shade = shade;
+      el.appendChild(refl);
+      el.appendChild(shade);
+      el._face = face; el._refl = reflImg; el._shade = shade;
       sizeCover(el);
       return el;
     }
     function bindCover(el, i){
       el.dataset.i = String(i);
       el._album = albums[i];
-      el._side = null;
-      var face = el._face;
+      el._side = null; el._z = undefined; el._sh = undefined;
+      var face = el._face, reflImg = el._refl;
       var old = face.querySelector('img');
       if(old) old.remove();
+      var oldR = reflImg.querySelector('img');
+      if(oldR) oldR.remove();
       var al = albums[i];
       var src = artSourceForTracks(al.tracks) || { name: al.album };
       face.className = 'cf-face';
       face.style.background = '';
       applyPlaceholderArt(face, favKey(src));
+      reflImg.style.background = face.style.background;
       requestThumb(al, function(url){
         if(el._album !== al || !url) return;
         var img = document.createElement('img');
         img.alt = '';
         img.decoding = 'async';
-        img.onload = function(){ if(el._album === al) face.style.background = '#000'; };
         img.src = url;
-        face.insertBefore(img, face.firstChild);
+        // Decoded before it goes in, so it never stalls a frame of the scroll to decode.
+        var put = function(){
+          if(el._album !== al) return;
+          var copy = img.cloneNode();
+          face.insertBefore(img, face.firstChild);
+          reflImg.appendChild(copy);
+          face.style.background = '#000';
+          reflImg.style.background = '#000';
+        };
+        if(img.decode) img.decode().then(put, put); else img.onload = put;
       });
     }
     function render(){
@@ -9680,7 +9720,14 @@
       thumbWaiting.push({ al: al, cb: cb });
       pumpThumbs();
     }
+    var thumbPause = 0;
     function pumpThumbs(){
+      // While the row is flying past, covers are left on their placeholders; the art is
+      // prepared once it slows enough to see.
+      if(running && Math.abs(vel) > 14){
+        if(!thumbPause) thumbPause = setTimeout(function(){ thumbPause = 0; pumpThumbs(); }, 120);
+        return;
+      }
       while(thumbBusy < 3 && thumbWaiting.length){
         // Jobs for covers a fast scroll has already carried away are dropped unseen.
         thumbWaiting = thumbWaiting.filter(function(jb){
@@ -9722,9 +9769,38 @@
       if(!isLocalTrack(src)) return Promise.resolve(null);
       return localArtUrl(src).then(function(u){ return u || albumMateArtUrl(src); });
     }
+    // A cover from the library is decoded and shrunk off the main thread where the browser
+    // can (createImageBitmap with a resize), so a large embedded picture never holds up a
+    // frame; anything else goes the older way through an <img>.
+    function bitmapThumb(url){
+      if(!window.createImageBitmap || !/^blob:/.test(url)) return Promise.reject();
+      return fetch(url).then(function(r){ return r.blob(); }).then(function(blob){
+        return createImageBitmap(blob);
+      }).then(function(full){
+        var w = full.width, h = full.height, side = Math.min(w, h);
+        return createImageBitmap(full, (w - side) / 2, (h - side) / 2, side, side,
+          { resizeWidth: THUMB, resizeHeight: THUMB, resizeQuality: 'high' }).then(function(bmp){
+          if(full.close) full.close();
+          return bmp;
+        });
+      }).then(function(bmp){
+        return new Promise(function(resolve, reject){
+          var c = document.createElement('canvas');
+          c.width = THUMB; c.height = THUMB;
+          c.getContext('2d').drawImage(bmp, 0, 0);
+          if(bmp.close) bmp.close();
+          c.toBlob(function(b){ b ? resolve({ url: URL.createObjectURL(b), own: true }) : reject(); }, 'image/jpeg', 0.86);
+        });
+      });
+    }
     function makeThumb(al){
       return sourceArtUrl(al).then(function(url){
         if(!url) return null;
+        return bitmapThumb(url)['catch'](function(){ return imgThumb(url); });
+      })['catch'](function(){ return null; });
+    }
+    function imgThumb(url){
+      return Promise.resolve().then(function(){
         return new Promise(function(resolve){
           var img = new Image();
           // A remote custom cover may refuse to be read back from a canvas; it is then
@@ -9753,7 +9829,7 @@
           };
           img.src = url;
         });
-      })['catch'](function(){ return null; });
+      });
     }
     function forgetThumbs(){
       thumbCache.forEach(function(e){ if(e.own){ try{ URL.revokeObjectURL(e.url); }catch(err){} } });
