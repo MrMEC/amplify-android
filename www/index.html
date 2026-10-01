@@ -4004,6 +4004,24 @@
   body.rotate-lock .now-playing-screen.lf-open .np-land-toggle{ bottom:calc(18px + var(--lf-size) + 18px); }
   .np-land-toggle svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; transition:transform .34s var(--lf-ease); }
   .now-playing-screen.lf-open .np-land-toggle svg{ transform:rotate(180deg); }
+  /* Albums button, just left of the favourites arrow (or in its place when there are no
+     favourites), riding up with it when the row opens. */
+  .np-land-albums-btn, .np-land-albums{ display:none; }
+  body.rotate-lock:not(.np-video-full) .np-land-albums-btn,
+  body.rotate-lock .np-land-albums-back{
+    display:flex; align-items:center; justify-content:center;
+    position:absolute; right:18px; bottom:18px; z-index:3;
+    width:44px; height:44px; padding:0; border:none; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; cursor:pointer;
+    transition:bottom .34s var(--lf-ease), background .15s ease;
+  }
+  body.rotate-lock:not(.np-video-full) .np-land-toggle.has-favs ~ .np-land-albums-btn{ right:74px; }
+  body.rotate-lock .now-playing-screen.lf-open .np-land-albums-btn{ bottom:calc(18px + var(--lf-size) + 18px); }
+  .np-land-albums-btn svg, .np-land-albums-back svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+  /* The Albums page: covers the whole player, empty for now apart from the way back. */
+  body.rotate-lock:not(.np-video-full) .now-playing-screen.la-open .np-land-albums{
+    display:block; position:absolute; inset:0; z-index:6; background:var(--np-tint, #1c1d22);
+  }
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
     body.rotate-lock .sidebar-top{ display:none !important; }
@@ -5028,6 +5046,15 @@
       <button type="button" class="np-land-toggle" id="npLandToggle" aria-expanded="false" aria-label="Show favorites" title="Favorites">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 15l6-6 6 6"/></svg>
       </button>
+      <!-- Landscape only: opens the Albums page over the player (blank for now). -->
+      <button type="button" class="np-land-albums-btn" id="npLandAlbumsBtn" aria-label="Albums" title="Albums">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5"/></svg>
+      </button>
+      <div class="np-land-albums" id="npLandAlbums" aria-hidden="true">
+        <button type="button" class="np-land-albums-back" id="npLandAlbumsBack" aria-label="Back to Now Playing" title="Now Playing">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 20V12"/><path d="M10 20V6"/><path d="M14 20V9"/><path d="M18 20V4"/></svg>
+        </button>
+      </div>
 
       <!-- Everything below the artwork sits on the tint the artwork faded into. -->
       <div class="np-below">
@@ -9413,7 +9440,23 @@
       setLandFavsOpen(!nowPlayingScreen.classList.contains('lf-open'));
       renderLandFavs();
     });
+    // Albums page (landscape). Always starts closed, like the favourites row.
+    var npLandAlbums = document.getElementById('npLandAlbums');
+    var setLandAlbumsOpen = function(open){
+      nowPlayingScreen.classList.toggle('la-open', open);
+      npLandAlbums.setAttribute('aria-hidden', open ? 'false' : 'true');
+    };
+    document.getElementById('npLandAlbumsBtn').addEventListener('click', function(e){
+      e.stopPropagation();
+      setLandAlbumsOpen(true);
+    });
+    document.getElementById('npLandAlbumsBack').addEventListener('click', function(e){
+      e.stopPropagation();
+      setLandAlbumsOpen(false);
+    });
+    npLandAlbums.addEventListener('click', function(e){ e.stopPropagation(); });
     rotateLockQuery.addEventListener && rotateLockQuery.addEventListener('change', function(){
+      setLandAlbumsOpen(false);
       if(!rotateLockQuery.matches) setLandFavsOpen(false);
       renderLandFavs();
     });
