@@ -9506,6 +9506,7 @@
     var EDGE = 0.09;              // share of the width at each side that steps one album
     var COVER_SCALE = 1.06;       // covers relative to the size the caption is placed for
     var REFL_GAP = 0.42;          // cover bottom to caption, as a share of the cover (the visible reflection)
+    var COVER_DROP = 40;          // px the covers sit lower than that (Mark's placement); caption unmoved
 
     var root = document.createElement('div');
     root.className = 'cf';
@@ -9561,7 +9562,7 @@
       C = S * 0.64;               // centre to first side cover
       G = S * 0.2;                // between consecutive side covers
       D = S * 0.62;               // how far back the sides sit
-      coverTop = Math.max(8, Math.round(capTop - S * REFL_GAP - S));
+      coverTop = Math.max(8, Math.round(capTop - S * REFL_GAP - S)) + COVER_DROP;
       stage.style.top = coverTop + 'px';
       stage.style.perspective = Math.round(S * 3.3) + 'px';
       stage.style.perspectiveOrigin = '50% ' + Math.round(S / 2) + 'px';

@@ -168,8 +168,8 @@ async def main():
         host = await pg.evaluate("(function(){var r=document.getElementById('npLandAlbums').getBoundingClientRect();return [Math.round(r.top),Math.round(r.bottom)];})()")
         mid = (c['t'] + c['b']) / 2
         gap = capbox - c['b']
-        check(200 <= c['w'] <= 210 and c['t'] < 36 and 0.38 * c['w'] <= gap <= 0.46 * c['w'],
-              f'covers a little larger (was 195px, now {c["w"]}px), higher (top was 36, now {c["t"]}), with the original room above the caption ({gap}px, was 82)')
+        check(200 <= c['w'] <= 210 and 57 <= c['t'] <= 61 and 44 <= gap <= 50,
+              f'covers {c["w"]}px, 40px lower than build 91 (top {c["t"]}, was 19), {gap}px above the caption (was 87)')
         check(all(x['img'] for x in cv if abs(x['i'] - 5) <= 3), 'nearby covers have their art')
         await pg.screenshot(path=f'{shots}/cf-open.png')
 
