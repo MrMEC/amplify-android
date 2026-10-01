@@ -10036,15 +10036,13 @@
       live = {};
       capIndex = -1;
     }
-    // The first album by an artist: one under their own name, else a compilation they're
-    // on, else (an artist with only stations) whichever album comes next alphabetically.
+    // The first album under an artist's own name; for an artist with none (only on
+    // compilations, or only stations) the album where their name falls alphabetically, so
+    // the row opens among their alphabetical neighbours rather than off in Various Artists.
     function indexOfArtist(artistKey, artistName){
       if(!artistKey) return -1;
       var i;
       for(i = 0; i < albums.length; i++) if(artistMatchKey(albums[i].artist) === artistKey) return i;
-      for(i = 0; i < albums.length; i++){
-        if(albums[i].tracks.some(function(t){ return artistMatchKey((t.artist || '').trim() || UNKNOWN_ARTIST) === artistKey; })) return i;
-      }
       if(artistName){
         var nk = alphaSortKey(artistName);
         for(i = 0; i < albums.length; i++) if(alphaCompare(alphaSortKey(albums[i].artist), nk) >= 0) return i;
@@ -10077,7 +10075,8 @@
         isOpen = true;
         order = newOrder;
         load();
-        var i = opts.artistKey ? indexOfArtist(opts.artistKey, opts.artistName) : indexOfKey(centerKey);
+        // The top of the list opens at the start of the row.
+        var i = opts.atTop ? 0 : opts.artistKey ? indexOfArtist(opts.artistKey, opts.artistName) : indexOfKey(centerKey);
         if(i === -1) i = indexOfKey(lastKey);
         if(i === -1) i = clampIndex(Math.round(target));
         pos = target = albums.length ? i : 0;
@@ -10147,8 +10146,14 @@
           // Cover Flow, starting where the top of the list was: albums in album order, or in
           // artist order on that artist's first album.
           coverFlowFromLibrary = libraryDirectoryInView();
-          if(coverFlowFromLibrary && albumInViewPortrait && albumInViewPortrait.order === coverFlowFromLibrary.order){
-            coverFlowFromLibrary = albumInViewPortrait;
+          // The position noted while upright, as long as it is from the list on screen now (a
+          // list drawn again since, for another visit, starts from the top).
+          var seenUpright = albumInViewPortrait;
+          if(coverFlowFromLibrary && seenUpright && seenUpright.order === coverFlowFromLibrary.order &&
+             seenUpright.tile && seenUpright.tile.isConnected){
+            coverFlowFromLibrary = seenUpright;
+          } else if(coverFlowFromLibrary){
+            coverFlowFromLibrary.atTop = coverFlowFromLibrary.atTop || window.scrollY < 40;
           }
           rotateLockOpenedNp = true;
           openNowPlaying();
@@ -10175,7 +10180,7 @@
         albumInViewQueued = false;
         if(document.body.classList.contains('rotate-lock') || innerWidth > innerHeight) return;
         var seen = libraryDirectoryInView();
-        albumInViewPortrait = (seen && (seen.key || seen.artistKey)) ? seen : null;
+        albumInViewPortrait = (seen && seen.tile) ? seen : null;
       });
     }, { passive: true });
     // { order, key } for the Albums list or { order, artistKey, artistName } for Artists,
@@ -10193,9 +10198,11 @@
         if(r.bottom > 60 && r.height){ tile = tiles[i]; break; }
       }
       var raw = tile ? String(tile.dataset.key || '') : '';
-      if(entity === 'album') return { order: 'album', key: raw.replace(/^album:/, '') };
+      // The first tile still showing is the first in the list: the list is at its top.
+      var atTop = !tile || tile === tiles[0];
+      if(entity === 'album') return { order: 'album', key: raw.replace(/^album:/, ''), tile: tile, atTop: atTop };
       var nameEl = tile && tile.querySelector('.tile-name');
-      return { order: 'artist', artistKey: raw.replace(/^artist:/, ''), artistName: nameEl ? nameEl.textContent : '' };
+      return { order: 'artist', artistKey: raw.replace(/^artist:/, ''), artistName: nameEl ? nameEl.textContent : '', tile: tile, atTop: atTop };
     };
     // The favourites row always starts closed in landscape.
     var npLandToggle = document.getElementById('npLandToggle');

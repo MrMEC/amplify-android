@@ -1,6 +1,7 @@
 """Cover Flow from My Library > Artists: turning the phone opens it with albums in artist order
-(artist, then album title), on the first album of the artist at the top of the list. An artist
-found only on a compilation opens on that compilation. The Albums button on the landscape Now
+(artist, then album title), on the first album of the artist at the top of the list; at the very
+top of the list, on the first album. An artist found only on a compilation opens where their name
+falls alphabetically, not on the compilation (which sorts under Various Artists). The Albums button on the landscape Now
 Playing screen still opens it in album order.
 Run: python3 tests/test_cover_flow_artists.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess, colorsys
@@ -38,15 +39,15 @@ def song(folder, n, title, artist, album, cover):
                     '-metadata', f'album={album}', '-metadata', f'track={n}', p], check=True)
 
 # Artist order differs from album order on purpose.
-for artist, albums in [('Zed', ['Alpha', 'Mid']), ('Abba', ['Zulu', 'Beta']), ('Moby', ['Play']), ('Ivy', ['Green'])]:
+for artist, albums in [('Zed', ['Alpha', 'Mid']), ('Abba', ['Zulu', 'Beta']), ('Moby', ['Play']), ('Ivy', ['Green']), ('Jay', ['Jazz'])]:
     for al in albums:
         c = art(al[:4])
         song(f'{artist}/{al}', 1, f'{al} one', artist, al, c)
         song(f'{artist}/{al}', 2, f'{al} two', artist, al, c)
-# A compilation; Kim and Lou appear only on it.
+# A compilation; Aaron (first in the Artists list) and Kim appear only on it.
 c = art('Now')
 song('Comp/Now 1', 1, 'Kim song', 'Kim', 'Now 1', c)
-song('Comp/Now 1', 2, 'Lou song', 'Lou', 'Now 1', c)
+song('Comp/Now 1', 2, 'Aaron song', 'Aaron', 'Now 1', c)
 # Enough other artists to make the Artists list scroll.
 for i in range(30):
     c = art(f'F{i:02d}')
@@ -123,7 +124,7 @@ async def main():
         check(head == ['Beta / Abba', 'Zulu / Abba'], f'albums run by artist, then album title {head}')
         check(tail[-4:] == ['Record F29 / Ofiller 29', 'Now 1 / Various Artists', 'Alpha / Zed', 'Mid / Zed'] and lst.index('Green / Ivy') < lst.index('Play / Moby') < lst.index('Record F00 / Ofiller 00'),
               f'...through to the last artist {tail}')
-        check(lst[int(st['pos'])] == 'Beta / Abba', f'opens on the first album of the artist at the top ({top} -> {lst[int(st["pos"])]})')
+        check(top == 'Aaron' and int(st['pos']) == 0 and lst[0] == 'Beta / Abba', f'at the top of the list it opens on the first album, not the top artist\'s compilation ({top} -> {lst[int(st["pos"])]})')
         cap = await pg.evaluate("document.querySelector('.cf-cap.on').innerText")
         check(cap == 'Beta\nAbba', f'caption {cap!r}')
         await pg.screenshot(path=f'{shots}/cfa-abba.png')
@@ -131,13 +132,25 @@ async def main():
         back = await pg.evaluate("[document.body.classList.contains('np-open'), document.querySelectorAll(\".tile[data-entity='artist']\").length > 0]")
         check(not back[0] and back[1], f'turning back returns to the Artists list {back}')
 
-        # An artist only on a compilation opens on the compilation.
+        # An artist only on a compilation opens where their name falls (Kim -> Moby's album).
         await scroll_to_artist(pg, 'Kim')
         top = await pg.evaluate(TOP)
         await rotate(pg, True)
         st = await pg.evaluate("__t.cf()._state(true)")
-        check(top == 'Kim' and st['list'][int(st['pos'])] == 'Now 1 / Various Artists', f'compilation-only artist opens on the compilation ({top} -> {st["list"][int(st["pos"])]})')
+        check(top == 'Kim' and st['list'][int(st['pos'])] == 'Play / Moby', f'compilation-only artist opens in alphabetical place ({top} -> {st["list"][int(st["pos"])]})')
         await pg.screenshot(path=f'{shots}/cfa-kim.png')
+        await rotate(pg, False)
+
+        # Scrolled down, then away and back to Artists (list drawn again, at its top): opens at
+        # the start, not where the old scroll was.
+        await scroll_to_artist(pg, 'Ofiller 20')
+        await pg.evaluate("__t.runLibrarySection('albums')"); await pg.wait_for_timeout(700)
+        await pg.evaluate("__t.runLibrarySection('artists')"); await pg.wait_for_timeout(900)
+        top = await pg.evaluate(TOP)
+        await rotate(pg, True)
+        st = await pg.evaluate("__t.cf()._state(true)")
+        check(top == 'Aaron' and int(st['pos']) == 0, f'a fresh visit to Artists opens at the start ({top} -> {st["list"][int(st["pos"])]})')
+        await pg.screenshot(path=f'{shots}/cfa-fresh.png')
         await rotate(pg, False)
 
         # A filler artist part way down.
@@ -161,7 +174,7 @@ async def main():
         await pg.evaluate("document.getElementById('npLandAlbumsBtn').click()"); await pg.wait_for_timeout(900)
         st = await pg.evaluate("__t.cf()._state(true)")
         titles = [x.split(' / ')[0] for x in st['list']]
-        check(st['order'] == 'album' and titles[:4] == ['Alpha', 'Beta', 'Green', 'Mid'], f'Albums button opens in album order {titles[:4]}')
+        check(st['order'] == 'album' and titles[:5] == ['Alpha', 'Beta', 'Green', 'Jazz', 'Mid'], f'Albums button opens in album order {titles[:4]}')
         check(st['list'][int(st['pos'])] == want, f'...on the same album it was showing ({st["list"][int(st["pos"])]})')
         await rotate(pg, False)
 
