@@ -91,7 +91,13 @@ COVERS = """(function(){ return Array.from(document.querySelectorAll('#npLandAlb
 
 
 async def settle(pg, ms=1200):
+    # At least ms, then until the row has come to rest (a long fling glides for a few seconds).
     await pg.wait_for_timeout(ms)
+    for _ in range(60):
+        st = await pg.evaluate("__t.cf() && __t.cf()._state()")
+        if not st or (st['pos'] == st['target'] and st['pos'] == int(st['pos'])):
+            return
+        await pg.wait_for_timeout(100)
 
 
 async def main():
@@ -209,12 +215,15 @@ async def main():
         check(st['pos'] == N - 1 and mx <= N - 1 + 0.001, f'hard fling reaches the end without overshooting ({st["pos"]}, max {mx:.3f})')
 
         # --- Dragging past the end bands back.
-        await pg.evaluate("__t.cf()._state()")
-        await pg.mouse.move(150, 150); await pg.mouse.down()
-        for k in range(1, 40):
-            await pg.mouse.move(150 + k * 30, 150); await pg.wait_for_timeout(8)
-        await pg.mouse.up()
-        await settle(pg, 1500)
+        # Back to the first album in on-screen strokes.
+        for _ in range(15):
+            if (await pg.evaluate(ST))['pos'] == 0: break
+            await pg.mouse.move(100, 150); await pg.mouse.down()
+            for k in range(1, 21):
+                await pg.mouse.move(100 + k * 30, 150); await pg.wait_for_timeout(8)
+            await pg.mouse.up()
+            await settle(pg, 600)
+        check((await pg.evaluate(ST))['pos'] == 0, 'flings back to the first album')
         await pg.mouse.move(150, 150); await pg.mouse.down()
         for k in range(1, 12):
             await pg.mouse.move(150 + k * 30, 150); await pg.wait_for_timeout(20)
