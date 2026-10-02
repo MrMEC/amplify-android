@@ -3217,6 +3217,9 @@
   .row-thumb img{ width:100%; height:100%; object-fit:cover; }
   .row-name{ font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
   .row-fav{ background:none; border:none; color:var(--text-faint); font-size:16px; cursor:pointer; flex-shrink:0; padding:2px; }
+  /* Top Artists: each artist's play count, on the far right. */
+  .row-count{ flex-shrink:0; margin-left:auto; padding:0 6px 0 10px; font-size:13px; color:var(--text-dim);
+    font-variant-numeric:tabular-nums; white-space:nowrap; }
   .row-fav.on{ color:var(--accent); }
   .row-fav:hover{ color:var(--accent-dim); }
   /* The More button sitting on a cover: just the dots, no disc behind them, with a soft
@@ -9426,6 +9429,44 @@
       keys.slice(0, keys.length - ARTIST_PLAYS_LIMIT).forEach(function(k){ delete plays[k]; });
     }
     saveArtistPlays(plays);
+  }
+  // A play counts once it has actually been listened to: 20 seconds of playing (pauses
+  // don't count), or nearly all of a song shorter than that -- the same 20 seconds the
+  // native player uses for plays started from Android Auto. Counting the moment something
+  // started used to make every song skipped past (Next, a quick tap in Cover Flow) a play.
+  var PLAY_COUNT_AFTER_S = 20;
+  var pendingPlay = null;      // { item, key, need, heard, t }
+  function playCountNeed(item){
+    var d = isLocalTrack(item) ? (item.duration || 0) : 0;
+    return d > 0 ? Math.min(PLAY_COUNT_AFTER_S, d * 0.9) : PLAY_COUNT_AFTER_S;
+  }
+  // Credits the time since the last check, if something was playing, then counts the play
+  // if it has had its time. Run every second, and on every play/pause change.
+  function playCountTick(){
+    if(!pendingPlay) return;
+    var now = Date.now();
+    if(uiIsPlaying) pendingPlay.heard += Math.min(now - pendingPlay.t, 60000) / 1000;
+    pendingPlay.t = now;
+    if(pendingPlay.heard >= pendingPlay.need){
+      var item = pendingPlay.item;
+      pendingPlay = null;
+      recordArtistPlay(item);
+      return;
+    }
+    if(!currentStation || favKey(currentStation) !== pendingPlay.key) pendingPlay = null;
+  }
+  // Something new started: what came before gets its last moments credited (it may have
+  // just run out), and the new item starts its own count.
+  function startPlayCount(item){
+    playCountTick();
+    pendingPlay = (item && artistNameForPlay(item))
+      ? { item: item, key: favKey(item), need: playCountNeed(item), heard: 0, t: Date.now() }
+      : null;
+  }
+  setInterval(playCountTick, 1000);
+  function artistPlayCount(key){
+    var rec = loadArtistPlays()[key];
+    return rec ? (rec.count || 0) : 0;
   }
   // Most played first; a tie goes to whoever was played more recently.
   function topArtistList(){
@@ -19382,7 +19423,15 @@
       setResultCount(0);
       return;
     }
-    list.forEach(function(entry){ stationsGrid.appendChild(buildRow(artistFavRecord(entry), false)); });
+    list.forEach(function(entry){
+      var row = buildRow(artistFavRecord(entry), false);
+      var n = artistPlayCount(entry.key);
+      var count = document.createElement('div');
+      count.className = 'row-count';
+      count.textContent = n + (n === 1 ? ' play' : ' plays');
+      row.appendChild(count);
+      stationsGrid.appendChild(row);
+    });
     setResultCount(list.length, 'artist');
   }
 
@@ -23742,7 +23791,7 @@
     // A video of your own, or a TV channel, goes to Continue Watching, not Continue Listening.
     if(isLocalVideo(station)){ refreshContinueWatching(); return; }
     if(isNpChannel(station)){ recordChannelWatch(station); return; }
-    recordArtistPlay(station);
+    startPlayCount(station);
     recordRecent(station);
   }
 
@@ -24138,6 +24187,8 @@
   }
 
   function setPlayingUI(isPlaying){
+    // Listening time up to this moment is credited under the old state (a pause stops it).
+    if(typeof playCountTick === 'function') playCountTick();
     uiIsPlaying = isPlaying;
     document.body.classList.toggle('ui-playing', !!isPlaying);
     if(coverFlow) coverFlow.syncPlaying();
