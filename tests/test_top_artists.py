@@ -143,6 +143,14 @@ async def main():
         # The page clock is under the test's control; let it run so the page paints first.
         await pg.clock.run_for(2000); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{shots}/top-artists-counts.png')
+        # One-time reset: counts saved before this build are cleared on the first start only.
+        OLD = json.dumps({'zed': {'name': 'Zed', 'count': 99, 'last': 1}})
+        await pg.evaluate(f"localStorage.setItem('radioPlayerArtistPlays', {json.dumps(OLD)}); localStorage.removeItem('radioPlayerArtistPlaysReset1');")
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        check(await counts() == {}, f'old counts are cleared once on the first start of this build {await counts()}')
+        await pg.evaluate(f"localStorage.setItem('radioPlayerArtistPlays', {json.dumps(OLD)})")
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        check(await counts() == {'Zed': 99}, f'after that, counts are kept across restarts {await counts()}')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('ALL PASSED' if not fails else f'FAILED {fails}')

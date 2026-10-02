@@ -2862,6 +2862,11 @@
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
   .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
+  /* My Channels' sort options, shown only while editing. */
+  .tile-grid > .ch-sort-opts{ grid-column:1/-1; display:flex; flex-direction:column; gap:10px; margin:2px 0 8px; }
+  .ch-sort-line{ display:flex; align-items:center; gap:12px; }
+  .ch-sort-label{ flex:0 0 52px; font-size:12.5px; font-weight:700; color:var(--text-dim); }
+  .ch-sort-tabs.home-tabs{ margin:0; flex-wrap:nowrap; }
   .tile-grid > .video-tabs + .grid-section-label, .tile-grid > .video-tabs + .grid-section-label.ch-row-label{ margin-top:4px; }
   .tile-grid > .video-tabs.vd-seasons{ margin:4px 0 -18px; }
   .v-progress{ position:absolute; left:8px; right:8px; bottom:8px; height:4px; border-radius:2px; background:rgba(255,255,255,.35); overflow:hidden; z-index:2; }
@@ -5704,6 +5709,9 @@
   </button>
   <button type="button" class="np-menu-item" id="rowMenuAddQueue" role="menuitem">
     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 13.5v7M14.5 17h7"/></svg><span>Add to Queue</span>
+  </button>
+  <button type="button" class="np-menu-item" id="rowMenuRename" role="menuitem" style="display:none;">
+    <i class="fa-solid fa-pen"></i><span>Rename</span>
   </button>
   <button type="button" class="np-menu-item" id="rowMenuRemove" role="menuitem" style="display:none;">
     <i class="fa-solid fa-xmark"></i><span>Remove</span>
@@ -9387,6 +9395,15 @@
   var TOP_ARTISTS_MAX = 20;
   var TOP_ARTISTS_MIN = 3;
   var topArtistsShown = false;
+  // Counts kept before plays needed 20 seconds of listening included every song skipped
+  // past, so they were cleared once (Mark asked for a fresh start). The marker makes sure
+  // that happens only the one time.
+  try{
+    if(!localStorage.getItem('radioPlayerArtistPlaysReset1')){
+      localStorage.removeItem(ARTIST_PLAYS_KEY);
+      localStorage.setItem('radioPlayerArtistPlaysReset1', String(Date.now()));
+    }
+  }catch(e){}
   function loadArtistPlays(){
     try{
       var raw = localStorage.getItem(ARTIST_PLAYS_KEY);
@@ -11044,11 +11061,12 @@
   }
   // Same idea as updateEditLinkIcon, for the labelled page-header Reorder/Done buttons
   // (For You / Playlists / Genres): icon plus visible text rather than an icon alone.
-  function updateReorderHeaderBtn(btn, on){
+  function updateReorderHeaderBtn(btn, on, label){
+    label = label || 'Reorder';
     btn.innerHTML = on
       ? '<i class="fa-solid fa-check"></i><span class="btn-text">Done</span>'
-      : '<i class="fa-solid fa-pen"></i><span class="btn-text">Reorder</span>';
-    btn.title = on ? 'Done' : 'Reorder';
+      : '<i class="fa-solid fa-pen"></i><span class="btn-text">' + label + '</span>';
+    btn.title = on ? 'Done' : label;
     btn.setAttribute('aria-label', btn.title);
   }
   function setGenresEditing(on){
@@ -11774,8 +11792,20 @@
       ADULT_GROUP_RE.test(String(e.group || ''));
   }
   function channelVisible(e){ return !isAdultChannel(e); }
-  function visibleVideoChannels(){ return videoChannels.filter(channelVisible); }
-  // My Channels: grouped by category, or one list in your own order.
+  // My Channels runs A to Z by name unless Manual is chosen (in edit mode), in which case
+  // it's the order the channels were last dragged into (new ones go on the end). The stored
+  // list keeps that manual order whichever is showing, so switching back finds it intact.
+  var CHANNEL_ORDER_KEY = 'radioPlayerChannelOrder';
+  var channelOrder = 'az';
+  try{ if(localStorage.getItem(CHANNEL_ORDER_KEY) === 'manual') channelOrder = 'manual'; }catch(e){}
+  function channelAzCompare(a, b){
+    return alphaCompare(alphaSortKey(a.name || ''), alphaSortKey(b.name || '')) || (a.url < b.url ? -1 : a.url > b.url ? 1 : 0);
+  }
+  function visibleVideoChannels(){
+    var list = videoChannels.filter(channelVisible);
+    return channelOrder === 'az' ? list.sort(channelAzCompare) : list;
+  }
+  // My Channels: grouped by category, or one list.
   var CHANNEL_SORT_KEY = 'radioPlayerChannelSort';
   var channelSort = 'category';
   try{ if(localStorage.getItem(CHANNEL_SORT_KEY) === 'list') channelSort = 'list'; }catch(e){}
@@ -11831,6 +11861,42 @@
     if(ch.cats && ch.cats.length) return categoryName(ch.cats[0]);
     return '';
   }
+  // Renames a channel in My Channels and everywhere it's been copied to (Favorites, Recent,
+  // Continue Watching, the player). In A to Z the list re-sorts under its new name.
+  function promptRenameVideoChannel(ch){
+    var cur = findVideoChannel(ch && ch.url);
+    if(!cur) return;
+    var t = window.prompt('Channel name', cur.name || '');
+    if(t == null) return;
+    renameVideoChannel(cur.url, t);
+  }
+  function renameVideoChannel(url, name){
+    name = String(name || '').trim();
+    var ch = findVideoChannel(url);
+    if(!ch || !name || name === ch.name) return;
+    ch.name = name;
+    saveVideoChannels();
+    function fix(x){
+      if(!x || (x.urlToResolve || x.url) !== url) return;
+      x.name = name;
+      if(x.channel) x.channel.name = name;
+    }
+    [currentStation, npStation].concat(favorites, recentStations).forEach(fix);
+    stationPlaylists.forEach(function(p){ (p.stations || []).forEach(fix); });
+    saveFavorites(); saveRecent(); saveStationPlaylists();
+    if(typeof channelHistory !== 'undefined'){
+      var changed = false;
+      channelHistory.forEach(function(h){ if(h.url === url){ h.name = name; changed = true; } });
+      if(changed){ vsave(CHANNEL_HISTORY_KEY, channelHistory); refreshContinueWatching(); }
+    }
+    renderFavoritesList(); renderRecentList(); renderRecentSection();
+    if(currentStation && (currentStation.urlToResolve || currentStation.url) === url){
+      playerName.textContent = stripExclusively(currentStation.name);
+      updateMediaSession(currentStation);
+    }
+    if(nowPlayingScreen.style.display === 'flex') renderNowPlayingScreen();
+    if(onVideoView) rerenderVideoKeepingScroll();
+  }
   function removeVideoChannel(url){
     videoChannels = videoChannels.filter(function(c){ return c.url !== url; });
     saveVideoChannels();
@@ -11877,8 +11943,9 @@
     videoRefreshHeaderBtnEl.style.display = 'none';
     var mine = visibleVideoChannels();
     videoReorderHeaderBtnEl.style.display = mine.length > 1 ? '' : 'none';
-    videoSortHeaderBtnEl.style.display = mine.length > 1 && !videoChannelsEditing ? '' : 'none';
-    updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing);
+    // Sorting lives in edit mode (Mark: options only while editing), so no Sort button here.
+    videoSortHeaderBtnEl.style.display = 'none';
+    updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing, 'Edit');
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
     if(!mine.length){
       appendGridSection('My Channels');
@@ -11888,20 +11955,25 @@
       stationsGrid.appendChild(empty);
       return;
     }
-    // Reordering is one list of everything, as the same stacked rows, dragged into order.
+    // Edit mode: the sort options, then one list of everything as stacked rows. In Manual
+    // the rows drag into order; in A to Z there's nothing to drag.
     if(videoChannelsEditing){
+      appendChannelSortOptions();
       appendGridSection('My Channels').classList.add('ch-row-label');
+      var manual = channelOrder === 'manual';
       mine.forEach(function(ch){
         var row = buildEntityTile({
           key: 'channel:' + ch.url, reorderId: ch.url, entity: 'video-channel', name: ch.name, row: true,
-          artFrom: channelToStation(ch), draggable: true, onReorder: reorderVideoChannelsFromGrid
+          artFrom: channelToStation(ch), draggable: manual, onReorder: manual ? reorderVideoChannelsFromGrid : null
         });
         row.classList.add('ch-item');
-        var grip = document.createElement('span');
-        grip.className = 'ch-grip';
-        grip.setAttribute('aria-hidden', 'true');
-        grip.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"></path></svg>';
-        row.appendChild(grip);
+        if(manual){
+          var grip = document.createElement('span');
+          grip.className = 'ch-grip';
+          grip.setAttribute('aria-hidden', 'true');
+          grip.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"></path></svg>';
+          row.appendChild(grip);
+        }
         stationsGrid.appendChild(row);
       });
       return;
@@ -11921,12 +11993,63 @@
       if(!byName[name]){ byName[name] = { name: name, list: [] }; groups.push(byName[name]); }
       byName[name].list.push(ch);
     });
+    // A to Z puts the categories in alphabetical order too (Manual keeps the order above).
+    if(channelOrder === 'az') groups.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
     var other = byName[''];
     if(other){ groups.splice(groups.indexOf(other), 1); groups.push(other); }
     groups.forEach(function(g){
       appendGridSection(g.name || (groups.length > 1 ? 'Other' : 'My Channels')).classList.add('ch-row-label');
       g.list.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
     });
+  }
+  // The sort options shown at the top of My Channels while editing: the order (A to Z, or
+  // Manual) and how the list is shown (By Category, or One List), as two rows of pills.
+  function appendChannelSortOptions(){
+    var box = document.createElement('div');
+    box.className = 'ch-sort-opts';
+    [['Order', [['az', 'A to Z'], ['manual', 'Manual']], function(){ return channelOrder; }, function(v){
+        // Leaving Manual: the order the rows were just dragged into is kept first.
+        if(channelOrder === 'manual') reorderVideoChannelsFromGrid();
+        channelOrder = v;
+        try{ localStorage.setItem(CHANNEL_ORDER_KEY, v); }catch(e){}
+        saveVideoChannels();
+      }],
+     ['Show', [['category', 'By Category'], ['list', 'One List']], function(){ return channelSort; }, function(v){
+        if(channelOrder === 'manual') reorderVideoChannelsFromGrid();
+        channelSort = v;
+        try{ localStorage.setItem(CHANNEL_SORT_KEY, v); }catch(e){}
+      }]
+    ].forEach(function(g){
+      var line = document.createElement('div');
+      line.className = 'ch-sort-line';
+      var label = document.createElement('span');
+      label.className = 'ch-sort-label';
+      label.textContent = g[0];
+      line.appendChild(label);
+      var tabs = document.createElement('div');
+      tabs.className = 'home-tabs ch-sort-tabs';
+      tabs.setAttribute('role', 'radiogroup');
+      tabs.setAttribute('aria-label', g[0]);
+      g[1].forEach(function(o){
+        var b = document.createElement('button');
+        b.type = 'button';
+        var on = g[2]() === o[0];
+        b.className = 'home-tab' + (on ? ' active' : '');
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.dataset.opt = o[0];
+        b.textContent = o[1];
+        b.addEventListener('click', function(){
+          if(g[2]() === o[0]) return;
+          g[3](o[0]);
+          renderVideoHome();
+        });
+        tabs.appendChild(b);
+      });
+      line.appendChild(tabs);
+      box.appendChild(line);
+    });
+    stationsGrid.appendChild(box);
   }
   // The sort icon in the header: a small menu, By Category or One List, the current one ticked.
   var channelSortMenu = null;
@@ -12039,7 +12162,8 @@
     var sub = tile.querySelector('.tile-sub');
     if(sub && ch.dead) sub.classList.add('ch-dead');
     tile.appendChild(buildRowMoreBtn(st, { fav: true, className: 'row-more-btn',
-      onRemove: saved ? function(){ removeVideoChannel(ch.url); } : null }));
+      onRemove: saved ? function(){ removeVideoChannel(ch.url); } : null,
+      onRename: saved ? function(){ promptRenameVideoChannel(ch); } : null }));
     return tile;
   }
   function reorderVideoChannelsFromGrid(){
@@ -12053,7 +12177,8 @@
   }
   videoReorderHeaderBtnEl.addEventListener('click', function(){
     videoChannelsEditing = !videoChannelsEditing;
-    if(!videoChannelsEditing) reorderVideoChannelsFromGrid();
+    // Only a manual order is read back from the rows; in A to Z they're just sorted.
+    if(!videoChannelsEditing && channelOrder === 'manual') reorderVideoChannelsFromGrid();
     renderVideoHome();
   });
   videoAddHeaderBtnEl.addEventListener('click', function(){
@@ -21432,13 +21557,22 @@
     b.addEventListener('click', function(e){
       e.stopPropagation();
       if(rowMenu.classList.contains('open') && rowMenu._anchor === b){ closeRowMenu(); return; }
-      openRowMenu(b, [track], { fav: withFav, onRemove: opts.onRemove });
+      openRowMenu(b, [track], { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename });
     });
     return b;
   }
   var rowMenuFav = document.getElementById('rowMenuFav');
   var rowMenuRemove = document.getElementById('rowMenuRemove');
   var rowMenuOnRemove = null;
+  // opts.onRename: a Rename item (My Channels) that calls it.
+  var rowMenuRename = document.getElementById('rowMenuRename');
+  var rowMenuOnRename = null;
+  rowMenuRename.addEventListener('click', function(e){
+    e.stopPropagation();
+    var fn = rowMenuOnRename, t = rowMenuTracks && rowMenuTracks[0];
+    closeRowMenu();
+    if(fn && t) fn(t);
+  });
   rowMenuRemove.addEventListener('click', function(e){
     e.stopPropagation();
     var fn = rowMenuOnRemove, t = rowMenuTracks && rowMenuTracks[0];
@@ -21466,6 +21600,8 @@
     if(withFav) syncRowMenuFav(tracks[0]);
     rowMenuOnRemove = (opts && opts.onRemove) || null;
     rowMenuRemove.style.display = rowMenuOnRemove ? '' : 'none';
+    rowMenuOnRename = (opts && opts.onRename) || null;
+    rowMenuRename.style.display = rowMenuOnRename ? '' : 'none';
     rowMenu._anchor = anchor;
     rowMenu.classList.add('open');
     var r = anchor.getBoundingClientRect();
@@ -21484,6 +21620,7 @@
     rowMenu._anchor = null;
     rowMenuTracks = null;
     rowMenuOnRemove = null;
+    rowMenuOnRename = null;
   }
   document.getElementById('rowMenuPlayNext').addEventListener('click', function(e){
     e.stopPropagation();

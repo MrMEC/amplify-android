@@ -159,7 +159,7 @@ async def main():
         labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return x!=='Continue Watching';})")
         rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row:not(.vw-row)').length===0 && document.querySelectorAll('#stationsGrid > .tile.tile-row.ch-item').length")
         check(labels == ['News', 'Other'] and rows_ok == 5, f'back to Video: stacked rows under a heading per category, uncategorised last {labels} rows={rows_ok}')
-        check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'PBS', 'Link One', 'Link Three'], f'each row keeps the order added {[x["name"] for x in t]}')
+        check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z by default, within each category {[x["name"] for x in t]}')
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='BBC News';}).click()"); await pg.wait_for_timeout(900)
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         t = {x['name']: x for x in await my_tiles(pg)}
@@ -171,33 +171,77 @@ async def main():
         check(lk2 == 'Remove from My Channels', f'a saved channel offers Remove from My Channels ({lk2})')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')
-        setsort = "(v)=>{document.getElementById('videoSortHeaderBtn').click(); document.querySelector('.ch-sort-menu [data-sort='+v+']').click();}"
-        icons = await pg.evaluate("(()=>{var s=document.getElementById('videoSortHeaderBtn'), r=document.getElementById('videoReorderHeaderBtn');return [getComputedStyle(s).display!=='none', !!(s.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING), Math.round(s.getBoundingClientRect().top)===Math.round(r.getBoundingClientRect().top), !document.querySelector('#stationsGrid select')];})()")
-        check(all(icons), f'a sort icon sits in the header, left of the edit icon, no dropdown on the page {icons}')
-        await pg.evaluate("document.getElementById('videoSortHeaderBtn').click()"); await pg.wait_for_timeout(200)
-        items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.ch-sort-menu .np-menu-item'),function(b){return b.textContent+(b.classList.contains('on')?'*':'');})")
-        check(items == ['By Category*', 'One List'], f'the sort icon offers By Category / One List, current ticked {items}')
-        await pg.screenshot(path=f'{SHOTS}/ch-sort-menu.png')
-        await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(200)
-        check(not await pg.evaluate("!!document.querySelector('.ch-sort-menu')"), 'tapping elsewhere closes it')
         lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return x!=='Continue Watching';})"
-        await pg.evaluate(setsort, 'list'); await pg.wait_for_timeout(300)
+        EDIT = "document.getElementById('videoReorderHeaderBtn').click()"
+        opts = "Array.prototype.map.call(document.querySelectorAll('.ch-sort-opts .home-tab'),function(b){return b.textContent+(b.classList.contains('active')?'*':'');})"
+        pick = "(v)=>document.querySelector('.ch-sort-opts [data-opt='+v+']').click()"
+        names = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile[data-entity=video-channel] .tile-name'),function(n){return n.textContent;})"
+        hdr = await pg.evaluate("(()=>{var s=document.getElementById('videoSortHeaderBtn'), r=document.getElementById('videoReorderHeaderBtn');return [getComputedStyle(s).display, r.textContent.trim(), !!document.querySelector('.ch-sort-opts')];})()")
+        check(hdr == ['none', 'Edit', False], f'no sort options outside edit mode; the edit button reads Edit {hdr}')
+        home = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#channelsHomeGrid .tile-name'),function(n){return n.textContent;})")
+        check(home == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'the Home row of My Channels is A to Z too {home}')
+
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        check(await pg.evaluate(opts) == ['A to Z*', 'Manual', 'By Category*', 'One List'], f'editing shows the sort options, A to Z and By Category ticked {await pg.evaluate(opts)}')
+        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile.tile-draggable').length")
+        check(drag == 0 and await pg.evaluate(names) == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'in A to Z the list is sorted and nothing drags ({drag})')
+        await pg.screenshot(path=f'{SHOTS}/ch-edit-az.png')
+        await pg.evaluate(pick, 'manual'); await pg.wait_for_timeout(300)
+        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid > .tile.tile-row.tile-draggable').length")
+        grips = await pg.evaluate("document.querySelectorAll('#stationsGrid .ch-grip').length")
+        check(drag == 5 and grips == 5, f'Manual makes the stacked rows draggable, with grips ({drag}, {grips})')
+        check(await pg.evaluate(names) == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Manual starts from the order kept by hand (here, the order added) {await pg.evaluate(names)}')
+        await pg.screenshot(path=f'{SHOTS}/ch-edit-manual.png')
+        # Drag Link Three to the top (moving the row is what a drag does), then One List, then Done.
+        await pg.evaluate("(()=>{var g=document.getElementById('stationsGrid'); var t=Array.prototype.find.call(g.querySelectorAll('.tile[data-entity=video-channel]'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}); var first=g.querySelector('.tile[data-entity=video-channel]'); g.insertBefore(t, first);})()")
+        await pg.evaluate(pick, 'list'); await pg.wait_for_timeout(300)
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(await pg.evaluate(lbls) == ['My Channels'] and t == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Sort by List: one list in your order {t}')
-        await pg.screenshot(path=f'{SHOTS}/ch-my-list.png')
+        check(await pg.evaluate(lbls) == ['My Channels'] and t == ['Link Three', 'PBS', 'ABC News Live', 'BBC News', 'Link One'], f'Manual + One List: your dragged order {t}')
+        check(not await pg.evaluate("!!document.querySelector('.ch-sort-opts')"), 'Done hides the sort options')
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
-        check(await pg.evaluate(lbls) == ['My Channels'], 'the sort choice is kept')
-        await pg.evaluate(setsort, 'category'); await pg.wait_for_timeout(300)
-        check(await pg.evaluate(lbls) == ['News', 'Other'], 'Sort by Category brings the headings back')
-
-        await pg.evaluate("document.getElementById('videoReorderHeaderBtn').click()"); await pg.wait_for_timeout(300)
-        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile.tile-draggable').length")
-        check(drag == 5, f'Reorder makes the tiles draggable ({drag})')
-        stacked = await pg.evaluate("document.querySelectorAll('#stationsGrid > .tile.tile-row.tile-draggable').length")
-        check(stacked == 5, f'Reorder uses the same stacked rows ({stacked})')
-        await pg.screenshot(path=f'{SHOTS}/ch-reorder.png')
-        await pg.evaluate("document.getElementById('videoReorderHeaderBtn').click()"); await pg.wait_for_timeout(300)
+        t = [x['name'] for x in await my_tiles(pg)]
+        check(await pg.evaluate(lbls) == ['My Channels'] and t[0] == 'Link Three', f'choices and manual order kept after a restart {t}')
+        # Back to A to Z: sorted again; the manual order is still there for next time.
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        await pg.evaluate(pick, 'az'); await pg.wait_for_timeout(300)
+        await pg.evaluate(pick, 'category'); await pg.wait_for_timeout(300)
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        t = [x['name'] for x in await my_tiles(pg)]
+        check(await pg.evaluate(lbls) == ['News', 'Other'] and t == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z again, by category {t}')
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        await pg.evaluate(pick, 'manual'); await pg.wait_for_timeout(300)
+        check((await pg.evaluate(names))[0] == 'Link Three', f'switching back to Manual finds the hand order intact {await pg.evaluate(names)}')
+        await pg.evaluate(pick, 'az'); await pg.wait_for_timeout(300)
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        # Rename via the More menu: the row re-sorts under its new name (A to Z), the Home row
+        # follows, and it's kept after a restart. Cancel leaves it alone.
+        def more(name):
+            return "Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent===" + json.dumps(name) + ";}).querySelector('.row-more-btn').click()"
+        await pg.evaluate(more('PBS')); await pg.wait_for_timeout(300)
+        shown = await pg.evaluate("getComputedStyle(document.getElementById('rowMenuRename')).display")
+        check(shown != 'none', f"a saved channel's More menu has Rename ({shown})")
+        await pg.screenshot(path=f'{SHOTS}/ch-rename-menu.png')
+        asked = []
+        async def answer(d):
+            asked.append((d.message, d.default_value)); await d.accept('Aardvark TV')
+        pg.once('dialog', lambda d: asyncio.ensure_future(answer(d)))
+        await pg.evaluate("document.getElementById('rowMenuRename').click()"); await pg.wait_for_timeout(500)
+        t = [x['name'] for x in await my_tiles(pg)]
+        check(asked == [('Channel name', 'PBS')] and t == ['ABC News Live', 'BBC News', 'Aardvark TV', 'Link One', 'Link Three'],
+              f'Rename asks with the current name and the list re-sorts under the new one {asked} {t}')
+        home = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#channelsHomeGrid .tile-name'),function(n){return n.textContent;})")
+        check(home[0] == 'Aardvark TV', f'the Home row uses the new name, in order {home}')
+        await pg.evaluate(more('Link One')); await pg.wait_for_timeout(300)
+        pg.once('dialog', lambda d: asyncio.ensure_future(d.dismiss()))
+        await pg.evaluate("document.getElementById('rowMenuRename').click()"); await pg.wait_for_timeout(500)
+        check('Link One' in [x['name'] for x in await my_tiles(pg)], 'cancelling Rename changes nothing')
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
+        t = [x['name'] for x in await my_tiles(pg)]
+        check('Aardvark TV' in t and 'PBS' not in t, f'the new name is kept after a restart {t}')
+        await pg.screenshot(path=f'{SHOTS}/ch-renamed.png')
         # Remove via the More menu
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}).querySelector('.row-more-btn').click()"); await pg.wait_for_timeout(300)
         await pg.evaluate("document.getElementById('rowMenuRemove').click()"); await pg.wait_for_timeout(300)
