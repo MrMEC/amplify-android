@@ -14,7 +14,9 @@ os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
 HOOK = ("window.__t = { cf: function(){ return coverFlow; }, runLibrarySection: runLibrarySection, tracks: function(){ return libraryTracks; },"
-        " openNp: function(){ openNowPlaying(); }, openArtist: function(name){ openArtistPage(artistMatchKey(name)); }, hist: function(){ return viewHistory.map(function(v){ return v.label; }); },"
+        " openNp: function(){ openNowPlaying(); }, openArtist: function(name){ openArtistPage(artistMatchKey(name)); },"
+        " openAlbum: function(title, artist){ var t = libraryTracks.filter(function(x){ return x.album === title; })[0]; openAlbumPage(albumKeyFor(t), artist ? artistMatchKey(artist) : null); },"
+        " hist: function(){ return viewHistory.map(function(v){ return v.label; }); },"
         " setArt: function(album, url){ var t = libraryTracks.filter(function(x){ return x.album === album; })[0]; return setCustomArtUrl('album:' + albumKeyFor(t), url); },"
         " clearArt: function(album){ var t = libraryTracks.filter(function(x){ return x.album === album; })[0]; return clearCustomArtUrl('album:' + albumKeyFor(t)); } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
@@ -195,6 +197,33 @@ async def main():
             await rotate(pg, False)
             back = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('artist-open'), (document.querySelector('.artist-hero-name, #artistHeroName')||{}).textContent]")
             check(not back[0] and back[1], f'turning back returns to the artist page {back}')
+
+        key = lambda k: pg.evaluate("document.querySelector('.cf').dispatchEvent(new KeyboardEvent('keydown',{key:'" + k + "'}))")
+        # From an album's page, turning the phone opens Cover Flow on that album: album order
+        # when it was opened from Albums, artist order when opened from the artist's page.
+        for title, artist, order in [('Mid', None, 'album'), ('Mid', 'Zed', 'artist'), ('Record F07', None, 'album')]:
+            await pg.evaluate("__t.runLibrarySection('albums')" if not artist else f"__t.openArtist({json.dumps(artist)})"); await pg.wait_for_timeout(700)
+            hist0 = await pg.evaluate("__t.hist().length")
+            await pg.evaluate(f"__t.openAlbum({json.dumps(title)}, {json.dumps(artist)})"); await pg.wait_for_timeout(900)
+            await rotate(pg, True)
+            st = await pg.evaluate("__t.cf()._state(true)")
+            cur = st['list'][int(st['pos'])]
+            open_ = await pg.evaluate("document.getElementById('nowPlayingScreen').classList.contains('la-open')")
+            check(open_ and st['order'] == order and cur.startswith(title + ' /'),
+                  f'album page {title} (from {artist or "Albums"}): Cover Flow opens on it in {order} order ({st["order"]}, {cur})')
+            if artist: await pg.screenshot(path=f'{shots}/cfa-album-page.png')
+            # Turning the same album over adds nothing to Back's history.
+            await key('Enter'); await pg.wait_for_timeout(800)
+            await key('Escape'); await pg.wait_for_timeout(500)
+            hist1 = await pg.evaluate("__t.hist().length")
+            check(hist1 == hist0 + 1, f'turning over the album it opened on adds no extra Back step ({hist0} -> {hist1})')
+            await rotate(pg, False)
+            up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open'), document.getElementById('albumHeroName').textContent]")
+            check(not up[0] and up[1] and up[2] == title, f'turning back returns to the album page {up}')
+            await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(800)
+            where = await pg.evaluate("[document.body.classList.contains('album-open'), document.body.classList.contains('artist-open'), document.querySelectorAll(\".tile[data-entity='album']\").length]")
+            want = [False, True] if artist else [False, False]
+            check(where[:2] == want and (artist or where[2] > 30), f'Back from the album goes where it did before ({where})')
 
         # Turning an album over opens its page behind Cover Flow; a second one replaces it;
         # upright again, the page is showing and Back returns to the Artists list.
