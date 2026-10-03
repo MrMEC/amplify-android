@@ -3047,6 +3047,65 @@
     font-size:12.5px; font-weight:600; cursor:pointer;
   }
   .art-url-save-btn:hover{ filter:brightness(1.05); }
+  /* Info & Tags: a taller sheet whose body scrolls under a fixed header. */
+  /* Opened from Now Playing, whose tab bar sits at 1001: the sheet goes over it. */
+  #tagOverlay{ z-index:1002; }
+  .settings-panel.tag-panel{
+    width:min(480px, 100%); max-height:calc(100dvh - 40px); display:flex; flex-direction:column;
+    padding:16px 0 0; overflow:hidden;
+  }
+  .settings-header.tag-header{ padding:0 16px 0 10px; margin-bottom:10px; gap:10px; }
+  .tag-header-left{ display:flex; align-items:center; gap:6px; min-width:0; }
+  .tag-header-left h2{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag-edit-btn{
+    flex-shrink:0; min-width:72px; height:34px; padding:0 16px; border-radius:17px; cursor:pointer;
+    background:var(--panel-2); color:var(--text); border:1px solid var(--border); font-size:13px; font-weight:600;
+  }
+  .tag-edit-btn.primary{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  .tag-edit-btn:disabled{ opacity:.45; cursor:default; }
+  .tag-edit-btn[hidden]{ display:none; }
+  .tag-note{
+    margin:0 16px 10px; padding:9px 12px; border-radius:10px; font-size:12.5px; line-height:1.4;
+    background:var(--panel-2); color:var(--text-dim); display:flex; align-items:center; gap:10px;
+  }
+  .tag-note[hidden]{ display:none; }
+  .tag-note > span{ flex:1; min-width:0; }
+  .tag-note.err{ color:var(--danger); }
+  .tag-note.ok{ color:var(--text); }
+  .tag-note-btn{
+    flex-shrink:0; background:var(--accent); color:var(--accent-text); border:none; border-radius:8px;
+    padding:7px 14px; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .tag-body{ overflow-y:auto; overscroll-behavior:contain; padding:0 16px 18px; -webkit-overflow-scrolling:touch; }
+  .tag-head{ display:flex; align-items:center; gap:12px; padding:2px 0 14px; }
+  .tag-art{
+    width:64px; height:64px; border-radius:8px; flex-shrink:0; overflow:hidden; position:relative;
+    background:var(--panel-2); display:flex; align-items:center; justify-content:center;
+  }
+  .tag-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .tag-head-text{ min-width:0; }
+  .tag-head-title{ font-size:15px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tag-head-sub{ font-size:13px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .tag-head-fmt{ font-size:11.5px; color:var(--text-faint); margin-top:4px; }
+  .tag-sec{ border-top:1px solid var(--border); padding:10px 0 4px; }
+  .tag-sec-title{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); padding-bottom:4px; }
+  .tag-row{ display:flex; align-items:baseline; gap:12px; padding:7px 0; font-size:13.5px; }
+  .tag-k{ flex:0 0 104px; color:var(--text-dim); font-weight:600; font-size:12.5px; overflow-wrap:anywhere; }
+  .tag-id{ display:block; font-family:ui-monospace, Menlo, Consolas, monospace; font-weight:400; font-size:10.5px; color:var(--text-faint); margin-top:1px; }
+  .tag-v{ flex:1; min-width:0; color:var(--text); overflow-wrap:anywhere; white-space:pre-wrap; }
+  .tag-v.empty{ color:var(--text-faint); }
+  .tag-row.multi .tag-v{ max-height:9.5em; overflow-y:auto; }
+  .tag-pic{ display:block; width:96px; height:96px; object-fit:cover; border-radius:6px; margin-bottom:6px; background:var(--panel-2); }
+  .tag-empty{ padding:14px 0; color:var(--text-faint); font-size:13px; }
+  .tag-panel.editing .tag-row{ align-items:center; padding:5px 0; }
+  .tag-panel.editing .tag-row.multi{ align-items:flex-start; }
+  .tag-panel.editing .tag-row.multi .tag-k{ padding-top:9px; }
+  .tag-in{
+    flex:1; min-width:0; width:100%; box-sizing:border-box; background:var(--panel-2); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:8px 10px; font:inherit; font-size:14px;
+  }
+  textarea.tag-in{ resize:vertical; line-height:1.4; }
+  .tag-in:focus{ outline:none; border-color:var(--accent); }
   .art-url-search-btn{
     background:none; border:1px solid var(--border); color:var(--text-dim); border-radius:8px; padding:9px 14px;
     font-size:12.5px; cursor:pointer;
@@ -5117,6 +5176,10 @@
                   <button type="button" class="np-menu-item" id="npRenameBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7V5h11v2M9.5 5v14M7.5 19h4"/><path d="M15 12h5M17.5 12v7M16 19h3"/></svg><span>Rename</span>
                   </button>
+                  <!-- A song in the library: every tag in the file, and editing them. -->
+                  <button type="button" class="np-menu-item" id="npTagsBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><path d="M8 11.5h5M8 14.5h3"/></svg><span>Info &amp; Tags</span>
+                  </button>
                   <button type="button" class="np-menu-item" id="npArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit cover art</span>
                   </button>
@@ -5325,6 +5388,20 @@
       <button type="button" class="settings-data-btn settings-wide-btn" id="diagnosticsBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>Check storage</button>
     </div>
     <div class="settings-diagnostics" id="diagnostics" style="display:none;"></div>
+  </div>
+</div>
+
+<div class="settings-overlay" id="tagOverlay">
+  <div class="settings-panel tag-panel" id="tagPanel" role="dialog" aria-modal="true" aria-labelledby="tagTitle">
+    <div class="settings-header tag-header">
+      <div class="tag-header-left">
+        <button type="button" class="settings-close" id="tagCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        <h2 id="tagTitle">Info &amp; Tags</h2>
+      </div>
+      <button type="button" class="tag-edit-btn" id="tagEditBtn" hidden>Edit</button>
+    </div>
+    <div class="tag-note" id="tagNote" hidden></div>
+    <div class="tag-body" id="tagBody"></div>
   </div>
 </div>
 
@@ -6363,6 +6440,7 @@
   var npPlayBtn = document.getElementById('npPlayBtn');
   var npArtWrap = document.getElementById('npArtWrap');
   var npArtEditBtn = document.getElementById('npArtEditBtn');
+  var npTagsBtn = document.getElementById('npTagsBtn');
   var npBackdropImg = document.getElementById('npBackdropImg');
   var pageBackdrop = document.getElementById('pageBackdrop');
   var pageGlow = document.getElementById('pageGlow');
@@ -8089,6 +8167,7 @@
     if(vidItem){ npCopyBtn.style.display = 'none'; npMoreLikeBtn.style.display = 'none'; }
     npDeleteBtn.style.display = vidItem ? 'none' : '';
     npPlaylistBtn.style.display = vidItem ? 'none' : '';
+    npTagsBtn.style.display = (local && !vidItem) ? '' : 'none';
     syncNpTracksBtn(st);
     // Next and Previous are meaningless on a station, so they are hidden rather than left
     // sitting there permanently greyed out.
@@ -21852,6 +21931,1031 @@
     });
   }
 
+  // ---- Info & Tags: every tag in a library song, and editing the common ones ----
+  // The song is read as it sits on the phone now (the copy in the music folder), falling back
+  // to Amplify's own copy. MP3 (ID3v2.3 or 2.4, or no tag yet) and FLAC can be edited: only the
+  // tag area at the front of the file is replaced, the audio itself is never touched. Other
+  // formats (M4A, Ogg, ID3v2.2) are shown read-only.
+  var TAG_FIELDS = [
+    { key: 'title', label: 'Title' },
+    { key: 'artist', label: 'Artist' },
+    { key: 'album', label: 'Album' },
+    { key: 'albumArtist', label: 'Album Artist' },
+    { key: 'genre', label: 'Genre' },
+    { key: 'year', label: 'Year' },
+    { key: 'track', label: 'Track', hint: 'e.g. 3 or 3/12', mode: 'numeric' },
+    { key: 'disc', label: 'Disc', hint: 'e.g. 1 or 1/2', mode: 'numeric' },
+    { key: 'composer', label: 'Composer' },
+    { key: 'comment', label: 'Comment', multi: true },
+    { key: 'lyrics', label: 'Lyrics', multi: true }
+  ];
+  var ID3_FRAME_NAMES = {
+    TIT1:'Grouping', TIT2:'Title', TIT3:'Subtitle', TPE1:'Artist', TPE2:'Album Artist', TPE3:'Conductor',
+    TPE4:'Remixed by', TALB:'Album', TCON:'Genre', TRCK:'Track', TPOS:'Disc', TYER:'Year', TDAT:'Date',
+    TIME:'Time', TDRC:'Recording date', TDRL:'Release date', TDOR:'Original release date', TORY:'Original year',
+    TCOM:'Composer', TEXT:'Lyricist', TOLY:'Original lyricist', TOPE:'Original artist', TOAL:'Original album',
+    TBPM:'BPM', TKEY:'Initial key', TLAN:'Language', TLEN:'Length (ms)', TMED:'Media type', TPUB:'Publisher',
+    TCOP:'Copyright', TPRO:'Produced', TENC:'Encoded by', TSSE:'Encoder settings', TSRC:'ISRC', TFLT:'File type',
+    TSOA:'Album sort order', TSOP:'Artist sort order', TSOT:'Title sort order', TSO2:'Album artist sort order',
+    TSOC:'Composer sort order', TCMP:'Compilation', TMOO:'Mood', TDEN:'Encoding time', TDTG:'Tagging time',
+    TOWN:'File owner', TRSN:'Radio station', TRSO:'Radio station owner', TIPL:'Involved people',
+    TMCL:'Musician credits', IPLS:'Involved people', TSST:'Set subtitle', TOFN:'Original filename',
+    TDLY:'Playlist delay', TXXX:'User text', COMM:'Comment', USLT:'Lyrics', SYLT:'Synced lyrics', APIC:'Picture',
+    PRIV:'Private data', UFID:'Unique file ID', POPM:'Rating', PCNT:'Play counter', WXXX:'User URL',
+    WCOM:'Commercial info URL', WCOP:'Copyright URL', WOAF:'Audio file URL', WOAR:'Artist URL',
+    WOAS:'Audio source URL', WORS:'Radio station URL', WPAY:'Payment URL', WPUB:'Publisher URL',
+    GEOB:'Embedded object', MCDI:'CD identifier', RVA2:'Volume adjustment', RVAD:'Volume adjustment',
+    EQU2:'Equalisation', CHAP:'Chapter', CTOC:'Table of contents', GRP1:'Grouping', MVNM:'Movement',
+    MVIN:'Movement number', PCST:'Podcast', TCAT:'Podcast category', TDES:'Podcast description',
+    TGID:'Podcast ID', WFED:'Podcast feed',
+    TT1:'Grouping', TT2:'Title', TT3:'Subtitle', TP1:'Artist', TP2:'Album Artist', TP3:'Conductor',
+    TP4:'Remixed by', TAL:'Album', TCO:'Genre', TRK:'Track', TPA:'Disc', TYE:'Year', TCM:'Composer',
+    TXT:'Lyricist', TBP:'BPM', TEN:'Encoded by', TSS:'Encoder settings', TCR:'Copyright', TPB:'Publisher',
+    TXX:'User text', COM:'Comment', ULT:'Lyrics', PIC:'Picture', UFI:'Unique file ID', POP:'Rating',
+    CNT:'Play counter', TCP:'Compilation', WXX:'User URL'
+  };
+  var VORBIS_NAMES = {
+    TITLE:'Title', ARTIST:'Artist', ALBUM:'Album', ALBUMARTIST:'Album Artist', 'ALBUM ARTIST':'Album Artist',
+    GENRE:'Genre', DATE:'Date', YEAR:'Year', TRACKNUMBER:'Track', TRACKTOTAL:'Total tracks', TOTALTRACKS:'Total tracks',
+    DISCNUMBER:'Disc', DISCTOTAL:'Total discs', TOTALDISCS:'Total discs', COMPOSER:'Composer', COMMENT:'Comment',
+    DESCRIPTION:'Description', LYRICS:'Lyrics', UNSYNCEDLYRICS:'Lyrics', PERFORMER:'Performer', COPYRIGHT:'Copyright',
+    LICENSE:'Licence', ORGANIZATION:'Label', LABEL:'Label', ISRC:'ISRC', ENCODER:'Encoder', ENCODEDBY:'Encoded by',
+    BPM:'BPM', COMPILATION:'Compilation', GROUPING:'Grouping', LYRICIST:'Lyricist', CONDUCTOR:'Conductor',
+    ALBUMSORT:'Album sort order', ARTISTSORT:'Artist sort order', TITLESORT:'Title sort order',
+    ALBUMARTISTSORT:'Album artist sort order', REPLAYGAIN_TRACK_GAIN:'ReplayGain (track)',
+    REPLAYGAIN_ALBUM_GAIN:'ReplayGain (album)', REPLAYGAIN_TRACK_PEAK:'ReplayGain peak (track)',
+    REPLAYGAIN_ALBUM_PEAK:'ReplayGain peak (album)', METADATA_BLOCK_PICTURE:'Picture'
+  };
+  var MP4_NAMES = {
+    '©nam':'Title', '©ART':'Artist', aART:'Album Artist', '©alb':'Album', '©gen':'Genre',
+    gnre:'Genre', '©day':'Year', trkn:'Track', disk:'Disc', '©wrt':'Composer', '©cmt':'Comment',
+    '©lyr':'Lyrics', covr:'Picture', cpil:'Compilation', tmpo:'BPM', '©grp':'Grouping',
+    '©too':'Encoder', cprt:'Copyright', desc:'Description', ldes:'Long description', soal:'Album sort order',
+    soar:'Artist sort order', sonm:'Title sort order', soaa:'Album artist sort order', soco:'Composer sort order',
+    pgap:'Gapless', rtng:'Rating', stik:'Media kind', '©enc':'Encoded by', apID:'Account', purd:'Purchase date'
+  };
+  var PIC_TYPES = ['Other', 'File icon', 'Other file icon', 'Front cover', 'Back cover', 'Leaflet page', 'Media',
+    'Lead artist', 'Artist', 'Conductor', 'Band', 'Composer', 'Lyricist', 'Recording location', 'During recording',
+    'During performance', 'Screen capture', 'Bright coloured fish', 'Illustration', 'Band logo', 'Publisher logo'];
+  // Each editable field and the Vorbis comment names that carry it. Track and disc also own
+  // their "total" companions, since "3/12" is shown and edited as one value.
+  var VORBIS_FIELD_KEYS = {
+    title: ['TITLE'], artist: ['ARTIST'], album: ['ALBUM'], albumArtist: ['ALBUMARTIST', 'ALBUM ARTIST'],
+    genre: ['GENRE'], year: ['DATE', 'YEAR'], track: ['TRACKNUMBER', 'TRACKTOTAL', 'TOTALTRACKS'],
+    disc: ['DISCNUMBER', 'DISCTOTAL', 'TOTALDISCS'], composer: ['COMPOSER'], comment: ['COMMENT', 'DESCRIPTION'],
+    lyrics: ['LYRICS', 'UNSYNCEDLYRICS']
+  };
+
+  // --- small byte helpers ---
+  function tagUtf8(s){
+    if(window.TextEncoder) return new window.TextEncoder().encode(String(s));
+    var u = unescape(encodeURIComponent(String(s))), out = new Uint8Array(u.length);
+    for(var i = 0; i < u.length; i++) out[i] = u.charCodeAt(i);
+    return out;
+  }
+  function tagLatin1(s){
+    s = String(s);
+    var out = new Uint8Array(s.length);
+    for(var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
+    return out;
+  }
+  function tagUtf16le(s){
+    s = String(s);
+    var out = new Uint8Array(s.length * 2);
+    for(var i = 0; i < s.length; i++){ var c = s.charCodeAt(i); out[i*2] = c & 0xff; out[i*2+1] = c >> 8; }
+    return out;
+  }
+  function tagConcat(parts){
+    var n = 0;
+    parts.forEach(function(p){ n += p.length; });
+    var out = new Uint8Array(n), o = 0;
+    parts.forEach(function(p){ out.set(p, o); o += p.length; });
+    return out;
+  }
+  function tagBe32(n){ return new Uint8Array([(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]); }
+  function tagLe32(n){ return new Uint8Array([n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]); }
+  function tagSynchsafe(n){ return new Uint8Array([(n >>> 21) & 0x7f, (n >>> 14) & 0x7f, (n >>> 7) & 0x7f, n & 0x7f]); }
+  var CRC_TABLE = null;
+  function crc32(bytes){
+    if(!CRC_TABLE){
+      CRC_TABLE = new Int32Array(256);
+      for(var n = 0; n < 256; n++){
+        var c = n;
+        for(var k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        CRC_TABLE[n] = c;
+      }
+    }
+    var crc = -1;
+    for(var i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    return (crc ^ -1) >>> 0;
+  }
+  function tagBase64(bytes){
+    var out = '';
+    for(var i = 0; i < bytes.length; i += 0x8000){
+      out += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(out);
+  }
+  function tagBytesLabel(n){
+    if(n < 1024) return n + ' bytes';
+    if(n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  // --- ID3v2 ---
+  function id3Str(enc, bytes){
+    if(!bytes || !bytes.length) return '';
+    if(enc === 0) return decodeBytes(bytes, 'iso-8859-1');
+    if(enc === 1){
+      var label = 'utf-16le';
+      if(bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) label = 'utf-16be';
+      return decodeBytes(bytes, label).replace(/^﻿/, '');
+    }
+    if(enc === 2) return decodeBytes(bytes, 'utf-16be');
+    return decodeBytes(bytes, 'utf-8');
+  }
+  function id3TermLen(enc){ return (enc === 1 || enc === 2) ? 2 : 1; }
+  // Splits "encoding, description\0, rest" (TXXX, WXXX, COMM and USLT after their language).
+  function id3DescAndRest(d, from){
+    var enc = d[0];
+    var end = skipTerminatedString(d, from, enc);
+    var descBytes = d.subarray(from, Math.max(from, end - id3TermLen(enc)));
+    return { enc: enc, desc: trimNulls(id3Str(enc, descBytes)), rest: d.subarray(Math.min(end, d.length)) };
+  }
+  function id3CleanText(s){ return String(s || '').replace(/\u0000+$/, '').replace(/\u0000/g, ' / ').trim(); }
+  // The frame's own bytes with v2.3/v2.4 per-frame extras undone; null when it is compressed
+  // or encrypted (shown by size only, and always copied back untouched).
+  function id3FrameBody(fr, major){
+    var d = fr.data;
+    if(major === 4){
+      var f = fr.flags[1];
+      if(f & 0x0c) return null;
+      if(f & 0x40) d = d.subarray(1);
+      if(f & 0x01) d = d.subarray(4);
+      if(f & 0x02) d = removeUnsync(d);
+      return d;
+    }
+    if(major === 3){
+      if(fr.flags[1] & 0xc0) return null;
+      if(fr.flags[1] & 0x20) d = d.subarray(1);
+    }
+    return d;
+  }
+  function parseId3Frames(b){
+    if(b.length < 10 || b[0] !== 0x49 || b[1] !== 0x44 || b[2] !== 0x33) return null;
+    var major = b[3], flags = b[5];
+    var size = synchsafe32(b, 6);
+    var end = 10 + size + ((major === 4 && (flags & 0x10)) ? 10 : 0);
+    var body = b.subarray(10, Math.min(10 + size, b.length));
+    // v2.3 unsynchronises the whole tag; v2.4 does it frame by frame (see id3FrameBody).
+    if((flags & 0x80) && major < 4) body = removeUnsync(body);
+    var pos = 0;
+    if(flags & 0x40){
+      if(major >= 4) pos += synchsafe32(body, 0);
+      else pos += 4 + u32be(body, 0);
+    }
+    var idLen = major === 2 ? 3 : 4, headerLen = major === 2 ? 6 : 10;
+    var idRe = major === 2 ? /^[A-Z0-9]{3}$/ : /^[A-Z0-9]{4}$/;
+    var frames = [];
+    while(pos + headerLen <= body.length){
+      var id = bytesToString(body, pos, idLen);
+      if(!idRe.test(id)) break;
+      var fsize = id3FrameSize(body, pos, major, headerLen);
+      var at = pos + headerLen;
+      if(fsize <= 0 || at + fsize > body.length) break;
+      frames.push({
+        id: id,
+        flags: major === 2 ? new Uint8Array(2) : body.slice(pos + 8, pos + 10),
+        data: body.slice(at, at + fsize)
+      });
+      pos = at + fsize;
+    }
+    return { major: major, revision: b[4], end: end, frames: frames };
+  }
+  function describeId3Frame(fr, major){
+    var id = fr.id, d = id3FrameBody(fr, major);
+    var row = { id: id, label: ID3_FRAME_NAMES[id] || id, value: '' };
+    if(!d){ row.value = 'Compressed or encrypted (' + tagBytesLabel(fr.data.length) + ')'; return row; }
+    try{
+      if(id === 'TXXX' || id === 'TXX'){
+        var x = id3DescAndRest(d, 1);
+        if(x.desc) row.label = x.desc;
+        row.value = id3CleanText(id3Str(x.enc, x.rest));
+      } else if(id.charAt(0) === 'T'){
+        var t = id3CleanText(id3Str(d[0], d.subarray(1)));
+        row.value = (id === 'TCON' || id === 'TCO') ? (normalizeGenreText(t) || t) : t;
+      } else if(id === 'WXXX' || id === 'WXX'){
+        var w = id3DescAndRest(d, 1);
+        if(w.desc) row.label = 'URL (' + w.desc + ')';
+        row.value = trimNulls(decodeBytes(w.rest, 'iso-8859-1'));
+      } else if(id.charAt(0) === 'W'){
+        row.value = trimNulls(decodeBytes(d, 'iso-8859-1'));
+      } else if(id === 'COMM' || id === 'USLT' || id === 'COM' || id === 'ULT'){
+        var lang = bytesToString(d, 1, 3).replace(/[^\x20-\x7e]/g, '');
+        var c = id3DescAndRest(d, 4);
+        var bits = [];
+        if(c.desc) bits.push(c.desc);
+        if(lang && lang !== 'XXX' && lang !== 'xxx') bits.push(lang);
+        if(bits.length) row.label += ' (' + bits.join(', ') + ')';
+        row.value = id3CleanText(id3Str(c.enc, c.rest));
+        row.multi = true;
+      } else if(id === 'APIC' || id === 'PIC'){
+        var enc = d[0], p = 1, mime;
+        if(id === 'PIC'){ mime = bytesToString(d, 1, 3).toLowerCase() === 'png' ? 'image/png' : 'image/jpeg'; p = 4; }
+        else {
+          var ms = p;
+          while(p < d.length && d[p] !== 0) p++;
+          mime = trimNulls(decodeBytes(d.subarray(ms, p), 'iso-8859-1')).toLowerCase() || 'image/jpeg';
+          if(mime.indexOf('/') === -1) mime = 'image/' + (mime === 'jpg' ? 'jpeg' : mime);
+          p++;
+        }
+        var ptype = d[p]; p++;
+        var pe = skipTerminatedString(d, p, enc);
+        var pdesc = trimNulls(id3Str(enc, d.subarray(p, Math.max(p, pe - id3TermLen(enc)))));
+        var img = d.subarray(Math.min(pe, d.length));
+        row.label = PIC_TYPES[ptype] || 'Picture';
+        row.value = (pdesc ? pdesc + ' · ' : '') + mime.replace('image/', '').toUpperCase() + ' · ' + tagBytesLabel(img.length);
+        if(img.length) row.pic = new Blob([img], { type: mime });
+      } else if(id === 'PRIV' || id === 'UFID' || id === 'UFI'){
+        var z = 0;
+        while(z < d.length && d[z] !== 0) z++;
+        row.value = trimNulls(decodeBytes(d.subarray(0, z), 'iso-8859-1')) + ' · ' + tagBytesLabel(Math.max(0, d.length - z - 1));
+      } else if(id === 'POPM' || id === 'POP'){
+        var e2 = 0;
+        while(e2 < d.length && d[e2] !== 0) e2++;
+        var who = decodeBytes(d.subarray(0, e2), 'iso-8859-1');
+        var rating = d[e2 + 1] || 0;
+        row.value = Math.round(rating / 51) + ' of 5 stars' + (who ? ' · ' + who : '');
+      } else if(id === 'PCNT' || id === 'CNT'){
+        var cnt = 0;
+        for(var i = 0; i < d.length; i++) cnt = cnt * 256 + d[i];
+        row.value = String(cnt);
+      } else {
+        row.value = tagBytesLabel(d.length);
+      }
+    }catch(e){ row.value = tagBytesLabel(fr.data.length); }
+    return row;
+  }
+  // Which editable field (if any) a frame carries. Comments and lyrics only count with an
+  // empty description: "iTunNORM" and friends are machine data, kept as they are.
+  function id3FieldOfFrame(fr, major){
+    var id = fr.id;
+    var map = { TIT2:'title', TPE1:'artist', TALB:'album', TPE2:'albumArtist', TCON:'genre', TRCK:'track',
+      TPOS:'disc', TCOM:'composer', TYER:'year', TDRC:'year', COMM:'comment', USLT:'lyrics' };
+    var key = map[id];
+    if(!key) return null;
+    if(key === 'comment' || key === 'lyrics'){
+      var d = id3FrameBody(fr, major);
+      if(!d) return null;
+      if(id3DescAndRest(d, 4).desc) return null;
+    }
+    return key;
+  }
+  function id3FieldValues(frames, major){
+    var v = {};
+    frames.forEach(function(fr){
+      var key = id3FieldOfFrame(fr, major);
+      if(!key) return;
+      // The year frame that matches the tag's version wins over a stray one of the other.
+      if(key === 'year' && v.year !== undefined && fr.id !== (major === 4 ? 'TDRC' : 'TYER')) return;
+      if(v[key] !== undefined && key !== 'year') return;
+      var row = describeId3Frame(fr, major);
+      v[key] = row.value;
+    });
+    return v;
+  }
+  function id3TextFrameData(major, s){
+    if(major === 4) return tagConcat([new Uint8Array([3]), tagUtf8(s)]);
+    if(/^[\x00-\xff]*$/.test(s)) return tagConcat([new Uint8Array([0]), tagLatin1(s)]);
+    return tagConcat([new Uint8Array([1, 0xff, 0xfe]), tagUtf16le(s)]);
+  }
+  function id3LangFrameData(major, s){
+    var eng = new Uint8Array([0x65, 0x6e, 0x67]);
+    if(major === 4) return tagConcat([new Uint8Array([3]), eng, new Uint8Array([0]), tagUtf8(s)]);
+    if(/^[\x00-\xff]*$/.test(s)) return tagConcat([new Uint8Array([0]), eng, new Uint8Array([0]), tagLatin1(s)]);
+    return tagConcat([new Uint8Array([1]), eng, new Uint8Array([0xff, 0xfe, 0, 0, 0xff, 0xfe]), tagUtf16le(s)]);
+  }
+  function id3NewFrame(key, major, value){
+    var id = { title:'TIT2', artist:'TPE1', album:'TALB', albumArtist:'TPE2', genre:'TCON', track:'TRCK',
+      disc:'TPOS', composer:'TCOM', year: major === 4 ? 'TDRC' : 'TYER', comment:'COMM', lyrics:'USLT' }[key];
+    var data = (key === 'comment' || key === 'lyrics') ? id3LangFrameData(major, value) : id3TextFrameData(major, value);
+    return { id: id, flags: new Uint8Array(2), data: data };
+  }
+  // A whole new tag: untouched frames copied byte for byte, changed fields replaced where the
+  // old frame stood, new ones added at the end. Padded to the old tag's size when it fits, so
+  // the file keeps its length and only the front of it is rewritten.
+  function buildId3Tag(doc, changes){
+    var major = doc.id3.major;
+    var out = [], placed = {};
+    doc.id3.frames.forEach(function(fr){
+      var key = id3FieldOfFrame(fr, major);
+      if(key && Object.prototype.hasOwnProperty.call(changes, key)){
+        if(!placed[key]){
+          placed[key] = true;
+          if(changes[key]) out.push(id3NewFrame(key, major, changes[key]));
+        }
+        return;
+      }
+      out.push(fr);
+    });
+    Object.keys(changes).forEach(function(key){
+      if(!placed[key] && changes[key]) out.push(id3NewFrame(key, major, changes[key]));
+    });
+    var parts = [];
+    out.forEach(function(fr){
+      var flags = fr.flags;
+      // Frames copied from a v2.4 tag keep their own unsync flag, which still describes them.
+      parts.push(tagLatin1(fr.id), major === 4 ? tagSynchsafe(fr.data.length) : tagBe32(fr.data.length), flags, fr.data);
+    });
+    var frames = tagConcat(parts);
+    var room = doc.headLen - 10 - frames.length;
+    var padding = room >= 0 ? room : 2048;
+    var header = new Uint8Array([0x49, 0x44, 0x33, major, 0, 0]);
+    return tagConcat([header, tagSynchsafe(frames.length + padding), frames, new Uint8Array(padding)]);
+  }
+
+  // --- Vorbis comments (FLAC, Ogg) ---
+  function readVorbisComments(b, start, end){
+    var p = start, out = { vendor: '', comments: [] };
+    if(p + 4 > end) return out;
+    var vlen = u32le(b, p); p += 4;
+    out.vendor = decodeBytes(b.subarray(p, Math.min(end, p + vlen)), 'utf-8'); p += vlen;
+    if(p + 4 > end) return out;
+    var count = Math.min(u32le(b, p), 4096); p += 4;
+    for(var i = 0; i < count; i++){
+      if(p + 4 > end) break;
+      var len = u32le(b, p); p += 4;
+      if(p + len > end) break;
+      var text = decodeBytes(b.subarray(p, p + len), 'utf-8');
+      p += len;
+      var eq = text.indexOf('=');
+      if(eq > 0) out.comments.push({ key: text.slice(0, eq), value: text.slice(eq + 1) });
+    }
+    return out;
+  }
+  function vorbisFieldValues(comments){
+    function all(keys){
+      return comments.filter(function(c){ return keys.indexOf(c.key.toUpperCase()) !== -1; })
+        .map(function(c){ return c.value; }).filter(Boolean);
+    }
+    var v = {};
+    ['title', 'artist', 'album', 'albumArtist', 'genre', 'year', 'composer', 'comment', 'lyrics'].forEach(function(k){
+      var vals = all(VORBIS_FIELD_KEYS[k]);
+      if(vals.length) v[k] = vals.join('; ');
+    });
+    [['track', 'TRACKNUMBER', ['TRACKTOTAL', 'TOTALTRACKS']], ['disc', 'DISCNUMBER', ['DISCTOTAL', 'TOTALDISCS']]].forEach(function(t){
+      var n = all([t[1]])[0] || '', tot = all(t[2])[0] || '';
+      if(n) v[t[0]] = (tot && n.indexOf('/') === -1) ? n + '/' + tot : n;
+    });
+    return v;
+  }
+  function describeVorbis(comments, rows){
+    comments.forEach(function(c){
+      var up = c.key.toUpperCase();
+      if(up === 'METADATA_BLOCK_PICTURE'){
+        rows.push({ id: c.key, label: 'Picture', value: 'Embedded · ' + tagBytesLabel(Math.round(c.value.length * 0.75)) });
+        return;
+      }
+      rows.push({ id: c.key, label: VORBIS_NAMES[up] || c.key, value: c.value, multi: c.value.length > 60 });
+    });
+  }
+  function vorbisReplace(comments, changes){
+    var out = [], placed = {};
+    function fieldOf(key){
+      var up = key.toUpperCase();
+      for(var k in changes){
+        if(Object.prototype.hasOwnProperty.call(changes, k) && VORBIS_FIELD_KEYS[k].indexOf(up) !== -1) return k;
+      }
+      return null;
+    }
+    function fresh(k){
+      var v = changes[k];
+      if(!v) return [];
+      if(k === 'track' || k === 'disc'){
+        var m = v.match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/);
+        var base = k === 'track' ? 'TRACK' : 'DISC';
+        if(m) return [{ key: base + 'NUMBER', value: m[1] }, { key: base + 'TOTAL', value: m[2] }];
+        return [{ key: base + 'NUMBER', value: v }];
+      }
+      return [{ key: VORBIS_FIELD_KEYS[k][0], value: v }];
+    }
+    comments.forEach(function(c){
+      var k = fieldOf(c.key);
+      if(!k){ out.push(c); return; }
+      if(!placed[k]){ placed[k] = true; out = out.concat(fresh(k)); }
+    });
+    Object.keys(changes).forEach(function(k){ if(!placed[k]) out = out.concat(fresh(k)); });
+    return out;
+  }
+  function encodeVorbisBlock(vendor, comments){
+    var parts = [], v = tagUtf8(vendor || 'Amplify');
+    parts.push(tagLe32(v.length), v, tagLe32(comments.length));
+    comments.forEach(function(c){
+      var t = tagUtf8(c.key + '=' + c.value);
+      parts.push(tagLe32(t.length), t);
+    });
+    return tagConcat(parts);
+  }
+  function buildFlacHead(doc, changes){
+    var f = doc.flac;
+    var comments = vorbisReplace(f.comments, changes);
+    var vc = { type: 4, data: encodeVorbisBlock(f.vendor, comments) };
+    var blocks = [], hadVc = false;
+    f.blocks.forEach(function(bl){
+      if(bl.type === 1) return; // padding is rebuilt at the end
+      if(bl.type === 4){ if(!hadVc){ hadVc = true; blocks.push(vc); } return; }
+      blocks.push(bl);
+    });
+    if(!hadVc) blocks.splice(1, 0, vc);
+    var used = 4;
+    blocks.forEach(function(bl){ used += 4 + bl.data.length; });
+    var spare = doc.headLen - used - 4;
+    blocks.push({ type: 1, data: new Uint8Array(spare >= 0 ? spare : 4096) });
+    var parts = [tagLatin1('fLaC')];
+    blocks.forEach(function(bl, i){
+      var n = bl.data.length;
+      parts.push(new Uint8Array([(i === blocks.length - 1 ? 0x80 : 0) | bl.type, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]), bl.data);
+    });
+    return tagConcat(parts);
+  }
+
+  // --- reading a song's tags, all of them ---
+  function readFlacBlocks(blob){
+    var p = 4, blocks = [];
+    function step(){
+      return readBlobSlice(blob, p, 4).then(function(hb){
+        var h = new Uint8Array(hb);
+        if(h.length < 4) return null;
+        var len = (h[1] << 16) | (h[2] << 8) | h[3];
+        var type = h[0] & 0x7f, last = !!(h[0] & 0x80);
+        if(p + 4 + len > blob.size) return null;
+        return readBlobSlice(blob, p + 4, len).then(function(db){
+          blocks.push({ type: type, data: new Uint8Array(db) });
+          p += 4 + len;
+          if(last || blocks.length > 64) return { blocks: blocks, end: p };
+          return step();
+        });
+      });
+    }
+    return step();
+  }
+  function flacStreamInfo(data){
+    if(!data || data.length < 18) return '';
+    var rate = (data[10] << 12) | (data[11] << 4) | (data[12] >> 4);
+    var ch = ((data[12] >> 1) & 7) + 1;
+    var bps = (((data[12] & 1) << 4) | (data[13] >> 4)) + 1;
+    return rate.toLocaleString('en-US') + ' Hz · ' + (ch === 1 ? 'Mono' : ch === 2 ? 'Stereo' : ch + ' channels') + ' · ' + bps + '-bit';
+  }
+  function readId3v1(blob){
+    if(blob.size < 128) return Promise.resolve(null);
+    return readBlobSlice(blob, blob.size - 128, 128).then(function(buf){
+      var b = new Uint8Array(buf);
+      if(bytesToString(b, 0, 3) !== 'TAG') return null;
+      function s(a, n){ return trimNulls(decodeBytes(b.subarray(a, a + n), 'iso-8859-1')); }
+      var rows = [
+        { id: 'v1', label: 'Title', value: s(3, 30) }, { id: 'v1', label: 'Artist', value: s(33, 30) },
+        { id: 'v1', label: 'Album', value: s(63, 30) }, { id: 'v1', label: 'Year', value: s(93, 4) }
+      ];
+      var hasTrack = b[125] === 0 && b[126] !== 0;
+      rows.push({ id: 'v1', label: 'Comment', value: s(97, hasTrack ? 28 : 30) });
+      if(hasTrack) rows.push({ id: 'v1', label: 'Track', value: String(b[126]) });
+      if(b[127] !== 255) rows.push({ id: 'v1', label: 'Genre', value: genreFromIndex(b[127]) });
+      return rows.filter(function(r){ return r.value; });
+    })['catch'](function(){ return null; });
+  }
+  function describeMp4(buf){
+    var b = new Uint8Array(buf), rows = [], ilst = null;
+    walkMp4Children(b, 0, b.length, function(name, s, e){
+      if(name !== 'udta') return;
+      walkMp4Children(b, s, e, function(n2, s2, e2){
+        if(n2 !== 'meta') return;
+        walkMp4Children(b, s2 + 4, e2, function(n3, s3, e3){ if(n3 === 'ilst') ilst = { start: s3, end: e3 }; });
+      });
+    });
+    var v = {};
+    if(!ilst) return { rows: rows, values: v };
+    walkMp4Children(b, ilst.start, ilst.end, function(name, s, e){
+      var label = MP4_NAMES[name] || name.replace(/©/g, '©');
+      if(name === '----'){
+        var mean = '', nm = '', val = '';
+        walkMp4Children(b, s, e, function(n, s2, e2){
+          if(n === 'name') nm = decodeBytes(b.subarray(s2 + 4, e2), 'utf-8');
+          else if(n === 'mean') mean = decodeBytes(b.subarray(s2 + 4, e2), 'utf-8');
+          else if(n === 'data') val = decodeBytes(b.subarray(s2 + 8, e2), 'utf-8');
+        });
+        rows.push({ id: '----', label: nm || mean || 'Custom', value: trimNulls(val) });
+        return;
+      }
+      var d = mp4ItemPayload(b, s, e);
+      if(!d) return;
+      var value = '', row = { id: name.replace(/©/g, '©'), label: label };
+      if(name === 'covr'){
+        row.label = 'Front cover';
+        row.value = (d.type === 14 ? 'PNG' : 'JPEG') + ' · ' + tagBytesLabel(d.end - d.start);
+        row.pic = new Blob([b.slice(d.start, d.end)], { type: d.type === 14 ? 'image/png' : 'image/jpeg' });
+        rows.push(row);
+        return;
+      }
+      if(name === 'trkn' || name === 'disk'){
+        if(d.end - d.start >= 6){
+          var n1 = (b[d.start + 2] << 8) | b[d.start + 3], n2 = (b[d.start + 4] << 8) | b[d.start + 5];
+          value = n1 ? (n2 ? n1 + '/' + n2 : String(n1)) : '';
+        }
+      } else if(name === 'gnre'){
+        value = genreFromIndex(((b[d.start] << 8) | b[d.start + 1]) - 1);
+      } else if(d.type === 1){
+        value = trimNulls(decodeBytes(b.subarray(d.start, d.end), 'utf-8'));
+      } else if(d.type === 21 || d.type === 0){
+        var num = 0;
+        for(var i = d.start; i < d.end && i < d.start + 6; i++) num = num * 256 + b[i];
+        value = String(num);
+      } else {
+        value = tagBytesLabel(d.end - d.start);
+      }
+      row.value = value;
+      row.multi = value.length > 60;
+      rows.push(row);
+      var key = { '©nam':'title', '©ART':'artist', '©alb':'album', aART:'albumArtist', '©gen':'genre',
+        gnre:'genre', '©day':'year', trkn:'track', disk:'disc', '©wrt':'composer', '©cmt':'comment', '©lyr':'lyrics' }[name];
+      if(key && value && v[key] === undefined) v[key] = value;
+    });
+    return { rows: rows, values: v };
+  }
+  function looksLikeMpeg(b){ return b.length >= 2 && b[0] === 0xff && (b[1] & 0xe0) === 0xe0; }
+  // Everything the sheet shows, plus what saving needs: the bytes the tag occupies now
+  // (headLen, and a checksum of them so a file changed meanwhile is never overwritten).
+  function readTagDoc(blob, fileName){
+    var ext = extensionOf(fileName);
+    var doc = { blob: blob, ext: ext, format: 'other', formatLabel: (ext || 'Audio').toUpperCase(), editable: false,
+      whyNot: '', values: {}, rows: [], v1: null, info: [], headLen: 0, head: new Uint8Array(0) };
+    return readBlobSlice(blob, 0, Math.min(blob.size, 16)).then(function(hb){
+      var h = new Uint8Array(hb);
+      var magic = bytesToString(h, 0, 4);
+      if(h.length >= 10 && h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33){
+        var tagEnd = 10 + synchsafe32(h, 6) + ((h[3] === 4 && (h[5] & 0x10)) ? 10 : 0);
+        if(tagEnd > blob.size || tagEnd > 64 * 1024 * 1024) throw new Error('The tag in this file looks damaged.');
+        return readBlobSlice(blob, 0, tagEnd).then(function(tb){
+          var b = new Uint8Array(tb);
+          var t = parseId3Frames(b);
+          doc.format = 'id3';
+          doc.id3 = t;
+          doc.headLen = t.end;
+          doc.head = b;
+          doc.formatLabel = (ext === 'mp3' ? 'MP3' : (ext || 'Audio').toUpperCase()) + ' · ID3v2.' + t.major;
+          t.frames.forEach(function(fr){ doc.rows.push(describeId3Frame(fr, t.major)); });
+          doc.values = id3FieldValues(t.frames, t.major);
+          if(t.major === 2) doc.whyNot = 'This file has an old ID3v2.2 tag, which can be viewed but not edited here.';
+          else if(t.major > 4) doc.whyNot = 'This file’s tag version isn’t supported for editing.';
+          else if(ext !== 'mp3') doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+          else doc.editable = true;
+        });
+      }
+      if(magic === 'fLaC'){
+        doc.format = 'flac';
+        doc.formatLabel = 'FLAC · Vorbis comments';
+        return readFlacBlocks(blob).then(function(r){
+          if(!r) throw new Error('This FLAC file’s header looks damaged.');
+          var vc = { vendor: '', comments: [] };
+          r.blocks.forEach(function(bl){
+            if(bl.type === 4) vc = readVorbisComments(bl.data, 0, bl.data.length);
+          });
+          doc.flac = { blocks: r.blocks, vendor: vc.vendor, comments: vc.comments };
+          doc.headLen = r.end;
+          describeVorbis(vc.comments, doc.rows);
+          r.blocks.forEach(function(bl){
+            if(bl.type === 6){
+              var m = {};
+              parseFlacPicture(bl.data, 0, bl.data.length, m);
+              if(m.art){
+                var pt = bl.data.length >= 4 ? u32be(bl.data, 0) : 3;
+                doc.rows.push({ id: 'PICTURE', label: PIC_TYPES[pt] || 'Picture',
+                  value: (m.artMime || 'image/jpeg').replace('image/', '').toUpperCase() + ' · ' + tagBytesLabel(m.art.length),
+                  pic: new Blob([m.art], { type: m.artMime || 'image/jpeg' }) });
+              }
+            }
+          });
+          doc.values = vorbisFieldValues(vc.comments);
+          var si = r.blocks[0] && r.blocks[0].type === 0 ? flacStreamInfo(r.blocks[0].data) : '';
+          if(si) doc.info.push({ label: 'Audio', value: si });
+          if(vc.vendor) doc.info.push({ label: 'Encoder', value: vc.vendor });
+          doc.editable = true;
+          return readBlobSlice(blob, 0, r.end).then(function(all){ doc.head = new Uint8Array(all); });
+        });
+      }
+      if(magic === 'OggS'){
+        doc.format = 'ogg';
+        doc.formatLabel = (ext === 'opus' ? 'Opus' : 'Ogg') + ' · Vorbis comments';
+        doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+        return readBlobSlice(blob, 0, Math.min(blob.size, TAG_HEAD_BYTES)).then(function(buf){
+          var b = new Uint8Array(buf), chunks = [], total = 0, p = 0, pages = 0;
+          while(p + 27 <= b.length && pages < 16 && bytesToString(b, p, 4) === 'OggS'){
+            var segs = b[p + 26], at = p + 27 + segs, len = 0;
+            for(var i = 0; i < segs; i++) len += b[p + 27 + i];
+            if(at + len > b.length) break;
+            chunks.push(b.subarray(at, at + len)); total += len; p = at + len; pages++;
+          }
+          var joined = tagConcat(chunks);
+          for(var q = 0; q + 8 <= joined.length; q++){
+            var start = -1;
+            if(joined[q] === 3 && bytesToString(joined, q + 1, 6) === 'vorbis') start = q + 7;
+            else if(bytesToString(joined, q, 8) === 'OpusTags') start = q + 8;
+            if(start >= 0){
+              var vc = readVorbisComments(joined, start, joined.length);
+              describeVorbis(vc.comments, doc.rows);
+              doc.values = vorbisFieldValues(vc.comments);
+              if(vc.vendor) doc.info.push({ label: 'Encoder', value: vc.vendor });
+              break;
+            }
+          }
+        });
+      }
+      if(bytesToString(h, 4, 4) === 'ftyp'){
+        doc.format = 'mp4';
+        doc.formatLabel = (ext === 'm4b' ? 'M4B' : ext === 'mp4' ? 'MP4' : 'M4A') + ' · iTunes tags';
+        doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+        return findMp4Moov(blob).then(function(moov){
+          if(!moov) return;
+          var r = describeMp4(moov);
+          doc.rows = r.rows;
+          doc.values = r.values;
+        });
+      }
+      // No tag at the front yet: an MP3 gets a brand new ID3v2.3 tag when saved.
+      if(ext === 'mp3' || looksLikeMpeg(h)){
+        doc.format = 'id3';
+        doc.formatLabel = 'MP3 · no ID3v2 tag';
+        doc.id3 = { major: 3, revision: 0, end: 0, frames: [] };
+        doc.editable = ext === 'mp3';
+        if(!doc.editable) doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+        return;
+      }
+      doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+    }).then(function(){
+      return readId3v1(blob).then(function(v1){
+        doc.v1 = v1;
+        // An MP3 with only an old ID3v1 tag still shows its values in the editable fields.
+        if(doc.format === 'id3' && !doc.id3.frames.length && v1){
+          v1.forEach(function(r){
+            var k = { Title:'title', Artist:'artist', Album:'album', Year:'year', Track:'track', Genre:'genre', Comment:'comment' }[r.label];
+            if(k && !doc.values[k]) doc.values[k] = r.value;
+          });
+        }
+        return doc;
+      });
+    });
+  }
+  function buildTagHead(doc, changes){
+    return doc.format === 'flac' ? buildFlacHead(doc, changes) : buildId3Tag(doc, changes);
+  }
+
+  // --- the song's bytes: the folder copy first ---
+  function tagSourceFor(track){
+    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer;
+    var canDisk = !!(NATIVE_APP && track.srcUri && P && typeof P.writeFileHead === 'function');
+    function fromLibrary(){
+      return localFileBlob(track).then(function(b){
+        if(!b) throw new Error('This song’s file isn’t on this device.');
+        return { blob: b, onDisk: false };
+      });
+    }
+    if(!canDisk) return fromLibrary();
+    return fetch(window.Capacitor.convertFileSrc(track.srcUri), { cache: 'no-store' }).then(function(r){
+      if(!r.ok) throw new Error('read');
+      return r.blob();
+    }).then(function(b){ return { blob: b, onDisk: true }; }, fromLibrary);
+  }
+  function treeOfUri(u){
+    u = String(u || '');
+    var i = u.indexOf('/document/');
+    if(i > 0) return u.slice(0, i);
+    var f = musicFolders.filter(function(x){ return x.treeUri && u.indexOf(x.treeUri) === 0; })[0];
+    return f ? f.treeUri : '';
+  }
+  function folderNameOfTree(tree){
+    var f = musicFolders.filter(function(x){ return x.treeUri === tree; })[0];
+    if(f && f.name) return f.name;
+    var id = decodeURIComponent(tree.slice(tree.lastIndexOf('/') + 1));
+    return id.slice(id.lastIndexOf(':') + 1).split('/').pop() || 'Music';
+  }
+
+  // --- the library after a save ---
+  function applySavedTags(track, newFile, disk){
+    return Promise.all([readTags(newFile), computeContentKey(newFile)['catch'](function(){ return ''; })]).then(function(r){
+      var fresh = buildTrackRecord(newFile, r[0], track.duration, null, r[1]);
+      ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo', 'metaKey'].forEach(function(k){ track[k] = fresh[k]; });
+      if(r[1]) track.contentKey = r[1];
+      if(disk){
+        // What the folder copy looks like now, so a refresh doesn't take it for a new song.
+        track.diskSize = disk.size;
+        track.diskModified = disk.lastModified;
+      }
+      var key = favKey(track);
+      return idbDo([LIB_STORE_TRACKS, LIB_STORE_FILES], 'readwrite', function(tx){
+        tx.objectStore(LIB_STORE_FILES).put(newFile, key);
+        return tx.objectStore(LIB_STORE_TRACKS).put(track);
+      });
+    }).then(function(){
+      indexLibrary();
+      renderLibraryList();
+      refreshLibraryView();
+      if(currentStation && favKey(currentStation) === favKey(track)){
+        if(currentStation !== track){
+          ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo'].forEach(function(k){ currentStation[k] = track[k]; });
+        }
+        playerName.textContent = stripExclusively(track.name);
+        try{ updateMediaSession(currentStation); }catch(e){}
+      }
+      if(nowPlayingScreen.style.display === 'flex'){
+        var st = npTarget();
+        if(st && favKey(st) === favKey(track)){
+          if(st !== track) ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo'].forEach(function(k){ st[k] = track[k]; });
+          renderNowPlayingScreen();
+        }
+      }
+      if(queuePanelOpen) renderQueuePanel();
+    });
+  }
+
+  // --- the sheet ---
+  var tagOverlay = document.getElementById('tagOverlay');
+  var tagPanel = document.getElementById('tagPanel');
+  var tagBody = document.getElementById('tagBody');
+  var tagEditBtn = document.getElementById('tagEditBtn');
+  var tagCloseBtn = document.getElementById('tagCloseBtn');
+  var tagNote = document.getElementById('tagNote');
+  var tagState = null; // { track, doc, onDisk, editing, saving, urls }
+  function tagEl(tag, cls, text){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  function setTagNote(msg, kind, action){
+    tagNote.innerHTML = '';
+    tagNote.className = 'tag-note' + (kind ? ' ' + kind : '');
+    tagNote.hidden = !msg;
+    if(!msg) return;
+    tagNote.appendChild(tagEl('span', '', msg));
+    if(action){
+      var b = tagEl('button', 'tag-note-btn', action.label);
+      b.type = 'button';
+      b.addEventListener('click', action.run);
+      tagNote.appendChild(b);
+    }
+  }
+  function tagPicUrl(blob){
+    var u = URL.createObjectURL(blob);
+    tagState.urls.push(u);
+    return u;
+  }
+  function syncTagHeader(){
+    var s = tagState;
+    tagEditBtn.hidden = !s || !s.doc;
+    if(!s || !s.doc) return;
+    tagEditBtn.textContent = s.saving ? 'Saving…' : s.editing ? 'Save' : 'Edit';
+    tagEditBtn.classList.toggle('primary', !!s.editing);
+    tagEditBtn.disabled = !!s.saving || (!s.editing && !s.doc.editable);
+    tagEditBtn.title = !s.doc.editable ? s.doc.whyNot : '';
+    tagCloseBtn.setAttribute('aria-label', s.editing ? 'Cancel editing' : 'Close');
+    tagPanel.classList.toggle('editing', !!s.editing);
+  }
+  function renderTagSheet(){
+    var s = tagState, doc = s.doc, track = s.track;
+    tagBody.innerHTML = '';
+    syncTagHeader();
+    var head = tagEl('div', 'tag-head');
+    var art = tagEl('div', 'tag-art');
+    renderStationArt(art, track);
+    head.appendChild(art);
+    var ht = tagEl('div', 'tag-head-text');
+    ht.appendChild(tagEl('div', 'tag-head-title', doc.values.title || track.name));
+    ht.appendChild(tagEl('div', 'tag-head-sub', doc.values.artist || track.artist || ''));
+    ht.appendChild(tagEl('div', 'tag-head-fmt', doc.formatLabel));
+    head.appendChild(ht);
+    tagBody.appendChild(head);
+
+    var sec = tagEl('div', 'tag-sec');
+    sec.appendChild(tagEl('div', 'tag-sec-title', 'Tags'));
+    TAG_FIELDS.forEach(function(f){
+      var val = doc.values[f.key] || '';
+      var row = tagEl(s.editing ? 'label' : 'div', 'tag-row' + (f.multi ? ' multi' : ''));
+      row.appendChild(tagEl('span', 'tag-k', f.label));
+      if(s.editing){
+        var inp = document.createElement(f.multi ? 'textarea' : 'input');
+        inp.className = 'tag-in';
+        inp.dataset.key = f.key;
+        inp.value = val;
+        if(!f.multi){ inp.type = 'text'; inp.setAttribute('enterkeyhint', 'next'); }
+        else inp.rows = f.key === 'lyrics' ? 5 : 2;
+        if(f.mode) inp.setAttribute('inputmode', f.mode);
+        if(f.hint) inp.placeholder = f.hint;
+        inp.setAttribute('autocomplete', 'off');
+        inp.setAttribute('autocapitalize', f.mode ? 'off' : 'words');
+        inp.spellcheck = false;
+        row.appendChild(inp);
+      } else {
+        var v = tagEl('span', 'tag-v' + (val ? '' : ' empty'), val || '—');
+        row.appendChild(v);
+      }
+      sec.appendChild(row);
+    });
+    tagBody.appendChild(sec);
+
+    if(!s.editing){
+      var all = tagEl('div', 'tag-sec');
+      all.appendChild(tagEl('div', 'tag-sec-title', 'Everything in the file'));
+      if(!doc.rows.length) all.appendChild(tagEl('div', 'tag-empty', doc.format === 'id3' && !doc.id3.frames.length ? 'This file has no ID3v2 tag yet.' : 'No tags found.'));
+      doc.rows.forEach(function(r){
+        var row = tagEl('div', 'tag-row raw' + (r.multi ? ' multi' : ''));
+        var k = tagEl('span', 'tag-k');
+        k.appendChild(document.createTextNode(r.label));
+        if(r.id && r.id !== r.label) k.appendChild(tagEl('span', 'tag-id', r.id));
+        row.appendChild(k);
+        var v = tagEl('span', 'tag-v' + (r.value ? '' : ' empty'), r.value || '—');
+        if(r.pic){
+          var img = document.createElement('img');
+          img.className = 'tag-pic';
+          img.alt = '';
+          img.src = tagPicUrl(r.pic);
+          v.insertBefore(img, v.firstChild);
+        }
+        row.appendChild(v);
+        all.appendChild(row);
+      });
+      tagBody.appendChild(all);
+      if(doc.v1 && doc.v1.length){
+        var v1 = tagEl('div', 'tag-sec');
+        v1.appendChild(tagEl('div', 'tag-sec-title', 'ID3v1 tag (end of file)'));
+        doc.v1.forEach(function(r){
+          var row = tagEl('div', 'tag-row raw');
+          row.appendChild(tagEl('span', 'tag-k', r.label));
+          row.appendChild(tagEl('span', 'tag-v', r.value));
+          v1.appendChild(row);
+        });
+        tagBody.appendChild(v1);
+      }
+      var file = tagEl('div', 'tag-sec');
+      file.appendChild(tagEl('div', 'tag-sec-title', 'File'));
+      var dur = track.duration || 0;
+      var info = [
+        { label: 'Name', value: track.fileName || '' },
+        { label: 'Folder', value: dirOfRelPath(normalizeRelPath(track.relPath || '')) || '' },
+        { label: 'Size', value: tagBytesLabel(doc.blob.size) },
+        { label: 'Length', value: dur ? formatTime(dur) : '' },
+        { label: 'Bitrate', value: dur ? '~' + Math.round((doc.blob.size - doc.headLen) * 8 / dur / 1000) + ' kbps' : '' }
+      ].concat(doc.info);
+      if(!s.onDisk) info.push({ label: 'Copy shown', value: 'Amplify’s copy (the original file wasn’t reachable)' });
+      info.forEach(function(r){
+        if(!r.value) return;
+        var row = tagEl('div', 'tag-row raw');
+        row.appendChild(tagEl('span', 'tag-k', r.label));
+        row.appendChild(tagEl('span', 'tag-v', r.value));
+        file.appendChild(row);
+      });
+      tagBody.appendChild(file);
+    }
+  }
+  function closeTagSheet(){
+    if(tagState) tagState.urls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(e){} });
+    tagState = null;
+    tagOverlay.classList.remove('open');
+    tagPanel.classList.remove('editing');
+  }
+  function openTagSheet(track){
+    if(!track || !isLocalTrack(track)) return;
+    closeNpMenu();
+    if(tagState) closeTagSheet();
+    var mine = tagState = { track: track, doc: null, onDisk: false, editing: false, saving: false, urls: [] };
+    tagBody.innerHTML = '';
+    tagBody.appendChild(tagEl('div', 'tag-empty', 'Reading tags…'));
+    setTagNote('');
+    syncTagHeader();
+    tagOverlay.classList.add('open');
+    tagSourceFor(track).then(function(src){
+      return readTagDoc(src.blob, track.fileName || src.blob.name || '').then(function(doc){
+        if(tagState !== mine) return;
+        mine.doc = doc;
+        mine.onDisk = src.onDisk;
+        renderTagSheet();
+        if(!doc.editable) setTagNote(doc.whyNot, 'info');
+      });
+    })['catch'](function(err){
+      if(tagState !== mine) return;
+      tagBody.innerHTML = '';
+      tagBody.appendChild(tagEl('div', 'tag-empty', (err && err.message) || 'The tags could not be read.'));
+    });
+  }
+  function tagEdits(){
+    var changes = {}, any = false, bad = '';
+    tagBody.querySelectorAll('.tag-in').forEach(function(inp){
+      var k = inp.dataset.key;
+      var v = inp.tagName === 'TEXTAREA' ? inp.value.replace(/\s+$/, '') : inp.value.trim();
+      if((k === 'track' || k === 'disc') && v && !/^\d+(\s*\/\s*\d+)?$/.test(v)) bad = bad || (k === 'track' ? 'Track' : 'Disc') + ' should be a number, like 3 or 3/12.';
+      if(v !== (tagState.doc.values[k] || '')){ changes[k] = v.replace(/\s*\/\s*/, '/'); any = true; }
+    });
+    return { changes: changes, any: any, bad: bad };
+  }
+  function tagPlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer; }
+  function saveTagEdits(){
+    var s = tagState;
+    if(!s || !s.doc || s.saving) return;
+    var e = tagEdits();
+    if(e.bad){ setTagNote(e.bad, 'err'); return; }
+    if(!e.any){ s.editing = false; setTagNote(''); renderTagSheet(); return; }
+    var doc = s.doc, track = s.track;
+    var newHead;
+    try{ newHead = buildTagHead(doc, e.changes); }
+    catch(err){ setTagNote('These tags could not be prepared for saving.', 'err'); return; }
+    var oldHead = doc.head.subarray(0, doc.headLen);
+    var newBlob = new Blob([newHead, doc.blob.slice(doc.headLen)], { type: doc.blob.type || track.mime || '' });
+    s.saving = true;
+    setTagNote('');
+    syncTagHeader();
+    var write;
+    if(s.onDisk){
+      var P = tagPlugin();
+      var args = null;
+      write = Promise.resolve().then(function(){
+        args = { uri: track.srcUri, data: tagBase64(newHead), replace: doc.headLen, crc: crc32(oldHead), size: doc.blob.size };
+        return P.writeFileHead(args);
+      });
+    } else {
+      write = Promise.resolve(null);
+    }
+    write.then(function(disk){
+      var file = new File([newBlob], track.fileName || 'song', { type: newBlob.type, lastModified: (disk && disk.lastModified) || Date.now() });
+      return applySavedTags(track, file, disk).then(function(){ return { file: file, disk: disk }; });
+    }).then(function(res){
+      if(tagState !== s) return;
+      return readTagDoc(res.file, track.fileName || '').then(function(doc2){
+        s.doc = doc2;
+        s.saving = false;
+        s.editing = false;
+        renderTagSheet();
+        setTagNote(s.onDisk ? 'Saved to the file.' : 'Saved in Amplify. The original file isn’t in a music folder Amplify can change, so it wasn’t updated.', s.onDisk ? 'ok' : 'info');
+      });
+    })['catch'](function(err){
+      if(tagState !== s) return;
+      s.saving = false;
+      syncTagHeader();
+      var code = err && err.code;
+      if(code === 'NO_WRITE'){
+        var tree = treeOfUri(track.srcUri);
+        setTagNote('Amplify needs your permission to change files in “' + folderNameOfTree(tree) + '”. Tap Allow, then choose that folder and tap Use this folder.', 'info', {
+          label: 'Allow',
+          run: function(){
+            var P = tagPlugin();
+            P.grantFolderWrite({ treeUri: tree }).then(function(r){
+              if(tagState !== s) return;
+              if(r && r.cancelled){ setTagNote('Nothing was saved. Tap Save to try again.', 'info'); return; }
+              if(r && r.matches === false){
+                setTagNote('That was a different folder. Tap Save and choose “' + folderNameOfTree(tree) + '”.', 'err');
+                return;
+              }
+              saveTagEdits();
+            }, function(){ setTagNote('Permission wasn’t given, so nothing was saved.', 'err'); });
+          }
+        });
+        return;
+      }
+      if(code === 'CHANGED'){
+        setTagNote('This file was changed by something else since it was opened. Close this and open Info & Tags again.', 'err');
+        return;
+      }
+      setTagNote('The tags could not be saved' + (err && err.message ? ': ' + err.message : '.'), 'err');
+    });
+  }
+  tagEditBtn.addEventListener('click', function(){
+    var s = tagState;
+    if(!s || !s.doc) return;
+    if(s.editing){ saveTagEdits(); return; }
+    if(!s.doc.editable) return;
+    s.editing = true;
+    setTagNote('');
+    renderTagSheet();
+    var first = tagBody.querySelector('.tag-in');
+    if(first && !window.matchMedia('(pointer: coarse)').matches) first.focus();
+  });
+  tagCloseBtn.addEventListener('click', function(){
+    var s = tagState;
+    if(s && s.editing && !s.saving){ s.editing = false; setTagNote(''); renderTagSheet(); return; }
+    if(s && s.saving) return;
+    closeTagSheet();
+  });
+  tagOverlay.addEventListener('click', function(e){
+    // A stray tap outside never throws edits away.
+    if(e.target !== tagOverlay || (tagState && (tagState.editing || tagState.saving))) return;
+    closeTagSheet();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && tagOverlay.classList.contains('open')) tagCloseBtn.click();
+  });
+  npTagsBtn.addEventListener('click', function(){
+    var st = npTarget();
+    closeNpMenu();
+    if(st && isLocalTrack(st)) openTagSheet(libraryById[favKey(st)] || st);
+  });
+
   // ---- Refresh: the music folders picked in the app, scanned again. New songs are added;
   // songs whose files are gone from the folder leave the library. Songs added one file at a
   // time (or in a browser) have no folder to check and are left alone.
@@ -21914,7 +23018,13 @@
           (res.files || []).forEach(function(f){ present[f.uri] = true; });
           var gone = libraryTracks.filter(function(t){ return t.srcUri && t.srcUri.indexOf(tree + '/document/') === 0 && !present[t.srcUri]; });
           var stubs = nativeMusicStubs(res);
+          // A song whose tags were edited in Info & Tags keeps its place in the library;
+          // its file's new size and date are remembered, so it isn't taken for a new song.
+          var edited = {};
+          libraryTracks.forEach(function(t){ if(t.srcUri && t.diskSize) edited[t.srcUri] = t; });
           var fresh = stubs.filter(isAudioFile).filter(function(st){
+            var e = st.amplifyEntry && edited[st.amplifyEntry.uri];
+            if(e && e.diskSize === st.size && e.diskModified === st.lastModified) return false;
             return !libraryById[makeLocalTrackId(relPathOf(st), st.size, st.lastModified)];
           });
           if(fresh.length){

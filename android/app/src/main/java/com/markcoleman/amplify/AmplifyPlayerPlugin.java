@@ -563,7 +563,9 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   public void pickMusicFolder(PluginCall call) {
     Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
     i.addFlags(
-        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        Intent.FLAG_GRANT_READ_URI_PERMISSION
+            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
     startActivityForResult(call, i, "onMusicFolderPicked");
   }
 
@@ -580,9 +582,17 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     Uri tree = data.getData();
     ContentResolver cr = getContext().getContentResolver();
     try {
-      cr.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      // Write too, when given, so Info & Tags can save edited tags into the songs.
+      int keep =
+          Intent.FLAG_GRANT_READ_URI_PERMISSION
+              | (data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+      cr.takePersistableUriPermission(tree, keep);
     } catch (Exception ignored) {
-      // A one-off grant is still enough to import from.
+      try {
+        cr.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      } catch (Exception ignored2) {
+        // A one-off grant is still enough to import from.
+      }
     }
     new Thread(
             () -> {
@@ -768,6 +778,167 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
               }
             })
         .start();
+  }
+
+  // ---- Info & Tags: saving a song's edited tags into its file (see TagWriter) ----
+
+  /** Same folder: the same storage provider and the same folder within it. */
+  private static boolean sameTree(Uri a, Uri b) {
+    try {
+      return a.getAuthority() != null
+          && a.getAuthority().equals(b.getAuthority())
+          && DocumentsContract.getTreeDocumentId(a).equals(DocumentsContract.getTreeDocumentId(b));
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  /** Whether the folder a song came from was granted with permission to change its files. */
+  private boolean canWrite(Uri doc) {
+    for (android.content.UriPermission p :
+        getContext().getContentResolver().getPersistedUriPermissions()) {
+      if (p.isWritePermission() && sameTree(p.getUri(), doc)) return true;
+    }
+    return false;
+  }
+
+  /** {uri, data (base64 new tag), replace (bytes of the old tag), crc, size} -> {size, lastModified}. */
+  @PluginMethod
+  public void writeFileHead(PluginCall call) {
+    final String u = call.getString("uri");
+    final String b64 = call.getString("data");
+    final Integer replace = call.getInt("replace");
+    final long crc = call.getData().optLong("crc", -1);
+    final long expect = call.getData().optLong("size", -1);
+    if (u == null || b64 == null || replace == null || crc < 0) {
+      call.reject("Missing details");
+      return;
+    }
+    final Uri doc = Uri.parse(u);
+    if (!canWrite(doc)) {
+      call.reject("Amplify can't change files in this folder yet", "NO_WRITE");
+      return;
+    }
+    final ContentResolver cr = getContext().getContentResolver();
+    final File tmpDir = getContext().getCacheDir();
+    new Thread(
+            () -> {
+              try {
+                byte[] head = Base64.decode(b64, Base64.DEFAULT);
+                TagWriter.replaceHead(
+                    new TagWriter.Io() {
+                      @Override
+                      public long size() {
+                        try (android.os.ParcelFileDescriptor pfd = cr.openFileDescriptor(doc, "r")) {
+                          return pfd == null ? -1 : pfd.getStatSize();
+                        } catch (Exception e) {
+                          return -1;
+                        }
+                      }
+
+                      @Override
+                      public java.io.InputStream read() throws java.io.IOException {
+                        java.io.InputStream in = cr.openInputStream(doc);
+                        if (in == null) throw new java.io.IOException("The file can't be opened");
+                        return in;
+                      }
+
+                      @Override
+                      public java.io.OutputStream rewrite() throws java.io.IOException {
+                        java.io.OutputStream out = cr.openOutputStream(doc, "wt");
+                        if (out == null) throw new java.io.IOException("The file can't be written");
+                        return out;
+                      }
+
+                      @Override
+                      public void writeInPlace(byte[] data) throws java.io.IOException {
+                        try (android.os.ParcelFileDescriptor pfd = cr.openFileDescriptor(doc, "rw")) {
+                          if (pfd == null) throw new java.io.IOException("The file can't be written");
+                          try (FileOutputStream fos = new FileOutputStream(pfd.getFileDescriptor())) {
+                            java.nio.channels.FileChannel ch = fos.getChannel();
+                            java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(data);
+                            long pos = 0;
+                            while (buf.hasRemaining()) pos += ch.write(buf, pos);
+                            fos.getFD().sync();
+                          }
+                        }
+                      }
+                    },
+                    head,
+                    replace,
+                    crc,
+                    expect,
+                    tmpDir);
+                JSObject o = new JSObject();
+                String[] cols = {
+                  DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                };
+                try (Cursor c = cr.query(doc, cols, null, null, null)) {
+                  if (c != null && c.moveToFirst()) {
+                    o.put("size", c.isNull(0) ? 0 : c.getLong(0));
+                    o.put("lastModified", c.isNull(1) ? 0 : c.getLong(1));
+                  }
+                } catch (Exception ignored) {
+                }
+                call.resolve(o);
+              } catch (TagWriter.Changed e) {
+                call.reject(e.getMessage(), "CHANGED");
+              } catch (SecurityException e) {
+                call.reject("Amplify can't change files in this folder yet", "NO_WRITE");
+              } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Write failed" : e.getMessage());
+              }
+            })
+        .start();
+  }
+
+  /** Asks again for a music folder, this time with permission to change its files. */
+  @PluginMethod
+  public void grantFolderWrite(PluginCall call) {
+    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+    i.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION
+            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+    String t = call.getString("treeUri");
+    if (t != null && Build.VERSION.SDK_INT >= 26) {
+      try {
+        Uri tree = Uri.parse(t);
+        i.putExtra(
+            DocumentsContract.EXTRA_INITIAL_URI,
+            DocumentsContract.buildDocumentUriUsingTree(
+                tree, DocumentsContract.getTreeDocumentId(tree)));
+      } catch (Exception ignored) {
+      }
+    }
+    startActivityForResult(call, i, "onFolderWriteGranted");
+  }
+
+  @ActivityCallback
+  private void onFolderWriteGranted(PluginCall call, ActivityResult result) {
+    if (call == null) return;
+    Intent data = result.getData();
+    JSObject o = new JSObject();
+    if (result.getResultCode() != Activity.RESULT_OK || data == null || data.getData() == null) {
+      o.put("cancelled", true);
+      call.resolve(o);
+      return;
+    }
+    Uri picked = data.getData();
+    int flags =
+        data.getFlags()
+            & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+    try {
+      getContext().getContentResolver().takePersistableUriPermission(picked, flags);
+    } catch (Exception e) {
+      call.reject("Permission wasn't kept: " + e.getMessage());
+      return;
+    }
+    String want = call.getString("treeUri");
+    o.put("treeUri", picked.toString());
+    o.put("matches", want == null || sameTree(Uri.parse(want), picked));
+    o.put("canWrite", (flags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0);
+    call.resolve(o);
   }
 
   @Nullable
