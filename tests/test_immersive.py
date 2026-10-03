@@ -104,8 +104,8 @@ async def main():
             out.composite.push(a.effect.composite); out.filters.push(getComputedStyle(t).filter); rates.push(+a.playbackRate.toFixed(2)); });
           out.rates = rates;
           out.artT = getComputedStyle(document.getElementById('npArt')).transform;
-          var c = document.querySelector('.np-imm-bg canvas'); out.bgT = c ? getComputedStyle(c).transform : null;
-          out.canvases = document.querySelectorAll('.np-imm-bg').length;
+          var c = document.querySelector('canvas.np-imm-bg'); out.bgT = c ? c.dataset.t : null;
+          out.canvases = c ? +c.dataset.layers : 0; out.washEls = document.querySelectorAll('.np-imm-bg').length;
           out.ghosts = document.querySelectorAll('.np-imm-ghost').length; out.vui = window.__vui || []; return out; })()"""
         await pg.evaluate("__t.play(" + STN('Cover One', 'cov1') + ")"); await pg.wait_for_timeout(900)
         await pg.evaluate("__t.ui(true)")
@@ -114,7 +114,7 @@ async def main():
         await pg.screenshot(path=f'{shots}/immersive-wash-on.png')
         a1 = await pg.evaluate(ANIMS)
         print(a1)
-        check(a1['art'] == 1 and a1['bg'] == 3 and a1['other'] == 0 and a1['canvases'] == 1, f"the artwork and the wash are moving, nothing else {a1}")
+        check(a1['art'] == 1 and a1['bg'] == 0 and a1['other'] == 0 and a1['canvases'] == 1 and a1['washEls'] == 1, f"the artwork moves on the compositor, the wash is one painted canvas, nothing else {a1}")
         check(all(c == 'replace' for c in a1['composite']) and all(f == 'none' for f in a1['filters']),
               f"only plain transforms on unfiltered layers, so the phone's compositor runs them {a1['composite']} {a1['filters']}")
         check(all(r == 1 for r in a1['rates']), f"at full speed while playing {a1['rates']}")
@@ -149,11 +149,11 @@ async def main():
         await pg.evaluate("__t.play(" + STN('Cover Two', 'cov2') + ")"); await pg.wait_for_timeout(500)
         g1 = await pg.evaluate(ANIMS)
         fading = await pg.evaluate("document.getElementById('npArt').getAnimations().some(function(a){ return a.effect.getKeyframes().some(function(k){ return k.opacity !== undefined; }); })")
-        check(fading and g1['canvases'] == 2, f"the new artwork rises in, the old wash fades out over the new ({g1['canvases']} washes)")
+        check(fading and g1['canvases'] == 2 and g1['washEls'] == 1, f"the new artwork rises in, the new wash fades in over the old inside the one canvas ({g1['canvases']} washes, {g1['washEls']} element)")
         await pg.screenshot(path=f'{shots}/immersive-crossfade.png')
         await pg.wait_for_timeout(2000)
         g2 = await pg.evaluate(ANIMS)
-        check(g2['ghosts'] == 0 and g2['canvases'] == 1 and g2['art'] == 1 and g2['bg'] == 3, f"and are gone once the new one is in; the new one moves {g2}")
+        check(g2['ghosts'] == 0 and g2['canvases'] == 1 and g2['art'] == 1 and g2['bg'] == 0 and g2['bgT'] != g1['bgT'], f"and are gone once the new one is in; the new one moves {g2}")
         await pg.screenshot(path=f'{shots}/immersive-motion.png')
         # leaving stops it all and lets the screen sleep again
         await tap_art(); await pg.wait_for_timeout(500)

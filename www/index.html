@@ -3719,18 +3719,15 @@
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ bottom:0; }
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .np-backdrop-clip{ height:100vh; }
     body.np-immersive #npArtWrap{ cursor:zoom-out; }
-    /* The moving wash (see immSetBg): a small pre-blurred canvas scaled up over the still
-       backdrop, so only a transform ever animates. */
-    .np-imm-bg{ position:absolute; inset:-30%; width:160%; height:160%; pointer-events:none; }
-    .np-imm-bg-w{ position:absolute; inset:0; }
-    .np-imm-bg canvas{ position:absolute; inset:0; width:100%; height:100%; will-change:transform, opacity; }
+    /* The moving wash (see immSetBg): one tiny canvas, repainted each frame and scaled up
+       to fill, so the GPU only ever blends a single layer for it. */
+    .np-imm-bg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
     /* Under a full wash the page's own blurred backdrop is covered: off, so it isn't drawn
        (or re-blurred on a song change). The artwork's blurred twin goes in Immersive View
        for the same reason; the wash shows through the artwork's fade instead. */
     body.np-imm-wash #npBackdropImg{ visibility:hidden; }
     body.np-immersive #npArtBleed{ visibility:hidden; }
     body.np-immersive #npArt{ will-change:transform; filter:none; }
-    .np-imm-ghost{ z-index:2; pointer-events:none; will-change:opacity; }
     /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
        controls still: only the channel list under them scrolls. (Not in landscape or full
        screen, which have the whole screen to themselves.) */
@@ -7173,18 +7170,13 @@
   // keyframes (so the compositor runs them off the main thread), and nothing that moves
   // carries a CSS blur. The moving wash is its own small canvas, blurred once when drawn and
   // scaled up -- the page's own 90px-blurred backdrop stays put underneath, untouched.
-  var imm = { art: null, bg: [], rate: 0, rampRaf: 0, bgUrl: null, seq: 0 };
+  var imm = { art: null, wash: null, rate: 0, rampRaf: 0, bgUrl: null, seq: 0 };
   var IMM_ART_MS = 9000, IMM_BG_MS = 16000;
-  var IMM_BG_FRAMES = [
-    { transform: 'rotate(0deg) scale(1) translate(0%, 0%)' },
-    { transform: 'rotate(9deg) scale(1.22) translate(4%, -3%)' },
-    { transform: 'rotate(-6deg) scale(1.12) translate(-3%, 4%)' }
-  ];
   function reducedMotion(){
     try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
   }
   function immOn(){ return document.body.classList.contains('np-immersive'); }
-  function immAnims(){ var out = imm.art ? [imm.art] : []; imm.bg.forEach(function(l){ out = out.concat(l.anims); }); return out; }
+  function immAnims(){ return imm.art ? [imm.art] : []; }
   function startArtMotion(){
     if(imm.art){ try{ imm.art.cancel(); }catch(e){} imm.art = null; }
     if(!immOn() || reducedMotion() || !npArt.animate) return;
@@ -7207,24 +7199,26 @@
   // The wash: the cover blurred and scaled up to fill (the base), with two more layers on
   // top, each one corner of the cover blown up and blurred, slowly drifting and fading in and
   // out of step with each other -- so the cover's own colours keep moving around the screen.
+  // All of it is painted into ONE tiny canvas (about 64px wide) that the phone scales up to
+  // fill the screen. Separate full-screen layers for each part (as before build 115) meant
+  // the GPU blended six screens' worth of pixels every frame during a song change; on a
+  // phone it fell behind and left parts of the screen undrawn. Painting a 64px canvas costs
+  // next to nothing, and the GPU only ever blends one layer. A song change crossfades the
+  // two washes inside that same canvas.
   var IMM_BLOBS = [
     { crop: [0, 0], ms: 11000, at: 0,
-      frames: [{ opacity: 0, transform: 'translate(-8%, 6%) scale(1.05) rotate(0deg)' },
-               { opacity: .85, transform: 'translate(2%, -3%) scale(1.3) rotate(10deg)' },
-               { opacity: 0, transform: 'translate(9%, -8%) scale(1.15) rotate(18deg)' }] },
+      frames: [{ o: 0, tx: -8, ty: 6, s: 1.05, r: 0 }, { o: .85, tx: 2, ty: -3, s: 1.3, r: 10 }, { o: 0, tx: 9, ty: -8, s: 1.15, r: 18 }] },
     { crop: [.5, .5], ms: 14000, at: .5,
-      frames: [{ opacity: 0, transform: 'translate(8%, -6%) scale(1.2) rotate(0deg)' },
-               { opacity: .8, transform: 'translate(-3%, 3%) scale(1.05) rotate(-9deg)' },
-               { opacity: 0, transform: 'translate(-9%, 8%) scale(1.25) rotate(-16deg)' }] }
+      frames: [{ o: 0, tx: 8, ty: -6, s: 1.2, r: 0 }, { o: .8, tx: -3, ty: 3, s: 1.05, r: -9 }, { o: 0, tx: -9, ty: 8, s: 1.25, r: -16 }] }
   ];
-  // Fades a wash by fading each of its layers' own wrappers. Fading the box that holds them
-  // would make the phone draw the whole group offscreen and blend it, every frame.
-  function immFade(layer, from, to, ms){
-    var last = null;
-    Array.prototype.forEach.call(layer.el.children, function(w){
-      last = w.animate([{ opacity: from }, { opacity: to }], { duration: ms, easing: 'ease-in-out', fill: 'forwards' });
-    });
-    return last;
+  var IMM_BG_KEYS = [{ o: 1, tx: 0, ty: 0, s: 1, r: 0 }, { o: 1, tx: 4, ty: -3, s: 1.22, r: 9 }, { o: 1, tx: -3, ty: 4, s: 1.12, r: -6 }];
+  var IMM_WASH_SWAP_MS = 1100;
+  function immEase(k){ return .5 - .5 * Math.cos(Math.PI * k); }
+  // A point along three keyframes (at 0, .5 and 1) for an eased progress k.
+  function immKeyAt(keys, k){
+    var e = immEase(k), seg = e < .5 ? 0 : 1, f = (e - seg * .5) * 2, a = keys[seg], b = keys[seg + 1], o = {};
+    for(var n in a) o[n] = a[n] + (b[n] - a[n]) * f;
+    return o;
   }
   function immBgCanvas(img, crop, tint, filter){
     var c = document.createElement('canvas');
@@ -7237,92 +7231,104 @@
     else x.drawImage(img, -24, -24, 144, 144);
     return c;
   }
+  function immDrawPart(ctx, W, H, src, k, alpha){
+    if(alpha <= 0.002) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, alpha);
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(k.r * Math.PI / 180);
+    ctx.scale(k.s, k.s);
+    // the part is 160% of the screen each way, like the old inset:-30% layers
+    ctx.translate(1.6 * W * k.tx / 100, 1.6 * H * k.ty / 100);
+    ctx.drawImage(src, -.8 * W, -.8 * H, 1.6 * W, 1.6 * H);
+    ctx.restore();
+  }
+  function immWashDraw(w){
+    var c = w.el, ctx = w.ctx, W = c.width, H = c.height, t = w.t;
+    ctx.clearRect(0, 0, W, H);
+    w.layers.forEach(function(L){
+      var ph = (t / IMM_BG_MS) % 2; if(ph > 1) ph = 2 - ph; // alternate
+      immDrawPart(ctx, W, H, L.srcs[0], immKeyAt(IMM_BG_KEYS, ph), L.a);
+      IMM_BLOBS.forEach(function(b, i){
+        var k = immKeyAt(b.frames, (t / b.ms + b.at) % 1);
+        immDrawPart(ctx, W, H, L.srcs[i + 1], k, L.a * k.o);
+      });
+    });
+    c.dataset.layers = String(w.layers.length);
+    c.dataset.t = String(Math.round(t));
+  }
+  function immWashKick(){
+    var w = imm.wash;
+    if(!w || w.raf) return;
+    w.last = performance.now();
+    w.raf = requestAnimationFrame(immWashTick);
+  }
+  function immWashTick(now){
+    var w = imm.wash;
+    if(!w) return;
+    w.raf = 0;
+    var dt = Math.min(100, Math.max(0, now - w.last)); w.last = now;
+    w.t += dt * imm.rate;
+    var fading = false;
+    w.layers.forEach(function(L){
+      if(L.a < 1){ L.a = immEase(Math.min(1, (now - L.t0) / IMM_WASH_SWAP_MS)); fading = fading || L.a < 1; }
+    });
+    // once the newest wash is fully in, the ones under it are gone
+    var top = w.layers[w.layers.length - 1];
+    if(top && top.a >= 1 && w.layers.length > 1) w.layers = [top];
+    if(imm.rate > 0 || fading || w.dirty){ immWashDraw(w); w.dirty = false; }
+    if(imm.rate > 0 || fading) w.raf = requestAnimationFrame(immWashTick);
+  }
   function immSetBg(url){
     if(!immOn() || reducedMotion() || !npBackdropImg.animate) return;
     if(url === imm.bgUrl) return;
     imm.bgUrl = url;
     var mySeq = ++imm.seq;
-    var old = imm.bg.slice();
-    var first = !old.length;
-    function swapIn(layer){
-      if(mySeq !== imm.seq || !immOn()){ if(layer) layer.el.remove(); return; }
-      if(layer){
-        imm.bg.push(layer);
-        if(first){
-          // Eased in slowly the first time, so arriving in Immersive View is a drift, not a
-          // jump. Once it's up, the page's own blurred backdrop underneath is hidden: it's
-          // covered anyway, and leaving it there doubles what the phone draws every frame.
-          var a = immFade(layer, 0, 1, 3000);
-          if(a) a.onfinish = function(){ if(immOn() && imm.bg.indexOf(layer) !== -1) document.body.classList.add('np-imm-wash'); };
-        }
-        // A song change: the new wash's base is already in place underneath, whole; the old
-        // wash fades away on top of it (its drifting colours first), and only then do the new
-        // drifting colours fade in. Fewer layers on screen at once keeps the hand-over smooth.
-      }
-      var lastFade = null;
-      old.forEach(function(l){
-        var ws = l.el.children;
-        Array.prototype.forEach.call(ws, function(w, i){
-          lastFade = w.animate([{ opacity: 1 }, { opacity: 0 }], { duration: i ? 700 : 1500, easing: 'ease-in-out', fill: 'forwards' });
-        });
-        var gone = function(){ l.anims.forEach(function(a2){ try{ a2.cancel(); }catch(e){} }); l.el.remove(); };
-        if(lastFade){ var f0 = ws[0] && ws[0].getAnimations()[0]; (f0 || lastFade).onfinish = gone; } else gone();
-        imm.bg = imm.bg.filter(function(x){ return x !== l; });
-      });
-      if(layer && !first){
-        var blobs = Array.prototype.slice.call(layer.el.children, 1);
-        blobs.forEach(function(w){ w.style.visibility = 'hidden'; });
-        setTimeout(function(){
-          if(imm.bg.indexOf(layer) === -1) return;
-          blobs.forEach(function(w){
-            w.style.visibility = '';
-            w.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 2000, easing: 'ease-in-out', fill: 'forwards' });
-          });
-        }, old.length ? 1550 : 0);
-      }
-      if(!layer){ document.body.classList.remove('np-imm-wash'); }
-    }
-    if(!url){ swapIn(null); return; }
+    if(!url){ immWashRemove(); return; }
     var img = new Image();
     img.decoding = 'async';
     img.onload = function(){
-      if(mySeq !== imm.seq) return;
-      var box = document.createElement('div');
-      box.className = 'np-imm-bg';
-      box.setAttribute('aria-hidden', 'true');
-      var layer = { el: box, anims: [] };
-      var prev = imm.bg[imm.bg.length - 1];
+      if(mySeq !== imm.seq || !immOn()) return;
+      var srcs;
       try{
         var tint = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-tint') || '#1c1d22';
         // 14px at this size is about the page's own 90px blur once scaled up to fill.
-        var base = immBgCanvas(img, null, tint, 'blur(14px) saturate(1.9) brightness(.62)');
-        var canvases = [base];
-        IMM_BLOBS.forEach(function(b){ canvases.push(immBgCanvas(img, b.crop, null, 'blur(16px) saturate(2.2) brightness(.78)')); });
-        canvases.forEach(function(c){
-          var w = document.createElement('div');
-          w.className = 'np-imm-bg-w';
-          if(first) w.style.opacity = '0';
-          w.appendChild(c);
-          box.appendChild(w);
-        });
-      }catch(e){ swapIn(null); return; }
-      npBackdropImg.parentNode.insertBefore(box, npBackdropImg.nextSibling);
-      try{
-        var baseAnim = canvases[0].animate(IMM_BG_FRAMES, { duration: IMM_BG_MS, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
-        layer.anims.push(baseAnim);
-        IMM_BLOBS.forEach(function(b, i){
-          var a = canvases[i + 1].animate(b.frames, { duration: b.ms, iterations: Infinity, easing: 'ease-in-out' });
-          a.currentTime = b.ms * b.at; // out of step with each other from the start
-          layer.anims.push(a);
-        });
-        // In step with the layer it replaces, so the movement carries on through the dissolve.
-        if(prev) layer.anims.forEach(function(a, i){ if(prev.anims[i]) a.currentTime = prev.anims[i].currentTime; });
-        layer.anims.forEach(function(a){ a.playbackRate = imm.rate; });
-      }catch(e){}
-      swapIn(layer);
+        srcs = [immBgCanvas(img, null, tint, 'blur(14px) saturate(1.9) brightness(.62)')];
+        IMM_BLOBS.forEach(function(b){ srcs.push(immBgCanvas(img, b.crop, null, 'blur(16px) saturate(2.2) brightness(.78)')); });
+      }catch(e){ immWashRemove(); return; }
+      var w = imm.wash;
+      if(!w){
+        var c = document.createElement('canvas');
+        c.className = 'np-imm-bg';
+        c.setAttribute('aria-hidden', 'true');
+        npBackdropImg.parentNode.insertBefore(c, npBackdropImg.nextSibling);
+        var cw = c.clientWidth || 412, ch = c.clientHeight || 900;
+        c.width = 64; c.height = Math.max(64, Math.min(256, Math.round(64 * ch / cw)));
+        w = imm.wash = { el: c, ctx: c.getContext('2d'), layers: [{ srcs: srcs, a: 1 }], t: 0, last: 0, raf: 0, dirty: true };
+        // Eased in slowly the first time, so arriving in Immersive View is a drift, not a jump.
+        // Once it's up, the page's own blurred backdrop underneath is hidden: it's covered
+        // anyway, and leaving it there doubles what the phone draws every frame.
+        immWashDraw(w);
+        try{
+          var a = c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 3000, easing: 'ease-in-out' });
+          a.onfinish = function(){ if(immOn() && imm.wash === w) document.body.classList.add('np-imm-wash'); };
+        }catch(e){ document.body.classList.add('np-imm-wash'); }
+      } else {
+        // A song change: the new wash fades in over the old inside the same canvas.
+        if(w.layers.length > 1) w.layers = [w.layers[w.layers.length - 1]];
+        w.layers.push({ srcs: srcs, a: 0, t0: performance.now() });
+      }
+      w.dirty = true;
+      immWashKick();
     };
-    img.onerror = function(){ if(mySeq === imm.seq) swapIn(null); };
+    img.onerror = function(){ if(mySeq === imm.seq) immWashRemove(); };
     img.src = url;
+  }
+  function immWashRemove(){
+    var w = imm.wash;
+    if(w){ cancelAnimationFrame(w.raf); w.el.remove(); }
+    imm.wash = null;
+    document.body.classList.remove('np-imm-wash');
   }
   function startImmersiveMotion(){
     if(reducedMotion() || !npArt.animate) return;
@@ -7336,10 +7342,9 @@
     cancelAnimationFrame(imm.rampRaf);
     imm.seq++;
     if(imm.art){ try{ imm.art.cancel(); }catch(e){} }
-    imm.bg.forEach(function(l){ l.anims.forEach(function(a){ try{ a.cancel(); }catch(e){} }); l.el.remove(); });
-    imm.art = null; imm.bg = []; imm.rate = 0; imm.bgUrl = null;
-    document.body.classList.remove('np-imm-wash');
-    Array.prototype.forEach.call(document.querySelectorAll('.np-imm-ghost, .np-imm-bg'), function(g){ g.remove(); });
+    immWashRemove();
+    imm.art = null; imm.rate = 0; imm.bgUrl = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.np-imm-bg'), function(g){ g.remove(); });
   }
   // Motion follows the music: easing up to speed while it plays, down to a stop when paused.
   function syncImmersiveMotion(){
@@ -7362,6 +7367,7 @@
       var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       imm.rate = from + (target - from) * e;
       immAnims().forEach(function(a){ try{ a.playbackRate = imm.rate; }catch(err){} });
+      immWashKick();
       if(k < 1) imm.rampRaf = requestAnimationFrame(step);
     })();
   }
