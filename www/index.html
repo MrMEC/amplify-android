@@ -20149,21 +20149,36 @@
     var albums = buildAlbumIndex(entry.tracks);
     var total = 0;
 
-    if(entry.stations.length){
-      appendGridSection(entry.stations.length === 1 ? 'Station' : 'Stations', entry.stations.length);
-      dedupeByStreamUrl(entry.stations).forEach(function(st){
+    // A playlist named after the artist is shown as "Featuring <artist>". When it holds one
+    // of the artist's own stations, the Stations section goes and every station of theirs is
+    // listed under Featuring instead: the playlist's entries in its order, then any of their
+    // stations it doesn't hold.
+    var ownStations = dedupeByStreamUrl(entry.stations);
+    function sameStation(a, b){ return favKey(a) === favKey(b) || (!!a.url && a.url === b.url); }
+    var artistPls = playlistsForArtist(key);
+    var hostPl = null;
+    artistPls.some(function(p){
+      if(p.stations.some(function(item){ return ownStations.some(function(st){ return sameStation(st, item); }); })){ hostPl = p; return true; }
+      return false;
+    });
+    if(ownStations.length && !hostPl){
+      appendGridSection(ownStations.length === 1 ? 'Station' : 'Stations', ownStations.length);
+      ownStations.forEach(function(st){
         stationsGrid.appendChild(buildTile(st));
         total++;
       });
     }
-    // A playlist named after the artist comes straight after their stations, as "Featuring
-    // <artist>", ahead of the albums.
-    playlistsForArtist(key).forEach(function(p){
-      // Entries already shown above would just be repeats, so the section carries what the
-      // playlist adds rather than a second copy of the artist's own catalogue.
+    artistPls.forEach(function(p){
+      // Entries already shown above would just be repeats.
       var shown = {};
       stationsGrid.querySelectorAll('.tile').forEach(function(el){ shown[el.dataset.key] = true; });
-      var extra = dedupeByStreamUrl(p.stations.filter(function(item){
+      var items = p.stations.slice();
+      if(p === hostPl){
+        ownStations.forEach(function(st){
+          if(!items.some(function(item){ return sameStation(st, item); })) items.push(st);
+        });
+      }
+      var extra = dedupeByStreamUrl(items.filter(function(item){
         return !isBlacklisted(item) && !shown[favKey(item)];
       }));
       if(!extra.length) return;

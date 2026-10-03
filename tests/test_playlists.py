@@ -19,7 +19,8 @@ HOOK = ("window.__t = { tracks: function(){ return libraryTracks; },"
         " pl: function(id){ return findStationPlaylistById(id).stations.map(function(s){ return s.name; }); },"
         " stored: function(id){ return JSON.parse(localStorage.getItem('radioPlayerStationPlaylists')).filter(function(p){ return p.id === id; })[0].stations.map(function(s){ return s.name; }); },"
         " openPlaylists: function(){ openPlaylistsHome(); },"
-        " openArtist: function(n){ artistStations = [{ stationuuid: 'ex-ann', name: 'Exclusively Ann', url: 'http://radio.example/ann', favicon: '', tags: '' }]; artistStationsPromise = Promise.resolve(artistStations); openArtistPage(artistMatchKey(n)); }, cur: function(){ return currentStation && currentStation.name; },"
+        " insertSt: function(id, at, url){ var p = findStationPlaylistById(id); p.stations.splice(at, 0, { stationuuid: 'ex-ann', name: 'Exclusively Ann', url: url, favicon: '', tags: '' }); saveStationPlaylists(); },"
+        " openArtist: function(n){ artistStations = [{ stationuuid: 'ex-ann', name: 'Exclusively Ann', url: 'http://radio.example/ann', favicon: '', tags: '' }, { stationuuid: 'ex-ann2', name: 'Exclusively Ann', url: 'http://radio.example/ann2', favicon: '', tags: '' }]; artistStationsPromise = Promise.resolve(artistStations); openArtistPage(artistMatchKey(n)); }, cur: function(){ return currentStation && currentStation.name; },"
         " queue: function(){ return (typeof playQueue !== 'undefined' && playQueue) ? playQueue.map(function(s){ return s.name; }) : null; } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
@@ -170,14 +171,25 @@ async def main():
         await pg.wait_for_timeout(800)
         check([r['name'] for r in await pg.evaluate(ROWS)] == ['Dusk', 'Amber', 'Ember', 'Coral', 'Blue'], 'order survives a restart')
         # ---- an artist's own playlist sits right under their stations, as "Featuring <artist>" ----
-        await pg.evaluate("__t.makePl('Ann', ['Blue', 'http://radio.example/zzz', 'Amber'])")
+        ann = await pg.evaluate("__t.makePl('Ann', ['Blue', 'http://radio.example/zzz', 'Amber'])")
         await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(1200)
-        secs = await pg.evaluate("""Array.from(document.querySelectorAll('#stationsGrid .grid-section-label')).map(function(e){ return e.firstChild.textContent; })""")
-        check(secs == ['Station', 'Featuring Ann', 'Albums'], f'artist page sections: Station, Featuring Ann, Albums {secs}')
-        feat = await pg.evaluate("""(function(){ var out=[], on=false; Array.from(document.querySelectorAll('#stationsGrid > *')).forEach(function(e){
+        SECS = """Array.from(document.querySelectorAll('#stationsGrid .grid-section-label')).map(function(e){ return e.firstChild.textContent + ' ' + (e.querySelector('.grid-section-count')||{}).textContent; })"""
+        FEAT = """(function(){ var out=[], on=false; Array.from(document.querySelectorAll('#stationsGrid > *')).forEach(function(e){
             if(e.classList.contains('grid-section-label')){ on = /Featuring/.test(e.textContent); return; }
-            if(on){ var n=e.querySelector('.tile-name, .song-row-title, .row-name'); out.push(n ? n.textContent : ''); } }); return out; })()""")
+            if(on){ var n=e.querySelector('.tile-name, .song-row-title, .row-name'); out.push((n ? n.textContent : '') + '|' + (e.dataset.key || '')); } }); return out; })()"""
+        secs = await pg.evaluate(SECS)
+        check(secs == ['Stations 2', 'Featuring Ann 3', 'Albums 1'], f'playlist without their station: Stations, then Featuring, then Albums {secs}')
+        feat = [x.split('|')[0] for x in await pg.evaluate(FEAT)]
         check(feat == ['Blue', 'Radio zzz', 'Amber'], f'Featuring lists the playlist entries {feat}')
+        # The playlist holds one of their stations: no Stations section, all of them under Featuring
+        await pg.evaluate(f"__t.insertSt({json.dumps(ann)}, 1, 'http://radio.example/ann')")
+        await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(1200)
+        secs = await pg.evaluate(SECS)
+        check(secs == ['Featuring Ann 5', 'Albums 1'], f'playlist with their station: Stations hidden {secs}')
+        feat = await pg.evaluate(FEAT)
+        print(feat)
+        check([x.split('|')[0] for x in feat] == ['Blue', 'Ann', 'Radio zzz', 'Amber', 'Ann'] and feat[1].endswith('ex-ann') and feat[4].endswith('ex-ann2'),
+              f'Featuring holds the playlist in its order, then their other station {feat}')
         await pg.evaluate("document.querySelectorAll('#stationsGrid .grid-section-label')[0].scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/artist-featuring.png')
         no_more = await pg.evaluate("!/More from/.test(document.getElementById('stationsGrid').textContent)")
