@@ -7167,7 +7167,7 @@
   // carries a CSS blur. The moving wash is its own small canvas, blurred once when drawn and
   // scaled up -- the page's own 90px-blurred backdrop stays put underneath, untouched.
   var imm = { art: null, bg: [], rate: 0, rampRaf: 0, bgUrl: null, seq: 0 };
-  var IMM_ART_MS = 20000, IMM_BG_MS = 30000;
+  var IMM_ART_MS = 9000, IMM_BG_MS = 16000;
   var IMM_BG_FRAMES = [
     { transform: 'rotate(0deg) scale(1) translate(0%, 0%)' },
     { transform: 'rotate(9deg) scale(1.22) translate(4%, -3%)' },
@@ -7187,7 +7187,7 @@
     try{
       imm.art = npArt.animate([
         { transform: 'translate3d(0%, 0%, 0) scale(1)' },
-        { transform: 'translate3d(' + dx + '%, ' + dy + '%, 0) scale(1.14)' }
+        { transform: 'translate3d(' + dx + '%, ' + dy + '%, 0) scale(1.16)' }
       ], { duration: IMM_ART_MS, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
       imm.art.playbackRate = imm.rate;
     }catch(e){ imm.art = null; }
