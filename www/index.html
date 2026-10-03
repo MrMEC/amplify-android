@@ -7233,6 +7233,7 @@
     if(isLocalVideo(station)){ renderNpVideoList(station); return; }
     var col = collectionForStation(station);
     npCollectionGrid.innerHTML = '';
+    npCollectionGrid._ctxList = null;
     if(!col){ npCollection.style.display = 'none'; return; }
     var key = favKey(station);
     var others = dedupeByStreamUrl(col.stations.filter(function(s){
@@ -7260,6 +7261,11 @@
     npCollectionHeading.textContent = (col.type === 'search' ? 'More ' : 'More from ') + col.label;
     npCollectionGrid.classList.toggle('grid-songs', others.every(isLocalTrack));
     others.forEach(function(s){ npCollectionGrid.appendChild(buildTile(s)); });
+    // Picking one of these plays through the whole collection (this station included), in
+    // its own order, so Next and Previous step along it.
+    npCollectionGrid._ctxList = col.type === 'search' ? [station].concat(others)
+      : dedupeByStreamUrl(col.stations.filter(function(s){ return !isBlacklisted(s); }));
+    npCollectionGrid._ctxLabel = col.label;
   }
 
   // Bumped on every call so a slow/late API response for a station the user has since
@@ -7291,6 +7297,7 @@
     var headingEl = npRelated.querySelector('.np-related-heading');
     if(headingEl) headingEl.textContent = heading;
     npRelatedGrid.classList.add('grid-songs');
+    npRelatedGrid._ctxNone = true; // a song here plays on through the library, as before
     pool.slice(0, 16).sort(byTrackOrder).forEach(function(t){
       npRelatedGrid.appendChild(buildTile(t));
     });
@@ -7841,6 +7848,7 @@
             ).slice(0, 16);
           if(!related.length){ tryTag(tags, i + 1); return; }
           npRelatedGrid.innerHTML = '';
+          npRelatedGrid._ctxNone = false;
           related.forEach(function(s){ npRelatedGrid.appendChild(buildTile(s)); });
         })
         .catch(hide);
@@ -19371,6 +19379,8 @@
     // targets `.tile[data-entity="..."]` keeps working unchanged.
     tile.className = o.row ? 'tile tile-row' : 'tile';
     tile.dataset.key = o.key;
+    // A song shown as a cover tile (Home's rows) plays in the context of its row, like the rest.
+    if(o.entity === 'song' && (o.favTarget || o.artFrom)) tile._ctxItem = o.favTarget || o.artFrom;
     if(o.entity) tile.dataset.entity = o.entity;
     if(o.reorderId != null) tile.dataset.reorderId = o.reorderId;
 
@@ -24293,6 +24303,7 @@
     var row = document.createElement('div');
     row.className = 'tile song-row';
     row.dataset.key = favKey(track);
+    row._ctxItem = track;
     var playing = !!(currentStation && favKey(currentStation) === favKey(track));
     if(playing) row.classList.add('playing');
 
@@ -24429,6 +24440,7 @@
     var row = document.createElement('div');
     row.className = 'tile song-row';
     row.dataset.key = favKey(ep);
+    row._ctxItem = ep;
     if(currentStation && favKey(currentStation) === favKey(ep)) row.classList.add('playing');
 
     var art = document.createElement('div');
@@ -24488,6 +24500,7 @@
     var tile = document.createElement('div');
     tile.className = 'tile';
     tile.dataset.key = favKey(station);
+    tile._ctxItem = station;
     if(currentStation && favKey(currentStation) === favKey(station)) tile.classList.add('playing');
 
     var art = document.createElement('div');
@@ -24547,6 +24560,7 @@
     var row = document.createElement('div');
     row.className = 'row-item';
     row.dataset.key = favKey(station);
+    row._ctxItem = station;
     if(currentStation && favKey(currentStation) === favKey(station)) row.classList.add('playing');
 
     if(draggableMode){
@@ -25161,15 +25175,76 @@
 
   // What tapping a station or a song in any list does. Tapping is "start this", not "look at
   // this": the Now Playing screen is reached from the player bar instead (see
-  // playerNowTrigger). A local song goes through the library queue so Next/Previous have
-  // somewhere to go; a stream has no next or previous and starts on its own.
+  // playerNowTrigger). Tapped in a list, anything plays through that list (see
+  // clickedContext); otherwise a local song goes through the library queue and a stream
+  // starts on its own.
   function playEntity(item, queueList, queueLabel){
     if(!item) return;
+    var explicit = !!(queueList && queueList.length);
+    var ctx = clickedContext(item);
     if(isLocalTrack(item)){
-      if(queueList && queueList.length) return playTrackInList(queueList, item, queueLabel);
+      if(explicit) return playTrackInList(queueList, item, queueLabel);
+      if(ctx) return playTrackInList(ctx.list, item, ctx.label);
       return playTrackInLibrary(item);
     }
+    if(ctx && !isPodcastTrack(item) && !isLocalVideo(item) && !isChannelEntry(item)){
+      setQueue(ctx.list, item, ctx.label);
+    }
     return playStation(item);
+  }
+
+  // ---------- playing from a list: Next and Previous step along it ----------
+  // Whatever a station or song was tapped in -- a playlist, Favorites, a custom station's
+  // results, an artist page section, a Home row -- becomes its queue, so Now Playing (and the
+  // lock screen and Android Auto) can skip to the next or previous entry of that list. The
+  // list is read off the page: the tapped item's siblings in its section (between two
+  // section headings), or a list the container names itself (_ctxList).
+  var ctxClick = null;
+  document.addEventListener('click', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('.tile, .row-item, .song-row') : null;
+    ctxClick = (el && el._ctxItem) ? { el: el, at: Date.now() } : null;
+  }, true);
+  function sectionLabelOf(el){
+    for(var p = el.previousElementSibling; p; p = p.previousElementSibling){
+      if(p.classList.contains('grid-section-label')) return p.firstChild ? p.firstChild.textContent : p.textContent;
+    }
+    return '';
+  }
+  function clickedContext(item){
+    var c = ctxClick;
+    ctxClick = null;
+    if(!c || Date.now() - c.at > 1500 || !c.el._ctxItem || favKey(c.el._ctxItem) !== favKey(item)) return null;
+    var el = c.el, box = el.parentElement;
+    if(!box || box._ctxNone || !el.isConnected) return null;
+    var list, label;
+    if(box._ctxList){
+      list = box._ctxList;
+      label = box._ctxLabel || '';
+    } else {
+      var start = el, end = el;
+      while(start.previousElementSibling && !start.previousElementSibling.classList.contains('grid-section-label')) start = start.previousElementSibling;
+      while(end.nextElementSibling && !end.nextElementSibling.classList.contains('grid-section-label')) end = end.nextElementSibling;
+      list = [];
+      for(var k = start; k; k = k.nextElementSibling){
+        if(k._ctxItem) list.push(k._ctxItem);
+        if(k === end) break;
+      }
+      label = sectionLabelOf(start) || (box === stationsGrid ? stationsHeading.textContent : '');
+    }
+    var seen = {};
+    list = list.filter(function(t){
+      if(!queueable(t) || isChannelEntry(t) || isLocalVideo(t)) return false;
+      var k2 = favKey(t);
+      if(seen[k2]) return false;
+      seen[k2] = true;
+      return true;
+    });
+    if(list.length < 2 || indexOfTrack(list, item) === -1) return null;
+    // Browsing the library itself (Songs, an artist's or album's own lists): a song keeps
+    // playing on through the library in its order, as it always has.
+    var allSongs = list.every(isLocalTrack);
+    if(allSongs && box === stationsGrid && activeLibrarySection && !activeArtistKey) return null;
+    return { list: list, label: label };
   }
 
   // isReconnect: this call is picking a dropped station back up (see streamDropped), not the
