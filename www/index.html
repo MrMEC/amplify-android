@@ -10314,7 +10314,9 @@
           // The position noted while upright, as long as it is from the list on screen now (a
           // list drawn again since, for another visit, starts from the top).
           var seenUpright = albumInViewPortrait;
-          if(coverFlowFromLibrary && seenUpright && seenUpright.order === coverFlowFromLibrary.order &&
+          if(coverFlowFromLibrary && coverFlowFromLibrary.fromPage){
+            // An artist page names its artist outright; no list position to read.
+          } else if(coverFlowFromLibrary && seenUpright && seenUpright.order === coverFlowFromLibrary.order &&
              seenUpright.tile && seenUpright.tile.isConnected){
             coverFlowFromLibrary = seenUpright;
           } else if(coverFlowFromLibrary){
@@ -10351,6 +10353,11 @@
     // { order, key } for the Albums list or { order, artistKey, artistName } for Artists,
     // from the first tile still on screen; null when neither list is showing.
     var libraryDirectoryInView = function(){
+      // An artist's own page: Cover Flow in artist order, on that artist's first album.
+      if(activeArtistKey && !activeAlbumKey && activeLibrarySection === 'artists'){
+        var ent = findArtistEntry(activeArtistKey);
+        return { order: 'artist', artistKey: activeArtistKey, artistName: ent ? ent.name : '', tile: null, atTop: false, fromPage: true };
+      }
       if(activeAlbumKey || activeArtistKey) return null;
       if(document.body.classList.contains('album-open')) return null;
       var entity = activeLibrarySection === 'albums' ? 'album' : activeLibrarySection === 'artists' ? 'artist' : null;

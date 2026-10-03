@@ -14,7 +14,7 @@ os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
 HOOK = ("window.__t = { cf: function(){ return coverFlow; }, runLibrarySection: runLibrarySection, tracks: function(){ return libraryTracks; },"
-        " openNp: function(){ openNowPlaying(); }, hist: function(){ return viewHistory.map(function(v){ return v.label; }); },"
+        " openNp: function(){ openNowPlaying(); }, openArtist: function(name){ openArtistPage(artistMatchKey(name)); }, hist: function(){ return viewHistory.map(function(v){ return v.label; }); },"
         " setArt: function(album, url){ var t = libraryTracks.filter(function(x){ return x.album === album; })[0]; return setCustomArtUrl('album:' + albumKeyFor(t), url); },"
         " clearArt: function(album){ var t = libraryTracks.filter(function(x){ return x.album === album; })[0]; return clearCustomArtUrl('album:' + albumKeyFor(t)); } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
@@ -180,6 +180,21 @@ async def main():
         check(st['order'] == 'album' and titles[:5] == ['Alpha', 'Beta', 'Green', 'Jazz', 'Mid'], f'Albums button opens in album order {titles[:4]}')
         check(st['list'][int(st['pos'])] == want, f'...on the same album it was showing ({st["list"][int(st["pos"])]})')
         await rotate(pg, False)
+
+        # From an artist's own page, turning the phone opens Cover Flow on that artist (artist
+        # order), whatever the scroll; turning back returns to the artist page.
+        for name, want in [('Zed', 'Alpha / Zed'), ('Moby', 'Play / Moby'), ('Kim', 'Play / Moby')]:
+            await pg.evaluate(f"__t.openArtist({json.dumps(name)})"); await pg.wait_for_timeout(900)
+            await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(200)
+            await rotate(pg, True)
+            st = await pg.evaluate("__t.cf()._state(true)")
+            open_ = await pg.evaluate("document.getElementById('nowPlayingScreen').classList.contains('la-open')")
+            check(open_ and st['order'] == 'artist' and st['list'][int(st['pos'])] == want,
+                  f'artist page for {name}: Cover Flow opens on {want} ({st["order"]}, {st["list"][int(st["pos"])]})')
+            if name == 'Zed': await pg.screenshot(path=f'{shots}/cfa-artist-page.png')
+            await rotate(pg, False)
+            back = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('artist-open'), (document.querySelector('.artist-hero-name, #artistHeroName')||{}).textContent]")
+            check(not back[0] and back[1], f'turning back returns to the artist page {back}')
 
         # Turning an album over opens its page behind Cover Flow; a second one replaces it;
         # upright again, the page is showing and Back returns to the Artists list.
