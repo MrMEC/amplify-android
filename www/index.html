@@ -20156,6 +20156,24 @@
         total++;
       });
     }
+    // A playlist named after the artist comes straight after their stations, as "Featuring
+    // <artist>", ahead of the albums.
+    playlistsForArtist(key).forEach(function(p){
+      // Entries already shown above would just be repeats, so the section carries what the
+      // playlist adds rather than a second copy of the artist's own catalogue.
+      var shown = {};
+      stationsGrid.querySelectorAll('.tile').forEach(function(el){ shown[el.dataset.key] = true; });
+      var extra = dedupeByStreamUrl(p.stations.filter(function(item){
+        return !isBlacklisted(item) && !shown[favKey(item)];
+      }));
+      if(!extra.length) return;
+      appendGridSection('Featuring ' + (entry.name || p.label), extra.length);
+      extra.forEach(function(item){
+        stationsGrid.appendChild(buildTile(item));
+        total++;
+      });
+    });
+
     if(albums.length){
       appendGridSection('Albums', albums.length);
       // The albums get a box of their own rather than going straight into the page grid,
@@ -20187,22 +20205,6 @@
     }
     // No song list here. An artist page is a way in to their albums; the tracks belong on
     // the album that holds them, and on Now Playing beside whatever is playing.
-    playlistsForArtist(key).forEach(function(p){
-      // Entries already shown above would just be repeats, so the section carries what the
-      // playlist adds rather than a second copy of the artist's own catalogue.
-      var shown = {};
-      stationsGrid.querySelectorAll('.tile').forEach(function(el){ shown[el.dataset.key] = true; });
-      var extra = dedupeByStreamUrl(p.stations.filter(function(item){
-        return !isBlacklisted(item) && !shown[favKey(item)];
-      }));
-      if(!extra.length) return;
-      appendGridSection('More from ' + p.label, extra.length);
-      extra.forEach(function(item){
-        stationsGrid.appendChild(buildTile(item));
-        total++;
-      });
-    });
-
     if(!total){
       stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
     }
