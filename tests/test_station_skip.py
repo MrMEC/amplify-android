@@ -159,14 +159,22 @@ async def main():
         await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()")
 
         # ---- the artist page's Play button: Featuring (or their stations) becomes the queue ----
+        # (something else playing first; with one of theirs playing, Play is Pause)
+        await pg.evaluate("__t.openPl('pl_mix')"); await pg.wait_for_timeout(500)
+        await pg.evaluate(CLICK, 'Radio C'); await pg.wait_for_timeout(500)
         await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(900)
         await pg.evaluate("document.getElementById('artistPlayBtn').click()"); await pg.wait_for_timeout(700)
         st = await q()
-        check(st['cur'] == 'Exclusively Ann' and st['list'] == ['Ann Hits', 'Exclusively Ann', 'Ann Live'] and st['idx'] == 1,
-              f'Play on the artist page queues the Featuring list {st}')
+        check(st['cur'] == 'Ann Hits' and st['list'] == ['Ann Hits', 'Exclusively Ann', 'Ann Live'] and st['idx'] == 0,
+              f'Play on the artist page plays the Featuring list from the top {st}')
+        check(await pg.evaluate("document.getElementById('artistPlayBtn').dataset.state") == 'pause', 'the Play pill turns into Pause for a Featuring entry')
         await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(700)
         s = await steps()
-        check(s['prev']['shown'] and s['next']['shown'] and s['prev']['on'] and s['next']['on'], f'skip buttons shown after Play {s}')
+        check(s['prev']['shown'] and s['next']['shown'] and not s['prev']['on'] and s['next']['on'], f'skip buttons shown after Play {s}')
+        await pg.evaluate("document.getElementById('npNextBtn').click()"); await pg.wait_for_timeout(600)
+        await pg.evaluate("document.getElementById('npNextBtn').click()"); await pg.wait_for_timeout(600)
+        st = await q()
+        check(st['cur'] == 'Ann Live' and st['idx'] == 2, f'Next twice reaches every entry, to the last {st}')
         await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()")
         await pg.evaluate("__t.openArtist('Bob')"); await pg.wait_for_timeout(900)
         await pg.evaluate("document.getElementById('artistPlayBtn').click()"); await pg.wait_for_timeout(700)

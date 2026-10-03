@@ -20395,11 +20395,17 @@
     // the pill a Pause/Resume for it rather than a restart from the top.
     var ownKeys = {};
     (entry.stations || []).concat(entry.tracks || []).forEach(function(t){ if(t) ownKeys[favKey(t)] = true; });
-    artistPillOwns = first ? function(track){ return !!track && !!ownKeys[favKey(track)]; } : null;
+    // Anything listed above the albums (their stations, Featuring) counts as theirs too.
+    artistPillOwns = first ? function(track){
+      if(!track) return false;
+      var k = favKey(track);
+      if(ownKeys[k]) return true;
+      return Array.prototype.some.call(stationsGrid.children, function(el){ return el._ctxItem && favKey(el._ctxItem) === k; });
+    } : null;
     artistPlayBtn.onclick = first ? function(){
       if(artistPillOwns(currentStation)){ togglePlayPause(); return; }
       // Everything playable the page lists above the albums (their stations, Featuring),
-      // in page order, becomes the queue, so Next/Previous step through it from here too.
+      // in page order, becomes the queue and plays from the top, so Next reaches every entry.
       var list = [], seen = {};
       Array.prototype.forEach.call(stationsGrid.children, function(el){
         var t = el._ctxItem;
@@ -20407,9 +20413,10 @@
         seen[favKey(t)] = true;
         list.push(t);
       });
-      if(list.length > 1 && indexOfTrack(list, first) !== -1){
-        if(isLocalTrack(first)) playTrackInList(list, first, entry.name);
-        else { setQueue(list, first, entry.name); playStation(first); }
+      if(list.length > 1){
+        var start = list[0];
+        if(isLocalTrack(start)) playTrackInList(list, start, entry.name);
+        else { setQueue(list, start, entry.name); playStation(start); }
         return;
       }
       playStation(first);
