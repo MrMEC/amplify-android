@@ -3698,6 +3698,27 @@
       bottom:var(--mnav-total); padding-bottom:32px;
     }
     body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .np-backdrop-clip{ height:calc(100vh - var(--mnav-total)); }
+
+    /* Immersive View: a tap on the artwork slides the corner buttons up off the screen and
+       the mini player and tab bar down off it, leaving only Now Playing; another tap brings
+       them back. The screen grows into the tab bar's space as it leaves. */
+    .mobile-nav{ transition: transform .38s cubic-bezier(.4,0,.2,1); }
+    body.np-open .sidebar-top .hamburger-btn, .np-float .np-back{
+      transition: transform .38s cubic-bezier(.4,0,.2,1), opacity .3s ease, background .15s ease, border-color .15s ease;
+    }
+    body.np-open .now-playing-screen{ transition: bottom .38s cubic-bezier(.4,0,.2,1); }
+    body.np-immersive.np-open .sidebar-top .hamburger-btn,
+    body.np-immersive .np-float .np-back{
+      transform:translateY(calc(-100% - 40px)); opacity:0; pointer-events:none;
+    }
+    body.np-immersive .player-bar{
+      transform:translateY(calc(100% + var(--player-bar-bottom) + 24px));
+      opacity:0; pointer-events:none;
+    }
+    body.np-immersive .mobile-nav{ transform:translateY(calc(100% + 8px)); pointer-events:none; }
+    body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ bottom:0; }
+    body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .np-backdrop-clip{ height:100vh; }
+    body.np-immersive #npArtWrap{ cursor:zoom-out; }
     /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
        controls still: only the channel list under them scrolls. (Not in landscape or full
        screen, which have the whole screen to themselves.) */
@@ -5316,7 +5337,7 @@
      cost a strip of every screen. -->
 <div class="search-sheet" id="searchSheet" aria-hidden="true">
   <div class="search-sheet-inner">
-    <input type="text" id="searchSheetInput" placeholder="Search or add a stream" aria-label="Search">
+    <input type="text" id="searchSheetInput" placeholder="Search or add stream" aria-label="Search">
     <button type="button" id="searchSheetGo" title="Search" aria-label="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
     <button type="button" id="searchSheetClose" title="Close" aria-label="Close search"><i class="fa-solid fa-xmark"></i></button>
   </div>
@@ -7117,7 +7138,23 @@
   // playback entirely) -- those should land at the top of the new list, not jump to
   // wherever the previous screen happened to be scrolled.
   // animate: only the down-arrow button, which slides the screen back into the mini player.
+  // ---------- Immersive View ----------
+  // A tap on the artwork hides the corner buttons, the mini player and the tab bar (see the
+  // .np-immersive rules); another tap brings them back. Phones only, and not for a channel or
+  // a video of your own, which have their own full-screen layouts.
+  function setNpImmersive(on){
+    document.body.classList.toggle('np-immersive', !!on);
+  }
+  npArtWrap.addEventListener('click', function(e){
+    if(!isMobileLayout() || document.body.classList.contains('rotate-lock')) return;
+    if(e.target.closest && e.target.closest('button, a, .np-video-wrap:not([hidden])')) return;
+    var st = npTarget();
+    if(!st || isNpChannel(st) || isLocalVideo(st) || npVideoOn) return;
+    setNpImmersive(!document.body.classList.contains('np-immersive'));
+  });
+
   function closeNowPlaying(restoreScroll, animate){
+    setNpImmersive(false);
     // A channel's screen closes at once rather than sliding down.
     if(nowPlayingScreen.classList.contains('np-channel')) animate = false;
     if(npVideoOn && !npVideoStream) setNpVideo(false);
@@ -8175,6 +8212,7 @@
     var videoLayout = isNpChannel(st) || isLocalVideo(st);
     nowPlayingScreen.classList.toggle('np-channel', videoLayout);
     document.body.classList.toggle('np-channel-open', videoLayout);
+    if(videoLayout) setNpImmersive(false);
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
@@ -10807,7 +10845,7 @@
   // The full placeholder is truncated to uselessness in a phone-width field, so mobile gets
   // a shorter one. Kept in JS because a placeholder can't be swapped from a media query.
   var SEARCH_PLACEHOLDER_FULL = searchInput.getAttribute('placeholder');
-  var SEARCH_PLACEHOLDER_SHORT = 'Search or paste a stream';
+  var SEARCH_PLACEHOLDER_SHORT = 'Search or add stream';
   function syncSearchPlaceholder(){
     searchInput.setAttribute('placeholder', isMobileLayout() ? SEARCH_PLACEHOLDER_SHORT : SEARCH_PLACEHOLDER_FULL);
   }
