@@ -3309,6 +3309,14 @@
   }
   .tile-grid > .row-item .row-thumb{ width:64px; height:64px; border-radius:10px; font-size:22px; }
   .tile-grid > .row-item .row-name{ font-size:15px; font-weight:600; }
+  /* A playlist in Edit: the title with the song's artist and album under it. */
+  .row-item .row-text{ flex:1; min-width:0; }
+  .row-item .row-text .row-name{ display:block; }
+  .row-item .row-sub{ font-size:12.5px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .tile-grid > .row-item.playlist-edit-row{ cursor:default; }
+  .tile-grid > .row-item.playlist-edit-row .row-drag-handle{ width:28px; height:56px; font-size:16px; margin-left:-4px; }
+  .tile-grid > .row-item.playlist-edit-row .fav-remove-btn{ width:44px; height:44px; font-size:17px; }
+  .tile-grid > .row-item.playlist-edit-row:hover{ background:transparent; }
   @media (max-width: 900px){
     .tile-grid > .row-item .row-thumb{ width:56px; height:56px; }
     .tile-grid > .row-item .row-name{ font-size:14.5px; }
@@ -14908,16 +14916,118 @@
     });
   });
 
-  function renderPlaylistStations(playlist, draggableMode){
+  // A playlist reads top to bottom as stacked rows, whatever it holds: songs get the song row
+  // (artist and album under the title, the More menu), stations and episodes the station row.
+  // Playing a song from it plays on through the playlist's other songs, in its order.
+  function renderPlaylistStations(playlist, editing){
     resetStationsGrid();
+    stationsGrid.classList.add('grid-songs');
+    if(editing){
+      // Edit lists every entry (nothing filtered), so the order saved is the whole playlist.
+      var seen = {};
+      playlist.stations = playlist.stations.filter(function(s){
+        var k = favKey(s);
+        if(seen[k]) return false;
+        seen[k] = true;
+        return true;
+      });
+      if(!playlist.stations.length){
+        stationsGrid.innerHTML = '<div class="empty-state">This playlist is empty.</div>';
+        setResultCount(0);
+        return;
+      }
+      playlist.stations.forEach(function(s){ stationsGrid.appendChild(buildPlaylistEditRow(s, playlist)); });
+      setResultCount(playlist.stations.length, 'item');
+      return;
+    }
     var cards = dedupeByStreamUrl(playlist.stations.filter(function(s){ return !isBlacklisted(s); }));
     if(!cards.length){
       stationsGrid.innerHTML = '<div class="empty-state">No stations in this playlist yet. Add one from the Now Playing screen.</div>';
       setResultCount(0);
       return;
     }
-    cards.forEach(function(s){ stationsGrid.appendChild(buildTile(s, draggableMode)); });
-    setResultCount(cards.length);
+    var songs = cards.filter(isLocalTrack);
+    cards.forEach(function(s){
+      if(isLocalTrack(s)) stationsGrid.appendChild(buildSongRow(s, { queueList: songs, queueLabel: playlist.label }));
+      else if(trackType(s) === 'podcast') stationsGrid.appendChild(buildPodcastEpisodeRow(s));
+      else stationsGrid.appendChild(buildRow(s, false));
+    });
+    setResultCount(cards.length, 'item');
+  }
+
+  // Saves the order the rows are in now (after a drag), while editing a playlist.
+  function commitPlaylistEditOrder(pl){
+    var keys = Array.prototype.map.call(stationsGrid.querySelectorAll('.playlist-edit-row'), function(el){ return el.dataset.key; });
+    var byKey = {};
+    pl.stations.forEach(function(s){ byKey[favKey(s)] = s; });
+    var reordered = keys.map(function(k){ return byKey[k]; }).filter(Boolean);
+    if(reordered.length === pl.stations.length && reordered.some(function(s, i){ return s !== pl.stations[i]; })){
+      pl.stations = reordered;
+      saveStationPlaylists();
+    }
+  }
+  // One row of a playlist in Edit: a grip to drag it by, the entry, and a button to remove it.
+  function buildPlaylistEditRow(s, pl){
+    var row = document.createElement('div');
+    row.className = 'row-item fav-edit-row playlist-edit-row';
+    row.dataset.key = favKey(s);
+    var handle = document.createElement('div');
+    handle.className = 'row-drag-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
+    row.appendChild(handle);
+    var thumb = document.createElement('div');
+    thumb.className = 'row-thumb';
+    renderStationArt(thumb, s);
+    row.appendChild(thumb);
+    var text = document.createElement('div');
+    text.className = 'row-text';
+    var name = document.createElement('div');
+    name.className = 'row-name';
+    name.textContent = stripExclusively(s.name || '');
+    text.appendChild(name);
+    var subText = isLocalTrack(s) ? [s.artist, s.album].filter(Boolean).join(' - ') : '';
+    if(subText){
+      var sub = document.createElement('div');
+      sub.className = 'row-sub';
+      sub.textContent = subText;
+      text.appendChild(sub);
+    }
+    row.appendChild(text);
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'row-fav fav-remove-btn';
+    remove.title = 'Remove from playlist';
+    remove.setAttribute('aria-label', 'Remove ' + (name.textContent || '') + ' from this playlist');
+    remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    remove.addEventListener('click', function(e){
+      e.stopPropagation();
+      commitPlaylistEditOrder(pl);
+      var k = favKey(s);
+      pl.stations = pl.stations.filter(function(x){ return favKey(x) !== k; });
+      saveStationPlaylists();
+      renderStationPlaylistList();
+      var y = window.scrollY;
+      renderPlaylistStations(pl, true);
+      window.scrollTo(0, y);
+    });
+    row.appendChild(remove);
+    // Mouse: native drag and drop. Touch: the same finger-drag the other reorder lists use.
+    row.draggable = true;
+    row.addEventListener('dragstart', function(e){
+      row.classList.add('dragging');
+      if(e.dataTransfer){ e.dataTransfer.effectAllowed = 'move'; try{ e.dataTransfer.setData('text/plain', row.dataset.key); }catch(err){} }
+    });
+    row.addEventListener('dragend', function(){ row.classList.remove('dragging'); commitPlaylistEditOrder(pl); });
+    row.addEventListener('dragover', function(e){
+      e.preventDefault();
+      var dragging = stationsGrid.querySelector('.row-item.dragging');
+      if(!dragging || dragging === row) return;
+      var rect = row.getBoundingClientRect();
+      stationsGrid.insertBefore(dragging, (e.clientY - rect.top) < rect.height / 2 ? row : row.nextSibling);
+    });
+    enableTouchReorder({ item: row, handle: handle, list: stationsGrid, selector: '.row-item', onDrop: function(){ commitPlaylistEditOrder(pl); } });
+    return row;
   }
 
   // Toggled by the pencil/save icon at the top of the center column while a playlist is
@@ -14941,11 +15051,7 @@
     } else {
       var newLabel = stationsHeadingInput.value.trim();
       if(newLabel) pl.label = newLabel;
-      var order = Array.prototype.map.call(stationsGrid.querySelectorAll('.tile'), function(el){ return el.dataset.key; });
-      var byKey = {};
-      pl.stations.forEach(function(s){ byKey[favKey(s)] = s; });
-      var reordered = order.map(function(k){ return byKey[k]; }).filter(Boolean);
-      if(reordered.length === pl.stations.length) pl.stations = reordered;
+      commitPlaylistEditOrder(pl);
       saveStationPlaylists();
       renderStationPlaylistList();
       stationsHeading.textContent = pl.label;
