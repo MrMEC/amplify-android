@@ -3721,7 +3721,8 @@
     body.np-immersive #npArtWrap{ cursor:zoom-out; }
     /* The moving wash (see immSetBg): a small pre-blurred canvas scaled up over the still
        backdrop, so only a transform ever animates. */
-    .np-imm-bg{ position:absolute; inset:-30%; width:160%; height:160%; opacity:0; pointer-events:none; will-change:transform, opacity; }
+    .np-imm-bg{ position:absolute; inset:-30%; width:160%; height:160%; opacity:0; pointer-events:none; will-change:opacity; }
+    .np-imm-bg canvas{ position:absolute; inset:0; width:100%; height:100%; will-change:transform, opacity; }
     body.np-immersive #npArt{ will-change:transform; filter:none; }
     .np-imm-ghost{ z-index:2; pointer-events:none; will-change:opacity; }
     /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
@@ -7177,7 +7178,7 @@
     try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
   }
   function immOn(){ return document.body.classList.contains('np-immersive'); }
-  function immAnims(){ return (imm.art ? [imm.art] : []).concat(imm.bg.map(function(l){ return l.anim; }).filter(Boolean)); }
+  function immAnims(){ var out = imm.art ? [imm.art] : []; imm.bg.forEach(function(l){ out = out.concat(l.anims); }); return out; }
   function startArtMotion(){
     if(imm.art){ try{ imm.art.cancel(); }catch(e){} imm.art = null; }
     if(!immOn() || reducedMotion() || !npArt.animate) return;
@@ -7197,50 +7198,84 @@
     var m = /url\("?(.*?)"?\)$/.exec(npBackdropImg.style.backgroundImage || '');
     return m ? m[1].replace(/\\"/g, '"') : '';
   }
+  // The wash: the cover blurred and scaled up to fill (the base), with two more layers on
+  // top, each one corner of the cover blown up and blurred, slowly drifting and fading in and
+  // out of step with each other -- so the cover's own colours keep moving around the screen.
+  var IMM_BLOBS = [
+    { crop: [0, 0], ms: 11000, at: 0,
+      frames: [{ opacity: 0, transform: 'translate(-8%, 6%) scale(1.05) rotate(0deg)' },
+               { opacity: .85, transform: 'translate(2%, -3%) scale(1.3) rotate(10deg)' },
+               { opacity: 0, transform: 'translate(9%, -8%) scale(1.15) rotate(18deg)' }] },
+    { crop: [.5, .5], ms: 14000, at: .5,
+      frames: [{ opacity: 0, transform: 'translate(8%, -6%) scale(1.2) rotate(0deg)' },
+               { opacity: .8, transform: 'translate(-3%, 3%) scale(1.05) rotate(-9deg)' },
+               { opacity: 0, transform: 'translate(-9%, 8%) scale(1.25) rotate(-16deg)' }] }
+  ];
+  function immBgCanvas(img, crop, tint, filter){
+    var c = document.createElement('canvas');
+    c.width = 96; c.height = 96;
+    var x = c.getContext('2d');
+    if(tint){ x.fillStyle = tint; x.fillRect(0, 0, 96, 96); }
+    x.filter = filter;
+    var w = img.naturalWidth || img.width || 96, h = img.naturalHeight || img.height || 96;
+    if(crop) x.drawImage(img, w * crop[0], h * crop[1], w / 2, h / 2, -24, -24, 144, 144);
+    else x.drawImage(img, -24, -24, 144, 144);
+    return c;
+  }
   function immSetBg(url){
     if(!immOn() || reducedMotion() || !npBackdropImg.animate) return;
     if(url === imm.bgUrl) return;
     imm.bgUrl = url;
     var mySeq = ++imm.seq;
     var old = imm.bg.slice();
+    var first = !old.length;
     function swapIn(layer){
       if(mySeq !== imm.seq || !immOn()){ if(layer) layer.el.remove(); return; }
       old.forEach(function(l){
         // Fades out where it is, still moving, then goes.
         var f = l.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1600, easing: 'ease-in-out', fill: 'forwards' });
-        f.onfinish = function(){ if(l.anim) try{ l.anim.cancel(); }catch(e){} l.el.remove(); };
+        f.onfinish = function(){ l.anims.forEach(function(a){ try{ a.cancel(); }catch(e){} }); l.el.remove(); };
         imm.bg = imm.bg.filter(function(x){ return x !== l; });
       });
       if(!layer) return;
       imm.bg.push(layer);
-      layer.el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: old.length ? 1600 : 900, easing: 'ease-in-out', fill: 'forwards' });
+      // Eased in slowly the first time, so arriving in Immersive View is a drift, not a jump.
+      layer.el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: first ? 3000 : 1600, easing: 'ease-in-out', fill: 'forwards' });
     }
     if(!url){ swapIn(null); return; }
     var img = new Image();
     img.decoding = 'async';
     img.onload = function(){
       if(mySeq !== imm.seq) return;
-      var c = document.createElement('canvas');
-      c.className = 'np-imm-bg';
-      c.width = 96; c.height = 96;
-      c.setAttribute('aria-hidden', 'true');
+      var box = document.createElement('div');
+      box.className = 'np-imm-bg';
+      box.setAttribute('aria-hidden', 'true');
+      var layer = { el: box, anims: [] };
+      var prev = imm.bg[imm.bg.length - 1];
       try{
-        var x = c.getContext('2d');
-        x.fillStyle = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-tint') || '#1c1d22';
-        x.fillRect(0, 0, 96, 96);
+        var tint = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-tint') || '#1c1d22';
         // 14px at this size is about the page's own 90px blur once scaled up to fill.
-        x.filter = 'blur(14px) saturate(1.9) brightness(.62)';
-        x.drawImage(img, -24, -24, 144, 144);
+        var base = immBgCanvas(img, null, tint, 'blur(14px) saturate(1.9) brightness(.62)');
+        box.appendChild(base);
+        var canvases = [base];
+        IMM_BLOBS.forEach(function(b){
+          var c = immBgCanvas(img, b.crop, null, 'blur(16px) saturate(2.2) brightness(.78)');
+          box.appendChild(c);
+          canvases.push(c);
+        });
       }catch(e){ swapIn(null); return; }
-      var clip = npBackdropImg.parentNode;
-      clip.insertBefore(c, npBackdropImg.nextSibling);
-      var layer = { el: c, anim: null };
+      npBackdropImg.parentNode.insertBefore(box, npBackdropImg.nextSibling);
       try{
-        layer.anim = c.animate(IMM_BG_FRAMES, { duration: IMM_BG_MS, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
-        // In step with the layer it replaces, so the swell carries on through the dissolve.
-        var prev = imm.bg[imm.bg.length - 1];
-        if(prev && prev.anim) layer.anim.currentTime = prev.anim.currentTime;
-        layer.anim.playbackRate = imm.rate;
+        var baseAnim = canvases[0].animate(IMM_BG_FRAMES, { duration: IMM_BG_MS, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+        layer.anims.push(baseAnim);
+        IMM_BLOBS.forEach(function(b, i){
+          var a = canvases[i + 1].animate(b.frames, { duration: b.ms, iterations: Infinity, easing: 'ease-in-out' });
+          a.currentTime = b.ms * b.at; // out of step with each other from the start
+          layer.anims.push(a);
+        });
+        // In step with the layer it replaces, so the movement carries on through the dissolve.
+        if(prev) layer.anims.forEach(function(a, i){ if(prev.anims[i]) a.currentTime = prev.anims[i].currentTime; });
+        layer.anims.forEach(function(a){ a.playbackRate = imm.rate; });
       }catch(e){}
       swapIn(layer);
     };
@@ -7259,7 +7294,7 @@
     cancelAnimationFrame(imm.rampRaf);
     imm.seq++;
     if(imm.art){ try{ imm.art.cancel(); }catch(e){} }
-    imm.bg.forEach(function(l){ if(l.anim) try{ l.anim.cancel(); }catch(e){} l.el.remove(); });
+    imm.bg.forEach(function(l){ l.anims.forEach(function(a){ try{ a.cancel(); }catch(e){} }); l.el.remove(); });
     imm.art = null; imm.bg = []; imm.rate = 0; imm.bgUrl = null;
     Array.prototype.forEach.call(document.querySelectorAll('.np-imm-ghost, .np-imm-bg'), function(g){ g.remove(); });
   }
