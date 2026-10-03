@@ -499,8 +499,10 @@ final class CarLibrary {
             arrayList.add(message(emptyMessage(str)));
             return arrayList;
           }
-          // An album or a playlist opens with a Shuffle row that plays all of it in a random order.
-          if (playableCount > 1 && (str.startsWith("album:") || str.startsWith("pl:"))) {
+          // An album, a playlist or the Songs list opens with a Shuffle row that plays all of it in
+          // a random order.
+          if (playableCount > 1
+              && (str.startsWith("album:") || str.startsWith("pl:") || "lib:songs".equals(str))) {
             arrayList.add(0, shuffleItem(str));
           }
           break;
@@ -1053,7 +1055,7 @@ final class CarLibrary {
     return new MediaItem.Builder().setMediaId(SHUFFLE_PREFIX + listId).setMediaMetadata(md).build();
   }
 
-  /** Every playable item of the list, in a random order (at most 300), starting at the first. */
+  /** Every playable item of the list, in a random order (at most 500), starting at the first. */
   Queue shuffleQueue(String listId) throws JSONException {
     List<JSONObject> items = listItems(listId);
     ArrayList<Integer> idx = new ArrayList<>();
@@ -1062,7 +1064,7 @@ final class CarLibrary {
     }
     if (idx.isEmpty()) return null;
     Collections.shuffle(idx);
-    if (idx.size() > 300) idx = new ArrayList<>(idx.subList(0, 300));
+    if (idx.size() > 500) idx = new ArrayList<>(idx.subList(0, 500));
     ArrayList<MediaItem> out = new ArrayList<>();
     for (int k : idx) {
       JSONObject it = items.get(k);

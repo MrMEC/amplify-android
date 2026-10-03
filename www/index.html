@@ -901,6 +901,9 @@
     transition: background .15s ease;
   }
   .song-row:hover{ background:var(--panel-2); }
+  .song-row.shuffle-all-row{ cursor:pointer; }
+  .song-row .song-row-art.shuffle-all-art{ display:flex; align-items:center; justify-content:center; background:var(--accent); color:var(--accent-text); }
+  .shuffle-all-art .shuffle-icon{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .song-row .song-row-art{
     width:64px; height:64px; flex-shrink:0; aspect-ratio:auto; border-radius:10px;
     font-size:22px;
@@ -22069,6 +22072,31 @@
     // name of -- and an alphabet rail over an unsorted list would send you nowhere.
     stationsGrid.classList.add('grid-songs');
     tracks.sort(byNameAsc);
+    // A Shuffle All row heads the list (the car's Songs list starts with the same one).
+    if(tracks.length > 1){
+      var sh = document.createElement('div');
+      sh.className = 'tile song-row shuffle-all-row';
+      sh.setAttribute('role', 'button');
+      sh.tabIndex = 0;
+      var shArt = document.createElement('div');
+      shArt.className = 'tile-art song-row-art shuffle-all-art';
+      shArt.innerHTML = '<svg class="shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+        + '<path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/>'
+        + '<path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>';
+      sh.appendChild(shArt);
+      var shBody = document.createElement('div');
+      shBody.className = 'song-row-body';
+      shBody.innerHTML = '<div class="tile-name song-row-title">Shuffle All</div>';
+      var shSub = document.createElement('div');
+      shSub.className = 'song-row-sub';
+      shSub.textContent = plural(tracks.length, 'song', 'songs');
+      shBody.appendChild(shSub);
+      sh.appendChild(shBody);
+      var shuffleAll = function(){ playShuffled(tracks, 'Songs'); };
+      sh.addEventListener('click', shuffleAll);
+      sh.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); shuffleAll(); } });
+      stationsGrid.appendChild(sh);
+    }
     // Broken into letters, with the letter over each run. A few hundred titles in one
     // unbroken column gives you no way to tell how far through the alphabet you are without
     // reading; the headings are what the rail on the right is pointing at, made visible.
@@ -22086,7 +22114,7 @@
       stationsGrid.appendChild(buildTile(t));
     });
     setResultCount(tracks.length, 'song');
-    buildAzRail(azItemsFromGrid('.song-row', '.song-row-title'));
+    buildAzRail(azItemsFromGrid('.song-row:not(.shuffle-all-row)', '.song-row-title'));
   }
 
   // ---------- library search ----------

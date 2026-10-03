@@ -190,6 +190,16 @@ async def main():
         await pg.wait_for_timeout(700)
         st = await q()
         check(st['label'] == 'Library' and st['cur'] == 'Song 2', f'a song from the Songs list still plays through the library {st}')
+        # ---- Songs: a Shuffle All row heads the list ----
+        await pg.evaluate('__t.songs()'); await pg.wait_for_timeout(700)
+        first = await pg.evaluate("(function(){ var r = document.querySelector('#stationsGrid .song-row'); return r ? r.className + '|' + r.textContent.trim() : ''; })()")
+        check('shuffle-all-row' in first and 'Shuffle All' in first and '3 songs' in first, f'the Songs list starts with Shuffle All ({first})')
+        await pg.screenshot(path=f'{shots}/shuffle-songs.png')
+        await pg.evaluate("document.querySelector('#stationsGrid .shuffle-all-row').click()"); await pg.wait_for_timeout(600)
+        st = await q()
+        check(sorted(st['list']) == ['Song 1', 'Song 2', 'Song 3'] and st['idx'] == 0 and st['cur'] == st['list'][0] and st['label'] == 'Songs',
+              f'Shuffle All plays every song in a random order {st}')
+
         # ---- Shuffle: a playlist page has it (songs and stations), hidden while editing ----
         await pg.evaluate("__t.openPl('pl_mix')"); await pg.wait_for_timeout(600)
         vis = lambda: pg.evaluate("getComputedStyle(document.getElementById('libraryShuffleBtn')).display !== 'none'")
