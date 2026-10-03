@@ -20397,8 +20397,22 @@
     (entry.stations || []).concat(entry.tracks || []).forEach(function(t){ if(t) ownKeys[favKey(t)] = true; });
     artistPillOwns = first ? function(track){ return !!track && !!ownKeys[favKey(track)]; } : null;
     artistPlayBtn.onclick = first ? function(){
-      if(artistPillOwns(currentStation)) togglePlayPause();
-      else playStation(first);
+      if(artistPillOwns(currentStation)){ togglePlayPause(); return; }
+      // Everything playable the page lists above the albums (their stations, Featuring),
+      // in page order, becomes the queue, so Next/Previous step through it from here too.
+      var list = [], seen = {};
+      Array.prototype.forEach.call(stationsGrid.children, function(el){
+        var t = el._ctxItem;
+        if(!t || !queueable(t) || isChannelEntry(t) || isLocalVideo(t) || seen[favKey(t)]) return;
+        seen[favKey(t)] = true;
+        list.push(t);
+      });
+      if(list.length > 1 && indexOfTrack(list, first) !== -1){
+        if(isLocalTrack(first)) playTrackInList(list, first, entry.name);
+        else { setQueue(list, first, entry.name); playStation(first); }
+        return;
+      }
+      playStation(first);
     } : null;
     syncHeroPlayPills();
 

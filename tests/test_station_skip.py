@@ -17,7 +17,7 @@ ST = lambda n: ("{ stationuuid: 'st-" + n + "', name: '" + n + "', url: 'http://
 HOOK = ("window.__t = { tracks: function(){ return libraryTracks.map(function(t){ return t.name; }); },"
         " T: function(n){ return libraryTracks.filter(function(t){ return t.name === n; })[0]; },"
         " setup: function(){ var T = window.__t.T;"
-        "   artistStations = [" + ST('Exclusively Ann') + "]; artistStationsFailed = false; artistStationsPromise = Promise.resolve(artistStations);"
+        "   artistStations = [" + ST('Exclusively Ann') + ", " + ST('Exclusively Bob') + ", " + ST('Exclusively Bob Hits').replace("name: 'Exclusively Bob Hits'", "name: 'Exclusively Bob'") + "]; artistStationsFailed = false; artistStationsPromise = Promise.resolve(artistStations);"
         "   stationPlaylists.push({ id: 'pl_mix', label: 'Mix', stations: [" + ST('Radio A') + ", T('Song 1'), " + ST('Radio B') + ", " + ST('Radio C') + "] });"
         "   stationPlaylists.push({ id: 'pl_ann', label: 'Ann', stations: [" + ST('Ann Hits') + ", " + ST('Exclusively Ann') + ", " + ST('Ann Live') + "] });"
         "   saveStationPlaylists(); favorites = [" + ST('Fav One') + ", " + ST('Fav Two') + ", T('Song 2'), " + ST('Fav Three') + "]; saveFavorites(); },"
@@ -157,6 +157,24 @@ async def main():
         await pg.evaluate("document.getElementById('npNextBtn').click()"); await pg.wait_for_timeout(700)
         check((await q())['cur'] == 'Ann Live', 'Next goes to the next station under Featuring')
         await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()")
+
+        # ---- the artist page's Play button: Featuring (or their stations) becomes the queue ----
+        await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(900)
+        await pg.evaluate("document.getElementById('artistPlayBtn').click()"); await pg.wait_for_timeout(700)
+        st = await q()
+        check(st['cur'] == 'Exclusively Ann' and st['list'] == ['Ann Hits', 'Exclusively Ann', 'Ann Live'] and st['idx'] == 1,
+              f'Play on the artist page queues the Featuring list {st}')
+        await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(700)
+        s = await steps()
+        check(s['prev']['shown'] and s['next']['shown'] and s['prev']['on'] and s['next']['on'], f'skip buttons shown after Play {s}')
+        await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()")
+        await pg.evaluate("__t.openArtist('Bob')"); await pg.wait_for_timeout(900)
+        await pg.evaluate("document.getElementById('artistPlayBtn').click()"); await pg.wait_for_timeout(700)
+        st = await q()
+        check(st['cur'] == 'Exclusively Bob' and len(st['list']) == 2 and st['idx'] == 0, f'Play with two stations queues both {st}')
+        await pg.evaluate("document.getElementById('barNextBtn').click()"); await pg.wait_for_timeout(700)
+        check((await q())['idx'] == 1, 'Next goes to their other station')
+        await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(900)
 
         # ---- library browsing keeps the library order for songs ----
         await pg.evaluate('__t.songs()'); await pg.wait_for_timeout(700)
