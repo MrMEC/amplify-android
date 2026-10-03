@@ -5057,6 +5057,9 @@
               <button type="button" class="np-menu-item" id="albumAddQueueBtn" role="menuitem">
                 <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 13.5v7M14.5 17h7"/></svg><span>Add to Queue</span>
               </button>
+              <button type="button" class="np-menu-item" id="albumAddPlaylistBtn" role="menuitem">
+                <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
+              </button>
               <button type="button" class="np-menu-item" id="albumArtEditBtn" role="menuitem">
                 <i class="fa-solid fa-pen"></i><span>Edit Album Cover</span>
               </button>
@@ -5795,6 +5798,9 @@
   <button type="button" class="np-menu-item" id="rowMenuAddQueue" role="menuitem">
     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 13.5v7M14.5 17h7"/></svg><span>Add to Queue</span>
   </button>
+  <button type="button" class="np-menu-item" id="rowMenuAddPlaylist" role="menuitem">
+    <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
+  </button>
   <button type="button" class="np-menu-item" id="rowMenuRename" role="menuitem" style="display:none;">
     <i class="fa-solid fa-pen"></i><span>Rename</span>
   </button>
@@ -6520,6 +6526,7 @@
   var albumArtEditBtn = document.getElementById('albumArtEditBtn');
   var albumPlayNextBtn = document.getElementById('albumPlayNextBtn');
   var albumAddQueueBtn = document.getElementById('albumAddQueueBtn');
+  var albumAddPlaylistBtn = document.getElementById('albumAddPlaylistBtn');
   var azRail = document.getElementById('azRail');
   var azBubble = document.getElementById('azBubble');
   var localFilesInput = document.getElementById('localFilesInput');
@@ -6611,7 +6618,8 @@
   var activeStationPlaylistId = null; // id of the active custom Playlist, or null
   var editingStationPlaylistId = null; // which playlist the open add/edit modal is editing, or null when adding
   var playlistModalSavedCallback = null; // optional callback(item) run after a successful playlist-modal save
-  var addToPlaylistStation = null; // the station the open "Add to Playlist" picker modal is adding
+  var addToPlaylistStation = null; // what the open "Add to Playlist" picker is adding: a list of items
+  var addToPlaylistLabel = '';      // a name for that list (an album), for the confirmation
   var editingPodcastCategoryId = null; // which category the open create/rename modal is editing, or null when creating
   var podcastCategoryModalSavedCallback = null; // optional callback(cat) run after a successful category-modal save
   var addToCategoryShow = null; // the followed show (podcastSubs entry) the open "Add to Category" picker is toggling
@@ -15225,11 +15233,14 @@
   function renderAddToPlaylistList(){
     addToPlaylistList.innerHTML = '';
     addToPlaylistEmpty.style.display = stationPlaylists.length ? 'none' : '';
-    var key = addToPlaylistStation ? favKey(addToPlaylistStation) : null;
+    var items = addToPlaylistStation || [];
     stationPlaylists.forEach(function(p){
       var row = document.createElement('div');
       row.className = 'custom-search-item';
-      var already = p.stations.some(function(s){ return favKey(s) === key; });
+      // Ticked when everything being added is already in it.
+      var already = items.length > 0 && items.every(function(it){
+        return p.stations.some(function(s){ return favKey(s) === favKey(it); });
+      });
       var label = document.createElement('span');
       label.className = 'cs-label';
       label.textContent = p.label;
@@ -15242,20 +15253,25 @@
         row.appendChild(check);
       }
       row.addEventListener('click', function(){
-        addStationToPlaylist(p.id, addToPlaylistStation);
+        addItemsToPlaylist(p.id, addToPlaylistStation, addToPlaylistLabel);
         closeAddToPlaylistDialog();
       });
       addToPlaylistList.appendChild(row);
     });
   }
-  function openAddToPlaylistDialog(station){
-    addToPlaylistStation = station;
+  // station: one item, or a list (an album's songs, in order); label names a list.
+  function openAddToPlaylistDialog(station, label){
+    var items = Array.isArray(station) ? station : [station];
+    addToPlaylistStation = items.filter(function(t){ return t && queueable(t); });
+    addToPlaylistLabel = label || '';
+    if(!addToPlaylistStation.length) return;
     renderAddToPlaylistList();
     addToPlaylistOverlay.classList.add('open');
   }
   function closeAddToPlaylistDialog(){
     addToPlaylistOverlay.classList.remove('open');
     addToPlaylistStation = null;
+    addToPlaylistLabel = '';
   }
   function showAddedToPlaylistTip(){
     npPlaylistBtn.classList.add('added');
@@ -15263,15 +15279,23 @@
     npPlaylistBtn._addedTimer = setTimeout(function(){ npPlaylistBtn.classList.remove('added'); }, 1500);
   }
   function addStationToPlaylist(playlistId, station){
+    addItemsToPlaylist(playlistId, [station]);
+  }
+  // Adds whatever isn't in the playlist yet, at the end, in the order given.
+  function addItemsToPlaylist(playlistId, items, label){
     var p = findStationPlaylistById(playlistId);
-    if(!p || !station) return;
-    var key = favKey(station);
-    if(!p.stations.some(function(s){ return favKey(s) === key; })){
-      p.stations.push(station);
-      saveStationPlaylists();
-    }
+    if(!p || !items || !items.length) return;
+    var added = 0;
+    items.forEach(function(it){
+      if(!it) return;
+      var key = favKey(it);
+      if(!p.stations.some(function(s){ return favKey(s) === key; })){ p.stations.push(it); added++; }
+    });
+    if(added){ saveStationPlaylists(); renderStationPlaylistList(); }
     showAddedToPlaylistTip();
-    if(activeStationPlaylistId === playlistId) renderPlaylistStations(p);
+    var what = label ? '\u201c' + label + '\u201d' : (items.length === 1 ? '\u201c' + stripExclusively(items[0].name || 'That') + '\u201d' : items.length + ' songs');
+    setStatus(added ? what + ' was added to \u201c' + p.label + '\u201d.' : what + ' is already in \u201c' + p.label + '\u201d.');
+    if(activeStationPlaylistId === playlistId && !stationPlaylistStationsEditing) renderPlaylistStations(p);
   }
   npPlaylistBtn.addEventListener('click', function(){
     closeNpMenu();
@@ -15284,10 +15308,10 @@
     if(e.target === addToPlaylistOverlay) closeAddToPlaylistDialog();
   });
   addToPlaylistNewBtn.addEventListener('click', function(){
-    var station = addToPlaylistStation;
+    var station = addToPlaylistStation, label = addToPlaylistLabel;
     closeAddToPlaylistDialog();
     openPlaylistModal(null, function(newItem){
-      if(newItem && station) addStationToPlaylist(newItem.id, station);
+      if(newItem && station) addItemsToPlaylist(newItem.id, station, label);
     });
   });
 
@@ -20882,6 +20906,8 @@
     };
     albumPlayNextBtn.onclick = function(){ closeAlbumMenu(); queuePlayNext(album.tracks, album.album); };
     albumAddQueueBtn.onclick = function(){ closeAlbumMenu(); queueAddToEnd(album.tracks, album.album); };
+    // The whole album, in its running order.
+    albumAddPlaylistBtn.onclick = function(){ closeAlbumMenu(); openAddToPlaylistDialog(album.tracks.slice(), album.album); };
     // The same album cover Now Playing edits for any of its songs ('album:' + key), with the
     // same MusicBrainz suggestions. Not offered for "Singles": untagged songs don't share a
     // cover (see customArtFor), so one set here would show nowhere.
@@ -21942,6 +21968,11 @@
     e.stopPropagation();
     var t = rowMenuTracks; closeRowMenu();
     if(t) queueAddToEnd(t);
+  });
+  document.getElementById('rowMenuAddPlaylist').addEventListener('click', function(e){
+    e.stopPropagation();
+    var t = rowMenuTracks; closeRowMenu();
+    if(t && t.length) openAddToPlaylistDialog(t.slice());
   });
   document.addEventListener('click', function(e){
     if(!rowMenu.classList.contains('open')) return;
