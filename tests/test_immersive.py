@@ -10,7 +10,9 @@ src = open(os.path.join(HERE, 'test_station_skip.py')).read()
 head = src[:src.index('async def main()')]
 head = head.replace("'/tmp/claude-0/t/srv_skip'", "'/tmp/claude-0/t/srv_imm'").replace('PORT = 8794', 'PORT = 8796')
 head = head.replace('" skip: function(){', '" closeNp: function(){ closeNowPlaying(false, false); }, play: function(x){ playStation(x); }, skip: function(){')
-assert 'closeNp' in head
+head = head.replace('skip: function(){ return window.__skip; }', 'ui: function(b){ setPlayingUI(b); }, skip: function(){ return window.__skip; }')
+head = head.replace("setSkip: function(o){", "setVideoUi: function(o){ (window.__vui = window.__vui || []).push(o); return Promise.resolve({}); }, setSkip: function(o){")
+assert 'closeNp' in head and '__vui' in head and 'setPlayingUI' in head
 exec(head)
 from playwright.async_api import async_playwright
 
@@ -82,6 +84,54 @@ async def main():
         await run('podcast', "__t.play({ type: 'podcast', guid: 'ep-1', name: 'Episode One', url: 'http://pod.example/ep1.mp3', collectionName: 'The Show', artworkUrl: '' })")
         # a channel has its own full-screen layout: no Immersive View there
 
+
+        # ---- movement in Immersive View ----
+        ANIMS = """(()=>{ var ids = { npArt: 0, npArtBleed: 0, npBackdropImg: 0 };
+          document.getAnimations().forEach(function(a){ var t = a.effect && a.effect.target; if(t && t.id in ids && a.playState !== 'finished') ids[t.id]++; });
+          var rates = document.getAnimations().filter(function(a){ var t = a.effect && a.effect.target; return t && /^(npArt|npArtBleed|npBackdropImg)$/.test(t.id); }).map(function(a){ return +a.playbackRate.toFixed(2); });
+          return { ids: ids, rates: rates, art: getComputedStyle(document.getElementById('npArt')).transform,
+                   bg: getComputedStyle(document.getElementById('npBackdropImg')).transform,
+                   ghosts: document.querySelectorAll('.np-imm-ghost').length, vui: window.__vui || [] }; })()"""
+        await pg.evaluate("__t.ui(true)")
+        await tap_art(); await pg.wait_for_timeout(2200)
+        a1 = await pg.evaluate(ANIMS)
+        print(a1)
+        check(a1['ids']['npArt'] == 1 and a1['ids']['npArtBleed'] == 1 and a1['ids']['npBackdropImg'] == 1, f"art, its blurred twin and the backdrop are moving {a1['ids']}")
+        check(all(r == 1 for r in a1['rates']), f"at full speed while playing {a1['rates']}")
+        check(a1['vui'] and a1['vui'][-1].get('awake') is True, f"screen kept on {a1['vui']}")
+        await pg.wait_for_timeout(1500)
+        a2 = await pg.evaluate(ANIMS)
+        check(a2['art'] != a1['art'] and a2['bg'] != a1['bg'], f"the art and the backdrop drift over time {a1['art']} -> {a2['art']}")
+        # pause: eases to a stop
+        await pg.evaluate("__t.ui(false)"); await pg.wait_for_timeout(500)
+        mid = await pg.evaluate(ANIMS)
+        check(all(0 < r < 1 for r in mid['rates']), f"pausing slows it down gradually {mid['rates']}")
+        await pg.wait_for_timeout(1300)
+        p1 = await pg.evaluate(ANIMS); await pg.wait_for_timeout(700); p2 = await pg.evaluate(ANIMS)
+        check(all(r == 0 for r in p1['rates']) and p1['art'] == p2['art'], f"paused: everything holds still {p1['rates']}")
+        await pg.evaluate("__t.ui(true)"); await pg.wait_for_timeout(2200)
+        check(all(r == 1 for r in (await pg.evaluate(ANIMS))['rates']), 'playing again: back up to speed')
+        # a new song dissolves in
+        await pg.evaluate("__t.play({ stationuuid: 'st-new', name: 'New Station', url: 'http://radio.example/new', urlToResolve: 'http://radio.example/new', favicon: '', tags: '' })")
+        await pg.wait_for_timeout(300)
+        g1 = await pg.evaluate(ANIMS)
+        check(g1['ghosts'] == 3, f"the old artwork, twin and backdrop fade out over the new ({g1['ghosts']} layers)")
+        await pg.screenshot(path=f'{shots}/immersive-crossfade.png')
+        await pg.wait_for_timeout(1700)
+        g2 = await pg.evaluate(ANIMS)
+        check(g2['ghosts'] == 0 and g2['ids']['npArt'] == 1, f"and are gone once the new one is in; the new one moves {g2['ids']}")
+        await pg.screenshot(path=f'{shots}/immersive-motion.png')
+        # leaving stops it all and lets the screen sleep again
+        await tap_art(); await pg.wait_for_timeout(500)
+        a3 = await pg.evaluate(ANIMS)
+        check(sum(a3['ids'].values()) == 0 and not a3['vui'][-1].get('awake'), f"leaving Immersive View stops the motion and the keep-awake {a3['ids']} {a3['vui'][-1]}")
+        # Remove animations: no motion
+        await pg.emulate_media(reduced_motion='reduce')
+        await tap_art(); await pg.wait_for_timeout(600)
+        a4 = await pg.evaluate(ANIMS)
+        check(sum(a4['ids'].values()) == 0 and (await st())['imm'], f"with Remove animations on, Immersive View still works but holds still {a4['ids']}")
+        await tap_art(); await pg.wait_for_timeout(400)
+        await pg.emulate_media(reduced_motion='no-preference')
 
         # closing Now Playing while immersive leaves it
         await tap_art(); await pg.wait_for_timeout(500)
