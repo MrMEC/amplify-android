@@ -486,16 +486,22 @@ final class CarLibrary {
           break;
         default:
           List<JSONObject> listListItems = listItems(str);
+          int playableCount = 0;
           while (i < listListItems.size()) {
             MediaItem browseItem = toBrowseItem(str, i, listListItems.get(i));
             if (browseItem != null) {
               arrayList.add(browseItem);
             }
+            if (isPlayable(listListItems.get(i))) playableCount++;
             i++;
           }
           if (arrayList.isEmpty()) {
             arrayList.add(message(emptyMessage(str)));
             return arrayList;
+          }
+          // An album or a playlist opens with a Shuffle row that plays all of it in a random order.
+          if (playableCount > 1 && (str.startsWith("album:") || str.startsWith("pl:"))) {
+            arrayList.add(0, shuffleItem(str));
           }
           break;
       }
@@ -1030,7 +1036,47 @@ final class CarLibrary {
     return null;
   }
 
+  static final String SHUFFLE_PREFIX = "shuffle:";
+
+  /** The Shuffle row at the top of an album or playlist in the car. */
+  private MediaItem shuffleItem(String listId) {
+    MediaMetadata md =
+        new MediaMetadata.Builder()
+            .setTitle("Shuffle")
+            .setArtworkUri(
+                Uri.parse(
+                    "android.resource://" + this.ctx.getPackageName() + "/drawable/ic_car_shuffle"))
+            .setIsPlayable(true)
+            .setIsBrowsable(false)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_MIXED)
+            .build();
+    return new MediaItem.Builder().setMediaId(SHUFFLE_PREFIX + listId).setMediaMetadata(md).build();
+  }
+
+  /** Every playable item of the list, in a random order (at most 300), starting at the first. */
+  Queue shuffleQueue(String listId) throws JSONException {
+    List<JSONObject> items = listItems(listId);
+    ArrayList<Integer> idx = new ArrayList<>();
+    for (int k = 0; k < items.size(); k++) {
+      if (isPlayable(items.get(k))) idx.add(k);
+    }
+    if (idx.isEmpty()) return null;
+    Collections.shuffle(idx);
+    if (idx.size() > 300) idx = new ArrayList<>(idx.subList(0, 300));
+    ArrayList<MediaItem> out = new ArrayList<>();
+    for (int k : idx) {
+      JSONObject it = items.get(k);
+      MediaItem m = playable(listId, k, it, null);
+      if ("station".equals(it.optString("t"))) m = resolvePlaylist(m);
+      out.add(m);
+    }
+    return new Queue(out, 0, 0L);
+  }
+
   Queue queueFor(String str) throws JSONException {
+    if (str != null && str.startsWith(SHUFFLE_PREFIX)) {
+      return shuffleQueue(str.substring(SHUFFLE_PREFIX.length()));
+    }
     int i;
     int i2;
     JSONObject jSONObjectOptJSONObject;

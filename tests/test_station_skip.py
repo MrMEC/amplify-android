@@ -190,6 +190,28 @@ async def main():
         await pg.wait_for_timeout(700)
         st = await q()
         check(st['label'] == 'Library' and st['cur'] == 'Song 2', f'a song from the Songs list still plays through the library {st}')
+        # ---- Shuffle: a playlist page has it (songs and stations), hidden while editing ----
+        await pg.evaluate("__t.openPl('pl_mix')"); await pg.wait_for_timeout(600)
+        vis = lambda: pg.evaluate("getComputedStyle(document.getElementById('libraryShuffleBtn')).display !== 'none'")
+        check(await vis(), 'a playlist page shows Shuffle')
+        await pg.screenshot(path=f'{shots}/shuffle-playlist.png')
+        orders = set()
+        for _ in range(6):
+            await pg.evaluate("document.getElementById('libraryShuffleBtn').click()"); await pg.wait_for_timeout(400)
+            st = await q()
+            check(sorted(st['list']) == sorted(['Radio A', 'Song 1', 'Radio B', 'Radio C']) and st['idx'] == 0 and st['cur'] == st['list'][0] and st['label'] == 'Mix',
+                  f'shuffle plays every entry once, from the first {st}')
+            orders.add(tuple(st['list']))
+        check(len(orders) > 1, f'and the order changes from one shuffle to the next ({len(orders)} orders)')
+        sk = await pg.evaluate('__t.skip()')
+        check(sk and sk.get('next'), f'Next is offered outside the app (Android Auto) {sk}')
+        await pg.evaluate("document.getElementById('editActiveCustomSearchBtn').click()"); await pg.wait_for_timeout(400)
+        check(not await vis(), 'Shuffle hides while editing')
+        await pg.evaluate("document.getElementById('editActiveCustomSearchBtn').click()"); await pg.wait_for_timeout(400)
+        check(await vis(), 'and comes back after')
+        await pg.evaluate("__t.openPl('pl_ann')"); await pg.wait_for_timeout(500)
+        check(await vis(), 'a stations-only playlist shuffles too')
+
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('ALL PASSED' if not fails else f'FAILED {fails}')

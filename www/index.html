@@ -14941,6 +14941,8 @@
     stationsHeading.textContent = item.label;
     showStationsHeadingActionsFor('playlist');
     renderPlaylistStations(item);
+    syncPlaylistShuffleBtn(item);
+    syncFavPageEditBtn(); // Favorites' own Edit must not linger here
   }
 
   // ---------- playlist cover images ----------
@@ -14988,6 +14990,11 @@
   // A playlist reads top to bottom as stacked rows, whatever it holds: songs get the song row
   // (artist and album under the title, the More menu), stations and episodes the station row.
   // Playing a song from it plays on through the playlist's other songs, in its order.
+  // Shuffle in the heading row, for a playlist with two or more things to play (not while editing).
+  function syncPlaylistShuffleBtn(pl){
+    var n = pl ? pl.stations.filter(function(s){ return queueable(s); }).length : 0;
+    libraryShuffleBtn.style.display = (pl && n > 1 && !stationPlaylistStationsEditing) ? '' : 'none';
+  }
   function renderPlaylistStations(playlist, editing){
     resetStationsGrid();
     stationsGrid.classList.add('grid-songs');
@@ -15115,6 +15122,7 @@
       editActiveCustomSearchBtn.setAttribute('aria-label', 'Save changes');
       renderPlaylistStations(pl, true);
       syncPlaylistCoverBtn(pl);
+      syncPlaylistShuffleBtn(pl);
       stationsHeadingInput.focus();
       stationsHeadingInput.select();
     } else {
@@ -15131,6 +15139,7 @@
       editActiveCustomSearchBtn.setAttribute('aria-label', 'Edit this playlist');
       renderPlaylistStations(pl, false);
       syncPlaylistCoverBtn(null);
+      syncPlaylistShuffleBtn(pl);
     }
   }
   stationsHeadingInput.addEventListener('keydown', function(e){
@@ -22035,6 +22044,9 @@
     if(activeHomeSection === 'favorites'){ playShuffledMixed(favorites, 'Favorites'); return; }
     if(activeHomeSection === 'recentStations'){ playShuffledMixed(recentStations, 'Continue Listening'); return; }
     if(activeHomeSection === 'recentSongs'){ playShuffledMixed(recentSongsOnly(), 'Recent Songs'); return; }
+    // A playlist shuffles its own entries, songs and stations alike.
+    var shufflePl = activeStationPlaylistId ? findStationPlaylistById(activeStationPlaylistId) : null;
+    if(shufflePl){ playShuffledMixed(shufflePl.stations, shufflePl.label); return; }
     if(activeAlbumKey && currentAlbumForShuffle && currentAlbumForShuffle.tracks.length){
       playShuffled(currentAlbumForShuffle.tracks, currentAlbumForShuffle.album);
       return;
