@@ -8259,6 +8259,7 @@
       // blacklist entry would silently suppress the same file if it were ever re-imported
       // -- the opposite of what "remove this from my library" should mean.
       removeLocalTrack(station).then(function(){
+        pruneStaleLibraryRefs();
         renderLibraryList();
         refreshLibraryView();
       })['catch'](function(){
@@ -9573,10 +9574,62 @@
     return rec ? (rec.count || 0) : 0;
   }
   // Most played first; a tie goes to whoever was played more recently.
+  // An artist or album page whose subject has left the library steps back to where it was
+  // opened from (once, after this render), rather than showing an empty page.
+  function leaveMissingPage(stillThere){
+    setTimeout(function(){
+      if(!stillThere()) return;
+      if(detailBackBtn.style.display !== 'none' && typeof detailBackBtn.onclick === 'function') detailBackBtn.onclick();
+      else runLibrarySection('artists');
+    }, 0);
+  }
+  // The artist directory has answered, so "not in the index" really means gone.
+  function artistIndexKnown(){ return Array.isArray(artistStations) && artistStations.length > 0; }
+  // Favourites, Continue Listening, playlists and Top Artists play counts drop anything that
+  // points at music no longer in the library (a song removed, or an artist or album with no
+  // songs and no stations left), so nothing ever leads to an empty page. Only runs once the
+  // library has been read cleanly: a failed read must never empty them.
+  function pruneStaleLibraryRefs(){
+    if(!libraryLoaded || libraryStorageError) return;
+    var known = artistIndexKnown();
+    function gone(s){
+      if(!s) return true;
+      if(isLocalTrack(s)) return !libraryById[favKey(s)];
+      if(isAlbumFav(s)) return !albumEntryForFav(s).tracks.length;
+      if(isArtistFav(s)) return known && !findArtistEntry(s.artistKey);
+      return false;
+    }
+    var changed = {};
+    var fav2 = favorites.filter(function(s){ return !gone(s); });
+    if(fav2.length !== favorites.length){ favorites = fav2; saveFavorites(); changed.fav = true; }
+    var rec2 = recentStations.filter(function(s){ return !gone(s); });
+    if(rec2.length !== recentStations.length){ recentStations = rec2; saveRecent(); changed.rec = true; }
+    stationPlaylists.forEach(function(p){
+      var keep = (p.stations || []).filter(function(s){ return !gone(s); });
+      if(keep.length !== (p.stations || []).length){ p.stations = keep; changed.pl = true; }
+    });
+    if(changed.pl) saveStationPlaylists();
+    if(known){
+      var plays = loadArtistPlays(), dropped = false;
+      Object.keys(plays).forEach(function(k){ if(!findArtistEntry(k)){ delete plays[k]; dropped = true; } });
+      if(dropped){ saveArtistPlays(plays); changed.top = true; }
+    }
+    if(changed.fav){ renderFavoritesList(); if(typeof renderFavoritesSection === 'function') try{ renderFavoritesSection(); }catch(e){} }
+    if(changed.rec){ renderRecentList(); renderRecentSection(); }
+    if(changed.pl) renderStationPlaylistList();
+    if(changed.top) renderTopArtistsSection();
+    if((changed.fav || changed.rec || changed.top) && activeHomeSection) renderHomeSectionPage();
+    if(changed.pl && activeStationPlaylistId && !stationPlaylistStationsEditing){
+      var pl = findStationPlaylistById(activeStationPlaylistId);
+      if(pl) renderPlaylistStations(pl);
+    }
+  }
   function topArtistList(){
     var plays = loadArtistPlays();
+    var known = artistIndexKnown();
     return Object.keys(plays).filter(function(k){
-      return plays[k] && plays[k].count > 0;
+      // An artist with nothing left in the library (and no station) is never listed.
+      return plays[k] && plays[k].count > 0 && (!known || !!findArtistEntry(k));
     }).sort(function(a, b){
       return (plays[b].count - plays[a].count) || ((plays[b].last || 0) - (plays[a].last || 0));
     }).slice(0, TOP_ARTISTS_MAX).map(function(k){
@@ -17467,6 +17520,7 @@
       renderFavoritesList();
       renderRecentList();
       renderRecentSection();
+      pruneStaleLibraryRefs();
       setTimeout(backfillArtSigs, 1500);
       return libraryTracks;
     })['catch'](function(err){
@@ -18472,10 +18526,13 @@
       if(!artistStations) artistStations = [];
       return artistStations;
     });
+    // Once the directory has answered, artists that are gone for good can be cleared out.
+    artistStationsPromise.then(function(){ setTimeout(pruneStaleLibraryRefs, 0); });
     return artistStationsPromise;
   }
   function onArtistStationsChanged(){
     brandArtCache = null;
+    pruneStaleLibraryRefs();
     renderLibraryList();
     // Favourited artists may have been drawn before the directory answered, with no station
     // art to reach for; now there is.
@@ -20115,11 +20172,11 @@
       stationsHeading.textContent = 'Artist';
       // A station-only artist is not in the index until the directory answers. Saying they
       // are gone while that request is still out is simply wrong, so wait instead.
-      var indexPending = (artistStations === null) && !artistStationsFailed;
-      stationsGrid.innerHTML = indexPending
-        ? '<div class="loading-state"><div class="spinner"></div></div>'
-        : '<div class="empty-state">That artist is no longer in your library.</div>';
+      var indexPending = ((artistStations === null) && !artistStationsFailed) || !libraryLoaded;
+      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
       setResultCount(null);
+      // Gone for good (removed from the library): the page is never shown, it steps back.
+      if(!indexPending) leaveMissingPage(function(){ return activeArtistKey === key && !activeAlbumKey; });
       return;
     }
 
@@ -20688,8 +20745,9 @@
     if(!album){
       hideAlbumHero();
       stationsHeading.textContent = 'Album';
-      stationsGrid.innerHTML = '<div class="empty-state">That album is no longer in your library.</div>';
-      setResultCount(0, 'song');
+      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      setResultCount(null);
+      if(libraryLoaded) leaveMissingPage(function(){ return activeAlbumKey === key; });
       return;
     }
     // The cover leads, at size and centred, and the album's own controls sit under it. The
@@ -23171,6 +23229,7 @@
     }).then(function(importedCount){
       musicRefreshBusy = false;
       libraryRefreshHeaderBtn.classList.remove('refreshing');
+      pruneStaleLibraryRefs();
       renderLibraryList();
       refreshLibraryView();
       // With new songs the import reports its own result; otherwise say what changed.
