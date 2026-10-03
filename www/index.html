@@ -3719,6 +3719,11 @@
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ bottom:0; }
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .np-backdrop-clip{ height:100vh; }
     body.np-immersive #npArtWrap{ cursor:zoom-out; }
+    /* The moving wash (see immSetBg): a small pre-blurred canvas scaled up over the still
+       backdrop, so only a transform ever animates. */
+    .np-imm-bg{ position:absolute; inset:-30%; width:160%; height:160%; opacity:0; pointer-events:none; will-change:transform, opacity; }
+    body.np-immersive #npArt{ will-change:transform; filter:none; }
+    .np-imm-ghost{ z-index:2; pointer-events:none; will-change:opacity; }
     /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
        controls still: only the channel list under them scrolls. (Not in landscape or full
        screen, which have the whole screen to themselves.) */
@@ -7153,56 +7158,114 @@
 
   // ---------- Immersive View: movement ----------
   // The artwork drifts and slowly zooms like a camera moving over a photograph (a new
-  // direction for every song), the blurred wash behind it turns and swells on its own slower
+  // direction for every song), the colour wash behind it turns and swells on its own slower
   // rhythm, a new song's cover dissolves in over the old one, pausing eases all of it to a
   // stop and playing eases it back, and the screen stays on. Off with the system's "Remove
-  // animations" setting. Web Animations with composite 'add', so the scroll parallax already
-  // on these elements is left as it is.
-  var imm = { art: [], bg: null, rate: 0, rampRaf: 0 };
+  // animations" setting.
+  // Built to stay smooth on a phone: only transform and opacity ever animate, with plain
+  // keyframes (so the compositor runs them off the main thread), and nothing that moves
+  // carries a CSS blur. The moving wash is its own small canvas, blurred once when drawn and
+  // scaled up -- the page's own 90px-blurred backdrop stays put underneath, untouched.
+  var imm = { art: null, bg: [], rate: 0, rampRaf: 0, bgUrl: null, seq: 0 };
+  var IMM_ART_MS = 20000, IMM_BG_MS = 30000;
+  var IMM_BG_FRAMES = [
+    { transform: 'rotate(0deg) scale(1) translate(0%, 0%)' },
+    { transform: 'rotate(9deg) scale(1.22) translate(4%, -3%)' },
+    { transform: 'rotate(-6deg) scale(1.12) translate(-3%, 4%)' }
+  ];
   function reducedMotion(){
     try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
   }
-  function immAnims(){ return imm.art.concat(imm.bg ? [imm.bg] : []); }
+  function immOn(){ return document.body.classList.contains('np-immersive'); }
+  function immAnims(){ return (imm.art ? [imm.art] : []).concat(imm.bg.map(function(l){ return l.anim; }).filter(Boolean)); }
   function startArtMotion(){
-    imm.art.forEach(function(a){ try{ a.cancel(); }catch(e){} });
-    imm.art = [];
-    if(!document.body.classList.contains('np-immersive') || reducedMotion() || !npArt.animate) return;
-    // A direction of its own for each song: zoom in towards one corner, then back out.
+    if(imm.art){ try{ imm.art.cancel(); }catch(e){} imm.art = null; }
+    if(!immOn() || reducedMotion() || !npArt.animate) return;
+    // A direction of its own for each song: zoom in towards one side, then back out.
     var ang = Math.random() * Math.PI * 2;
     var dx = (Math.cos(ang) * 3.2).toFixed(2), dy = (Math.sin(ang) * 2.4).toFixed(2);
-    var frames = [
-      { transform: 'translate(0%, 0%) scale(1)' },
-      { transform: 'translate(' + dx + '%, ' + dy + '%) scale(1.14)' }
-    ];
-    var opts = { duration: 20000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out', composite: 'add' };
-    [npArt, npArtBleed].forEach(function(el){
-      if(!el) return;
-      try{ var a = el.animate(frames, opts); a.playbackRate = imm.rate; imm.art.push(a); }catch(e){}
-    });
+    try{
+      imm.art = npArt.animate([
+        { transform: 'translate3d(0%, 0%, 0) scale(1)' },
+        { transform: 'translate3d(' + dx + '%, ' + dy + '%, 0) scale(1.14)' }
+      ], { duration: IMM_ART_MS, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+      imm.art.playbackRate = imm.rate;
+    }catch(e){ imm.art = null; }
+  }
+  // The wash: the cover drawn small, blurred and darkened once, then scaled up to fill.
+  function immBgUrl(){
+    var m = /url\("?(.*?)"?\)$/.exec(npBackdropImg.style.backgroundImage || '');
+    return m ? m[1].replace(/\\"/g, '"') : '';
+  }
+  function immSetBg(url){
+    if(!immOn() || reducedMotion() || !npBackdropImg.animate) return;
+    if(url === imm.bgUrl) return;
+    imm.bgUrl = url;
+    var mySeq = ++imm.seq;
+    var old = imm.bg.slice();
+    function swapIn(layer){
+      if(mySeq !== imm.seq || !immOn()){ if(layer) layer.el.remove(); return; }
+      old.forEach(function(l){
+        // Fades out where it is, still moving, then goes.
+        var f = l.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1600, easing: 'ease-in-out', fill: 'forwards' });
+        f.onfinish = function(){ if(l.anim) try{ l.anim.cancel(); }catch(e){} l.el.remove(); };
+        imm.bg = imm.bg.filter(function(x){ return x !== l; });
+      });
+      if(!layer) return;
+      imm.bg.push(layer);
+      layer.el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: old.length ? 1600 : 900, easing: 'ease-in-out', fill: 'forwards' });
+    }
+    if(!url){ swapIn(null); return; }
+    var img = new Image();
+    img.decoding = 'async';
+    img.onload = function(){
+      if(mySeq !== imm.seq) return;
+      var c = document.createElement('canvas');
+      c.className = 'np-imm-bg';
+      c.width = 96; c.height = 96;
+      c.setAttribute('aria-hidden', 'true');
+      try{
+        var x = c.getContext('2d');
+        x.fillStyle = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-tint') || '#1c1d22';
+        x.fillRect(0, 0, 96, 96);
+        // 14px at this size is about the page's own 90px blur once scaled up to fill.
+        x.filter = 'blur(14px) saturate(1.9) brightness(.62)';
+        x.drawImage(img, -24, -24, 144, 144);
+      }catch(e){ swapIn(null); return; }
+      var clip = npBackdropImg.parentNode;
+      clip.insertBefore(c, npBackdropImg.nextSibling);
+      var layer = { el: c, anim: null };
+      try{
+        layer.anim = c.animate(IMM_BG_FRAMES, { duration: IMM_BG_MS, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+        // In step with the layer it replaces, so the swell carries on through the dissolve.
+        var prev = imm.bg[imm.bg.length - 1];
+        if(prev && prev.anim) layer.anim.currentTime = prev.anim.currentTime;
+        layer.anim.playbackRate = imm.rate;
+      }catch(e){}
+      swapIn(layer);
+    };
+    img.onerror = function(){ if(mySeq === imm.seq) swapIn(null); };
+    img.src = url;
   }
   function startImmersiveMotion(){
     if(reducedMotion() || !npArt.animate) return;
     imm.rate = 0;
+    imm.bgUrl = null;
     startArtMotion();
-    try{
-      imm.bg = npBackdropImg.animate([
-        { transform: 'rotate(0deg) scale(1) translate(0%, 0%)' },
-        { transform: 'rotate(9deg) scale(1.22) translate(4%, -3%)' },
-        { transform: 'rotate(-6deg) scale(1.12) translate(-3%, 4%)' }
-      ], { duration: 30000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out', composite: 'add' });
-      imm.bg.playbackRate = 0;
-    }catch(e){ imm.bg = null; }
+    immSetBg(immBgUrl());
     syncImmersiveMotion();
   }
   function stopImmersiveMotion(){
     cancelAnimationFrame(imm.rampRaf);
-    immAnims().forEach(function(a){ try{ a.cancel(); }catch(e){} });
-    imm.art = []; imm.bg = null; imm.rate = 0;
-    Array.prototype.forEach.call(document.querySelectorAll('.np-imm-ghost'), function(g){ g.remove(); });
+    imm.seq++;
+    if(imm.art){ try{ imm.art.cancel(); }catch(e){} }
+    imm.bg.forEach(function(l){ if(l.anim) try{ l.anim.cancel(); }catch(e){} l.el.remove(); });
+    imm.art = null; imm.bg = []; imm.rate = 0; imm.bgUrl = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.np-imm-ghost, .np-imm-bg'), function(g){ g.remove(); });
   }
   // Motion follows the music: easing up to speed while it plays, down to a stop when paused.
   function syncImmersiveMotion(){
-    if(!imm || !immAnims().length) return;
+    if(!imm || !immOn()) return;
     var target = uiIsPlaying ? 1 : 0;
     var from = imm.rate, t0 = performance.now(), dur = target ? 1800 : 1400;
     cancelAnimationFrame(imm.rampRaf);
@@ -7214,24 +7277,19 @@
       if(k < 1) imm.rampRaf = requestAnimationFrame(step);
     })();
   }
-  // A new song's artwork (and the wash behind it) dissolves in over the old one.
+  // A new song's artwork dissolves in over the old one (the wash does the same in immSetBg).
   function immersiveCrossfade(){
-    if(!document.body.classList.contains('np-immersive') || reducedMotion()) return;
-    [npArt, npArtBleed, npBackdropImg].forEach(function(el){
-      if(!el || !el.parentNode || !el.animate) return;
-      var g = el.cloneNode(true);
-      g.removeAttribute('id');
-      g.classList.add('np-imm-ghost');
-      g.setAttribute('aria-hidden', 'true');
-      // Frozen where the old picture was in its drift, so the hand-over doesn't jump.
-      var cs = getComputedStyle(el);
-      g.style.transform = cs.transform === 'none' ? '' : cs.transform;
-      g.style.zIndex = el === npBackdropImg ? '' : '2';
-      g.style.pointerEvents = 'none';
-      el.parentNode.insertBefore(g, el.nextSibling);
-      var a = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1600, easing: 'ease-in-out', fill: 'forwards' });
-      a.onfinish = function(){ g.remove(); };
-    });
+    if(!immOn() || reducedMotion() || !npArt.animate) return;
+    var g = npArt.cloneNode(true);
+    g.removeAttribute('id');
+    g.classList.add('np-imm-ghost');
+    g.setAttribute('aria-hidden', 'true');
+    // Frozen where the old picture was in its drift, so the hand-over doesn't jump.
+    var t = getComputedStyle(npArt).transform;
+    g.style.transform = t === 'none' ? '' : t;
+    npArt.parentNode.insertBefore(g, npArt.nextSibling);
+    var a = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1600, easing: 'ease-in-out', fill: 'forwards' });
+    a.onfinish = function(){ g.remove(); };
   }
   npArtWrap.addEventListener('click', function(e){
     if(!isMobileLayout() || document.body.classList.contains('rotate-lock')) return;
@@ -8153,6 +8211,7 @@
     var value = src ? 'url("' + src.replace(/"/g, '\\"') + '")' : '';
     npBackdropImg.style.backgroundImage = value;
     npBackdropImg.style.opacity = src ? '' : '0';
+    if(typeof immSetBg === 'function' && imm && immOn()) immSetBg(src || '');
     // The twin behind the crisp square carries the same image, which is the whole point of
     // it: the dissolve has to be the picture losing focus, not one picture over another.
     if(npArtBleed){
@@ -8296,7 +8355,7 @@
     if(artChanged) immersiveCrossfade();
     applyNpTint(null);            // reset first, so the old cover's colour never lingers
     renderStationArt(npArt, st);
-    if(artChanged && imm.art.length) startArtMotion();
+    if(artChanged && immOn()) startArtMotion();
     syncNpTint();
     renderNpName(st);
     renderNpOnAir(st);
