@@ -250,10 +250,10 @@ final class CarLibrary {
         new String[] {
           "home:favorites",
           "home:topartists",
-          "home:madeforyou",
           "home:continue",
           "home:recentsongs",
           "home:latest",
+          "home:madeforyou",
           "home:topstations"
         });
     linkedHashMap2.put(

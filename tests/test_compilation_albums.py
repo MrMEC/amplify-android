@@ -123,7 +123,7 @@ async def main():
         await pg.wait_for_timeout(800)
         hero = await pg.evaluate("document.getElementById('albumHeroArtist').textContent + '|' + document.getElementById('albumHeroArtist').tagName")
         check(hero == 'Various Artists|DIV', 'album page names Various Artists, not a link')
-        subs = await pg.evaluate("Array.from(document.querySelectorAll('.song-row .song-row-sub')).map(function(e){return e.textContent;})")
+        subs = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .song-row .song-row-sub')).map(function(e){return e.textContent;})")
         check(subs == ['Alpha Band', 'Beta Singer', 'Gamma Crew'], 'each song row shows its artist: %r' % subs)
         await pg.screenshot(path=shots + '/comp_album_page.png')
 

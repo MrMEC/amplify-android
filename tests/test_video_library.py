@@ -77,7 +77,7 @@ async def main():
 
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
         tabs = await names(pg, '.video-tabs .home-tab')
-        check(tabs == ['Channels', 'Movies', 'TV Shows'], f'Video has Channels / Movies / TV Shows tabs {tabs}')
+        check(tabs == ['Live TV', 'Movies', 'TV Shows'], f'Video has Live TV / Movies / TV Shows tabs {tabs}')
         await tab(pg, 'movies')
         empty = await pg.evaluate("document.querySelector('#stationsGrid .v-empty') && document.querySelector('#stationsGrid .v-empty').textContent")
         check(empty and 'Add a folder' in empty, f'Movies is empty until a folder is added ({empty})')

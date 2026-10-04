@@ -247,7 +247,7 @@ async def main():
         hist = await pg.evaluate("__t.hist()")
         check(name == 'Zulu' and hist.count('Beta') == 0, f'a second album replaces the first, not stacked behind it ({name}, history {hist})')
         await rotate(pg, False)
-        up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open'), document.getElementById('albumHeroName').textContent, Math.round(document.getElementById('albumHero').getBoundingClientRect().height), window.scrollY, document.querySelectorAll('.song-row').length]")
+        up = await pg.evaluate("[document.body.classList.contains('np-open'), document.body.classList.contains('album-open'), document.getElementById('albumHeroName').textContent, Math.round(document.getElementById('albumHero').getBoundingClientRect().height), window.scrollY, document.querySelectorAll('#stationsGrid .song-row').length]")
         check(not up[0] and up[1] and up[2] == 'Zulu' and up[3] > 100 and up[5] == 2, f'upright, the album page is showing {up}')
         await pg.screenshot(path=f'{shots}/cfa-upright-album.png')
         back = await pg.evaluate("document.getElementById('detailBackLabel') ? document.getElementById('detailBackLabel').textContent : ''")
