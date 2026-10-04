@@ -1454,9 +1454,8 @@
     .artist-albums{ transition:none; }
   }
 
-  /* Music Videos on a favourite artist's page (build 126): a sideways row of 16:9 thumbnails
-     under the albums. It runs to the screen's edges so the cut-off card shows it scrolls. */
-  .artist-videos-label{ margin-top:6px !important; }
+  /* Music Videos on a favourite artist's page (builds 126-127): a sideways row of 16:9 thumbnails
+     under the bio, above the albums. It runs to the screen's edges so the cut-off card shows it scrolls. */
   .artist-videos{
     grid-column:1/-1; display:flex; flex-wrap:nowrap; gap:14px;
     overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity;
@@ -21170,7 +21169,7 @@
     if(!total){
       stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
     }
-    // A favourite artist's music videos, under the albums.
+    // A favourite artist's music videos, under the bio (syncArtistVideos puts them at the top).
     syncArtistVideos(entry);
   }
 
@@ -21259,8 +21258,8 @@
   // from YouTube's public feed for that channel. The feed has no CORS headers, so on the phone
   // it is fetched natively (AmplifyPlayer.fetchText). Each feed holds a channel's
   // latest 15 uploads; up to three channels are merged (an artist often has their own channel
-  // and a VEVO one). Titles reading like official music videos are kept; when none do, every
-  // video is shown and the section is headed just "Videos". Tapping one plays it in an
+  // and a VEVO one). Uploads that look like music videos are kept (see looksLikeMusicVideo); when
+  // none do, every video is shown and the section is headed just "Videos". Tapping one plays it in an
   // overlay with YouTube's embedded player; the radio pauses meanwhile and resumes after.
   var YT_STORE_KEY = 'artistVideos';
   var YT_TTL_MS = 12 * 60 * 60 * 1000;          // the video list is refreshed twice a day
@@ -21379,16 +21378,27 @@
       return ytFeed('channel_id=' + ch).then(function(l2){ return l2 || list; });
     });
   }
-  var YT_MV_RE = /\b(official\s+(4k\s+|hd\s+)?(music\s+)?video|music\s+video|official\s+mv|m\/v)\b|[\(\[]\s*video\s*[\)\]]/i;
-  var YT_NOT_MV_RE = /\b(lyrics?|visuali[sz]er|official\s+audio|audio\s+only|teaser|trailer|behind\s+the\s+scenes|making\s+of|interview|reaction|livestream|live\s+stream)\b/i;
+  // Which uploads count as music videos (filter version YT_FV; a record from an older filter
+  // is shown but refreshed). Labelled ones ("Official Video", "Official Animated Video"), plus
+  // anything titled like "Artist - Song", live performances included. Out: audio-only uploads,
+  // lyric videos, visualizers, trailers, promos and the like. Build 127: build 126 kept only
+  // the "Official (Music) Video" label, which left Prince with one video out of eight.
+  var YT_FV = 2;
+  var YT_MV_RE = /\b(official\s+(?:[\w-]+\s+){0,2}video|music\s+video|official\s+mv|m\/v)\b|[\(\[]\s*video\s*[\)\]]/i;
+  var YT_NOT_MV_RE = /\b(lyrics?|visuali[sz]er|official\s+audio|audio\s+only|full\s+album|teaser|trailer|behind\s+the\s+scenes|making\s+of|interview|reaction|livestream|live\s+stream|anniversary|deluxe|edition|fyc|unboxing|documentary|episode|podcast|announcement|q\s*&\s*a|preview|snippet|out\s+now|pre-?order|tour\s+dates?)\b|#shorts/i;
+  function looksLikeMusicVideo(title){
+    var t = String(title || '');
+    if(YT_NOT_MV_RE.test(t)) return false;
+    return YT_MV_RE.test(t) || /\S\s[-\u2013\u2014]\s\S/.test(t);
+  }
   function pickArtistVideos(lists){
     var seen = {}, all = [];
     lists.forEach(function(l){ (l || []).forEach(function(v){ if(!seen[v.id]){ seen[v.id] = true; all.push(v); } }); });
     all.sort(function(a, b){ return String(b.published).localeCompare(String(a.published)); });
-    var mv = all.filter(function(v){ return YT_MV_RE.test(v.title) && !YT_NOT_MV_RE.test(v.title); });
+    var mv = all.filter(function(v){ return looksLikeMusicVideo(v.title); });
     return { videos: (mv.length ? mv : all).slice(0, YT_MAX_VIDEOS), mv: !!mv.length };
   }
-  function ytFresh(rec){ return !!rec && Date.now() - (rec.ts || 0) < (rec.channels && rec.channels.length ? YT_TTL_MS : YT_MISS_TTL_MS); }
+  function ytFresh(rec){ return !!rec && rec.fv === YT_FV && Date.now() - (rec.ts || 0) < (rec.channels && rec.channels.length ? YT_TTL_MS : YT_MISS_TTL_MS); }
   // Resolves to the stored record { channels, chTs, ts, videos, mv }, or null (nothing known).
   function loadArtistVideos(entry){
     var k = entry.key, rec = ytStore[k];
@@ -21401,7 +21411,7 @@
       .then(function(chs){
         if(chs === null) return rec || null;   // couldn't reach Wikidata: keep what we had
         if(!chs.length){
-          ytStore[k] = { channels: [], chTs: now, ts: now, videos: [], mv: false };
+          ytStore[k] = { channels: [], chTs: now, ts: now, videos: [], mv: false, fv: YT_FV };
           ytSave();
           return ytStore[k];
         }
@@ -21409,7 +21419,7 @@
           if(lists.every(function(l){ return l === null; })) return rec || null;   // YouTube unreachable
           var pick = pickArtistVideos(lists);
           var sameCh = rec && rec.channels && rec.channels.join() === chs.join();
-          ytStore[k] = { channels: chs, chTs: (knownCh || sameCh) ? (rec.chTs || now) : now, ts: now, videos: pick.videos, mv: pick.mv };
+          ytStore[k] = { channels: chs, chTs: (knownCh || sameCh) ? (rec.chTs || now) : now, ts: now, videos: pick.videos, mv: pick.mv, fv: YT_FV };
           ytSave();
           return ytStore[k];
         });
@@ -21418,13 +21428,16 @@
     p.then(function(){ delete ytPending[k]; }, function(){ delete ytPending[k]; });
     return p;
   }
-  // "Artist - Song (Official Music Video)" -> "Song".
+  // "Artist - Song (Official Music Video)" -> "Song"; "Artist & Band - Song" -> "Song".
   function ytDisplayTitle(title, artistName){
     var t = String(title || '');
     var clean = t.replace(/\s*[\(\[][^\)\]]*\b(official|video|4k|hd|remaster(ed)?)\b[^\)\]]*[\)\]]/ig, '').trim();
     var a = sanitizeArtistName(artistName || '');
     if(a){
-      var re = new RegExp('^' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-\u2013\u2014:|]\\s*', 'i');
+      // The credit before the dash, whenever it starts with the artist: "Prince & The
+      // Revolution - Purple Rain" -> "Purple Rain".
+      var re = new RegExp('^' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])[^\u2013\u2014|]*?\\s[-\u2013\u2014|]\\s+', 'i');
+      if(!re.test(clean)) re = new RegExp('^' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[-\u2013\u2014:|]\\s*', 'i');
       clean = clean.replace(re, '');
     }
     return clean || t;
@@ -21472,8 +21485,10 @@
     }
     var empty = stationsGrid.querySelector('.empty-state');
     if(empty) empty.remove();
+    // Directly under the bio: the first thing in the page's grid, above Stations and Albums.
     var label = appendGridSection(loading ? 'Music Videos' : (rec.mv ? 'Music Videos' : 'Videos'));
     label.classList.add('artist-videos-label');
+    stationsGrid.insertBefore(label, stationsGrid.firstChild);
     var row = document.createElement('div');
     row.className = 'artist-videos';
     if(loading){
@@ -21486,7 +21501,7 @@
     } else {
       rec.videos.forEach(function(v){ row.appendChild(buildYtTile(v, entry.name)); });
     }
-    stationsGrid.appendChild(row);
+    stationsGrid.insertBefore(row, label.nextSibling);
   }
   // Called whenever the artist page is drawn and when the artist is favourited or not.
   function syncArtistVideos(entry){

@@ -1,5 +1,5 @@
-"""Build 126: a favourite artist's page shows a sideways row of YouTube music videos under the
-albums (channel from Wikidata P2397, videos from YouTube's public feed fetched natively), and tapping one plays it in a full-screen overlay. Artist bio previews are
+"""Builds 126-127: a favourite artist's page shows a sideways row of YouTube music videos under the
+bio (above Albums; build 127) (channel from Wikidata P2397, videos from YouTube's public feed fetched natively), and tapping one plays it in a full-screen overlay. Artist bio previews are
 left-aligned. Run: python3 tests/test_artist_videos.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess, re
 from urllib.parse import urlparse, parse_qs, unquote
@@ -16,6 +16,8 @@ HOOK = ("window.__v = { fav: function(n){ var e = findArtistEntry(artistMatchKey
         " tracks: function(){ return libraryTracks.length; }, hide: function(){ try{ hideImportPanel(); setStatus('', false); }catch(e){} },"
         " play: function(){ currentStation = libraryTracks[0]; audio.play = function(){ return Promise.resolve(); }; audio.pause = function(){}; setPlayingUI(true); },"
         " playing: function(){ return uiIsPlaying; },"
+        " mv: function(a){ return a.filter(looksLikeMusicVideo); },"
+        " stale: function(n){ var k = findArtistEntry(artistMatchKey(n)).key, r = ytStore[k]; delete r.fv; r.videos = [{ id: 'oldOnly0001', title: 'Bravo - Old (Official Video)', published: '2020-01-01' }]; ytSave(); },"
         " paused: [] };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
@@ -70,6 +72,13 @@ FEEDS = {
         entry('alphaLyric1', 'Alpha - Sunrise (Official Lyric Video)', '2025-05-20'),
         entry('alphaIntv01', 'Alpha interview at the festival', '2025-05-10'),
         entry('alphaVid002', 'Alpha - Midnight Drive [Official Video]', '2023-03-04'),
+        entry('alphaPlain1', 'Alpha &amp; The Band - Old Song', '2025-04-01'),
+        entry('alphaLive01', 'Alpha - Deep Cut (Live at Club 3121, Las Vegas)', '2025-03-01'),
+        entry('alphaAnim01', 'Alpha, Alpha and The Band - Cartoon (Official Animated Video)', '2025-02-01'),
+        entry('alphaPromo1', 'ALPHA IS TIMELESS', '2025-01-15'),
+        entry('alphaDelux1', 'Alpha - Hits | Super Deluxe Edition Grammy FYC', '2025-01-10'),
+        entry('alphaAudio1', 'Alpha - B Side (Official Audio)', '2025-01-05'),
+        entry('alphaTrail1', 'Alpha: The Movie | Official Trailer | In IMAX', '2025-01-02'),
     ]),
     'playlist_id=UULF' + CH_A2[2:]: feed([
         entry('alphaVevo01', 'Alpha - A Very Long Song Title That Goes On And On Well Past Two Lines Of Text (Official Music Video)', '2024-11-11'),
@@ -215,6 +224,18 @@ async def main():
         check(bio and abs(bio['left'] - bio['gl']) <= 2 and abs(bio['more'] - bio['gl']) <= 2, 'bio text and More start at the page edge')
         await pg.screenshot(path=f'{shots}/artvid-bio-left.png')
 
+        prince = await pg.evaluate("""__v.mv([
+          'Prince - The Guilty Ones (Official Video)', 'PRINCE IS TIMELESS', 'Prince - With This Tear',
+          'Prince - Lolita (Live at Club 3121, Las Vegas, January 20, 2007)', 'Prince & The Revolution - I Would Die 4 U',
+          'Prince & The Revolution - When Doves Cry', 'Prince & The Revolution - Purple Rain',
+          'Prince, Prince and The Revolution - Pop Life (Official Animated Video)',
+          "Prince: Sign O' The Times | Official Trailer | Experience It In IMAX®",
+          'Prince, The New Power Generation - Insatiable (Live at Glam Slam)',
+          'Prince - Diamonds And Pearls | Super Deluxe Edition Grammy FYC', 'Prince - Silver Tongue (Official Audio)',
+          'Prince - Magnificent (Official Audio)', 'Prince - United States Of Division (Official Audio)',
+          'Prince - Musicology: Real Music by Real Musicians (20th Anniversary)']).length""")
+        check(prince == 8, f"Prince's 15 latest uploads: 8 music videos kept ({prince})")
+
         # ---- favourite it from the artist menu: the row appears ----
         await pg.evaluate("document.getElementById('artistFavBtn').click()"); await pg.wait_for_timeout(60)
         r = await pg.evaluate(ROW)
@@ -223,10 +244,15 @@ async def main():
         r = await pg.evaluate(ROW)
         print(r)
         check(r['label'] == 'Music Videos', 'headed Music Videos')
-        check(r['albumsIdx'] >= 0 and r['labelIdx'] > r['albumsIdx'] and r['rowIdx'] == r['labelIdx'] + 1, 'the row sits below the albums')
-        check(r['ids'] == ['alphaVid001', 'alphaVevo01', 'alphaVid002', 'alphaVevo02'],
-              f'official videos from both channels, newest first, no lyric video, interview or Short, no repeats {r["ids"]}')
-        check(r['titles'][0] == 'Sunrise' and r['titles'][2] == 'Midnight Drive' and r['titles'][3] == 'Old Hit', f'titles tidied {r["titles"]}')
+        check(r['labelIdx'] == 0 and r['rowIdx'] == 1 and r['albumsIdx'] > r['rowIdx'], f'the row sits right under the bio, above Albums {r}')
+        gap = await pg.evaluate("""(()=>{ var b = document.getElementById('artistHeroBio').getBoundingClientRect(), l = document.querySelector('.artist-videos-label').getBoundingClientRect(),
+          row = document.querySelector('.artist-videos').getBoundingClientRect(), al = Array.from(document.querySelectorAll('#stationsGrid .grid-section-label')).filter(function(x){ return /Albums/.test(x.textContent); })[0].getBoundingClientRect();
+          return { bioToLabel: Math.round(l.top - b.bottom), rowToAlbums: Math.round(al.top - row.bottom) }; })()""")
+        print('gaps', gap)
+        check(8 <= gap['bioToLabel'] <= 60 and 8 <= gap['rowToAlbums'] <= 70, f'sensible spacing above and below the row {{gap}}')
+        check(r['ids'] == ['alphaVid001', 'alphaPlain1', 'alphaLive01', 'alphaAnim01', 'alphaVevo01', 'alphaVid002', 'alphaVevo02'],
+              f'music videos from both channels (labelled, plain "Artist - Song", live, animated), newest first; no lyric video, interview, Short, audio, trailer, promo or deluxe-edition clip; no repeats {r["ids"]}')
+        check(r['titles'][:4] == ['Sunrise', 'Old Song', 'Deep Cut (Live at Club 3121, Las Vegas)', 'Cartoon'] and r['titles'][5:] == ['Midnight Drive', 'Old Hit'], f'titles tidied {r["titles"]}')
         urls = await pg.evaluate('__http')
         check(not any(CH_AX in u for u in urls), 'a deprecated channel is never asked')
         check(any('channel_id=' + CH_A1 in u for u in urls), 'a channel without a videos-only list falls back to its plain feed')
@@ -252,7 +278,7 @@ async def main():
         # ---- play one ----
         await pg.evaluate('__v.play()'); await pg.wait_for_timeout(300)
         check(await pg.evaluate('__v.playing()'), '(setup) something is playing')
-        await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[1].click()"); await pg.wait_for_timeout(1200)
+        await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[4].click()"); await pg.wait_for_timeout(1200)
         ov = await pg.evaluate("""(()=>{ var o = document.getElementById('ytOverlay'), f = o.querySelector('iframe'), r = o.getBoundingClientRect(), fr = f.getBoundingClientRect();
           return { open: o.classList.contains('open'), src: f.src, ref: f.getAttribute('referrerpolicy'), title: document.getElementById('ytOvTitle').textContent,
             link: document.getElementById('ytOpenLink').href, full: r.width === innerWidth && r.height === innerHeight,
@@ -300,6 +326,13 @@ async def main():
         rc = await pg.evaluate(ROW)
         check(rc['rowIdx'] == -1 and rc['skel'] == 0, 'Charlie: no channel, no row')
 
+        # ---- a list saved by the build 126 filter is shown, then refreshed ----
+        await pg.evaluate("__v.stale('Bravo')")
+        await pg.evaluate("__v.open('Bravo')"); await pg.wait_for_timeout(60)
+        check((await pg.evaluate(ROW))['ids'] == ['oldOnly0001'], 'an older saved list shows at once')
+        await pg.wait_for_timeout(1500)
+        check((await pg.evaluate(ROW))['ids'] == ['bravoVid001'], 'and is replaced by the new filter')
+
         # ---- after a restart: shown straight from the saved list, nothing asked ----
         await pg.reload(); await pg.wait_for_timeout(2500)
         wd0 = counts['wikidata']
@@ -335,7 +368,7 @@ async def main():
         await dp.wait_for_timeout(300); await dp.evaluate('__v.hide()')
         await dp.evaluate("__v.fav('Alpha')"); await dp.evaluate("__v.open('Alpha')"); await dp.wait_for_timeout(2500)
         rr = await dp.evaluate(ROW)
-        check(rr['ids'] and len(rr['ids']) == 4, 'desktop: the row shows')
+        check(rr['ids'] and len(rr['ids']) == 7, 'desktop: the row shows')
         await dp.screenshot(path=f'{shots}/artvid-desktop.png', full_page=True)
         await b.close()
     print('ALL PASSED' if not fails else f'FAILED {fails}')
