@@ -247,9 +247,10 @@ async def main():
         check(r['labelIdx'] == 0 and r['rowIdx'] == 1 and r['albumsIdx'] > r['rowIdx'], f'the row sits right under the bio, above Albums {r}')
         gap = await pg.evaluate("""(()=>{ var b = document.getElementById('artistHeroBio').getBoundingClientRect(), l = document.querySelector('.artist-videos-label').getBoundingClientRect(),
           row = document.querySelector('.artist-videos').getBoundingClientRect(), al = Array.from(document.querySelectorAll('#stationsGrid .grid-section-label')).filter(function(x){ return /Albums/.test(x.textContent); })[0].getBoundingClientRect();
-          return { bioToLabel: Math.round(l.top - b.bottom), rowToAlbums: Math.round(al.top - row.bottom) }; })()""")
+          var lt = document.createRange(); lt.selectNodeContents(document.querySelector('.artist-videos-label')); var tr = lt.getClientRects()[0];
+          return { bioToLabel: Math.round(tr.top - b.bottom), labelToRow: Math.round(row.top - tr.bottom), rowToAlbums: Math.round(al.top - row.bottom) }; })()""")
         print('gaps', gap)
-        check(8 <= gap['bioToLabel'] <= 60 and 8 <= gap['rowToAlbums'] <= 70, f'sensible spacing above and below the row {{gap}}')
+        check(28 <= gap['bioToLabel'] <= 60 and 10 <= gap['labelToRow'] <= 24 and 8 <= gap['rowToAlbums'] <= 70, f'room between More and Music Videos (build 128), sensible gap below the row {gap}')
         check(r['ids'] == ['alphaVid001', 'alphaPlain1', 'alphaLive01', 'alphaAnim01', 'alphaVevo01', 'alphaVid002', 'alphaVevo02'],
               f'music videos from both channels (labelled, plain "Artist - Song", live, animated), newest first; no lyric video, interview, Short, audio, trailer, promo or deluxe-edition clip; no repeats {r["ids"]}')
         check(r['titles'][:4] == ['Sunrise', 'Old Song', 'Deep Cut (Live at Club 3121, Las Vegas)', 'Cartoon'] and r['titles'][5:] == ['Midnight Drive', 'Old Hit'], f'titles tidied {r["titles"]}')
@@ -279,21 +280,51 @@ async def main():
         await pg.evaluate('__v.play()'); await pg.wait_for_timeout(300)
         check(await pg.evaluate('__v.playing()'), '(setup) something is playing')
         await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[4].click()"); await pg.wait_for_timeout(1200)
-        ov = await pg.evaluate("""(()=>{ var o = document.getElementById('ytOverlay'), f = o.querySelector('iframe'), r = o.getBoundingClientRect(), fr = f.getBoundingClientRect();
-          return { open: o.classList.contains('open'), src: f.src, ref: f.getAttribute('referrerpolicy'), title: document.getElementById('ytOvTitle').textContent,
+        OV = """(()=>{ var o = document.getElementById('ytOverlay'), f = o.querySelector('iframe'), r = o.getBoundingClientRect(), fr = f.getBoundingClientRect();
+          var bar = o.querySelector('.yt-ov-bar').getBoundingClientRect(), back = document.getElementById('ytBackBtn'), list = document.getElementById('ytOvList');
+          var rows = Array.from(list.querySelectorAll('.yt-row'));
+          return { open: o.classList.contains('open'), src: f.src, ref: f.getAttribute('referrerpolicy'),
+            title: document.getElementById('ytOvTitle').textContent, sub: document.getElementById('ytOvSub').textContent,
             link: document.getElementById('ytOpenLink').href, full: r.width === innerWidth && r.height === innerHeight,
-            fw: Math.round(fr.width), fh: Math.round(fr.height), z: getComputedStyle(o).zIndex }; })()""")
+            fw: Math.round(fr.width), fh: Math.round(fr.height), ft: Math.round(fr.top), barBottom: Math.round(bar.bottom),
+            bg: getComputedStyle(o).backgroundColor, tint: getComputedStyle(document.body).backgroundColor,
+            back: back.getAttribute('aria-label'), backIcon: !!back.querySelector('.fa-arrow-left'),
+            head: (list.querySelector('.yt-ov-list-head') || {}).textContent, rows: rows.map(function(x){ return x.dataset.vid; }),
+            rowTitles: rows.map(function(x){ return x.querySelector('.yt-title').textContent; }),
+            listTop: Math.round(list.getBoundingClientRect().top), listScroll: list.scrollHeight > list.clientHeight }; })()"""
+        ov = await pg.evaluate(OV)
         print(ov)
-        check(ov['open'] and ov['full'], 'the player covers the screen')
+        check(ov['open'] and ov['full'], 'the video page covers the screen')
+        check(ov['bg'] == ov['tint'] and ov['bg'] not in ('rgb(0, 0, 0)', 'rgba(0, 0, 0, 0)'), f"painted in the artist page's colour, not black ({ov['bg']} vs page {ov['tint']})")
+        check(ov['back'] == 'Back' and ov['backIcon'], 'a Back arrow instead of a close X')
+        check(abs(ov['ft'] - ov['barBottom']) <= 1, 'the video sits right under Back and Open in YouTube')
         check('/embed/alphaVevo01?' in ov['src'] and 'autoplay=1' in ov['src'] and 'playsinline=1' in ov['src'] and 'fs=0' in ov['src'], 'embeds that video, autoplaying inline')
         check(ov['ref'] == 'strict-origin-when-cross-origin', 'the embed sends a referrer (no error 153)')
         check(ov['link'] == 'https://www.youtube.com/watch?v=alphaVevo01', 'Open in YouTube points at the video')
         check(ov['fw'] == 390 and abs(ov['fh'] - 390 * 9 / 16) < 2, f'video frame is full width, 16:9 ({ov["fw"]}x{ov["fh"]})')
+        check(ov['title'].startswith('A Very Long Song') and ov['sub'] == 'Alpha \u00b7 2024', f'title and "artist · year" under the video ({ov["sub"]})')
+        check(ov['head'] == 'More videos by Alpha', f'list headed "More videos by Alpha" ({ov["head"]})')
+        check(ov['rows'] == ['alphaVid001', 'alphaPlain1', 'alphaLive01', 'alphaAnim01', 'alphaVid002', 'alphaVevo02'], f'the other six videos listed, in order {ov["rows"]}')
+        check(ov['listScroll'], 'the list is taller than its space (scrolls)')
+        await pg.screenshot(path=f'{shots}/artvid-player.png')
+        await pg.evaluate("document.getElementById('ytOvList').scrollTop = 400"); await pg.wait_for_timeout(300)
+        sc = await pg.evaluate(OV)
+        check(await pg.evaluate("document.getElementById('ytOvList').scrollTop") > 100 and sc['ft'] == ov['ft'] and sc['listTop'] == ov['listTop'],
+              'scrolling the list leaves the video fixed at the top')
+        await pg.screenshot(path=f'{shots}/artvid-player-scrolled.png')
         check(not await pg.evaluate('__v.playing()'), 'the radio pauses while a video plays')
         check(len(counts['yt_embed']) == 1, 'the embed loaded')
-        await pg.screenshot(path=f'{shots}/artvid-player.png')
-        await pg.evaluate("document.getElementById('ytCloseBtn').click()"); await pg.wait_for_timeout(500)
-        check(await pg.evaluate("!document.getElementById('ytOverlay').classList.contains('open') && !document.querySelector('#ytOverlay iframe')"), 'closing stops and hides the video')
+        # play one from the list
+        await pg.evaluate("document.querySelector('#ytOvList .yt-row[data-vid=alphaLive01]').click()"); await pg.wait_for_timeout(800)
+        sw = await pg.evaluate(OV)
+        check('/embed/alphaLive01?' in sw['src'] and sw['title'] == 'Deep Cut (Live at Club 3121, Las Vegas)' and sw['link'].endswith('alphaLive01'),
+              'tapping a listed video plays it at the top')
+        check('alphaLive01' not in sw['rows'] and 'alphaVevo01' in sw['rows'] and len(sw['rows']) == 6, 'and the list now holds the others, the previous one included')
+        check(await pg.evaluate("document.getElementById('ytOvList').scrollTop") == 0, 'the list goes back to its top')
+        check(len(counts['yt_embed']) == 2 and await pg.evaluate("document.querySelectorAll('#ytOverlay iframe').length") == 1, 'one player at a time')
+        await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("!document.getElementById('ytOverlay').classList.contains('open') && !document.querySelector('#ytOverlay iframe')"), 'Back stops the video and returns to the artist page')
+        check(await pg.evaluate("document.body.classList.contains('artist-open')"), 'the artist page is still there')
         check(await pg.evaluate('__v.playing()'), 'and the radio resumes')
 
         # ---- landscape: player stays on top of the landscape Now Playing ----
@@ -304,7 +335,7 @@ async def main():
         print('landscape', land)
         check(land['onTop'] and land['ft'] == 0 and land['fh'] == 390 and abs(land['fw'] - 693) <= 1, f'landscape: the video stays on top and fills the height {land}')
         await pg.screenshot(path=f'{shots}/artvid-player-land.png')
-        await pg.evaluate("document.getElementById('ytCloseBtn').click()")
+        await pg.evaluate("document.getElementById('ytBackBtn').click()")
         await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(1200)
 
         # ---- unfavourite: the row goes ----

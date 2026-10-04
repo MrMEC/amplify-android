@@ -1482,32 +1482,51 @@
   @keyframes yt-skel{ from{ opacity:.55; } to{ opacity:1; } }
   @media (prefers-reduced-motion: reduce){ .yt-tile.yt-skel .yt-thumb{ animation:none; } }
 
-  /* The player: black, over everything (Now Playing and its landscape layout included). */
-  .yt-overlay{ position:fixed; inset:0; z-index:3000; background:#000; display:none; flex-direction:column; }
+  /* The video page (build 128): over everything (Now Playing and its landscape layout too),
+     painted in the artist page's own colour. Back and Open in YouTube on top, the video under
+     them, its title, then "More videos by ..." -- only that list scrolls, so the video stays
+     put at the top. */
+  .yt-overlay{ position:fixed; inset:0; z-index:3000; background:var(--page-tint, #1c1d22); color:var(--text);
+    display:none; flex-direction:column; }
   .yt-overlay.open{ display:flex; }
-  .yt-ov-bar{ flex:0 0 auto; display:flex; align-items:center; gap:10px;
-    padding:calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px; color:#fff; }
-  .yt-ov-close{ width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.18);
-    background:rgba(255,255,255,.08); color:#fff; font-size:17px; cursor:pointer; flex:0 0 auto;
-    display:flex; align-items:center; justify-content:center; }
-  .yt-ov-title{ flex:1 1 auto; min-width:0; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .yt-ov-bar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px; }
+  .yt-ov-back{ width:40px; height:40px; border-radius:50%; flex:0 0 auto; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:16px; color:#fff;
+    background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); }
   .yt-ov-open{ flex:0 0 auto; font-size:13px; font-weight:700; color:#fff; text-decoration:none;
-    border:1px solid rgba(255,255,255,.3); border-radius:999px; padding:7px 12px; }
-  .yt-ov-stage{ flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center;
-    padding-bottom:env(safe-area-inset-bottom, 0px); }
-  .yt-ov-frame{ position:relative; width:min(100vw, calc((100vh - 60px) * 16 / 9)); aspect-ratio:16/9; background:#000; }
+    background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.3); border-radius:999px; padding:8px 14px; }
+  .yt-ov-stage{ flex:0 0 auto; display:flex; justify-content:center; background:#000; }
+  .yt-ov-frame{ position:relative; width:min(100vw, 960px); aspect-ratio:16/9; background:#000; }
   .yt-ov-frame iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
-  /* Sideways on a phone: the video gets the whole height, with the bar floating at the top
-     (Close sits in the black margin beside the picture). */
+  .yt-ov-info{ flex:0 0 auto; padding:14px 16px 4px; }
+  .yt-ov-title{ font-size:18px; font-weight:700; line-height:1.3; color:var(--text);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .yt-ov-sub{ margin-top:3px; font-size:13px; color:var(--text-dim); }
+  .yt-ov-list{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    padding:10px 16px calc(env(safe-area-inset-bottom, 0px) + 20px); }
+  .yt-ov-list[hidden]{ display:none; }
+  .yt-ov-list-head{ font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); margin:8px 0 12px; }
+  .yt-row{ display:flex; align-items:flex-start; gap:12px; width:100%; padding:0; margin:0 0 14px;
+    background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+  .yt-row .yt-thumb{ flex:0 0 auto; width:min(150px, 42vw); border-radius:8px; }
+  .yt-row .yt-play{ width:30px; height:30px; margin:-15px 0 0 -15px; }
+  .yt-row .yt-play svg{ width:12px; height:12px; margin-left:2px; }
+  .yt-row-text{ flex:1 1 auto; min-width:0; padding-top:2px; }
+  .yt-row .yt-title{ margin-top:0; }
+  /* Sideways on a phone: just the video, as big as it goes, on black; the two buttons float
+     over the top (Back sits in the black margin beside the picture). */
   @media (orientation: landscape) and (max-height: 500px){
+    .yt-overlay{ background:#000; }
     .yt-ov-bar{ position:absolute; top:0; left:0; right:0; z-index:1; pointer-events:none;
       padding:8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); }
     .yt-ov-bar > *{ pointer-events:auto; }
-    .yt-ov-title{ visibility:hidden; }
-    .yt-ov-open{ background:rgba(0,0,0,.55); }
-    .yt-ov-stage{ height:100%; padding:0; }
+    .yt-ov-info, .yt-ov-list{ display:none; }
+    .yt-ov-stage{ flex:1 1 auto; height:100%; align-items:center; }
     .yt-ov-frame{ width:min(100vw, calc(100vh * 16 / 9)); }
   }
+  /* More room between the bio's More and the Music Videos heading under it. */
+  .tile-grid > .artist-videos-label:first-child{ padding-top:22px; margin-bottom:-10px; }
   @media (max-width: 900px){
     .artist-albums{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:28px 14px; }
   }
@@ -21471,7 +21490,7 @@
     d.textContent = yr ? yr[1] : '';
     b.appendChild(th); b.appendChild(t); b.appendChild(d);
     b.setAttribute('aria-label', 'Play video: ' + (v.title || name));
-    b.onclick = function(){ openYtPlayer(v, name); };
+    b.onclick = function(){ openYtPlayer(v, b._ytList, artistName); };
     return b;
   }
   function clearArtistVideos(){
@@ -21499,7 +21518,7 @@
         row.appendChild(sk);
       }
     } else {
-      rec.videos.forEach(function(v){ row.appendChild(buildYtTile(v, entry.name)); });
+      rec.videos.forEach(function(v){ var t = buildYtTile(v, entry.name); t._ytList = rec.videos; row.appendChild(t); });
     }
     stationsGrid.insertBefore(row, label.nextSibling);
   }
@@ -21523,8 +21542,9 @@
     });
   }
 
-  // ---------- the video player overlay ----------
+  // ---------- the video page ----------
   var ytOverlay = null, ytResumeAfter = false;
+  var ytCtx = null;   // { list, artist, current } for the page that is open
   function ensureYtOverlay(){
     if(ytOverlay) return ytOverlay;
     ytOverlay = document.createElement('div');
@@ -21534,19 +21554,71 @@
     ytOverlay.setAttribute('aria-modal', 'true');
     ytOverlay.setAttribute('aria-label', 'Music video');
     ytOverlay.innerHTML = '<div class="yt-ov-bar">'
-      + '<button type="button" class="yt-ov-close" id="ytCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>'
-      + '<div class="yt-ov-title" id="ytOvTitle"></div>'
+      + '<button type="button" class="yt-ov-back" id="ytBackBtn" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button>'
       + '<a class="yt-ov-open" id="ytOpenLink" target="_blank" rel="noopener noreferrer">Open in YouTube</a>'
-      + '</div><div class="yt-ov-stage"><div class="yt-ov-frame" id="ytOvFrame"></div></div>';
+      + '</div><div class="yt-ov-stage"><div class="yt-ov-frame" id="ytOvFrame"></div></div>'
+      + '<div class="yt-ov-info"><div class="yt-ov-title" id="ytOvTitle"></div><div class="yt-ov-sub" id="ytOvSub"></div></div>'
+      + '<div class="yt-ov-list" id="ytOvList"></div>';
     document.body.appendChild(ytOverlay);
-    document.getElementById('ytCloseBtn').onclick = closeYtPlayer;
+    document.getElementById('ytBackBtn').onclick = closeYtPlayer;
     document.getElementById('ytOpenLink').addEventListener('click', function(){ setTimeout(closeYtPlayer, 0); });
     document.addEventListener('keydown', function(e){
       if(e.key === 'Escape' && ytOverlay.classList.contains('open')) closeYtPlayer();
     });
     return ytOverlay;
   }
-  function openYtPlayer(v, name){
+  function ytYear(v){ var m = /^(\d{4})/.exec((v && v.published) || ''); return m ? m[1] : ''; }
+  // Puts video v at the top: a fresh iframe (changing an iframe's src would add a history
+  // entry), its title, and every other video of the artist's in the list under it.
+  function showYtVideo(v){
+    var ctx = ytCtx;
+    ctx.current = v;
+    var name = ytDisplayTitle(v.title, ctx.artist);
+    document.getElementById('ytOvTitle').textContent = name;
+    var yr = ytYear(v);
+    document.getElementById('ytOvSub').textContent = ctx.artist + (yr ? ' · ' + yr : '');
+    document.getElementById('ytOpenLink').href = 'https://www.youtube.com/watch?v=' + v.id;
+    var frame = document.getElementById('ytOvFrame');
+    frame.innerHTML = '';
+    // With a referrer: YouTube refuses to play embeds that arrive without one (error 153).
+    // fs=0: the Android shell has no full-screen support for web video; turning the phone
+    // sideways is what makes it full screen.
+    var f = document.createElement('iframe');
+    f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+    f.setAttribute('title', name || 'Music video');
+    f.src = 'https://www.youtube.com/embed/' + v.id + '?autoplay=1&playsinline=1&rel=0&fs=0&modestbranding=1';
+    frame.appendChild(f);
+    var list = document.getElementById('ytOvList');
+    list.innerHTML = '';
+    var others = ctx.list.filter(function(o){ return o.id !== v.id; });
+    list.hidden = !others.length;
+    if(others.length){
+      var h = document.createElement('div');
+      h.className = 'yt-ov-list-head';
+      h.textContent = 'More videos by ' + ctx.artist;
+      list.appendChild(h);
+      others.forEach(function(o){
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'yt-row';
+        row.dataset.vid = o.id;
+        var on = ytDisplayTitle(o.title, ctx.artist);
+        row.setAttribute('aria-label', 'Play video: ' + (o.title || on));
+        row.innerHTML = '<span class="yt-thumb"><img alt="" loading="lazy" decoding="async"><span class="yt-play">' + YT_PLAY_SVG + '</span></span>'
+          + '<span class="yt-row-text"><span class="yt-title"></span><span class="yt-date"></span></span>';
+        var img = row.querySelector('img');
+        img.src = 'https://i.ytimg.com/vi/' + o.id + '/mqdefault.jpg';
+        img.onerror = function(){ img.remove(); };
+        row.querySelector('.yt-title').textContent = on;
+        row.querySelector('.yt-date').textContent = ytYear(o);
+        row.onclick = function(){ showYtVideo(o); };
+        list.appendChild(row);
+      });
+    }
+    list.scrollTop = 0;
+  }
+  function openYtPlayer(v, list, artistName){
     var ov = ensureYtOverlay();
     // The radio and YouTube shouldn't play over each other.
     ytResumeAfter = false;
@@ -21557,20 +21629,8 @@
       setPlayingUI(false);
       saveCurrentPodcastProgress();
     }
-    document.getElementById('ytOvTitle').textContent = name || v.title || '';
-    document.getElementById('ytOpenLink').href = 'https://www.youtube.com/watch?v=' + v.id;
-    var frame = document.getElementById('ytOvFrame');
-    frame.innerHTML = '';
-    // A new iframe each time (changing an iframe's src would add a history entry), with a
-    // referrer: YouTube refuses to play embeds that arrive without one (error 153). fs=0:
-    // the Android shell has no full-screen support for web video; the overlay is the full
-    // screen, landscape included.
-    var f = document.createElement('iframe');
-    f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-    f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
-    f.setAttribute('title', name || 'Music video');
-    f.src = 'https://www.youtube.com/embed/' + v.id + '?autoplay=1&playsinline=1&rel=0&fs=0&modestbranding=1';
-    frame.appendChild(f);
+    ytCtx = { list: (list && list.length) ? list.slice() : [v], artist: artistName || '', current: v };
+    showYtVideo(v);
     ov.classList.add('open');
     document.body.classList.add('yt-open');
   }
@@ -21579,6 +21639,7 @@
     ytOverlay.classList.remove('open');
     document.body.classList.remove('yt-open');
     document.getElementById('ytOvFrame').innerHTML = '';   // stops the video
+    ytCtx = null;
     if(ytResumeAfter && currentStation && !uiIsPlaying) togglePlayPause();
     ytResumeAfter = false;
     // Turned sideways while watching: now the landscape layout applies.
