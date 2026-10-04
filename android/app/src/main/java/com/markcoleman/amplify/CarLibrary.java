@@ -227,6 +227,7 @@ final class CarLibrary {
     linkedHashMap.put("tab:podcasts", "Podcasts");
     linkedHashMap.put("home:favorites", "Favorites");
     linkedHashMap.put("home:topartists", "Top Artists");
+    linkedHashMap.put("home:madeforyou", "Made for You");
     linkedHashMap.put("home:continue", "Continue Listening");
     linkedHashMap.put("home:recentsongs", "Recent Songs");
     linkedHashMap.put("home:latest", "Latest Podcasts");
@@ -249,6 +250,7 @@ final class CarLibrary {
         new String[] {
           "home:favorites",
           "home:topartists",
+          "home:madeforyou",
           "home:continue",
           "home:recentsongs",
           "home:latest",
@@ -260,6 +262,7 @@ final class CarLibrary {
     linkedHashMap2.put("tab:stations", new String[] {"st:foryou", "st:recent", "st:top"});
     linkedHashMap3.put("home:favorites", "favorites");
     linkedHashMap3.put("home:topartists", "topArtists");
+    linkedHashMap3.put("home:madeforyou", "madeForYou");
     linkedHashMap3.put("home:continue", "continue");
     linkedHashMap3.put("home:recentsongs", "recentSongs");
     linkedHashMap3.put("home:latest", "podLatest");

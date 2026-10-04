@@ -76,7 +76,7 @@ MOCK = """
 })();
 """ % json.dumps(files)
 
-ALBUMS = """(function(){ return Array.from(document.querySelectorAll(".tile[data-entity='album']")).map(function(t){
+ALBUMS = """(function(){ return Array.from(document.querySelectorAll("#stationsGrid .tile[data-entity='album']")).map(function(t){
   return t.querySelector('.tile-name').textContent + ' / ' + (t.querySelector('.tile-sub')||{}).textContent; }); })()"""
 
 

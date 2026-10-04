@@ -934,6 +934,12 @@
   .song-row.playing .song-row-title{ color:var(--accent); }
   /* Search (build 117): Top Results rows, recent searches and action rows. */
   .song-row .song-row-art.round{ border-radius:50%; }
+  /* Made for You (build 122): each tile and row says why it's there. */
+  .mfy-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* The page's group headings sit in a list of rows (4px gaps), not a grid of covers, so the
+     generic label's negative margins (made for a 40px gap) would pull the rows over them. */
+  .tile-grid > .grid-section-label.mfy-label{ margin:22px 0 4px; }
+  .tile-grid > .grid-section-label.mfy-label:first-child{ margin-top:4px; }
   .top-result-chev{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:14px; }
   .song-row.search-more-row{ cursor:pointer; }
   .song-row .song-row-art.search-more-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); font-size:20px; }
@@ -4845,6 +4851,17 @@
         <div class="tile-grid top-artists-grid" id="topArtistsGrid"></div>
       </div>
 
+      <!-- Made for You (build 122): stations for the artists in the library, stations from the
+           genres the listener plays, and library albums worth coming back to -- worked out on
+           the phone from the library, play counts and favourites. Each tile says why it's there.
+           The heading opens a page with the three groups. Hidden until there is enough. -->
+      <div class="home-section made-for-you-section" id="madeForYouSection" style="display:none;">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="madeForYouHeading" role="button" tabindex="0">Made for You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid" id="madeForYouGrid"></div>
+      </div>
+
       <!-- Stations and songs are different shapes -- captioned squares against full-width
            rows -- so interleaving them by recency produced a ragged column with tiles
            stranded beside half-empty gaps. They get a section each, stacked. -->
@@ -6400,6 +6417,9 @@
   var favoritesSection = document.getElementById('favoritesSection');
   var favoritesGrid = document.getElementById('favoritesGrid');
   var topArtistsSection = document.getElementById('topArtistsSection');
+  var madeForYouSection = document.getElementById('madeForYouSection');
+  var madeForYouGrid = document.getElementById('madeForYouGrid');
+  var madeForYouShown = false;
   var topArtistsGrid = document.getElementById('topArtistsGrid');
   var latestPodcastsSection = document.getElementById('latestPodcastsSection');
   var latestPodcastsGrid = document.getElementById('latestPodcastsGrid');
@@ -9883,6 +9903,7 @@
   }
   function recordArtistPlay(item){
     if(!item || isBlacklisted(item)) return;
+    if(isLocalTrack(item)) noteAlbumPlayed(item);
     var name = artistNameForPlay(item);
     var key = name ? artistMatchKey(name) : '';
     if(!key) return;
@@ -10035,6 +10056,321 @@
         }));
       });
     }
+  }
+
+
+  // ================================================================
+  // Made for You (build 122)
+  // ================================================================
+  // Recommendations worked out on the phone from what is already here -- nothing about the
+  // listener leaves the phone except a genre name asked of the station directory.
+  //   Artists:   the "Exclusively ..." stations of artists in the library (or played, or
+  //              favourited), most-played first, ones not tuned into lately ahead.
+  //   Genres:    the genres the listener plays most -- their songs' genre tags, weighted by
+  //              plays, plus the tags of favourite and recent stations -- each giving a few
+  //              popular stations from the directory (fetched once a day, kept for offline).
+  //   Rediscover: library albums not played for a month (or not since this started being
+  //              kept), from the artists played most, a different handful each day.
+  // Each item carries why it's there ("Because you play Madonna"). The Home row mixes the
+  // three; its heading opens a page with them grouped. The car gets the same mix.
+  var MFY_KEY = 'radioPlayerMadeForYou';
+  var ALBUM_PLAYED_KEY = 'radioPlayerAlbumPlayed';
+  var MFY_REDISCOVER_DAYS = 30;
+  var mfyMemo = null, mfyGenreJob = null, mfyCarHook = null;
+
+  function loadAlbumPlayed(){
+    try{ var v = JSON.parse(localStorage.getItem(ALBUM_PLAYED_KEY) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
+  }
+  function noteAlbumPlayed(track){
+    try{
+      var m = loadAlbumPlayed();
+      m[albumKeyFor(track)] = Date.now();
+      var keys = Object.keys(m);
+      if(keys.length > 3000){ keys.sort(function(a, b){ return m[a] - m[b]; }); keys.slice(0, keys.length - 3000).forEach(function(k){ delete m[k]; }); }
+      localStorage.setItem(ALBUM_PLAYED_KEY, JSON.stringify(m));
+    }catch(e){}
+  }
+  function mfyDay(){ var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  // A small seeded shuffle, so "a different handful each day" stays the same all day.
+  function mfySeeded(list, seed){
+    var h = 2166136261;
+    for(var i = 0; i < seed.length; i++){ h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+    var out = list.slice();
+    for(var j = out.length - 1; j > 0; j--){
+      h ^= h << 13; h ^= h >>> 17; h ^= h << 5;
+      var k = Math.abs(h) % (j + 1);
+      var t = out[j]; out[j] = out[k]; out[k] = t;
+    }
+    return out;
+  }
+
+  // ---- genres ----
+  var MFY_GENRE_JUNK = /^(|other|others|unknown|misc|miscellaneous|music|genre|none|various|general|default|\(\d+\)|\d+)$/;
+  var MFY_GENRE_ALIASES = { 'hip-hop': 'hip hop', 'hiphop': 'hip hop', 'rap': 'hip hop', 'hip hop/rap': 'hip hop',
+    'r&b': 'rnb', 'r & b': 'rnb', 'rhythm and blues': 'rnb', 'r&b/soul': 'rnb', 'rock & roll': 'rock and roll',
+    'rock n roll': 'rock and roll', 'electronica': 'electronic', 'edm': 'electronic', 'dance/electronic': 'dance',
+    'alternative rock': 'alternative', 'alt rock': 'alternative', 'easy listening': 'easy listening',
+    'singer/songwriter': 'singer-songwriter', 'oldies': 'oldies', '80s': '80s', '1980s': '80s', '90s': '90s', '1990s': '90s', '70s': '70s', '1970s': '70s' };
+  var MFY_GENRE_LABELS = { 'rnb': 'R&B', 'hip hop': 'Hip Hop', 'edm': 'EDM', '80s': '80s', '90s': '90s', '70s': '70s', '60s': '60s', '00s': '2000s' };
+  function mfyGenreParts(raw){
+    return String(raw || '').toLowerCase().split(/[\/,;|]+/).map(function(g){
+      g = g.replace(/\s+/g, ' ').trim();
+      return MFY_GENRE_ALIASES[g] || g;
+    }).filter(function(g){ return g.length > 1 && !MFY_GENRE_JUNK.test(g); });
+  }
+  function mfyGenreLabel(tag){
+    if(MFY_GENRE_LABELS[tag]) return MFY_GENRE_LABELS[tag];
+    return tag.replace(/(^|[\s-])([a-z])/g, function(_, a, b){ return a + b.toUpperCase(); });
+  }
+  // The listener's genres, strongest first: a point for every song tagged with it, more for
+  // songs by artists they play, and some for the tags of favourite and recent stations.
+  function mfyTopGenres(max){
+    var score = {};
+    function add(g, n){ score[g] = (score[g] || 0) + n; }
+    var plays = loadArtistPlays();
+    libraryTracks.forEach(function(t){
+      if(isBlacklisted(t) || !t.genre) return;
+      var rec = plays[artistMatchKey(t.artist || '')];
+      var w = 1 + (rec ? Math.min(rec.count || 0, 50) / 5 : 0);
+      mfyGenreParts(t.genre).forEach(function(g){ add(g, w); });
+    });
+    favorites.concat(recentStations.slice(0, 30)).forEach(function(st){
+      if(!st || isLocalTrack(st) || isPodcastTrack(st) || isArtistFav(st) || isAlbumFav(st)) return;
+      mfyGenreParts(st.tags).slice(0, 4).forEach(function(g){ add(g, isFavorite(st) ? 3 : 1.5); });
+    });
+    return Object.keys(score).sort(function(a, b){ return score[b] - score[a]; }).slice(0, max);
+  }
+  function loadMfyCache(){
+    try{ var v = JSON.parse(localStorage.getItem(MFY_KEY) || 'null'); return v && typeof v === 'object' ? v : null; }catch(e){ return null; }
+  }
+  // Asks the directory for each top genre's popular stations, once a day (a saved answer is
+  // used until then, and offline).
+  function refreshMfyGenres(force){
+    if(mfyGenreJob) return mfyGenreJob;
+    var genres = mfyTopGenres(4);
+    var cache = loadMfyCache();
+    var sig = genres.join('|');
+    if(!force && cache && cache.day === mfyDay() && cache.sig === sig) return Promise.resolve(cache);
+    if(!genres.length) return Promise.resolve(cache);
+    mfyGenreJob = Promise.all(genres.map(function(g){
+      return apiFetch('/json/stations/search?tag=' + encodeURIComponent(g) + '&limit=15&hidebroken=true&order=clickcount&reverse=true')
+        .then(function(data){
+          return { tag: g, stations: dedupeByStreamUrl((data || []).map(stationToCardData)).filter(function(st){ return !isBlacklisted(st); }).slice(0, 10) };
+        })['catch'](function(){ return null; });
+    })).then(function(r){
+      var got = r.filter(function(x){ return x && x.stations.length; });
+      mfyGenreJob = null;
+      if(!got.length) return cache;
+      var v = { day: mfyDay(), sig: sig, genres: got };
+      try{ localStorage.setItem(MFY_KEY, JSON.stringify(v)); }catch(e){}
+      mfyMemo = null;
+      renderMadeForYouSection();
+      if(activeHomeSection === 'madeForYou') renderHomeSectionPage();
+      if(mfyCarHook) mfyCarHook();
+      return v;
+    }, function(){ mfyGenreJob = null; return cache; });
+    return mfyGenreJob;
+  }
+
+  // ---- the three lists ----
+  function mfyArtistStations(){
+    var plays = loadArtistPlays();
+    var favArtistKeys = {};
+    favorites.forEach(function(f){ if(isArtistFav(f)) favArtistKeys[f.artistKey] = true; });
+    var recentKeys = {};
+    recentStations.slice(0, 15).forEach(function(r){ recentKeys[favKey(r)] = true; });
+    var picks = [];
+    buildArtistIndex().forEach(function(e){
+      if(!e.stations.length) return;
+      var p = plays[e.key] ? (plays[e.key].count || 0) : 0;
+      var fav = !!favArtistKeys[e.key];
+      if(!e.tracks.length && !p && !fav) return; // an artist this listener has no tie to
+      var st = e.stations.filter(function(x){ return !isBlacklisted(x); });
+      if(!st.length) return;
+      var fresh = st.filter(function(x){ return !recentKeys[favKey(x)]; });
+      var station = (fresh[0] || st[0]);
+      var score = 3 * Math.log2(1 + p) + (fav ? 4 : 0) + Math.log2(1 + e.tracks.length) + (fresh.length ? 2 : 0);
+      var why = p >= 2 ? 'Because you play ' + e.name
+        : fav ? 'A favorite artist'
+        : e.tracks.length ? 'You have ' + plural(e.tracks.length, 'song', 'songs') + ' by ' + e.name
+        : 'Because you play ' + e.name;
+      picks.push({ kind: 'station', item: station, why: why, score: score, group: 'artists' });
+    });
+    picks.sort(function(a, b){ return b.score - a.score; });
+    return picks.slice(0, 12);
+  }
+  function mfyGenreStations(exclude){
+    var cache = loadMfyCache();
+    if(!cache || !cache.genres) return [];
+    var seen = {};
+    Object.keys(exclude).forEach(function(k){ seen[k] = true; });
+    var out = [];
+    // A few from each genre, taking turns, so one genre doesn't fill the row.
+    var lists = cache.genres.map(function(g){
+      return g.stations.filter(function(st){
+        var k = favKey(st);
+        if(seen[k] || isFavorite(st) || /\bexclusively\b/i.test(st.name || '')) return false;
+        return true;
+      }).slice(0, 4).map(function(st){ return { kind: 'station', item: st, why: 'Because you like ' + mfyGenreLabel(g.tag), group: 'genres', genre: g.tag }; });
+    });
+    for(var round = 0; round < 4; round++){
+      lists.forEach(function(l){
+        var x = l[round];
+        if(x && !seen[favKey(x.item)]){ seen[favKey(x.item)] = true; out.push(x); }
+      });
+    }
+    return out;
+  }
+  function mfyRediscover(){
+    var played = loadAlbumPlayed();
+    var plays = loadArtistPlays();
+    var now = Date.now(), cutoff = now - MFY_REDISCOVER_DAYS * 864e5;
+    var recentAlbum = {};
+    recentStations.slice(0, 40).forEach(function(r){ if(isLocalTrack(r)) recentAlbum[albumKeyFor(r)] = true; });
+    var favAlbum = {}, favArtist = {};
+    favorites.forEach(function(f){ if(isAlbumFav(f)) favAlbum[resolveAlbumKey(f.albumKey)] = true; if(isArtistFav(f)) favArtist[f.artistKey] = true; });
+    var genres = {};
+    mfyTopGenres(4).forEach(function(g){ genres[g] = true; });
+    var cands = [];
+    buildAlbumIndex().forEach(function(al){
+      if(!al.tracks.length || recentAlbum[al.key]) return;
+      if(played[al.key] && played[al.key] > cutoff) return;
+      var ak = al.various ? '' : artistMatchKey(al.artist);
+      var p = ak && plays[ak] ? (plays[ak].count || 0) : 0;
+      var g = al.tracks.some(function(t){ return mfyGenreParts(t.genre).some(function(x){ return genres[x]; }); });
+      var score = 2 * Math.log2(1 + p) + (favAlbum[al.key] ? 3 : 0) + (favArtist[ak] ? 2 : 0) + (g ? 1 : 0) + (al.tracks.length >= 4 ? 0.5 : 0);
+      var last = played[al.key];
+      var why = last ? 'Not played in ' + mfyAgo(now - last)
+        : p >= 2 ? 'Because you play ' + al.artist
+        : favAlbum[al.key] ? 'A favorite album'
+        : 'From your library';
+      cands.push({ kind: 'album', item: al, why: why, score: score, group: 'rediscover' });
+    });
+    cands.sort(function(a, b){ return b.score - a.score; });
+    // The strongest few dozen, a different handful of them each day.
+    return mfySeeded(cands.slice(0, 30), 'rediscover|' + mfyDay()).slice(0, 10);
+  }
+  function mfyAgo(ms){
+    var d = Math.round(ms / 864e5);
+    if(d < 60) return Math.max(1, Math.round(d / 7)) + (Math.round(d / 7) === 1 ? ' week' : ' weeks');
+    var m = Math.round(d / 30);
+    return m < 24 ? m + ' months' : Math.round(m / 12) + ' years';
+  }
+  // Everything, worked out at most every ten minutes (or when the library or the directory
+  // changes), so the row doesn't reshuffle every time a song starts.
+  function madeForYou(){
+    var sig = mfyDay() + '|' + libraryTracks.length + '|' + (artistStations || []).length + '|' + favorites.length + '|' + blacklist.length;
+    if(mfyMemo && mfyMemo.sig === sig && Date.now() - mfyMemo.at < 600000) return mfyMemo;
+    var artists = mfyArtistStations();
+    var used = {};
+    artists.forEach(function(x){ used[favKey(x.item)] = true; });
+    var genres = mfyGenreStations(used);
+    var rediscover = mfyRediscover();
+    // The Home row: the three taking turns.
+    var mix = [], lists = [artists, genres, rediscover];
+    for(var i = 0; mix.length < 20 && i < 12; i++){
+      lists.forEach(function(l){ if(l[i] && mix.length < 20) mix.push(l[i]); });
+    }
+    mfyMemo = { sig: sig, at: Date.now(), artists: artists, genres: genres, rediscover: rediscover, mix: mix };
+    return mfyMemo;
+  }
+
+  // ---- drawing ----
+  function mfyTile(x){
+    var tile;
+    if(x.kind === 'album'){
+      var al = x.item;
+      tile = buildEntityTile({
+        key: 'album:' + al.key, entity: 'album', name: al.album,
+        artFrom: artSourceForTracks(al.tracks),
+        onClick: function(){ openAlbumPage(al.key, null); }
+      });
+    } else {
+      tile = buildTile(x.item);
+    }
+    tile.classList.add('mfy-tile');
+    var sub = tile.querySelector('.tile-sub');
+    if(!sub){
+      sub = document.createElement('div');
+      sub.className = 'tile-sub';
+      var name = tile.querySelector('.tile-name');
+      if(name && name.nextSibling) tile.insertBefore(sub, name.nextSibling); else tile.appendChild(sub);
+    }
+    sub.textContent = x.why;
+    return tile;
+  }
+  function renderMadeForYouSection(){
+    if(!madeForYouGrid) return;
+    var m;
+    try{ m = madeForYou(); }catch(e){ console.warn('Made for You', e); return; }
+    madeForYouShown = m.mix.length >= 3;
+    madeForYouGrid.innerHTML = '';
+    if(madeForYouShown) m.mix.forEach(function(x){ madeForYouGrid.appendChild(mfyTile(x)); });
+    if(madeForYouSection && document.body.classList.contains('home-stacked')) madeForYouSection.style.display = madeForYouShown ? '' : 'none';
+    // The genre stations come from the directory, once a day, after the page has settled.
+    if(!mfyGenreJob && libraryTracks.length){
+      var c = loadMfyCache();
+      if(!c || c.day !== mfyDay()) setTimeout(function(){ refreshMfyGenres(false); }, 1500);
+    }
+  }
+  // One row of the Made for You page: picture, name, and why it's there; a station plays
+  // (with its More menu), an album opens (with a chevron).
+  function buildMfyRow(x){
+    var row = document.createElement('div');
+    row.className = 'tile song-row mfy-row';
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art';
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div'); t.className = 'tile-name song-row-title';
+    var s2 = document.createElement('div'); s2.className = 'song-row-sub';
+    s2.textContent = x.why;
+    if(x.kind === 'album'){
+      var al = x.item;
+      renderStationArt(art, artSourceForTracks(al.tracks) || {});
+      t.textContent = al.album + (al.artist ? ' · ' + al.artist : '');
+      row.dataset.key = 'album:' + al.key;
+      row.addEventListener('click', function(){ openAlbumPage(al.key, null); });
+    } else {
+      renderStationArt(art, x.item);
+      t.textContent = stripExclusively(x.item.name || '');
+      row.dataset.key = favKey(x.item);
+      row._ctxItem = x.item;
+      if(currentStation && favKey(currentStation) === favKey(x.item)) row.classList.add('playing');
+      row.addEventListener('click', function(){ playEntity(x.item); });
+    }
+    body.appendChild(t); body.appendChild(s2);
+    row.appendChild(art); row.appendChild(body);
+    if(x.kind === 'album'){
+      var chev = document.createElement('span');
+      chev.className = 'top-result-chev';
+      chev.setAttribute('aria-hidden', 'true');
+      chev.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+      row.appendChild(chev);
+    } else row.appendChild(buildRowMoreBtn(x.item, { fav: true }));
+    return row;
+  }
+  function renderMadeForYouPage(){
+    var m = madeForYou();
+    var groups = [
+      ['Stations for Your Artists', m.artists],
+      ['From Your Genres', m.genres],
+      ['Rediscover', m.rediscover]
+    ].filter(function(g){ return g[1].length; });
+    if(!groups.length){
+      stationsGrid.innerHTML = '<div class="empty-state">Play some music and add your library: recommendations will show up here.</div>';
+      setResultCount(null);
+      return;
+    }
+    groups.forEach(function(g){
+      var label = document.createElement('div');
+      label.className = 'grid-section-label mfy-label';
+      label.textContent = g[0];
+      stationsGrid.appendChild(label);
+      g[1].forEach(function(x){ stationsGrid.appendChild(buildMfyRow(x)); });
+    });
+    setResultCount(null);
+    if(!m.genres.length && !mfyGenreJob) refreshMfyGenres(false);
   }
 
   function recordRecent(station){
@@ -11096,6 +11432,7 @@
     if(stacked){
       makeHomeRow(favoritesGrid);
       makeHomeRow(topArtistsGrid);
+      makeHomeRow(madeForYouGrid);
       makeHomeRow(recentGrid);
       makeHomeRow(latestPodcastsGrid);
       makeHomeRow(forYouGrid);
@@ -11108,6 +11445,7 @@
       homeTopHeading.style.display = '';
       favoritesSection.style.display = '';
       topArtistsSection.style.display = topArtistsShown ? '' : 'none';
+      madeForYouSection.style.display = madeForYouShown ? '' : 'none';
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
       recentSection.style.display = '';
       forYouSection.style.display = '';
@@ -11126,6 +11464,7 @@
       recentSection.style.display = 'none';
       favoritesSection.style.display = 'none';
       topArtistsSection.style.display = 'none';
+      madeForYouSection.style.display = 'none';
       latestPodcastsSection.style.display = 'none';
       forYouSection.style.display = 'none';
       cwHomeSection.style.display = 'none';
@@ -11145,6 +11484,7 @@
     recentSection.style.display = homeTab === 'recent' ? '' : 'none';
     favoritesSection.style.display = homeTab === 'favorites' ? '' : 'none';
     topArtistsSection.style.display = 'none';
+    madeForYouSection.style.display = 'none';
     latestPodcastsSection.style.display = 'none';
     forYouSection.style.display = 'none';
     cwHomeSection.style.display = 'none';
@@ -11342,6 +11682,7 @@
   function renderRecentSection(){
     dropChannelsFromRecent();
     renderTopArtistsSection();
+    renderMadeForYouSection();
     renderLatestPodcastsSection();
     renderForYouHomeSection();
     renderContinueWatchingHome();
@@ -20217,7 +20558,8 @@
     recentStations: 'Continue Listening',
     recentSongs: 'Recent Songs',
     topStations: 'Top Stations',
-    topArtists: 'Top Artists'
+    topArtists: 'Top Artists',
+    madeForYou: 'Made for You'
   };
 
   function openHomeSectionPage(section){
@@ -20245,6 +20587,7 @@
     if(section === 'recentStations'){ renderRecentStationsPage(); return; }
     if(section === 'recentSongs'){ renderRecentSongsPage(); return; }
     if(section === 'topStations'){ renderTopStationsPage(); return; }
+    if(section === 'madeForYou'){ libraryShuffleBtn.style.display = 'none'; renderMadeForYouPage(); return; }
     if(section === 'topArtists'){
       document.getElementById('allArtistsLink').style.display = '';
       sectionHeadingRow.classList.add('has-side-link');
@@ -20478,6 +20821,7 @@
   wireHomeSectionHeading(recentSongsHeadingBtn, 'recentSongs');
   wireHomeSectionHeading(topStationsHeadingBtn, 'topStations');
   wireHomeSectionHeading(document.getElementById('topArtistsHeading'), 'topArtists');
+  wireHomeSectionHeading(document.getElementById('madeForYouHeading'), 'madeForYou');
 
   // Re-renders whichever library view is currently showing, including a detail page. Called
   // after an import, a removal, or a late-arriving station list.
@@ -26947,6 +27291,15 @@
         lists.topArtists = compact(topArtistList().map(function(e){
           return e && e.key ? { t: 'artist', key: e.key, title: e.name || '' } : null;
         }));
+        // Made for You: the same mix as the Home row (stations play, albums open).
+        try{
+          lists.madeForYou = compact(madeForYou().mix.map(function(x){
+            if(x.kind === 'album') return { t: 'album', key: x.item.key, title: x.item.album || '', sub: x.why };
+            var c = carStation(x.item);
+            if(c) c.sub = x.why;
+            return c;
+          }));
+        }catch(e){ lists.madeForYou = []; }
         stationPlaylists.forEach(function(pl){
           lists['pl:' + pl.id] = compact((pl.stations || []).map(function(it){
             if(isPodcastTrack(it)) return carEpisode(it, prog);
@@ -27419,6 +27772,7 @@
       updateStepButtons();
     }
     carSkipHook = function(next){ if(P.carSkip) P.carSkip({ next: !!next })['catch'](function(){}); };
+    mfyCarHook = function(){ scheduleCarCatalog(); };
     window.addEventListener('amplify-car', function(e){ try{ followCar(e.detail || {}); }catch(err){ console.error(err); } });
     // Opened while the car is already playing something: pick it up.
     function checkCarNowPlaying(){
