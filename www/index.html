@@ -935,7 +935,9 @@
   /* Search (build 117): Top Results rows, recent searches and action rows. */
   .song-row .song-row-art.round{ border-radius:50%; }
   /* Made for You (build 122): each tile and row says why it's there. */
-  .mfy-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfy-row .song-row-title, .mfy-row .song-row-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfy-row .song-row-sub{ font-size:13.5px; color:var(--text-dim); }
+  .home-section .tile-grid.mfy-home-list{ display:grid; grid-template-columns:1fr; gap:4px; overflow:visible; }
   /* The page's group headings sit in a list of rows (4px gaps), not a grid of covers, so the
      generic label's negative margins (made for a 40px gap) would pull the rows over them. */
   .tile-grid > .grid-section-label.mfy-label{ margin:22px 0 4px; }
@@ -4851,16 +4853,6 @@
         <div class="tile-grid top-artists-grid" id="topArtistsGrid"></div>
       </div>
 
-      <!-- Made for You (build 122): stations for the artists in the library, stations from the
-           genres the listener plays, and library albums worth coming back to -- worked out on
-           the phone from the library, play counts and favourites. Each tile says why it's there.
-           The heading opens a page with the three groups. Hidden until there is enough. -->
-      <div class="home-section made-for-you-section" id="madeForYouSection" style="display:none;">
-        <div class="home-section-head">
-          <h2 class="home-heading-link" id="madeForYouHeading" role="button" tabindex="0">Made for You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
-        </div>
-        <div class="tile-grid" id="madeForYouGrid"></div>
-      </div>
 
       <!-- Stations and songs are different shapes -- captioned squares against full-width
            rows -- so interleaving them by recency produced a ragged column with tiles
@@ -4913,6 +4905,16 @@
           <h2 class="home-heading-link" id="channelsHomeHeading" role="button" tabindex="0">My Channels<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
         </div>
         <div class="tile-grid" id="channelsHomeGrid"></div>
+      </div>
+      <!-- Made for You (builds 122-123): stations for the artists in the library and library
+           albums worth coming back to, worked out on the phone from the library, play counts and
+           favourites, as stacked rows (each says why it's there). Sits right above Top Stations.
+           The heading opens a page with every pick. Hidden until there is enough. -->
+      <div class="home-section made-for-you-section" id="madeForYouSection" style="display:none;">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="madeForYouHeading" role="button" tabindex="0">Made for You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid grid-songs mfy-home-list" id="madeForYouGrid"></div>
       </div>
       <!-- Only on a stacked home: the tab used to name this panel, and with the tabs gone
            it needs a heading of its own. -->
@@ -10066,17 +10068,14 @@
   // listener leaves the phone except a genre name asked of the station directory.
   //   Artists:   the "Exclusively ..." stations of artists in the library (or played, or
   //              favourited), most-played first, ones not tuned into lately ahead.
-  //   Genres:    the genres the listener plays most -- their songs' genre tags, weighted by
-  //              plays, plus the tags of favourite and recent stations -- each giving a few
-  //              popular stations from the directory (fetched once a day, kept for offline).
   //   Rediscover: library albums not played for a month (or not since this started being
   //              kept), from the artists played most, a different handful each day.
   // Each item carries why it's there ("Because you play Madonna"). The Home row mixes the
-  // three; its heading opens a page with them grouped. The car gets the same mix.
-  var MFY_KEY = 'radioPlayerMadeForYou';
+  // two (stacked rows since build 123); its heading opens a page with them grouped. The car
+  // gets the same mix.
   var ALBUM_PLAYED_KEY = 'radioPlayerAlbumPlayed';
   var MFY_REDISCOVER_DAYS = 30;
-  var mfyMemo = null, mfyGenreJob = null, mfyCarHook = null;
+  var mfyMemo = null, mfyCarHook = null;
 
   function loadAlbumPlayed(){
     try{ var v = JSON.parse(localStorage.getItem(ALBUM_PLAYED_KEY) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
@@ -10140,37 +10139,9 @@
     });
     return Object.keys(score).sort(function(a, b){ return score[b] - score[a]; }).slice(0, max);
   }
-  function loadMfyCache(){
-    try{ var v = JSON.parse(localStorage.getItem(MFY_KEY) || 'null'); return v && typeof v === 'object' ? v : null; }catch(e){ return null; }
-  }
-  // Asks the directory for each top genre's popular stations, once a day (a saved answer is
-  // used until then, and offline).
-  function refreshMfyGenres(force){
-    if(mfyGenreJob) return mfyGenreJob;
-    var genres = mfyTopGenres(4);
-    var cache = loadMfyCache();
-    var sig = genres.join('|');
-    if(!force && cache && cache.day === mfyDay() && cache.sig === sig) return Promise.resolve(cache);
-    if(!genres.length) return Promise.resolve(cache);
-    mfyGenreJob = Promise.all(genres.map(function(g){
-      return apiFetch('/json/stations/search?tag=' + encodeURIComponent(g) + '&limit=15&hidebroken=true&order=clickcount&reverse=true')
-        .then(function(data){
-          return { tag: g, stations: dedupeByStreamUrl((data || []).map(stationToCardData)).filter(function(st){ return !isBlacklisted(st); }).slice(0, 10) };
-        })['catch'](function(){ return null; });
-    })).then(function(r){
-      var got = r.filter(function(x){ return x && x.stations.length; });
-      mfyGenreJob = null;
-      if(!got.length) return cache;
-      var v = { day: mfyDay(), sig: sig, genres: got };
-      try{ localStorage.setItem(MFY_KEY, JSON.stringify(v)); }catch(e){}
-      mfyMemo = null;
-      renderMadeForYouSection();
-      if(activeHomeSection === 'madeForYou') renderHomeSectionPage();
-      if(mfyCarHook) mfyCarHook();
-      return v;
-    }, function(){ mfyGenreJob = null; return cache; });
-    return mfyGenreJob;
-  }
+  // (Builds 122 only: popular directory stations for the listener's top genres were fetched
+  // here too. Since build 123 only Exclusively channels are recommended.)
+  try{ localStorage.removeItem('radioPlayerMadeForYou'); }catch(e){}
 
   // ---- the three lists ----
   function mfyArtistStations(){
@@ -10185,6 +10156,7 @@
       var p = plays[e.key] ? (plays[e.key].count || 0) : 0;
       var fav = !!favArtistKeys[e.key];
       if(!e.tracks.length && !p && !fav) return; // an artist this listener has no tie to
+      // Every directory artist station is an Exclusively channel (they come from that search).
       var st = e.stations.filter(function(x){ return !isBlacklisted(x); });
       if(!st.length) return;
       var fresh = st.filter(function(x){ return !recentKeys[favKey(x)]; });
@@ -10198,28 +10170,6 @@
     });
     picks.sort(function(a, b){ return b.score - a.score; });
     return picks.slice(0, 12);
-  }
-  function mfyGenreStations(exclude){
-    var cache = loadMfyCache();
-    if(!cache || !cache.genres) return [];
-    var seen = {};
-    Object.keys(exclude).forEach(function(k){ seen[k] = true; });
-    var out = [];
-    // A few from each genre, taking turns, so one genre doesn't fill the row.
-    var lists = cache.genres.map(function(g){
-      return g.stations.filter(function(st){
-        var k = favKey(st);
-        if(seen[k] || isFavorite(st) || /\bexclusively\b/i.test(st.name || '')) return false;
-        return true;
-      }).slice(0, 4).map(function(st){ return { kind: 'station', item: st, why: 'Because you like ' + mfyGenreLabel(g.tag), group: 'genres', genre: g.tag }; });
-    });
-    for(var round = 0; round < 4; round++){
-      lists.forEach(function(l){
-        var x = l[round];
-        if(x && !seen[favKey(x.item)]){ seen[favKey(x.item)] = true; out.push(x); }
-      });
-    }
-    return out;
   }
   function mfyRediscover(){
     var played = loadAlbumPlayed();
@@ -10262,12 +10212,12 @@
     var sig = mfyDay() + '|' + libraryTracks.length + '|' + (artistStations || []).length + '|' + favorites.length + '|' + blacklist.length;
     if(mfyMemo && mfyMemo.sig === sig && Date.now() - mfyMemo.at < 600000) return mfyMemo;
     var artists = mfyArtistStations();
-    var used = {};
-    artists.forEach(function(x){ used[favKey(x.item)] = true; });
-    var genres = mfyGenreStations(used);
+    // Only Exclusively (artist) channels are recommended since build 123: the genre stations
+    // from the directory are no longer mixed in (or fetched).
+    var genres = [];
     var rediscover = mfyRediscover();
-    // The Home row: the three taking turns.
-    var mix = [], lists = [artists, genres, rediscover];
+    // Home and the car: the two taking turns.
+    var mix = [], lists = [artists, rediscover];
     for(var i = 0; mix.length < 20 && i < 12; i++){
       lists.forEach(function(l){ if(l[i] && mix.length < 20) mix.push(l[i]); });
     }
@@ -10305,16 +10255,16 @@
     try{ m = madeForYou(); }catch(e){ console.warn('Made for You', e); return; }
     madeForYouShown = m.mix.length >= 3;
     madeForYouGrid.innerHTML = '';
-    if(madeForYouShown) m.mix.forEach(function(x){ madeForYouGrid.appendChild(mfyTile(x)); });
+    // Stacked rows (build 123): a picture, the name on one line, and why it's there on the
+    // line under it -- readable, unlike the small grey caption under a cover. The first
+    // six; the heading opens the rest.
+    if(madeForYouShown) m.mix.slice(0, 6).forEach(function(x){ madeForYouGrid.appendChild(buildMfyRow(x)); });
     if(madeForYouSection && document.body.classList.contains('home-stacked')) madeForYouSection.style.display = madeForYouShown ? '' : 'none';
-    // The genre stations come from the directory, once a day, after the page has settled.
-    if(!mfyGenreJob && libraryTracks.length){
-      var c = loadMfyCache();
-      if(!c || c.day !== mfyDay()) setTimeout(function(){ refreshMfyGenres(false); }, 1500);
-    }
   }
   // One row of the Made for You page: picture, name, and why it's there; a station plays
   // (with its More menu), an album opens (with a chevron).
+  // Drawn: the icon font is a subset with no chevron in it (an <i> for one renders nothing).
+  var ROW_CHEVRON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M9 5 L16 12 L9 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function buildMfyRow(x){
     var row = document.createElement('div');
     row.className = 'tile song-row mfy-row';
@@ -10345,7 +10295,7 @@
       var chev = document.createElement('span');
       chev.className = 'top-result-chev';
       chev.setAttribute('aria-hidden', 'true');
-      chev.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+      chev.innerHTML = ROW_CHEVRON_SVG;
       row.appendChild(chev);
     } else row.appendChild(buildRowMoreBtn(x.item, { fav: true }));
     return row;
@@ -10354,7 +10304,6 @@
     var m = madeForYou();
     var groups = [
       ['Stations for Your Artists', m.artists],
-      ['From Your Genres', m.genres],
       ['Rediscover', m.rediscover]
     ].filter(function(g){ return g[1].length; });
     if(!groups.length){
@@ -10370,7 +10319,6 @@
       g[1].forEach(function(x){ stationsGrid.appendChild(buildMfyRow(x)); });
     });
     setResultCount(null);
-    if(!m.genres.length && !mfyGenreJob) refreshMfyGenres(false);
   }
 
   function recordRecent(station){
@@ -11432,7 +11380,6 @@
     if(stacked){
       makeHomeRow(favoritesGrid);
       makeHomeRow(topArtistsGrid);
-      makeHomeRow(madeForYouGrid);
       makeHomeRow(recentGrid);
       makeHomeRow(latestPodcastsGrid);
       makeHomeRow(forYouGrid);
@@ -14062,7 +14009,7 @@
   function appendVideoTabs(){
     var tabs = document.createElement('div');
     tabs.className = 'home-tabs video-tabs';
-    [['channels', 'Channels'], ['movies', 'Movies'], ['shows', 'TV Shows']].forEach(function(t){
+    [['channels', 'Live TV'], ['movies', 'Movies'], ['shows', 'TV Shows']].forEach(function(t){
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'home-tab' + (videoTab === t[0] ? ' active' : '');
@@ -20763,7 +20710,7 @@
     setResultCount(null);
     // Same query loadTopStations() itself uses for the home row, just not sliced down to a
     // row's width -- every one of the 48 it fetches gets its own line here.
-    apiFetch('/json/stations/search?limit=48&hidebroken=true&order=clickcount&reverse=true')
+    apiFetch('/json/stations/search?limit=48&countrycode=US&hidebroken=true&order=clickcount&reverse=true')
       .then(function(data){
         if(activeHomeSection !== 'topStations') return;  // navigated away while this was in flight
         var cards = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
@@ -24458,7 +24405,7 @@
     // (a library section, a search, one of the "see all" pages, ...). Tapping Home and then
     // straight on to somewhere else before this fetch lands used to let it win the race and
     // clobber whatever ended up in the grid meanwhile; both branches below now check it first.
-    apiFetch('/json/stations/search?limit=48&hidebroken=true&order=clickcount&reverse=true')
+    apiFetch('/json/stations/search?limit=48&countrycode=US&hidebroken=true&order=clickcount&reverse=true')
       .then(function(data){ if(!onHomeView) return; renderStations(data); })
       .catch(function(err){ if(!onHomeView) return; setStatus(err.message, true); resetStationsGrid(); });
   }
@@ -25134,7 +25081,7 @@
       var chev = document.createElement('span');
       chev.className = 'top-result-chev';
       chev.setAttribute('aria-hidden', 'true');
-      chev.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+      chev.innerHTML = ROW_CHEVRON_SVG;
       row.appendChild(chev);
     }
     row.addEventListener('click', open);
@@ -27254,7 +27201,7 @@
     // Top Stations and every For You search, from the station directory.
     function refreshNetLists(){
       if(Date.now() - carNet.at < CAR_NET_MS && carNet.top) return Promise.resolve();
-      var jobs = [apiFetch('/json/stations/search?limit=48&hidebroken=true&order=clickcount&reverse=true')
+      var jobs = [apiFetch('/json/stations/search?limit=48&countrycode=US&hidebroken=true&order=clickcount&reverse=true')
         .then(function(data){ carNet.top = stationCards(data); })['catch'](function(){})];
       customSearches.forEach(function(item){
         jobs.push(apiFetch('/json/stations/search?name=' + encodeURIComponent(item.query) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')

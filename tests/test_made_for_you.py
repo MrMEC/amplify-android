@@ -1,6 +1,7 @@
-"""Made for You (build 122): a Home row (and page, and car list) of stations for the artists in
-the library, stations from the listener's genres, and library albums to rediscover, each saying
-why it's there. Run: python3 tests/test_made_for_you.py (screenshots in /tmp/claude-0/t/shots)"""
+"""Made for You (builds 122-123): stacked rows on Home, right above Top Stations (and a page,
+and a car list), of Exclusively stations for the library's artists and library albums to
+rediscover, each saying why it's there. Also Top Stations limited to US stations and the Video
+page's Live TV tab. Run: python3 tests/test_made_for_you.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess
 from playwright.async_api import async_playwright
 
@@ -69,7 +70,7 @@ fails = []
 def check(cond, msg):
     print(('PASS ' if cond else 'FAIL ') + msg)
     if not cond: fails.append(msg)
-calls = {'tag': []}
+calls = {'tag': [], 'top': []}
 NOW_MS = None
 EXCL = [{'name': 'Exclusively ' + a, 'url_resolved': 'http://s/ex-' + a, 'stationuuid': 'ex-' + a, 'favicon': '', 'tags': 'rock', 'codec': 'MP3'} for a in ('Alpha', 'Bravo', 'Charlie', 'Zed')]
 offline = {'on': False}
@@ -84,6 +85,11 @@ async def route(r):
             tag = q['tag'][0]; calls['tag'].append(tag)
             return await r.fulfill(status=200, content_type='application/json', body=json.dumps(
                 [{'name': '%s Station %d' % (tag.title(), i), 'url_resolved': 'http://s/%s%d' % (tag, i), 'stationuuid': '%s-%d' % (tag, i), 'favicon': '', 'tags': tag, 'codec': 'MP3'} for i in range(6)]))
+        if 'name' not in q and 'tag' not in q:
+            calls['top'].append(q.get('countrycode', [''])[0])
+            cc = q.get('countrycode', ['ANY'])[0]
+            return await r.fulfill(status=200, content_type='application/json', body=json.dumps(
+                [{'name': '%s Top %d' % (cc, i), 'url_resolved': 'http://s/top%s%d' % (cc, i), 'stationuuid': 'top%s%d' % (cc, i), 'favicon': '', 'tags': 'pop', 'countrycode': cc, 'codec': 'MP3'} for i in range(5)]))
         return await r.fulfill(status=200, content_type='application/json', body='[]')
     return await r.abort()
 
@@ -118,42 +124,50 @@ async def main():
         check(set(arts) == {'Alpha', 'Bravo', 'Charlie'}, f'artist stations for library artists only (not Zed) {list(arts)}')
         check([x[1] for x in m['artists']][0] == 'Alpha', 'the most-played artist first')
         check(arts.get('Alpha') == 'Because you play Alpha' and arts.get('Charlie') == 'A favorite artist', f'each says why {arts}')
-        # 2. genre stations
-        gen = await pg.evaluate('__m.genres()')
-        check(gen[:2] == ['rock', 'jazz'], f'top genres from the library, weighted by plays {gen}')
-        check(sorted(calls['tag']) == sorted(gen), f'one directory request per genre {calls["tag"]}')
-        gs = m['genres']
-        check(gs and gs[0][2] == 'Because you like Rock' and any(x[2] == 'Because you like Jazz' for x in gs), f'genre stations say which genre {[x[2] for x in gs][:4]}')
-        check(len([x for x in gs if 'Rock' in x[2]]) <= 4, 'no more than four from one genre')
+        # 2. only Exclusively channels: no genre stations, nothing from the directory but artist channels
+        check(m['genres'] == [] and calls['tag'] == [], f'no genre stations, and the directory is not asked for any {calls["tag"]}')
+        check(all(x[0] == 'album' or x[1] in ('Alpha', 'Bravo', 'Charlie') for x in m['mix']), f'every station is an Exclusively channel {[x[1] for x in m["mix"]]}')
         # 3. rediscover
         rd = {x[1]: x[2] for x in m['rediscover']}
         check('Alpha One' not in rd, 'an album played today is not suggested')
         check(rd.get('Bravo Blue') == 'Not played in 3 months', f'an album not played for months says so {rd}')
         check(rd.get('Alpha Two') == 'Because you play Alpha', f'an unplayed album by a played artist {rd}')
-        # the Home row
-        check(m['mix'][:3] == [m['artists'][0], m['genres'][0], m['rediscover'][0]], 'the Home row takes turns: artist station, genre station, album')
-        row = await pg.evaluate("""(()=>{ var s = document.getElementById('madeForYouSection'); var tiles = Array.from(document.querySelectorAll('#madeForYouGrid .tile'));
+        # the Home section: stacked rows, one-line titles, right above Top Stations
+        check(m['mix'][:2] == [m['artists'][0], m['rediscover'][0]], 'the mix takes turns: artist station, album')
+        row = await pg.evaluate("""(()=>{ var s = document.getElementById('madeForYouSection'); var rows = Array.from(document.querySelectorAll('#madeForYouGrid .mfy-row'));
+          var top = document.getElementById('homeTopHeading');
           return { shown: getComputedStyle(s).display !== 'none', heading: document.getElementById('madeForYouHeading').textContent.trim(),
-            names: tiles.map(function(t){ return t.querySelector('.tile-name').textContent; }), subs: tiles.map(function(t){ var x = t.querySelector('.tile-sub'); return x ? x.textContent : null; }),
-            after: (function(){ var a = document.getElementById('topArtistsSection'), b = s; return !!(a.compareDocumentPosition(b) & 4); })() }; })()""")
+            n: rows.length, tiles: document.querySelectorAll('#madeForYouGrid .tile:not(.mfy-row)').length,
+            boxes: rows.map(function(r){ var b = r.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.bottom)]; }),
+            titles: rows.map(function(r){ var t = r.querySelector('.song-row-title'), cs = getComputedStyle(t); return [t.textContent, cs.whiteSpace, Math.round(t.getBoundingClientRect().height), parseFloat(cs.lineHeight) || 0]; }),
+            subs: rows.map(function(r){ var x = r.querySelector('.song-row-sub'), cs = getComputedStyle(x); return [x.textContent, parseFloat(cs.fontSize), Math.round(x.getBoundingClientRect().height)]; }),
+            nextIsTop: (function(){ var n = s.nextElementSibling; while(n && n.nodeType !== 1) n = n.nextSibling; return n === top; })(),
+            inRow: !!s.querySelector('.home-row') }; })()""")
+        print('home', row)
         check(row['shown'] and row['heading'] == 'Made for You', f'Home shows Made for You {row["heading"]}')
-        check(len(row['names']) == len(m['mix']) and all(row['subs']), f'every tile has its reason under it {row["subs"][:4]}')
+        check(row['n'] == min(6, len(m['mix'])) and row['tiles'] == 0 and not row['inRow'], f'as stacked rows (up to six), not a sideways row of covers {row["n"]}')
+        check(all(row['boxes'][i + 1][1] >= row['boxes'][i][2] - 1 and row['boxes'][i + 1][0] == row['boxes'][0][0] for i in range(len(row['boxes']) - 1)), 'one under another')
+        check(all(t[1] == 'nowrap' and t[2] <= 24 for t in row['titles']), f'titles on one line {row["titles"]}')
+        check(all(x[0] and x[1] >= 13 and x[2] <= 20 for x in row['subs']), f'the reason is readable, on its own line {row["subs"]}')
+        check(row['nextIsTop'], 'right above Top Stations')
+        chev = await pg.evaluate("Array.from(document.querySelectorAll('#madeForYouGrid .mfy-row')).map(function(r){ var c = r.querySelector('.top-result-chev svg'); return c ? Math.round(c.getBoundingClientRect().width) : 0; })")
+        check(all((w >= 12) == (i % 2 == 1) for i, w in enumerate(chev)), f'albums show an arrow you can see, stations a More button {chev}')
         await pg.evaluate("document.getElementById('madeForYouSection').scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/mfy-home.png')
-        # play a station from the row, open an album from it
-        await pg.evaluate("Array.from(document.querySelectorAll('#madeForYouGrid .tile')).filter(function(t){ return t.querySelector('.tile-name').textContent === 'Alpha'; })[0].click()"); await pg.wait_for_timeout(600)
-        check(await pg.evaluate("__m.cur()") in ('Alpha', 'Exclusively Alpha'), f'a station tile plays it ({await pg.evaluate("__m.cur()")})')
-        await pg.evaluate("Array.from(document.querySelectorAll('#madeForYouGrid .tile')).filter(function(t){ return /Alpha Two/.test(t.textContent); })[0].click()"); await pg.wait_for_timeout(700)
-        check(await pg.evaluate("document.body.classList.contains('album-open') && /Alpha Two/.test(document.getElementById('albumHeroName').textContent)"), 'an album tile opens the album')
+        # play a station from it, open an album from it
+        await pg.evaluate("Array.from(document.querySelectorAll('#madeForYouGrid .mfy-row')).filter(function(t){ return t.querySelector('.song-row-title').textContent === 'Alpha'; })[0].click()"); await pg.wait_for_timeout(600)
+        check(await pg.evaluate("__m.cur()") in ('Alpha', 'Exclusively Alpha'), f'a station row plays it ({await pg.evaluate("__m.cur()")})')
+        await pg.evaluate("Array.from(document.querySelectorAll('#madeForYouGrid .mfy-row')).filter(function(t){ return /Alpha Two/.test(t.textContent); })[0].click()"); await pg.wait_for_timeout(700)
+        check(await pg.evaluate("document.body.classList.contains('album-open') && /Alpha Two/.test(document.getElementById('albumHeroName').textContent)"), 'an album row opens the album')
         # the page
         await pg.evaluate('__m.home()'); await pg.wait_for_timeout(800)
         await pg.evaluate("document.getElementById('madeForYouHeading').click()"); await pg.wait_for_timeout(600)
         pgv = await pg.evaluate("""(()=>({ heading: document.getElementById('stationsHeading').textContent,
           labels: Array.from(document.querySelectorAll('#stationsGrid .mfy-label')).map(function(l){ return l.textContent; }),
           rows: document.querySelectorAll('#stationsGrid .mfy-row').length, shuffle: getComputedStyle(document.getElementById('libraryShuffleBtn')).display, back: document.getElementById('detailBackLabel').textContent }))()""")
-        check(pgv['heading'] == 'Made for You' and pgv['labels'] == ['Stations for Your Artists', 'From Your Genres', 'Rediscover'], f'the page groups them {pgv}')
+        check(pgv['heading'] == 'Made for You' and pgv['labels'] == ['Stations for Your Artists', 'Rediscover'], f'the page groups them {pgv}')
         check(pgv['shuffle'] == 'none', 'no stray Shuffle button on the page')
-        check(pgv['rows'] == len(m['artists']) + len(m['genres']) + len(m['rediscover']), 'with every item as a row')
+        check(pgv['rows'] == len(m['artists']) + len(m['rediscover']), 'with every item as a row')
         ov = await pg.evaluate("""Array.from(document.querySelectorAll('#stationsGrid .mfy-label')).map(function(l){
           var n = l.nextElementSibling, p = l.previousElementSibling; var r = l.getBoundingClientRect();
           return [Math.round(n.getBoundingClientRect().top - r.bottom), p ? Math.round(r.top - p.getBoundingClientRect().bottom) : null]; })""")
@@ -165,14 +179,20 @@ async def main():
         lst = (cat or {}).get('lists', {}).get('madeForYou')
         check(lst and lst[0]['t'] == 'station' and lst[0].get('sub') == m['mix'][0][2] and any(x['t'] == 'album' for x in lst), f'Android Auto gets the same mix {lst and lst[:3]}')
         java = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'android/app/src/main/java/com/markcoleman/amplify/CarLibrary.java')).read()
-        check('"home:madeforyou", "Made for You"' in java and '"home:madeforyou", "madeForYou"' in java, 'the car menu has a Made for You folder under Home')
-        # stays the same all day; genre stations kept for offline
-        n_tag = len(calls['tag'])
-        offline['on'] = True
+        check('"home:madeforyou", "Made for You"' in java and '"home:madeforyou", "madeForYou"' in java and '"home:madeforyou",\n          "home:topstations"' in java, 'the car menu has Made for You under Home, just above Top Stations')
+        # Top Stations: US stations only (Home, its page, the car)
+        check(calls['top'] and all(c == 'US' for c in calls['top']), f'Top Stations asks for US stations only {calls["top"]}')
+        await pg.evaluate("document.getElementById('topStationsHeading').click()"); await pg.wait_for_timeout(800)
+        names = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .row-name, #stationsGrid .tile-name')).map(function(e){ return e.textContent; })")
+        check(names and all(n.startswith('US Top') for n in names) and all(c == 'US' for c in calls['top']), f'the Top Stations page too {names[:3]}')
+        # Video: Live TV tab
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
+        vt = await pg.evaluate("Array.from(document.querySelectorAll('.video-tabs .home-tab')).map(function(b){ return b.textContent; })")
+        check(vt[:1] == ['Live TV'] and 'Channels' not in vt, f'the Video page tab is called Live TV {vt}')
+        # stays the same all day
         await pg.reload(); await pg.wait_for_timeout(3500)
         await pg.evaluate('__m.reset()')
         m2 = await pg.evaluate('__m.mfy()')
-        check(m2['genres'] == m['genres'] and len(calls['tag']) == n_tag, 'genre picks are kept for the day (and offline), not asked for again')
         check(m2['rediscover'] == m['rediscover'], 'the albums to rediscover stay the same all day')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
