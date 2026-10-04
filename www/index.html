@@ -933,6 +933,11 @@
   .song-row .song-row-art.search-more-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); font-size:20px; }
   .song-row.recent-search-row .song-row-art.search-more-art{ width:44px; height:44px; font-size:16px; background:none; }
   .song-row.recent-search-row .song-row-title{ font-weight:500; }
+  /* The search page has no heading row: no "Results for", count, save or clear above the tabs
+     (build 118). Save Search lives on the Stations tab instead. */
+  body.search-view #sectionHeadingRow{ display:none; }
+  .search-tab-actions{ grid-column:1 / -1; display:flex; justify-content:flex-end; margin-bottom:-8px; }
+  .clear-search-btn.search-save-btn{ padding:7px 14px; }
   .recent-searches-head{ grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; }
   .recent-searches-clear{ border:none; background:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; padding:4px 6px; }
   /* A list that is only songs wants rows close together; the grid's 40px row gap is spacing
@@ -24056,12 +24061,14 @@
       setClearSearchVisible(false);
       setResultCount(null);
       onSearchView = true;
+      document.body.classList.add('search-view');
       renderSearchHome();
       return;
     }
     stationsHeading.textContent = searchHeadingFor(q);
     setClearSearchVisible(true);
     onSearchView = true;
+    document.body.classList.add('search-view');
     setResultCount(null);
     if(reuse && lastSearch && lastSearch.q === q){
       searchState = lastSearch;
@@ -24143,6 +24150,7 @@
     searchTabs.innerHTML = '';
     searchState = null;
     onSearchView = false;
+    document.body.classList.remove('search-view');
   }
 
   // ---------- query parsing and ranking ----------
@@ -24436,6 +24444,20 @@
       return;
     }
 
+    // Save Search sits on the Stations tab, on the right above the results (build 118).
+    if(group.id === 'stations'){
+      var bar = document.createElement('div');
+      bar.className = 'search-tab-actions';
+      var save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'clear-search-btn search-save-btn';
+      save.id = 'searchSaveBtn';
+      save.textContent = 'Save Search';
+      save.title = 'Save this search to For You';
+      save.addEventListener('click', function(){ saveSearchBtn.click(); });
+      bar.appendChild(save);
+      stationsGrid.appendChild(bar);
+    }
     items.forEach(function(item){
       if(group.id === 'artists'){
         stationsGrid.appendChild(buildArtistTile(item));

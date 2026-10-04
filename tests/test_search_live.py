@@ -117,6 +117,7 @@ async def main():
         s1 = await pg.evaluate(STATE)
         check(s1['heading'] == 'Search' and s1['focused'] == 'searchSheetInput', f"tapping the box opens the results page straight away {s1['heading']}")
         check(not s1['tabsShown'], 'an empty box: no tabs yet')
+        check(await pg.evaluate("getComputedStyle(document.getElementById('sectionHeadingRow')).display") == 'none', 'and no heading row on the search page')
         await pg.screenshot(path=f'{shots}/search-open.png')
 
         # typing updates the page letter by letter
@@ -149,6 +150,29 @@ async def main():
         titles = [r[1] for r in s2['rows']]
         check(titles.index('Ray of Light') < titles.index('Raye'), 'closest names first: "Ray of Light" (starts with ray) above Raye (contains it)')
         await pg.screenshot(path=f'{shots}/search-top.png')
+        # no heading row above the tabs (no "Results for", count, save or clear icons)
+        hr = await pg.evaluate("""(()=>{ var r = document.getElementById('sectionHeadingRow');
+          return { shown: getComputedStyle(r).display !== 'none' && r.getBoundingClientRect().height > 0,
+                   tabsTop: document.getElementById('searchTabs').getBoundingClientRect().top,
+                   save: !!document.getElementById('searchSaveBtn') }; })()""")
+        check(not hr['shown'], f'no heading, count or icons above the tabs {hr}')
+        check(not hr['save'], 'no Save Search on Top Results')
+        # Save Search: on the Stations tab, far right, above the results, text only
+        await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).filter(function(b){ return /^Stations/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(300)
+        sv = await pg.evaluate("""(()=>{ var b = document.getElementById('searchSaveBtn'); if(!b) return null;
+          var r = b.getBoundingClientRect(), g = document.getElementById('stationsGrid').getBoundingClientRect();
+          var first = document.querySelector('#stationsGrid .tile:not(.search-tab-actions)');
+          return { text: b.textContent.trim(), icon: !!b.querySelector('i, svg'), right: Math.round(g.right - r.right), gridLeft: g.left, left: r.left,
+                   above: first ? r.bottom <= first.getBoundingClientRect().top + 1 : null, shownText: getComputedStyle(b).textTransform }; })()""")
+        print('save', sv)
+        check(sv and sv['text'] == 'Save Search' and not sv['icon'], f'Stations tab has a "Save Search" button with no icon {sv}')
+        check(sv and sv['right'] <= 2 and sv['left'] > sv['gridLeft'] + 150 and sv['above'], f'on the far right, above the results {sv}')
+        await pg.screenshot(path=f'{shots}/search-stations-save.png')
+        await pg.evaluate("document.getElementById('searchSaveBtn').click()"); await pg.wait_for_timeout(300)
+        md = await pg.evaluate("[document.getElementById('customSearchOverlay').classList.contains('open'), document.getElementById('customSearchQueryInput').value]")
+        check(md == [True, 'ray'], f'it opens Save Search with the query filled in {md}')
+        await pg.evaluate("document.getElementById('customSearchOverlay').classList.remove('open')")
+        await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab'))[0].click()"); await pg.wait_for_timeout(300)
 
         # Channels tab
         await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).filter(function(b){ return /^Channels/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(300)
