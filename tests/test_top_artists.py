@@ -1,6 +1,7 @@
 """Top Artists play counts: a play counts after 20 seconds of actual listening (pauses don't
 count), a song skipped before then doesn't count, and the Top Artists page shows each artist's
-count on the far right. Uses Playwright's clock so the listening happens instantly, and a mocked
+count on the far right. Since build 121 artist stations count once at 20 seconds and again
+for every further 3.5 minutes; a Featuring-playlist station and "<artist> Radio" count too. Uses Playwright's clock so the listening happens instantly, and a mocked
 native player that reports playing/paused like the real one.
 Run: python3 tests/test_top_artists.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess
@@ -16,7 +17,9 @@ HOOK = ("window.__t = { tracks: function(){ return libraryTracks; }, runLibraryS
         " plays: function(){ return loadArtistPlays(); }, openTop: function(){ openHomeSectionPage('topArtists'); },"
         " playSong: function(title){ var t = libraryTracks.filter(function(x){ return x.name === title; })[0]; playEntity(t); },"
         " toggle: function(){ togglePlayPause(); }, playing: function(){ return uiIsPlaying; },"
-        " cur: function(){ return currentStation && currentStation.name; } };\n")
+        " cur: function(){ return currentStation && currentStation.name; },"
+        " playStation: function(n){ playStation({ stationuuid: 'st-' + n, name: n, url: 'http://radio.example/' + encodeURIComponent(n), urlToResolve: 'http://radio.example/' + encodeURIComponent(n), favicon: '', tags: '' }); },"
+        " addPl: function(label, n){ stationPlaylists.push({ id: 'pl-' + label, label: label, stations: [{ stationuuid: 'st-' + n, name: n, url: 'http://radio.example/' + encodeURIComponent(n), urlToResolve: 'http://radio.example/' + encodeURIComponent(n), favicon: '' }] }); saveStationPlaylists(); } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
 assert _src.count(_mark) == 1
@@ -143,6 +146,49 @@ async def main():
         # The page clock is under the test's control; let it run so the page paints first.
         await pg.clock.run_for(2000); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{shots}/top-artists-counts.png')
+        # ---- stations (build 121) ----
+        # An artist station counts like songs: once at 20 seconds, then every 3.5 minutes more.
+        base = await counts()
+        await pg.evaluate("__t.playStation('Exclusively Alpha')"); await pg.wait_for_timeout(600)
+        check(await pg.evaluate('__t.playing()') and await pg.evaluate('__t.cur()') == 'Exclusively Alpha', 'an artist station is playing')
+        await listen(21)
+        check((await counts()).get('Alpha') == base['Alpha'] + 1, f"an artist station counts after 20 seconds {await counts()}")
+        await listen(200)
+        check((await counts()).get('Alpha') == base['Alpha'] + 1, 'not again before another 3.5 minutes')
+        await listen(15)
+        check((await counts()).get('Alpha') == base['Alpha'] + 2, f"and again after 3.5 minutes more (about one song) {await counts()}")
+        await listen(8 * 60 - 236)
+        check((await counts()).get('Alpha') == base['Alpha'] + 3, f"8 minutes of an artist station: 3 plays {await counts()}")
+        # paused time doesn't count
+        await pg.evaluate('__t.toggle()'); await pg.wait_for_timeout(300)
+        await listen(30 * 60)
+        check((await counts()).get('Alpha') == base['Alpha'] + 3, 'half an hour paused adds nothing')
+        await pg.evaluate('__t.toggle()'); await pg.wait_for_timeout(300)
+        # a station in a playlist named after an artist (their Featuring list) counts for them
+        await pg.evaluate("__t.addPl('Bravo', 'Bravo Fan Stream')")
+        await pg.evaluate("__t.playStation('Bravo Fan Stream')"); await pg.wait_for_timeout(600)
+        await listen(21)
+        check((await counts()).get('Bravo') == base['Bravo'] + 1, f"a station under Featuring Bravo counts for Bravo {await counts()}")
+        # "<artist> Radio" counts for that artist
+        await pg.evaluate("__t.playStation('Charlie Radio')"); await pg.wait_for_timeout(600)
+        await listen(21)
+        check((await counts()).get('Charlie') == base['Charlie'] + 1, f"'Charlie Radio' counts for Charlie {await counts()}")
+        # a general station (no artist in its name, not under anyone's Featuring) counts for nobody
+        before = await counts()
+        await pg.evaluate("__t.playStation('Alpha FM')"); await pg.wait_for_timeout(600)
+        await listen(5 * 60)
+        await pg.evaluate("__t.playStation('Smooth Jazz 24')"); await pg.wait_for_timeout(600)
+        await listen(5 * 60)
+        check(await counts() == before, f"general stations ('Alpha FM', 'Smooth Jazz 24') count for no one {await counts()}")
+        # a song after a station: the station stops counting, the song counts once
+        await pg.evaluate("__t.playStation('Exclusively Alpha')"); await pg.wait_for_timeout(600)
+        await listen(100)
+        a0 = (await counts()).get('Alpha')
+        await pg.evaluate("__t.playSong('Charlie 2')"); await pg.wait_for_timeout(400)
+        await listen(6 * 60)
+        c = await counts()
+        check(c.get('Alpha') == a0 and c.get('Charlie') == before['Charlie'] + 1, f'switching to a song stops the station counting {c}')
+
         # One-time reset: counts saved before this build are cleared on the first start only.
         OLD = json.dumps({'zed': {'name': 'Zed', 'count': 99, 'last': 1}})
         await pg.evaluate(f"localStorage.setItem('radioPlayerArtistPlays', {json.dumps(OLD)}); localStorage.removeItem('radioPlayerArtistPlaysReset1');")

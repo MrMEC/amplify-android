@@ -9854,7 +9854,32 @@
       var n = (item.artist || '').trim();
       return (n && n !== UNKNOWN_ARTIST) ? n : '';
     }
-    return isArtistStation(item) ? artistNameFromStation(item) : '';
+    return stationArtistForPlay(item);
+  }
+  // Which artist a station's plays go to (build 121). An artist station first (an
+  // "Exclusively ..." channel, or one the directory lists for an artist). Then any station
+  // in a playlist named after an artist you have -- the stations under "Featuring <artist>"
+  // on their page. Then a station named after an artist you have with "Radio" or "Hits" on
+  // the end ("Phil Collins Radio"); a name with nothing like that ("KISS FM") is left alone,
+  // so a band is never credited for a general station that happens to share a word.
+  function stationArtistForPlay(st){
+    if(!st || isLocalTrack(st) || isPodcastTrack(st) || isLocalVideo(st) || st.videoChannel) return '';
+    if(isArtistStation(st)) return artistNameFromStation(st);
+    var k = favKey(st), url = st.urlToResolve || st.url || '';
+    for(var i = 0; i < stationPlaylists.length; i++){
+      var pl = stationPlaylists[i];
+      var holds = (pl.stations || []).some(function(x){ return favKey(x) === k || (url && (x.urlToResolve || x.url) === url); });
+      if(!holds) continue;
+      var e = findArtistEntry(artistMatchKey(pl.label));
+      if(e) return e.name;
+    }
+    var bare = stripExclusively(st.name || '');
+    var named = artistNameFromStation(st);
+    if(named && named.length < bare.length){
+      var e2 = findArtistEntry(artistMatchKey(named));
+      if(e2) return e2.name;
+    }
+    return '';
   }
   function recordArtistPlay(item){
     if(!item || isBlacklisted(item)) return;
@@ -9880,7 +9905,15 @@
   // native player uses for plays started from Android Auto. Counting the moment something
   // started used to make every song skipped past (Next, a quick tap in Cover Flow) a play.
   var PLAY_COUNT_AFTER_S = 20;
-  var pendingPlay = null;      // { item, key, need, heard, t }
+  // An artist station plays song after song by that artist, so it counts like songs do
+  // (build 121): a play once it has had its 20 seconds, then another for every further 3.5
+  // minutes listened (about one song). Counting it once per tune-in made an hour of an
+  // artist's station worth the same as one song of theirs.
+  var STATION_PLAY_EVERY_S = 210;
+  // The most one check can credit. The page's timers can run as rarely as once a minute
+  // while the phone is locked; 5 minutes allows for that without crediting a long gap.
+  var PLAY_TICK_MAX_MS = 300000;
+  var pendingPlay = null;      // { item, key, need, heard, t, station }
   function playCountNeed(item){
     var d = isLocalTrack(item) ? (item.duration || 0) : 0;
     return d > 0 ? Math.min(PLAY_COUNT_AFTER_S, d * 0.9) : PLAY_COUNT_AFTER_S;
@@ -9890,12 +9923,19 @@
   function playCountTick(){
     if(!pendingPlay) return;
     var now = Date.now();
-    if(uiIsPlaying) pendingPlay.heard += Math.min(now - pendingPlay.t, 60000) / 1000;
+    if(uiIsPlaying) pendingPlay.heard += Math.min(now - pendingPlay.t, PLAY_TICK_MAX_MS) / 1000;
     pendingPlay.t = now;
     if(pendingPlay.heard >= pendingPlay.need){
-      var item = pendingPlay.item;
+      var item = pendingPlay.item, wasStation = pendingPlay.station;
+      var extra = pendingPlay.heard - pendingPlay.need;
       pendingPlay = null;
       recordArtistPlay(item);
+      // A station keeps counting while it plays on (anything over carries to the next one).
+      if(wasStation && currentStation && favKey(currentStation) === favKey(item)){
+        pendingPlay = { item: item, key: favKey(item), need: STATION_PLAY_EVERY_S, heard: 0, t: now, station: true };
+        if(extra >= STATION_PLAY_EVERY_S){ pendingPlay.heard = extra; playCountTick(); }
+        else pendingPlay.heard = extra;
+      }
       return;
     }
     if(!currentStation || favKey(currentStation) !== pendingPlay.key) pendingPlay = null;
@@ -9905,7 +9945,7 @@
   function startPlayCount(item){
     playCountTick();
     pendingPlay = (item && artistNameForPlay(item))
-      ? { item: item, key: favKey(item), need: playCountNeed(item), heard: 0, t: Date.now() }
+      ? { item: item, key: favKey(item), need: playCountNeed(item), heard: 0, t: Date.now(), station: !isLocalTrack(item) }
       : null;
   }
   setInterval(playCountTick, 1000);

@@ -9,7 +9,7 @@ import org.json.JSONObject;
 
 /** Items played from the car, kept until the page takes them (takeCarHistory) to update Recent. */
 final class CarHistory {
-  private static final int LIMIT = 100;
+  private static final int LIMIT = 1000;
 
   private CarHistory() {}
 
@@ -25,7 +25,7 @@ final class CarHistory {
     }
   }
 
-  /** Appends one played item (entry JSON); keeps the newest 100. */
+  /** Appends one played item (entry JSON); keeps the newest LIMIT (a long drive on an artist station records a play every 3.5 minutes). */
   static synchronized void add(Context c, String itemJson) {
     try {
       JSONObject rec = new JSONObject();
@@ -34,7 +34,7 @@ final class CarHistory {
       JSONArray all = readAll(c);
       all.put(rec);
       JSONArray kept = new JSONArray();
-      for (int i = Math.max(0, all.length() - 100); i < all.length(); i++) kept.put(all.get(i));
+      for (int i = Math.max(0, all.length() - LIMIT); i < all.length(); i++) kept.put(all.get(i));
       File f = file(c);
       File part = new File(f.getPath() + ".part");
       try (FileOutputStream out = new FileOutputStream(part)) {

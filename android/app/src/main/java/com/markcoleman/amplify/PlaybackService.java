@@ -69,6 +69,14 @@ public class PlaybackService extends MediaLibraryService {
   CarLibrary car;
   ExoPlayer exo;
   private String historyPending;
+  // Play counts for items played from the car: time actually playing is added up in
+  // HISTORY_STEP_MS steps; an item is recorded once it has had HISTORY_FIRST_MS, and a station
+  // again for every further HISTORY_STATION_MS (about one song), like the phone does.
+  private static final long HISTORY_STEP_MS = 5000L;
+  private static final long HISTORY_FIRST_MS = 20000L;
+  private static final long HISTORY_STATION_MS = 210000L;
+  private long historyHeardMs;
+  private long historyNeedMs = HISTORY_FIRST_MS;
   SkipAwarePlayer player;
   private MediaLibraryService.MediaLibrarySession session;
   private String widgetArtKey;
@@ -744,9 +752,10 @@ public class PlaybackService extends MediaLibraryService {
     MediaItem currentMediaItem;
     String string;
     String str = this.historyPending;
-    this.historyPending = null;
-    if (str == null
-        || this.exo == null
+    if (str == null) {
+      return;
+    }
+    if (this.exo == null
         || (skipAwarePlayer = this.player) == null
         || !skipAwarePlayer.isNativeMode()
         || (currentMediaItem = this.exo.getCurrentMediaItem()) == null
@@ -754,9 +763,23 @@ public class PlaybackService extends MediaLibraryService {
         || currentMediaItem.mediaMetadata.extras == null
         || (string = currentMediaItem.mediaMetadata.extras.getString("amplify.item")) == null
         || string.contains("\"t\":\"episode\"")) {
+      this.historyPending = null;
       return;
     }
-    CarHistory.add(this, string);
+    if (this.exo.isPlaying()) {
+      this.historyHeardMs += HISTORY_STEP_MS;
+    }
+    if (this.historyHeardMs >= this.historyNeedMs) {
+      CarHistory.add(this, string);
+      if (!string.contains("\"t\":\"station\"")) {
+        this.historyPending = null;
+        return;
+      }
+      this.historyHeardMs = 0;
+      this.historyNeedMs = HISTORY_STATION_MS;
+    }
+    // Paused: look again less often (time is only added while playing).
+    this.main.postDelayed(this.historyTick, this.exo.isPlaying() ? HISTORY_STEP_MS : 15000L);
   }
 
   private final class WidgetListener implements Player.Listener {
@@ -888,7 +911,9 @@ public class PlaybackService extends MediaLibraryService {
         return;
       }
       PlaybackService.this.historyPending = mediaItem.mediaId;
-      PlaybackService.this.main.postDelayed(PlaybackService.this.historyTick, 20000L);
+      PlaybackService.this.historyHeardMs = 0;
+      PlaybackService.this.historyNeedMs = HISTORY_FIRST_MS;
+      PlaybackService.this.main.postDelayed(PlaybackService.this.historyTick, HISTORY_STEP_MS);
     }
   }
 
