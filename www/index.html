@@ -935,8 +935,11 @@
   /* Search (build 117): Top Results rows, recent searches and action rows. */
   .song-row .song-row-art.round{ border-radius:50%; }
   /* Made for You (build 122): each tile and row says why it's there. */
-  .mfy-row .song-row-title, .mfy-row .song-row-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .mfy-row .song-row-sub{ font-size:13.5px; color:var(--text-dim); }
+  /* The name on one line; why it's there may take two (build 124: on a phone with larger
+     text the reason was cut off after "Because you play", which hid the very point of it). */
+  .mfy-row .song-row-title{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfy-row .song-row-sub{ font-size:13.5px; line-height:1.3; color:var(--text-dim); white-space:normal;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
   .home-section .tile-grid.mfy-home-list{ display:grid; grid-template-columns:1fr; gap:4px; overflow:visible; }
   /* The page's group headings sit in a list of rows (4px gaps), not a grid of covers, so the
      generic label's negative margins (made for a 40px gap) would pull the rows over them. */
@@ -10190,10 +10193,12 @@
       var g = al.tracks.some(function(t){ return mfyGenreParts(t.genre).some(function(x){ return genres[x]; }); });
       var score = 2 * Math.log2(1 + p) + (favAlbum[al.key] ? 3 : 0) + (favArtist[ak] ? 2 : 0) + (g ? 1 : 0) + (al.tracks.length >= 4 ? 0.5 : 0);
       var last = played[al.key];
-      var why = last ? 'Not played in ' + mfyAgo(now - last)
+      // The row's title is the album alone, so every reason names the artist too.
+      var by = al.various ? 'various artists' : al.artist;
+      var why = last ? 'By ' + by + ', unplayed ' + mfyAgo(now - last)
         : p >= 2 ? 'Because you play ' + al.artist
-        : favAlbum[al.key] ? 'A favorite album'
-        : 'From your library';
+        : favAlbum[al.key] ? 'A favorite album, by ' + by
+        : 'By ' + by + ', not played lately';
       cands.push({ kind: 'album', item: al, why: why, score: score, group: 'rediscover' });
     });
     cands.sort(function(a, b){ return b.score - a.score; });
@@ -10278,7 +10283,8 @@
     if(x.kind === 'album'){
       var al = x.item;
       renderStationArt(art, artSourceForTracks(al.tracks) || {});
-      t.textContent = al.album + (al.artist ? ' · ' + al.artist : '');
+      // The album alone: the artist is in the reason underneath ("Because you play Prince").
+      t.textContent = al.album;
       row.dataset.key = 'album:' + al.key;
       row.addEventListener('click', function(){ openAlbumPage(al.key, null); });
     } else {

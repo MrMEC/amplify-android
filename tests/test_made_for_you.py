@@ -130,7 +130,7 @@ async def main():
         # 3. rediscover
         rd = {x[1]: x[2] for x in m['rediscover']}
         check('Alpha One' not in rd, 'an album played today is not suggested')
-        check(rd.get('Bravo Blue') == 'Not played in 3 months', f'an album not played for months says so {rd}')
+        check(rd.get('Bravo Blue') == 'By Bravo, unplayed 3 months', f'an album not played for months says so {rd}')
         check(rd.get('Alpha Two') == 'Because you play Alpha', f'an unplayed album by a played artist {rd}')
         # the Home section: stacked rows, one-line titles, right above Top Stations
         check(m['mix'][:2] == [m['artists'][0], m['rediscover'][0]], 'the mix takes turns: artist station, album')
@@ -148,8 +148,27 @@ async def main():
         check(row['n'] == min(6, len(m['mix'])) and row['tiles'] == 0 and not row['inRow'], f'as stacked rows (up to six), not a sideways row of covers {row["n"]}')
         check(all(row['boxes'][i + 1][1] >= row['boxes'][i][2] - 1 and row['boxes'][i + 1][0] == row['boxes'][0][0] for i in range(len(row['boxes']) - 1)), 'one under another')
         check(all(t[1] == 'nowrap' and t[2] <= 24 for t in row['titles']), f'titles on one line {row["titles"]}')
-        check(all(x[0] and x[1] >= 13 and x[2] <= 20 for x in row['subs']), f'the reason is readable, on its own line {row["subs"]}')
+        check(all(x[0] and x[1] >= 13 and x[2] <= 40 for x in row['subs']), f'the reason is readable, under the title, at most two lines {row["subs"]}')
         check(row['nextIsTop'], 'right above Top Stations')
+        # Readable on a phone with its text set larger (like Mark's): text 35% bigger, 360px wide.
+        # Every reason must show in full (two lines at most), every title on one line.
+        async def readability(width, scale):
+            await pg.set_viewport_size({'width': width, 'height': 800}); await pg.wait_for_timeout(300)
+            await pg.evaluate(f"""(()=>{{ var st = document.getElementById('__big') || document.head.appendChild(Object.assign(document.createElement('style'), {{ id: '__big' }}));
+              st.textContent = '.mfy-row .song-row-title{{ font-size:{15 * scale}px !important; }} .mfy-row .song-row-sub{{ font-size:{13.5 * scale}px !important; }}'; }})()""")
+            await pg.wait_for_timeout(200)
+            return await pg.evaluate("""Array.from(document.querySelectorAll('#madeForYouGrid .mfy-row')).map(function(r){
+              var t = r.querySelector('.song-row-title'), x = r.querySelector('.song-row-sub'), cs = getComputedStyle(x);
+              var lh = parseFloat(cs.lineHeight), lines = Math.round(x.clientHeight / lh);
+              return { why: x.textContent, full: x.scrollHeight <= x.clientHeight + 1, lines: lines, titleLines: Math.round(t.clientHeight / (parseFloat(getComputedStyle(t).fontSize) * 1.15)), font: parseFloat(cs.fontSize) }; })""")
+        for w, sc in ((412, 1.0), (412, 1.35), (360, 1.35)):
+            rd_ = await readability(w, sc)
+            print(w, sc, rd_)
+            check(all(x['full'] and x['lines'] <= 2 and x['titleLines'] <= 1 for x in rd_), f'{w}px wide, text x{sc}: every reason shows in full on at most two lines, titles on one line')
+        await pg.evaluate("document.getElementById('madeForYouSection').scrollIntoView()"); await pg.wait_for_timeout(300)
+        await pg.screenshot(path=f'{shots}/mfy-home-bigtext.png')
+        await pg.evaluate("document.getElementById('__big').remove()")
+        await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(300)
         chev = await pg.evaluate("Array.from(document.querySelectorAll('#madeForYouGrid .mfy-row')).map(function(r){ var c = r.querySelector('.top-result-chev svg'); return c ? Math.round(c.getBoundingClientRect().width) : 0; })")
         check(all((w >= 12) == (i % 2 == 1) for i, w in enumerate(chev)), f'albums show an arrow you can see, stations a More button {chev}')
         await pg.evaluate("document.getElementById('madeForYouSection').scrollIntoView()"); await pg.wait_for_timeout(300)
