@@ -33,6 +33,7 @@ MOVIES = [
   {'ratingKey': '502', 'title': 'Heat', 'year': 1995, 'thumb': '/library/metadata/502/thumb/1', 'duration': 10200000, 'addedAt': NOW - 5000,
    'viewCount': 1, 'lastViewedAt': NOW - 86400, 'Media': part(502)},
 ]
+HOME = [{'ratingKey': '900', 'title': 'Birthday Party', 'year': 2019, 'duration': 600000, 'addedAt': NOW - 2000, 'Media': part(900)}]
 SHOWS = [{'ratingKey': '10', 'title': 'Breaking Bad', 'thumb': '/library/metadata/10/thumb/1'},
          {'ratingKey': '20', 'title': 'Severance', 'year': 2022, 'summary': 'Mark leads a team of office workers whose memories have been surgically divided.',
           'thumb': '/library/metadata/20/thumb/1', 'art': '/library/metadata/20/art/1'}]
@@ -90,8 +91,10 @@ async def proute(r):
         if tok != 'SRVTOKEN': return await r.fulfill(status=401, headers=CORS, body='')
         if p == '/identity': return await jr(r, {'MediaContainer': {'machineIdentifier': 'srvabcdef123'}})
         if p == '/library/sections': return await jr(r, {'MediaContainer': {'Directory': [{'key': '1', 'type': 'movie', 'title': 'Movies'},
-                                                       {'key': '2', 'type': 'show', 'title': 'TV Shows'}, {'key': '3', 'type': 'artist', 'title': 'Music'}]}})
+                                                       {'key': '2', 'type': 'show', 'title': 'TV Shows'}, {'key': '3', 'type': 'artist', 'title': 'Music'},
+                                                       {'key': '4', 'type': 'movie', 'title': 'Home Movies'}]}})
         if p == '/library/sections/1/all': return await jr(r, {'MediaContainer': {'totalSize': len(MOVIES), 'Metadata': MOVIES}})
+        if p == '/library/sections/4/all': return await jr(r, {'MediaContainer': {'totalSize': 1, 'Metadata': HOME}})
         if p == '/library/sections/2/all':
             t = q.get('type', [''])[0]
             lst = SHOWS if t == '2' else EPS
@@ -165,7 +168,17 @@ async def main():
         check(status == 'Connected' and t[0] == 'Signed in as Mark', f'signed in {status} {t}')
         sel = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#plexServerSelect option'),function(o){return [o.textContent,o.selected];})")
         check(sel == [['Home Server', True], ['Friend Server', False]], f'servers to choose from, the owned one first and chosen {sel}')
-        check(any('3 movies · 2 shows' in x for x in t), f'library counted {t}')
+        check(any('4 movies · 2 shows' in x for x in t), f'library counted {t}')
+        libs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#plexLibraries .plex-lib'),function(b){return [b.querySelector('.plex-lib-name').textContent,b.querySelector('.plex-lib-sub').textContent,b.getAttribute('aria-checked')];})")
+        check(libs == [['Movies', '3 movies', 'true'], ['TV Shows', '2 shows', 'true'], ['Home Movies', '1 movie', 'true']], f'every movie and show library listed with a switch, all on (music left out) {libs}')
+        await pg.evaluate("document.getElementById('plexLibraries').scrollIntoView()"); await pg.wait_for_timeout(200)
+        await pg.screenshot(path=f'{SHOTS}/plex-libraries-on.png')
+        await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"4\"]').click()"); await pg.wait_for_timeout(300)
+        t = await plex_texts(pg)
+        libs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#plexLibraries .plex-lib'),function(b){return b.getAttribute('aria-checked');})")
+        check(libs == ['true', 'true', 'false'] and any('3 movies · 2 shows' in x for x in t), f'Home Movies switched off, count follows {libs} {t}')
+        await pg.evaluate("document.getElementById('plexLibraries').scrollIntoView()"); await pg.wait_for_timeout(200)
+        await pg.screenshot(path=f'{SHOTS}/plex-libraries-off.png')
         tokens = [x for x in REQ if x[1].startswith('https://plex.tv/api/v2/user') or x[1].startswith('https://plex.tv/api/v2/resources')]
         check(tokens and all(x[2] == 'TOKEN1' for x in tokens), f'plex.tv asked with the new token {tokens}')
         ident = [x[1] for x in REQ if x[1].endswith('/identity')]
@@ -183,7 +196,7 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(500)
         await tab(pg, 'movies')
         mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')
-        check(sorted(mv) == ['Arrival', 'Dune', 'Heat', 'Inception', 'The Matrix'], f'Plex movies beside the local ones, Inception once {mv}')
+        check(sorted(mv) == ['Arrival', 'Dune', 'Heat', 'Inception', 'The Matrix'], f'Plex movies beside the local ones, Inception once, Home Movies left out {mv}')
         check(mv[0] == 'Dune', f'Recently Added puts the newest Plex movie first {mv}')
         imgs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){var i=t.querySelector('img');return [t.querySelector('.tile-name').textContent, i?i.getAttribute('src'):''];})")
         dune = [x[1] for x in imgs if x[0] == 'Dune'][0]
@@ -255,7 +268,7 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(400)
         await tab(pg, 'movies')
         mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')
-        check('Dune' in mv and 'Heat' in mv, f'after a restart the Plex movies are there straight away {mv}')
+        check('Dune' in mv and 'Heat' in mv and 'Birthday Party' not in mv, f'after a restart the Plex movies are there straight away, Home Movies still left out {mv}')
         await pg.wait_for_timeout(2500)
         syncs = len([x for x in REQ if x[1].startswith(REMOTE + '/library/sections/1/all')])
         check(syncs == 1, f'a fresh library isn\'t fetched again on start-up ({syncs} fetches)')
@@ -271,6 +284,24 @@ async def main():
         check(not over, f'large text at 360: nothing in Plex settings spills or clips {over}')
         await pg.screenshot(path=f'{SHOTS}/plex-settings-bigtext.png')
 
+        # TV Shows off: Severance leaves, Breaking Bad keeps only the local seasons; on again brings them back
+        await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"2\"]').click()"); await pg.wait_for_timeout(300)
+        await close_settings(pg)
+        await tab(pg, 'movies'); await tab(pg, 'shows')
+        sh = await names(pg, '#stationsGrid .tile.vposter .tile-name')
+        cw = await names(pg, '#stationsGrid .vw-tile .tile-name')
+        check(sorted(sh) == ['Breaking Bad', 'Friends', 'The Office'] and 'Severance' not in cw, f'TV Shows library off: its shows leave Video and Continue Watching {sh} {cw}')
+        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"2\"]').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"4\"]').click()"); await pg.wait_for_timeout(300)
+        await close_settings(pg)
+        await tab(pg, 'movies'); await tab(pg, 'shows')
+        sh = await names(pg, '#stationsGrid .tile.vposter .tile-name')
+        check('Severance' in sh, f'switched back on, no sync needed {sh}')
+        await tab(pg, 'movies')
+        mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')
+        check('Birthday Party' in mv, f'Home Movies back on {mv}')
+        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(300)
         # Sign Out
         await pg.evaluate("document.getElementById('plexSignOutBtn').click()"); await pg.wait_for_timeout(600)
         t = await plex_texts(pg)

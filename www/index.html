@@ -4040,6 +4040,27 @@
     text-align:center; padding:8px; border-radius:10px; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
   }
   #settingsPanel .plex-server-select{ width:100%; }
+  /* Libraries (build 131): a switch per Plex library */
+  #settingsPanel .plex-libs-head{ font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin-top:4px; }
+  #settingsPanel .plex-libs{ display:flex; flex-direction:column; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  #settingsPanel .plex-lib{
+    display:flex; align-items:center; gap:12px; width:100%; padding:10px 12px; background:var(--panel-2); color:var(--text);
+    border:none; border-top:1px solid var(--border); text-align:left; cursor:pointer; font-family:inherit;
+  }
+  #settingsPanel .plex-lib:first-child{ border-top:none; }
+  #settingsPanel .plex-lib-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  #settingsPanel .plex-lib-name{ font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+  #settingsPanel .plex-lib-sub{ font-size:12px; color:var(--text-dim); }
+  #settingsPanel .plex-lib:not(.on) .plex-lib-name{ color:var(--text-dim); }
+  #settingsPanel .plex-switch{
+    position:relative; flex:0 0 auto; width:40px; height:24px; border-radius:12px; background:var(--border); transition:background .18s;
+  }
+  #settingsPanel .plex-switch::after{
+    content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff;
+    box-shadow:0 1px 2px rgba(0,0,0,.3); transition:transform .18s;
+  }
+  #settingsPanel .plex-lib.on .plex-switch{ background:var(--accent); }
+  #settingsPanel .plex-lib.on .plex-switch::after{ transform:translateX(16px); }
   #settingsPanel .build-stamp{
     background:none; border:none; padding:0; color:var(--text-faint); font-size:12px;
     overflow:hidden; text-overflow:ellipsis;
@@ -14192,17 +14213,28 @@
       return plexApi('/library/sections');
     }).then(function(d){
       var dirs = ((d && d.MediaContainer) || {}).Directory || [];
-      var lib = { serverId: s.id, at: Date.now(), movies: [], shows: [], episodes: [] };
+      var lib = { serverId: s.id, at: Date.now(), movies: [], shows: [], episodes: [], sections: [] };
       var chain = Promise.resolve();
+      // Every movie and show library is fetched and tagged with its section, so a library
+      // switched off in Settings (build 131) leaves Video at once and comes back without a sync.
       dirs.forEach(function(dir){
+        var sec = String(dir.key);
+        function tag(r){ r.sec = sec; return r; }
         if(dir.type === 'movie'){
           chain = chain.then(function(){ return plexAll(dir.key, 1); })
-            .then(function(ms){ ms.forEach(function(m){ lib.movies.push(plexMovieRec(m)); }); });
+            .then(function(ms){
+              ms.forEach(function(m){ lib.movies.push(tag(plexMovieRec(m))); });
+              lib.sections.push({ key: sec, title: dir.title || 'Movies', type: 'movie', n: ms.length });
+            });
         } else if(dir.type === 'show'){
+          var nShows = 0;
           chain = chain.then(function(){ return plexAll(dir.key, 2); })
-            .then(function(ss){ ss.forEach(function(x){ lib.shows.push(plexShowRec(x)); }); })
+            .then(function(ss){ nShows = ss.length; ss.forEach(function(x){ lib.shows.push(tag(plexShowRec(x))); }); })
             .then(function(){ return plexAll(dir.key, 4); })
-            .then(function(es){ es.forEach(function(e){ lib.episodes.push(plexEpRec(e)); }); });
+            .then(function(es){
+              es.forEach(function(e){ lib.episodes.push(tag(plexEpRec(e))); });
+              lib.sections.push({ key: sec, title: dir.title || 'TV Shows', type: 'show', n: nShows });
+            });
         }
       });
       return chain.then(function(){ return lib; });
@@ -14234,11 +14266,31 @@
       return null;
     });
   }
+  // Libraries switched off in Settings, per server: { serverId: { sectionKey: true } }.
+  function plexExcluded(){
+    var s = plexServer();
+    var all = (plexAccount && plexAccount.excluded) || {};
+    return (s && all[s.id]) || {};
+  }
+  function plexIncluded(r){ return !r || !r.sec || !plexExcluded()[r.sec]; }
+  function plexSetLibraryOn(key, on){
+    var s = plexServer();
+    if(!s) return;
+    var all = plexAccount.excluded || (plexAccount.excluded = {});
+    var ex = all[s.id] || (all[s.id] = {});
+    if(on) delete ex[key]; else ex[key] = true;
+    savePlexAccount();
+    invalidateVideoLib();
+    renderPlexSettings();
+    refreshVideoPages();
+    refreshContinueWatching();
+  }
   function plexCountText(){
     if(!plexLib) return '';
-    var showKeys = {};
-    plexLib.episodes.forEach(function(e){ showKeys[e.gk || e.st] = true; });
-    var m = plexLib.movies.length, n = Object.keys(showKeys).length;
+    var showKeys = {}, m = 0;
+    plexLib.movies.forEach(function(r){ if(plexIncluded(r)) m++; });
+    plexLib.episodes.forEach(function(e){ if(plexIncluded(e)) showKeys[e.gk || e.st] = true; });
+    var n = Object.keys(showKeys).length;
     return m + ' movie' + (m === 1 ? '' : 's') + ' · ' + n + ' show' + (n === 1 ? '' : 's');
   }
   // Plex's watch state for anything Amplify has no newer state for.
@@ -14269,7 +14321,7 @@
     var localMovie = {};
     movies.forEach(function(m){ localMovie[showKeyOf(m.title) + '|' + (m.year || '')] = true; });
     plexLib.movies.forEach(function(r){
-      if(!r.p || localMovie[showKeyOf(r.t) + '|' + (r.y || '')]) return;
+      if(!r.p || !plexIncluded(r) || localMovie[showKeyOf(r.t) + '|' + (r.y || '')]) return;
       var id = plexId(r.k), ed = videoEdits[id] || {};
       var item = { type: 'video', id: id, uri: plexMediaUrl(r.p), fileName: r.f || r.t, relPath: '', size: 0,
         addedAt: (r.ad || 0) * 1000, duration: r.d || 0, width: r.w || 0, height: r.h || 0, still: '', subs: [],
@@ -14286,7 +14338,7 @@
       showsByKey[k].episodes.forEach(function(e){ have[k + '|' + e.season + '|' + e.episode] = true; });
     });
     plexLib.episodes.forEach(function(r){
-      if(!r.p) return;
+      if(!r.p || !plexIncluded(r)) return;
       var sr = showRec[r.gk] || {};
       var title = r.st || sr.t || 'Unknown Show';
       var key = showKeyOf(title);
@@ -14437,6 +14489,42 @@
       }
       if(plexLib && plexServer() && plexLib.serverId === plexServer().id){
         line(plexCountText() + ' · synced ' + timeAgoShort(plexLib.at), 'plex-line dim');
+        // Which libraries show in Video (build 131): one switch each, all on to begin with.
+        var secs = plexLib.sections || [];
+        if(secs.length){
+          line('Libraries', 'plex-libs-head');
+          var ex = plexExcluded();
+          var list = document.createElement('div');
+          list.className = 'plex-libs';
+          list.id = 'plexLibraries';
+          secs.forEach(function(sec){
+            var on = !ex[sec.key];
+            var row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'plex-lib' + (on ? ' on' : '');
+            row.setAttribute('role', 'switch');
+            row.setAttribute('aria-checked', on ? 'true' : 'false');
+            row.dataset.key = sec.key;
+            var txt = document.createElement('span');
+            txt.className = 'plex-lib-text';
+            var nm = document.createElement('span');
+            nm.className = 'plex-lib-name';
+            nm.textContent = sec.title;
+            var sub = document.createElement('span');
+            sub.className = 'plex-lib-sub';
+            sub.textContent = sec.type === 'show'
+              ? sec.n + ' show' + (sec.n === 1 ? '' : 's')
+              : sec.n + ' movie' + (sec.n === 1 ? '' : 's');
+            txt.appendChild(nm); txt.appendChild(sub);
+            var sw = document.createElement('span');
+            sw.className = 'plex-switch';
+            sw.setAttribute('aria-hidden', 'true');
+            row.appendChild(txt); row.appendChild(sw);
+            row.addEventListener('click', function(){ plexSetLibraryOn(sec.key, !on); });
+            list.appendChild(row);
+          });
+          box.appendChild(list);
+        }
       } else if(plexSyncBusy){
         line('Loading your library…', 'plex-line dim');
       }
@@ -14453,7 +14541,7 @@
     if(!plexServer()) return;
     plexConnect().then(function(){
       invalidateVideoLib();
-      if(!plexLib || plexLib.serverId !== plexServer().id || Date.now() - (plexLib.at || 0) > PLEX_STALE_MS) return plexSync({ quiet: true });
+      if(!plexLib || !plexLib.sections || plexLib.serverId !== plexServer().id || Date.now() - (plexLib.at || 0) > PLEX_STALE_MS) return plexSync({ quiet: true });
       plexMergeProgress();
       renderPlexSettings();
       refreshVideoPages();
