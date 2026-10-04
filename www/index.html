@@ -4869,6 +4869,15 @@
         </div>
         <div class="tile-grid" id="latestPodcastsGrid"></div>
       </div>
+      <!-- Playlists (build 125): the listener's playlists as a row of covers under Latest
+           Podcasts, in the Playlists page's own order. The heading opens the Playlists page.
+           Hidden while there are none. -->
+      <div class="home-section playlists-home-section" id="playlistsHomeSection" style="display:none;">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="playlistsHomeHeading" role="button" tabindex="0">Playlists<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid" id="playlistsHomeGrid"></div>
+      </div>
       <div class="recent-section" id="recentSection" style="display:none;">
         <!-- Mobile only: stacked, the songs half starts a screen down, so these jump to it. -->
         <div class="recent-anchors" id="recentAnchors">
@@ -6425,6 +6434,9 @@
   var madeForYouSection = document.getElementById('madeForYouSection');
   var madeForYouGrid = document.getElementById('madeForYouGrid');
   var madeForYouShown = false;
+  var playlistsHomeSection = document.getElementById('playlistsHomeSection');
+  var playlistsHomeGrid = document.getElementById('playlistsHomeGrid');
+  var playlistsHomeShown = false;
   var topArtistsGrid = document.getElementById('topArtistsGrid');
   var latestPodcastsSection = document.getElementById('latestPodcastsSection');
   var latestPodcastsGrid = document.getElementById('latestPodcastsGrid');
@@ -9200,6 +9212,7 @@
   }
   function saveStationPlaylists(){
     try{ localStorage.setItem(STATION_PLAYLISTS_KEY, JSON.stringify(stationPlaylists)); }catch(e){ storageWorks = false; }
+    if(typeof renderPlaylistsHomeSection === 'function') try{ renderPlaylistsHomeSection(); }catch(e){}
   }
   function makeStationPlaylistId(){
     return 'pl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -11388,6 +11401,7 @@
       makeHomeRow(topArtistsGrid);
       makeHomeRow(recentGrid);
       makeHomeRow(latestPodcastsGrid);
+      makeHomeRow(playlistsHomeGrid);
       makeHomeRow(forYouGrid);
       makeHomeRow(cwHomeGrid);
       makeHomeRow(channelsHomeGrid);
@@ -11400,6 +11414,7 @@
       topArtistsSection.style.display = topArtistsShown ? '' : 'none';
       madeForYouSection.style.display = madeForYouShown ? '' : 'none';
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
+      playlistsHomeSection.style.display = playlistsHomeShown ? '' : 'none';
       recentSection.style.display = '';
       forYouSection.style.display = '';
       cwHomeSection.style.display = cwHomeSection.dataset.empty ? 'none' : '';
@@ -11419,6 +11434,7 @@
       topArtistsSection.style.display = 'none';
       madeForYouSection.style.display = 'none';
       latestPodcastsSection.style.display = 'none';
+      playlistsHomeSection.style.display = 'none';
       forYouSection.style.display = 'none';
       cwHomeSection.style.display = 'none';
       channelsHomeSection.style.display = 'none';
@@ -11439,6 +11455,7 @@
     topArtistsSection.style.display = 'none';
     madeForYouSection.style.display = 'none';
     latestPodcastsSection.style.display = 'none';
+    playlistsHomeSection.style.display = 'none';
     forYouSection.style.display = 'none';
     cwHomeSection.style.display = 'none';
     channelsHomeSection.style.display = 'none';
@@ -11554,6 +11571,38 @@
     });
   })();
 
+  // ---------- Playlists (home, build 125) ----------
+  // A cover per playlist (its own cover art, as on the Playlists page) with how much is in
+  // it; tapping one opens it. Redrawn whenever playlists are saved, so a new, renamed,
+  // reordered or deleted playlist shows straight away.
+  function renderPlaylistsHomeSection(){
+    if(!playlistsHomeGrid) return;
+    playlistsHomeShown = stationPlaylists.length > 0;
+    playlistsHomeGrid.innerHTML = '';
+    stationPlaylists.forEach(function(item){
+      playlistsHomeGrid.appendChild(buildEntityTile({
+        key: 'playlist-home-' + item.id,
+        entity: 'playlist',
+        name: item.label || 'Playlist',
+        sub: plural((item.stations || []).length, 'item', 'items'),
+        renderArt: function(art){ renderPlaylistCoverArt(art, item); },
+        onClick: function(){ pushView(); runStationPlaylist(item); }
+      }));
+    });
+    if(playlistsHomeSection && document.body.classList.contains('home-stacked') && onHomeView){
+      playlistsHomeSection.style.display = playlistsHomeShown ? '' : 'none';
+    }
+  }
+  (function(){
+    var h = document.getElementById('playlistsHomeHeading');
+    if(!h) return;
+    function go(){ pushView(); openPlaylistsHome(); }
+    h.addEventListener('click', go);
+    h.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); go(); }
+    });
+  })();
+
   // ---------- Latest Podcasts (home) ----------
   // Each followed show's newest episode (sub.latestEpisode, kept current by
   // backfillPodcastShowMeta -- forced on every page load, see the startup block), newest
@@ -11637,6 +11686,7 @@
     renderTopArtistsSection();
     renderMadeForYouSection();
     renderLatestPodcastsSection();
+    renderPlaylistsHomeSection();
     renderForYouHomeSection();
     renderContinueWatchingHome();
     renderChannelsHome();
@@ -15116,7 +15166,7 @@
         renderArt: function(art){ renderPlaylistCoverArt(art, item); },
         draggable: stationPlaylistsEditing,
         onReorder: function(){ reorderStationPlaylistsFromGrid(); renderStationPlaylistList(); },
-        onClick: function(){ runStationPlaylist(item); }
+        onClick: function(){ pushView(); runStationPlaylist(item); }
       }));
     });
   }
@@ -15541,6 +15591,7 @@
 
       row.addEventListener('click', function(){
         searchInput.value = '';
+        pushView();
         runStationPlaylist(item);
       });
       playlistList.appendChild(row);
@@ -15617,7 +15668,9 @@
     // A playlist is Playlists' own item, so its back button always returns there -- same
     // fixed-destination treatment as My Library's Artists/Albums/Songs and the Podcasts show
     // page, rather than a history-based one.
-    setDetailBack('Playlists', function(){ openPlaylistsHome(); });
+    // Back goes wherever the playlist was opened from (Home's Playlists row, a search, the
+    // Playlists page), falling back to the Playlists page (build 125; was always Playlists).
+    setDetailBackToHistory(function(){ openPlaylistsHome(); }, 'Playlists');
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
