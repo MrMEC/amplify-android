@@ -926,6 +926,15 @@
     position:static; opacity:1; transform:none; flex-shrink:0; margin-left:4px;
   }
   .song-row.playing .song-row-title{ color:var(--accent); }
+  /* Search (build 117): Top Results rows, recent searches and action rows. */
+  .song-row .song-row-art.round{ border-radius:50%; }
+  .top-result-chev{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:14px; }
+  .song-row.search-more-row{ cursor:pointer; }
+  .song-row .song-row-art.search-more-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); font-size:20px; }
+  .song-row.recent-search-row .song-row-art.search-more-art{ width:44px; height:44px; font-size:16px; background:none; }
+  .song-row.recent-search-row .song-row-title{ font-weight:500; }
+  .recent-searches-head{ grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; }
+  .recent-searches-clear{ border:none; background:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; padding:4px 6px; }
   /* A list that is only songs wants rows close together; the grid's 40px row gap is spacing
      meant for captioned squares. */
   .tile-grid.grid-songs{ gap:4px 16px; }
@@ -19976,7 +19985,7 @@
       // Back to the same results tab (a podcast opened from the Podcasts tab comes back there).
       var tab = (searchState && searchState.q === q) ? searchState.tab : null;
       return entry('Results', function(){
-        searchInput.value = q; searchByName(q);
+        setSearchBoxes(q); searchByName(q, true);
         if(tab && searchState && searchState.q === q){ searchState.tab = tab; applySearchResults(); }
       });
     }
@@ -23990,7 +23999,8 @@
 
   // reuse: show the kept last search when it is this query (see showLastSearchResults)
   // instead of asking the directories again.
-  function searchByName(q, reuse){
+  // live: called while typing (searchAsYouType), so the directories wait for a pause.
+  function searchByName(q, reuse, live){
     cancelPlaylistStationsEditing();
     closeNowPlaying();
     window.scrollTo(0, 0);
@@ -24045,22 +24055,26 @@
       stationsHeading.textContent = 'Search';
       setClearSearchVisible(false);
       setResultCount(null);
-      resetStationsGrid();
-      stationsGrid.innerHTML = '<div class="empty-state">Search for stations, podcasts, artists or songs, or paste a stream link.</div>';
+      onSearchView = true;
+      renderSearchHome();
       return;
     }
-    stationsHeading.textContent = 'Results for ' + (/["\u201C\u201D]/.test(q) ? q : '"' + q + '"');
+    stationsHeading.textContent = searchHeadingFor(q);
     setClearSearchVisible(true);
+    onSearchView = true;
     setResultCount(null);
     if(reuse && lastSearch && lastSearch.q === q){
       searchState = lastSearch;
       searchState.artists = searchArtists(q);
       searchState.albums = searchAlbums(q);
       searchState.songs = searchLocalTracks(q);
+      searchState.channels = searchChannels(q);
+      searchState.playlists = searchPlaylists(q);
       applySearchResults();
       return;
     }
-    runSearch(q);
+    if(live && isUrlLike(q)){ searchLiveNow(q); return; }
+    runSearch(q, live);
   }
 
   // ================================================================
@@ -24071,12 +24085,16 @@
   // never shows an empty Songs tab. Artists is what puts an artist page in reach from the
   // search box at all -- until now there was no route to one except the Artists list.
 
+  // Top Results (build 117) leads: the closest few matches of every kind, in one list.
   var SEARCH_GROUPS = [
+    { id: 'top', label: 'Top Results', noun: 'result' },
     { id: 'stations', label: 'Stations', noun: 'station' },
-    { id: 'podcasts', label: 'Podcasts', noun: 'show' },
     { id: 'artists', label: 'Artists', noun: 'artist' },
     { id: 'albums', label: 'Albums', noun: 'album' },
-    { id: 'songs', label: 'Songs', noun: 'song' }
+    { id: 'songs', label: 'Songs', noun: 'song' },
+    { id: 'podcasts', label: 'Podcasts', noun: 'show' },
+    { id: 'channels', label: 'Channels', noun: 'channel' },
+    { id: 'playlists', label: 'Playlists', noun: 'playlist' }
   ];
   var searchState = null;
 
@@ -24093,7 +24111,7 @@
     var savedSearch = JSON.parse(localStorage.getItem(LAST_SEARCH_KEY) || 'null');
     if(savedSearch && typeof savedSearch.q === 'string' && savedSearch.q){
       lastSearch = { q: savedSearch.q, stations: savedSearch.stations || [], podcasts: savedSearch.podcasts || [],
-        artists: [], albums: [], songs: [], tab: savedSearch.tab || null, pending: false, podcastsPending: false, restored: true };
+        artists: [], albums: [], songs: [], channels: [], playlists: [], tab: savedSearch.tab || null, pending: false, podcastsPending: false, restored: true };
     }
   }catch(e){}
   var lastSearchSaveTimer = null;
@@ -24124,6 +24142,7 @@
     searchTabs.style.display = 'none';
     searchTabs.innerHTML = '';
     searchState = null;
+    onSearchView = false;
   }
 
   // ---------- query parsing and ranking ----------
@@ -24172,7 +24191,9 @@
   // How closely one name answers the query. Lower is better:
   //   0  the name is exactly the query          (All Night Long)
   //   1  the name starts with it                (All Night Long (All Night))
+  //   1.5 the name starts with it mid-word     (Raye, for ray)
   //   2  the name contains it as a phrase       (You Shook Me All Night Long)
+  //   2.5 a word in the name starts with it
   //   3  the name has every word, in any order
   //   4  it matched on something else -- artist, album, genre, file name
   // A quoted phrase is also tried on its own, so "all night long" richie still ranks the song
@@ -24187,7 +24208,11 @@
     if(!w) return 4;
     if(n === w) return 0;
     if(n.indexOf(w + ' ') === 0) return 1;
+    // Half steps for a name that starts with what's typed so far (Raye, typing "ray"),
+    // which matters now that results update letter by letter.
+    if(n.indexOf(w) === 0) return 1.5;
     if((' ' + n + ' ').indexOf(' ' + w + ' ') !== -1) return 2;
+    if((' ' + n).indexOf(' ' + w) !== -1) return 2.5;
     var words = w.split(' ');
     if(words.every(function(x){ return n.indexOf(x) !== -1; })) return 3;
     return 4;
@@ -24228,9 +24253,14 @@
 
   function searchGroupItems(id){
     if(!searchState) return [];
+    if(id === 'top') return topSearchResults();
     return searchState[id] || [];
   }
   function searchGroupHasContent(id){
+    if(id === 'top'){
+      return !!searchState && (searchState.pending || searchState.podcastsPending ||
+        SEARCH_GROUPS.some(function(g){ return g.id !== 'top' && (searchState[g.id] || []).length; }));
+    }
     // While the directory call is in flight the Stations tab is offered anyway, so the
     // grouping does not visibly rearrange itself the moment results land.
     if(id === 'stations' && searchState && searchState.pending) return true;
@@ -24238,7 +24268,14 @@
     return searchGroupItems(id).length > 0;
   }
 
-  function runSearch(q){
+  // live: typed a letter at a time (searchAsYouType). Your own music, channels and playlists
+  // answer at once; the two directories are asked once typing pauses (SEARCH_REMOTE_DELAY),
+  // so a word typed quickly is one request rather than one per letter. The tab you are on
+  // is kept while it still has anything.
+  var SEARCH_REMOTE_DELAY = 320;
+  var searchRemoteTimer = null, searchRemoteRun = null;
+  function runSearch(q, live){
+    var prevTab = live && searchState ? searchState.tab : null;
     searchState = {
       q: q,
       stations: [],
@@ -24246,59 +24283,70 @@
       artists: searchArtists(q),
       albums: searchAlbums(q),
       songs: searchLocalTracks(q),
-      tab: null,
+      channels: searchChannels(q),
+      playlists: searchPlaylists(q),
+      tab: prevTab,
       pending: true,
       podcastsPending: true
     };
     lastSearch = searchState;
-
+    var st = searchState;
+    if(searchRemoteTimer){ clearTimeout(searchRemoteTimer); searchRemoteTimer = null; }
+    searchRemoteRun = function(){ searchRemoteTimer = null; searchRemoteRun = null; askDirectories(q, st); };
+    if(live) searchRemoteTimer = setTimeout(searchRemoteRun, SEARCH_REMOTE_DELAY);
+    else searchRemoteRun();
+    applySearchResults();
+  }
+  // Send a search waiting on the typing pause right away (the Go / Enter key).
+  function flushSearchRemote(){ if(searchRemoteRun){ clearTimeout(searchRemoteTimer); searchRemoteRun(); } }
+  function askDirectories(q, st){
     // The two remote directories know nothing about quotes, so they get the words alone and
     // the quoted phrases are enforced here, on what comes back.
     var pq = parseSearchQuery(q);
     var remoteQ = plainSearchText(q);
+    // The answers belong to this search (st), even after a newer one replaced it.
+    function stale(){ return lastSearch !== st; }
 
     itunesSearchPodcasts(remoteQ, 15).then(function(results){
-      if(!searchState || searchState.q !== q) return;
-      searchState.podcasts = rankByMatch(results.map(showFromItunes).filter(function(sh){
+      if(stale()) return;
+      st.podcasts = rankByMatch(results.map(showFromItunes).filter(function(sh){
         return !pq.phrases.length || matchesQuery([sh.collectionName, sh.artistName], { terms: [], phrases: pq.phrases });
       }), function(sh){ return sh.collectionName; }, pq);
-      searchState.podcastsPending = false;
-      applySearchResults();
+      st.podcastsPending = false;
+      if(searchState === st) applySearchResults();
     })['catch'](function(){
-      if(!searchState || searchState.q !== q) return;
-      searchState.podcastsPending = false;
-      applySearchResults();
+      if(stale()) return;
+      st.podcastsPending = false;
+      if(searchState === st) applySearchResults();
     });
 
     // The channel list may not have loaded yet; artists are recomputed when it arrives.
     loadArtistStations().then(function(){
-      if(!searchState || searchState.q !== q) return;
-      searchState.artists = searchArtists(q);
-      applySearchResults();
+      if(stale()) return;
+      st.artists = searchArtists(q);
+      if(searchState === st) applySearchResults();
     })['catch'](function(){});
-
-    applySearchResults();
 
     apiFetch('/json/stations/search?name=' + encodeURIComponent(remoteQ) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
       .then(function(data){
-        if(!searchState || searchState.q !== q) return;
+        if(stale()) return;
         // Best match first; within the same closeness, favourites still lead, then A-Z.
-        searchState.stations = rankByMatch(
+        st.stations = rankByMatch(
           dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(st){
             if(isBlacklisted(st)) return false;
             return !pq.phrases.length || matchesQuery([st.name], { terms: [], phrases: pq.phrases });
           })),
           function(st){ return st.name; }, pq,
           function(a, b){ return (isFavorite(a) ? 0 : 1) - (isFavorite(b) ? 0 : 1); });
-        searchState.pending = false;
-        applySearchResults();
+        st.pending = false;
+        if(searchState === st) applySearchResults();
       })
       ['catch'](function(err){
-        if(!searchState || searchState.q !== q) return;
+        if(stale()) return;
         setStatus(err.message, true);
         // The directory being unreachable must not take your own music down with it.
-        searchState.pending = false;
-        applySearchResults();
+        st.pending = false;
+        if(searchState === st) applySearchResults();
       });
   }
 
@@ -24336,7 +24384,7 @@
       btn.className = 'home-tab' + (searchState.tab === g.id ? ' active' : '');
       btn.setAttribute('role', 'tab');
       btn.dataset.group = g.id;
-      var count = searchGroupItems(g.id).length;
+      var count = g.id === 'top' ? 0 : searchGroupItems(g.id).length;
       btn.textContent = g.label + (count ? ' (' + count + ')' : '');
       btn.addEventListener('click', function(){
         if(!searchState) return;
@@ -24358,6 +24406,20 @@
     var items = searchGroupItems(group.id);
     resetStationsGrid();
 
+    if(group.id === 'top'){
+      if(!items.length){
+        stationsGrid.innerHTML = (searchState.pending || searchState.podcastsPending)
+          ? '<div class="loading-state"><div class="spinner"></div></div>'
+          : '<div class="empty-state">Nothing found. Try a different search.</div>';
+        setResultCount(null);
+        return;
+      }
+      stationsGrid.classList.add('grid-songs');
+      items.forEach(function(r){ stationsGrid.appendChild(buildTopResultRow(r)); });
+      setResultCount(null);
+      return;
+    }
+    if(group.id === 'channels' || group.id === 'playlists') stationsGrid.classList.add('grid-songs');
     if(group.id === 'stations' && !items.length && searchState.pending){
       stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
       setResultCount(null);
@@ -24394,6 +24456,15 @@
             if(sub && sub.parentNode) sub.parentNode.insertBefore(mark, sub.nextSibling); else tile.appendChild(mark);
           });
         })(stationsGrid.lastElementChild);
+      } else if(group.id === 'channels'){
+        stationsGrid.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url) }));
+      } else if(group.id === 'playlists'){
+        stationsGrid.appendChild(buildEntityTile({
+          key: 'playlist-' + item.id, entity: 'playlist', name: item.label, row: true,
+          sub: plural((item.stations || []).length, 'item', 'items'),
+          renderArt: function(art){ renderPlaylistCoverArt(art, item); },
+          onClick: function(){ pushView(); runStationPlaylist(item); }
+        }));
       } else if(group.id === 'albums'){
         stationsGrid.appendChild(buildEntityTile({
           key: 'album:' + item.key,
@@ -24410,11 +24481,294 @@
       }
     });
 
+    if(group.id === 'channels' && !iptvIndex) stationsGrid.appendChild(buildSearchAllChannelsRow());
     // Still counting up while the directory answers, so no total is claimed yet.
     if(group.id === 'stations' && searchState.pending) setResultCount(null);
     else if(group.id === 'podcasts' && searchState.podcastsPending) setResultCount(null);
     else setResultCount(items.length, group.noun);
   }
+
+
+  // ---------- search: Channels and Playlists ----------
+  // Your own TV channels (My Channels) always; the full TV directory (iptv-org) too once the
+  // phone has it -- from the Add Channels page, or the "Search all TV channels" row at the
+  // foot of the Channels tab. Typing never downloads it on its own: it's several megabytes.
+  function searchChannels(q){
+    var pq = parseSearchQuery(q);
+    if(pq.empty) return [];
+    var mine = videoChannels.filter(channelVisible).filter(function(c){
+      return matchesQuery([c.name, (c.catNames || []).join(' '), c.country], pq);
+    });
+    var seen = {};
+    mine.forEach(function(c){ seen[c.url] = true; });
+    var dir = [];
+    [iptvIndex && iptvIndex.list, freeTvList].forEach(function(list){
+      (list || []).forEach(function(c){
+        if(seen[c.url] || isAdultChannel(c) || !matchesQuery([c.name], pq)) return;
+        seen[c.url] = true; dir.push(c);
+      });
+    });
+    var nameOf = function(c){ return c.name; };
+    return rankByMatch(mine, nameOf, pq).concat(rankByMatch(dir, nameOf, pq).slice(0, 60));
+  }
+  // A copy of the directory saved earlier is used straight away when there is one.
+  var iptvPeeked = false;
+  function peekIptvIndex(){
+    if(iptvPeeked || iptvIndex || typeof caches === 'undefined') return;
+    iptvPeeked = true;
+    caches.open(IPTV_CACHE).then(function(c){ return c.match(new Request(IPTV_API + 'amplify-index.json')); })
+      .then(function(hit){ return hit ? hit.json() : null; })
+      .then(function(idx){
+        if(!idx || !idx.list || iptvIndex) return;
+        iptvIndex = idx;
+        refreshSearchChannels();
+      })['catch'](function(){});
+  }
+  function refreshSearchChannels(){
+    if(!searchState) return;
+    searchState.channels = searchChannels(searchState.q);
+    searchState._topKey = null;
+    applySearchResults();
+  }
+  function buildSearchAllChannelsRow(){
+    var row = document.createElement('div');
+    row.className = 'tile song-row search-more-row';
+    row.innerHTML = '<div class="tile-art song-row-art search-more-art"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></div>'
+      + '<div class="song-row-body"><div class="tile-name song-row-title">Search all TV channels</div>'
+      + '<div class="song-row-sub">Downloads the channel directory once a day</div></div>';
+    row.addEventListener('click', function(){
+      if(row.classList.contains('busy')) return;
+      row.classList.add('busy');
+      row.querySelector('.song-row-sub').textContent = 'Loading the channel directory…';
+      loadIptvIndex().then(function(){ refreshSearchChannels(); }, function(){
+        row.classList.remove('busy');
+        row.querySelector('.song-row-sub').textContent = "Couldn't load the channel directory. Tap to try again.";
+      });
+    });
+    return row;
+  }
+  function searchPlaylists(q){
+    var pq = parseSearchQuery(q);
+    if(pq.empty) return [];
+    return rankByMatch(stationPlaylists.filter(function(pl){ return matchesQuery([pl.label], pq); }),
+      function(pl){ return pl.label; }, pq);
+  }
+
+  // ---------- search: Top Results ----------
+  // The closest few of every kind in one list, like a music app's top hits: each kind
+  // offers its best few, every one is scored by how well its name answers the search (the
+  // same 0-4 closeness as everywhere else), with a small nudge per kind (an artist or a song
+  // of yours ahead of a directory station of the same closeness) and per place within its
+  // own list, and the best dozen are shown.
+  var TOP_POOLS = [
+    { id: 'artists', take: 4, bias: 0, name: function(e){ return e.name; } },
+    { id: 'songs', take: 5, bias: 1, name: function(t){ return t.name; } },
+    { id: 'albums', take: 3, bias: 1.5, name: function(a){ return a.album; } },
+    { id: 'playlists', take: 2, bias: 1.5, name: function(p){ return p.label; } },
+    { id: 'stations', take: 5, bias: 2, name: function(s){ return s.name; } },
+    { id: 'channels', take: 3, bias: 2.5, name: function(c){ return c.name; } },
+    { id: 'podcasts', take: 3, bias: 2.5, name: function(sh){ return sh.collectionName; } }
+  ];
+  var TOP_MAX = 12;
+  function topSearchResults(){
+    var st = searchState;
+    if(!st) return [];
+    var key = st.q + '|' + TOP_POOLS.map(function(p){ return (st[p.id] || []).length; }).join(',');
+    if(st._top && st._topKey === key) return st._top;
+    var pq = parseSearchQuery(st.q), cand = [];
+    TOP_POOLS.forEach(function(pool){
+      (st[pool.id] || []).slice(0, pool.take).forEach(function(item, i){
+        var fav = (pool.id === 'stations' || pool.id === 'songs') && isFavorite(item);
+        cand.push({ kind: pool.id, item: item,
+          score: nameMatchRank(pool.name(item), pq) * 10 + pool.bias + i * 1.2 - (fav ? 1.5 : 0) });
+      });
+    });
+    cand.sort(function(a, b){ return a.score - b.score; });
+    st._top = cand.slice(0, TOP_MAX);
+    st._topKey = key;
+    return st._top;
+  }
+  var TOP_KIND_LABEL = { artists: 'Artist', songs: 'Song', albums: 'Album', playlists: 'Playlist',
+    stations: 'Station', channels: 'TV Channel', podcasts: 'Podcast' };
+  function buildTopResultRow(r){
+    var item = r.item, kind = r.kind;
+    var row = document.createElement('div');
+    row.className = 'tile song-row top-result-row';
+    row.dataset.kind = kind;
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art' + (kind === 'artists' ? ' round' : '');
+    var title = '', sub = '', playable = null, open = null;
+    if(kind === 'artists'){
+      renderArtistArt(art, item); title = item.name;
+      open = function(){ openArtistPage(item.key); };
+    } else if(kind === 'albums'){
+      renderStationArt(art, artSourceForTracks(item.tracks) || {}); title = item.album; sub = item.artist;
+      row.dataset.key = 'album:' + item.key;
+      open = function(){ openAlbumPage(item.key, null); };
+    } else if(kind === 'playlists'){
+      renderPlaylistCoverArt(art, item); title = item.label; sub = plural((item.stations || []).length, 'item', 'items');
+      open = function(){ pushView(); runStationPlaylist(item); };
+    } else if(kind === 'podcasts'){
+      renderStationArt(art, { type: 'podcast', guid: 'show:' + item.collectionId, favicon: item.artworkUrl, name: item.collectionName });
+      title = item.collectionName; sub = item.artistName;
+      open = function(){ pushView(); openShowPage(item.collectionId); };
+    } else if(kind === 'channels'){
+      var cst = channelToStation(item);
+      renderStationArt(art, cst); title = item.name;
+      sub = (item.catNames && item.catNames.length) ? item.catNames[0] : '';
+      playable = cst;
+      row.dataset.key = favKey(cst);
+      open = function(){ playChannel(item); };
+    } else {
+      // a song or a station
+      renderStationArt(art, item);
+      title = kind === 'stations' ? stripExclusively(item.name) : (item.name || '');
+      sub = kind === 'songs' ? (item.artist || '') : (item.country || '');
+      playable = item;
+      row.dataset.key = favKey(item);
+      row._ctxItem = item;
+      open = function(){ playEntity(item); };
+    }
+    if(playable && currentStation && favKey(currentStation) === favKey(playable)) row.classList.add('playing');
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div');
+    t.className = 'tile-name song-row-title';
+    t.textContent = title;
+    body.appendChild(t);
+    var s2 = document.createElement('div');
+    s2.className = 'song-row-sub';
+    s2.textContent = TOP_KIND_LABEL[kind] + (sub ? ' · ' + sub : '');
+    body.appendChild(s2);
+    row.appendChild(body);
+    // Somewhere to go gets a chevron; something to play gets its More menu (never both).
+    if(playable) row.appendChild(buildRowMoreBtn(playable, { fav: true }));
+    else {
+      var chev = document.createElement('span');
+      chev.className = 'top-result-chev';
+      chev.setAttribute('aria-hidden', 'true');
+      chev.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+      row.appendChild(chev);
+    }
+    row.addEventListener('click', open);
+    return row;
+  }
+
+  // ---------- search as you type ----------
+  // Tapping the search box opens the results page straight away; each letter typed updates
+  // it in place (searchAsYouType), without waiting for Enter. The box keeps the keyboard.
+  var onSearchView = false;
+  function searchHeadingFor(q){
+    return 'Results for ' + (/["“”]/.test(q) ? q : '"' + q + '"');
+  }
+  var searchTypeTimer = null;
+  function searchAsYouType(v){
+    if(searchTypeTimer) clearTimeout(searchTypeTimer);
+    searchTypeTimer = setTimeout(function(){ searchTypeTimer = null; searchLiveNow(String(v || '').trim()); }, 90);
+  }
+  function searchLiveNow(q){
+    peekIptvIndex();
+    if(!onSearchView){ searchByName(q, false, true); return; }
+    if(!q){
+      if(searchRemoteTimer){ clearTimeout(searchRemoteTimer); searchRemoteTimer = null; searchRemoteRun = null; }
+      searchState = null;
+      stationsHeading.textContent = 'Search';
+      setClearSearchVisible(false);
+      setResultCount(null);
+      renderSearchHome();
+      return;
+    }
+    if(isUrlLike(q)){
+      searchState = null;
+      hideSearchTabsRow();
+      stationsHeading.textContent = 'Stream link';
+      setResultCount(null);
+      resetStationsGrid();
+      stationsGrid.classList.add('grid-songs');
+      stationsGrid.appendChild(buildSearchActionRow('fa-play', 'Play this stream', q, function(){ handleSearchSubmit(); }));
+      return;
+    }
+    stationsHeading.textContent = searchHeadingFor(q);
+    setClearSearchVisible(true);
+    runSearch(q, true);
+  }
+  function buildSearchActionRow(icon, title, sub, onClick){
+    var row = document.createElement('div');
+    row.className = 'tile song-row search-more-row';
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art search-more-art';
+    art.innerHTML = '<i class="fa-solid ' + icon + '" aria-hidden="true"></i>';
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div'); t.className = 'tile-name song-row-title'; t.textContent = title; body.appendChild(t);
+    if(sub){ var s2 = document.createElement('div'); s2.className = 'song-row-sub'; s2.textContent = sub; body.appendChild(s2); }
+    row.appendChild(body);
+    row.addEventListener('click', onClick);
+    return row;
+  }
+  // The search box was tapped: the results page, now. With words already in the box, their
+  // results; with an empty box, recent searches.
+  function openSearchFromInput(input){
+    if(onSearchView) return;
+    var v = String(input.value || '').trim();
+    peekIptvIndex();
+    if(v && lastSearch && v === lastSearch.q){ showLastSearchResults(); return; }
+    searchLiveNow(v);
+  }
+
+  // ---------- recent searches ----------
+  var RECENT_SEARCHES_KEY = 'radioPlayerRecentSearches';
+  var RECENT_SEARCHES_MAX = 10;
+  var recentSearches = [];
+  try{ recentSearches = (JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]') || []).filter(function(x){ return typeof x === 'string' && x; }); }catch(e){}
+  function saveRecentSearches(){ try{ localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recentSearches)); }catch(e){} }
+  function addRecentSearch(q){
+    q = String(q || '').trim();
+    if(!q || isUrlLike(q)) return;
+    var low = q.toLowerCase();
+    recentSearches = [q].concat(recentSearches.filter(function(x){ return x.toLowerCase() !== low; })).slice(0, RECENT_SEARCHES_MAX);
+    saveRecentSearches();
+  }
+  function setSearchBoxes(q){
+    searchInput.value = q;
+    if(searchSheetInput) searchSheetInput.value = q;
+  }
+  function renderSearchHome(){
+    hideSearchTabsRow();
+    resetStationsGrid();
+    if(!recentSearches.length){
+      stationsGrid.innerHTML = '<div class="empty-state">Search for stations, artists, albums, songs, podcasts and TV channels, or paste a stream link.</div>';
+      return;
+    }
+    stationsGrid.classList.add('grid-songs');
+    var head = document.createElement('div');
+    head.className = 'grid-section-label recent-searches-head';
+    head.innerHTML = '<span>Recent Searches</span>';
+    var clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'recent-searches-clear';
+    clear.textContent = 'Clear';
+    clear.addEventListener('click', function(){ recentSearches = []; saveRecentSearches(); renderSearchHome(); });
+    head.appendChild(clear);
+    stationsGrid.appendChild(head);
+    recentSearches.forEach(function(q){
+      var row = buildSearchActionRow('fa-magnifying-glass', q, '', function(){
+        setSearchBoxes(q);
+        addRecentSearch(q);
+        searchLiveNow(q);
+        flushSearchRemote();
+      });
+      row.classList.add('recent-search-row');
+      stationsGrid.appendChild(row);
+    });
+  }
+  // Opening anything from the results remembers what was searched.
+  stationsGrid.addEventListener('click', function(e){
+    if(!onSearchView || !searchState || !searchState.q) return;
+    if(e.target.closest('.tile, .row-item, .song-row, .ch-item')) addRecentSearch(searchState.q);
+  }, true);
 
   function searchByTag(tag){
     cancelPlaylistStationsEditing();
@@ -24492,8 +24846,11 @@
     // the Now Playing screen with nothing to show for the search.
     closeNowPlaying();
     var v = searchInput.value.trim();
+    if(searchTypeTimer){ clearTimeout(searchTypeTimer); searchTypeTimer = null; }
     // Nothing typed: the results page, on the last search (or empty if there hasn't been one).
     if(!v){ showLastSearchResults(); return; }
+    if(!isUrlLike(v)) addRecentSearch(v);
+    flushSearchRemote();
     // The same words as the kept search: bring those results back rather than searching again.
     if(lastSearch && v === lastSearch.q){ showLastSearchResults(); return; }
     if(isUrlLike(v)){
@@ -24509,6 +24866,8 @@
   }
   searchBtn.addEventListener('click', handleSearchSubmit);
   searchInput.addEventListener('keydown', function(e){ if(e.key === 'Enter') handleSearchSubmit(); });
+  searchInput.addEventListener('focus', function(){ openSearchFromInput(searchInput); });
+  searchInput.addEventListener('input', function(){ searchAsYouType(searchInput.value); });
 
   // ---------- the mobile search sheet ----------
   // The sheet's field is a second front end onto the same search: whatever is typed here is
@@ -24576,6 +24935,15 @@
   searchSheetInput.addEventListener('keydown', function(e){
     if(e.key === 'Enter') submitSearchSheet();
     else if(e.key === 'Escape') closeSearchSheet(true);
+  });
+  // Tapping the box opens the results page at once; typing updates it letter by letter.
+  searchSheetInput.addEventListener('focus', function(){
+    searchInput.value = searchSheetInput.value;
+    openSearchFromInput(searchSheetInput);
+  });
+  searchSheetInput.addEventListener('input', function(){
+    searchInput.value = searchSheetInput.value;
+    searchAsYouType(searchSheetInput.value);
   });
 
   // ---------- the mobile tab bar ----------

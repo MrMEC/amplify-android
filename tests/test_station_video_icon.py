@@ -51,6 +51,9 @@ async def run(b, w, h, tag):
     await pg.goto('http://127.0.0.1:8773/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("(()=>{var i=document.getElementById('searchInput');i.value='news';document.getElementById('searchBtn').click();})()")
     await pg.wait_for_timeout(1500)
+    # Top Results leads since build 117; the video marks are on the Stations tab's tiles.
+    await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).filter(function(b){ return /^Stations/.test(b.textContent); })[0].click()")
+    await pg.wait_for_timeout(400)
     m = await marks(pg)
     byname = {x['name']: x for x in m}
     check(len(m) == 6, f'[{tag}] six results ({len(m)})')
