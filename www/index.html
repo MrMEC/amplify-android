@@ -4028,6 +4028,18 @@
     stroke-linecap:round; stroke-linejoin:round;
   }
   #settingsPanel .settings-row-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  /* Plex (build 130) */
+  #settingsPanel .plex-status{ font-size:12px; font-weight:600; color:var(--text-faint); }
+  #settingsPanel .plex-status.on{ color:var(--accent); }
+  #settingsPanel .plex-body{ display:flex; flex-direction:column; gap:8px; }
+  #settingsPanel .plex-line{ font-size:13px; line-height:1.45; color:var(--text); overflow-wrap:anywhere; }
+  #settingsPanel .plex-line.dim{ color:var(--text-dim); }
+  #settingsPanel .plex-note{ font-size:12.5px; line-height:1.45; color:var(--text-dim); }
+  #settingsPanel .plex-code{
+    font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:20px; font-weight:700; letter-spacing:.18em;
+    text-align:center; padding:8px; border-radius:10px; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+  }
+  #settingsPanel .plex-server-select{ width:100%; }
   #settingsPanel .build-stamp{
     background:none; border:none; padding:0; color:var(--text-faint); font-size:12px;
     overflow:hidden; text-overflow:ellipsis;
@@ -5570,6 +5582,16 @@
         <input type="file" id="importFavInput" accept="application/json" hidden>
       </div>
     </div>
+    <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
+         and TV shows on its server join Video's Movies and TV Shows next to the phone's own
+         folders. Filled in by renderPlexSettings. -->
+    <div class="settings-row settings-row--stack" id="plexSettingsRow">
+      <div class="settings-row-head">
+        <span class="settings-label">Plex</span>
+        <span class="plex-status" id="plexStatus"></span>
+      </div>
+      <div class="plex-body" id="plexSettingsBody"></div>
+    </div>
     <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
          re-downloaded and opened from several places, and without this there is no way to
          tell one build from another from inside the app. -->
@@ -7096,7 +7118,7 @@
   }
   if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', renderDiagnostics);
 
-  function openSettings(){ settingsOverlay.classList.add('open'); }
+  function openSettings(){ if(typeof renderPlexSettings === 'function') renderPlexSettings(); settingsOverlay.classList.add('open'); }
   function closeSettings(){ settingsOverlay.classList.remove('open'); }
   settingsFab.addEventListener('click', openSettings);
   settingsCloseBtn.addEventListener('click', closeSettings);
@@ -12880,7 +12902,7 @@
   window.videoSortHeaderBtnEl = videoSortHeaderBtnEl;
   var videoRefreshHeaderBtnEl = document.getElementById('videoRefreshHeaderBtn');
   window.videoRefreshHeaderBtnEl = videoRefreshHeaderBtnEl;
-  videoRefreshHeaderBtnEl.addEventListener('click', function(){ rescanVideoFolders(); });
+  videoRefreshHeaderBtnEl.addEventListener('click', function(){ rescanVideoFolders(); if(plexServer()) plexSync({ connect: true, manual: true }); });
   var videoChannelsEditing = false;
 
   function findVideoChannel(url){
@@ -13738,6 +13760,7 @@
   }
   function capUrl(u){
     if(!u) return '';
+    if(/^https?:/i.test(u)) return u;   // a Plex picture is already a web address
     try{ if(window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function') return window.Capacitor.convertFileSrc(u); }catch(e){}
     return u;
   }
@@ -13880,6 +13903,7 @@
       }
       byId[id] = item;
     });
+    plexAddToLibrary(movies, showsByKey, byId);
     var shows = Object.keys(showsByKey).map(function(k){
       var s = showsByKey[k];
       var ed = videoEdits['show:' + k] || {};
@@ -13895,6 +13919,546 @@
   }
   function vlib(){ return videoLib || buildVideoLibrary(); }
   function invalidateVideoLib(){ videoLib = null; }
+
+  // ---- Plex (build 130)
+  // Sign in with a Plex account and the movies and TV shows on its server join Movies and TV
+  // Shows, next to the phone's own folders: same tiles, details pages, Continue Watching,
+  // progress and next-episode countdown. Sign-in is Plex's PIN flow: Amplify asks plex.tv for a
+  // PIN, opens app.plex.tv/auth in the browser for the person to approve, and polls the PIN
+  // until it carries a token (the password never passes through Amplify). The account's
+  // servers come from plex.tv/api/v2/resources; each lists its addresses (local, remote,
+  // relay), and the first that answers /identity, in that order of preference, becomes the
+  // base for everything else, re-checked on start-up and whenever a video fails to play.
+  // The library (every movie, show and episode, a compact record each) is kept in
+  // radioPlayerPlexLib so Video shows it straight away offline; Sync (Settings, or the Video
+  // page's refresh button) fetches it again, and start-up does so when it is over six hours
+  // old. Plex's own watch state seeds Amplify's progress for anything not watched in Amplify
+  // yet (or watched later on another Plex app), and progress made here goes back to Plex
+  // (/:/progress while playing, /:/scrobble and /:/unscrobble for watched). A Plex movie or
+  // episode that is also in a local folder (same title and year, same show, season and
+  // episode) is shown once, the local copy. Videos play directly from the server (the
+  // original file, no transcoding); the server's external subtitle files come along.
+  // Requests go through CapacitorHttp on the phone (no CORS there), plain fetch elsewhere.
+  var PLEX_ACCOUNT_KEY = 'radioPlayerPlexAccount';
+  var PLEX_LIB_KEY = 'radioPlayerPlexLib';
+  var PLEX_CLIENT_KEY = 'radioPlayerPlexClientId';
+  var PLEX_STALE_MS = 6 * 3600 * 1000;
+  var plexAccount = vload(PLEX_ACCOUNT_KEY, null);   // { token, user, servers:[{ id, name, token, owned, conns:[{ uri, local, relay }] }], serverId, base }
+  var plexLib = vload(PLEX_LIB_KEY, null);           // { serverId, at, movies:[], shows:[], episodes:[] }
+  var plexClientId = vload(PLEX_CLIENT_KEY, '');
+  if(!plexClientId || typeof plexClientId !== 'string'){
+    plexClientId = 'amplify-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    vsave(PLEX_CLIENT_KEY, plexClientId);
+  }
+  if(plexAccount && (typeof plexAccount !== 'object' || !plexAccount.token)) plexAccount = null;
+  if(plexLib && (typeof plexLib !== 'object' || !Array.isArray(plexLib.movies))) plexLib = null;
+  var plexSyncBusy = false, plexSignIn = null, plexBaseOk = false, plexNote = '', plexLibUnsaved = false;
+
+  function plexSignedIn(){ return !!(plexAccount && plexAccount.token); }
+  function plexServer(){
+    if(!plexSignedIn()) return null;
+    var list = plexAccount.servers || [];
+    for(var i = 0; i < list.length; i++) if(list[i].id === plexAccount.serverId) return list[i];
+    return list[0] || null;
+  }
+  function plexServerName(){ var s = plexServer(); return s ? s.name : 'Plex'; }
+  function savePlexAccount(){ if(plexAccount) vsave(PLEX_ACCOUNT_KEY, plexAccount); else try{ localStorage.removeItem(PLEX_ACCOUNT_KEY); }catch(e){} }
+  function plexHeaders(token){
+    var h = { 'Accept': 'application/json', 'X-Plex-Client-Identifier': plexClientId, 'X-Plex-Product': 'Amplify',
+      'X-Plex-Version': '1.0', 'X-Plex-Platform': 'Android', 'X-Plex-Device': 'Android', 'X-Plex-Device-Name': 'Amplify' };
+    if(token) h['X-Plex-Token'] = token;
+    return h;
+  }
+  // Resolves with the parsed JSON body; rejects on a failed request or any status but 2xx.
+  function plexRequest(method, url, token, ms){
+    ms = ms || 15000;
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform());
+    var headers = plexHeaders(token), job;
+    if(native && H && typeof H.request === 'function'){
+      job = Promise.resolve(H.request({ url: url, method: method, headers: headers, responseType: 'text', connectTimeout: ms, readTimeout: ms }))
+        .then(function(r){ return { status: (r && r.status) || 0, data: r ? r.data : null }; });
+    } else {
+      job = fetchWithTimeout(url, { method: method, headers: headers }, ms).then(function(res){
+        return res.text().then(function(t){ return { status: res.status, data: t }; });
+      });
+    }
+    return job.then(function(r){
+      if(r.status < 200 || r.status >= 300){ var err = new Error('HTTP ' + r.status); err.status = r.status; throw err; }
+      var d = r.data;
+      if(typeof d === 'string'){ d = d ? JSON.parse(d) : {}; }
+      return d || {};
+    });
+  }
+  function plexApi(path, ms){
+    var s = plexServer();
+    if(!s || !plexAccount.base) return Promise.reject(new Error('Not connected'));
+    return plexRequest('GET', plexAccount.base + path, s.token, ms);
+  }
+  function plexWithToken(url){
+    var s = plexServer();
+    return url + (url.indexOf('?') === -1 ? '?' : '&') + 'X-Plex-Token=' + encodeURIComponent(s ? s.token : '');
+  }
+  function plexMediaUrl(key){ return key && plexAccount && plexAccount.base ? plexWithToken(plexAccount.base + key) : ''; }
+  // Pictures come through the server's resizer, at the size they are shown.
+  function plexImg(path, w, h){
+    if(!path || !plexAccount || !plexAccount.base) return '';
+    return plexWithToken(plexAccount.base + '/photo/:/transcode?width=' + w + '&height=' + h + '&minSize=1&upscale=1&url=' + encodeURIComponent(path));
+  }
+  function plexId(k){ var s = plexServer(); return 'plex:' + (s ? String(s.id).slice(0, 8) : '') + ':' + k; }
+  function plexKeyOf(id){ var m = /^plex:[^:]*:(.+)$/.exec(String(id || '')); return m ? m[1] : ''; }
+  function isPlexId(id){ return /^plex:/.test(String(id || '')); }
+
+  // ---- signing in
+  function plexStartSignIn(){
+    if(plexSignIn) return;
+    // The page opens in the phone's browser once the PIN arrives (in a desktop browser a
+    // pop-up blocker may stop it; the Open Plex Page button is there for that).
+    plexSignIn = { pending: true };
+    renderPlexSettings('');
+    plexRequest('POST', 'https://plex.tv/api/v2/pins?strong=true', null).then(function(pin){
+      if(!pin || !pin.id || !pin.code) throw new Error('No PIN');
+      var url = 'https://app.plex.tv/auth#?clientID=' + encodeURIComponent(plexClientId) + '&code=' + encodeURIComponent(pin.code) +
+        '&context%5Bdevice%5D%5Bproduct%5D=Amplify';
+      plexSignIn = { id: pin.id, code: pin.code, url: url, until: Date.now() + 20 * 60000, timer: null, busy: false };
+      try{ window.open(url, '_blank'); }catch(e){}
+      renderPlexSettings('');
+      plexSignIn.timer = setTimeout(plexPollPin, 2500);
+    })['catch'](function(){
+      plexSignIn = null;
+      renderPlexSettings('Couldn’t reach Plex. Check the connection and try again.');
+    });
+  }
+  function plexCancelSignIn(){
+    if(plexSignIn && plexSignIn.timer) clearTimeout(plexSignIn.timer);
+    plexSignIn = null;
+    renderPlexSettings('');
+  }
+  function plexPollPin(){
+    var si = plexSignIn;
+    if(!si || !si.id || si.busy) return;
+    clearTimeout(si.timer);
+    if(Date.now() > si.until){ plexSignIn = null; renderPlexSettings('The sign-in timed out. Try again.'); return; }
+    si.busy = true;
+    plexRequest('GET', 'https://plex.tv/api/v2/pins/' + encodeURIComponent(si.id), null, 10000).then(function(pin){
+      si.busy = false;
+      if(plexSignIn !== si) return;
+      if(pin && pin.authToken){ plexSignIn = null; plexFinishSignIn(pin.authToken); return; }
+      si.timer = setTimeout(plexPollPin, 2000);
+    }, function(){
+      si.busy = false;
+      if(plexSignIn === si) si.timer = setTimeout(plexPollPin, 4000);
+    });
+  }
+  // Back from the browser: check straight away rather than waiting for the next poll.
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden && plexSignIn && plexSignIn.id) plexPollPin(); });
+  function plexServersFrom(res, token){
+    return (Array.isArray(res) ? res : []).filter(function(d){
+      return d && String(d.provides || '').split(',').indexOf('server') !== -1;
+    }).map(function(d){
+      return { id: String(d.clientIdentifier || ''), name: d.name || 'Plex Media Server', token: d.accessToken || token, owned: !!d.owned,
+        conns: (d.connections || []).filter(function(c){ return c && c.uri; }).map(function(c){
+          return { uri: String(c.uri).replace(/\/+$/, ''), local: !!c.local, relay: !!c.relay };
+        }) };
+    }).sort(function(a, b){ return (b.owned ? 1 : 0) - (a.owned ? 1 : 0); });
+  }
+  function plexFinishSignIn(token){
+    renderPlexSettings('Signed in. Looking for your server…');
+    Promise.all([
+      plexRequest('GET', 'https://plex.tv/api/v2/user', token)['catch'](function(){ return {}; }),
+      plexRequest('GET', 'https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', token)
+    ]).then(function(r){
+      var user = r[0] || {};
+      var servers = plexServersFrom(r[1], token);
+      plexAccount = { token: token, user: user.title || user.username || user.email || '', servers: servers,
+        serverId: servers[0] ? servers[0].id : '', base: '' };
+      plexBaseOk = false;
+      savePlexAccount();
+      if(!servers.length){ renderPlexSettings('Signed in, but this Plex account has no server.'); return; }
+      plexNote = '';
+      plexSync({ connect: true, quiet: true });
+    })['catch'](function(){
+      renderPlexSettings('Couldn’t finish signing in. Try again.');
+    });
+  }
+  function plexSignOut(){
+    if(!window.confirm('Sign out of Plex? Your Plex movies and shows leave Video. What you watched stays on Plex.')) return;
+    if(plexAccount && plexAccount.token){
+      // Tell plex.tv this device is gone; nothing waits on it.
+      plexRequest('DELETE', 'https://plex.tv/api/v2/devices/' + encodeURIComponent(plexClientId), plexAccount.token)['catch'](function(){});
+    }
+    plexAccount = null; plexLib = null; plexBaseOk = false;
+    savePlexAccount();
+    try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){}
+    invalidateVideoLib();
+    renderPlexSettings('');
+    refreshVideoPages();
+    refreshContinueWatching();
+  }
+  function plexChooseServer(id){
+    if(!plexSignedIn() || plexAccount.serverId === id) return;
+    plexAccount.serverId = id;
+    plexAccount.base = '';
+    plexBaseOk = false;
+    plexLib = null;
+    savePlexAccount();
+    try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){}
+    invalidateVideoLib();
+    refreshVideoPages();
+    plexSync({ connect: true, quiet: true });
+  }
+
+  // ---- finding the server: local first, then remote, then Plex's relay
+  var plexConnecting = null;
+  function plexConnect(){
+    if(plexConnecting) return plexConnecting;
+    var s = plexServer();
+    if(!s) return Promise.reject(new Error('No server'));
+    function rank(c){ return c.relay ? 2 : (c.local ? 0 : 1); }
+    var conns = s.conns.slice().sort(function(a, b){ return rank(a) - rank(b); });
+    plexConnecting = Promise.all(conns.map(function(c){
+      return plexRequest('GET', c.uri + '/identity', s.token, 6000).then(function(){ return c; }, function(){ return null; });
+    })).then(function(rs){
+      plexConnecting = null;
+      var ok = rs.filter(Boolean)[0];
+      if(!ok){ plexBaseOk = false; throw new Error('Unreachable'); }
+      plexBaseOk = true;
+      if(plexAccount && plexAccount.base !== ok.uri){
+        plexAccount.base = ok.uri;
+        savePlexAccount();
+        invalidateVideoLib();
+      }
+      return ok.uri;
+    }, function(err){ plexConnecting = null; throw err; });
+    return plexConnecting;
+  }
+
+  // ---- the library
+  function plexAll(sectionKey, type){
+    var out = [], size = 300;
+    function page(start){
+      return plexApi('/library/sections/' + encodeURIComponent(sectionKey) + '/all?type=' + type +
+        '&X-Plex-Container-Start=' + start + '&X-Plex-Container-Size=' + size, 30000).then(function(d){
+        var mc = (d && d.MediaContainer) || {};
+        var md = mc.Metadata || [];
+        out = out.concat(md);
+        if(md.length === size && (mc.totalSize == null || out.length < mc.totalSize) && start < 60000) return page(start + size);
+        return out;
+      });
+    }
+    return page(0);
+  }
+  function plexPart(m){
+    var med = (m.Media || [])[0] || {}, pt = (med.Part || [])[0] || {};
+    return { p: pt.key || '', w: med.width || 0, h: med.height || 0, f: pt.file ? String(pt.file).split(/[\\\/]/).pop() : '' };
+  }
+  function plexWatchBits(m, r){
+    r.d = Math.round((m.duration || 0) / 1000);
+    r.ad = m.addedAt || 0;
+    r.vo = Math.round((m.viewOffset || 0) / 1000);
+    r.vc = m.viewCount || 0;
+    r.lv = m.lastViewedAt || 0;
+    return r;
+  }
+  function plexMovieRec(m){
+    var pp = plexPart(m);
+    return plexWatchBits(m, { k: String(m.ratingKey), t: m.title || '', y: m.year ? String(m.year) : '', s: String(m.summary || '').slice(0, 1500),
+      th: m.thumb || '', a: m.art || '', p: pp.p, w: pp.w, h: pp.h, f: pp.f });
+  }
+  function plexShowRec(x){
+    return { k: String(x.ratingKey), t: x.title || '', y: x.year ? String(x.year) : '', s: String(x.summary || '').slice(0, 1500), th: x.thumb || '', a: x.art || '' };
+  }
+  function plexEpRec(e){
+    var pp = plexPart(e);
+    return plexWatchBits(e, { k: String(e.ratingKey), gk: String(e.grandparentRatingKey || ''), st: e.grandparentTitle || '',
+      sn: e.parentIndex != null ? e.parentIndex : 1, en: e.index || 0, t: e.title || '', th: e.thumb || '', p: pp.p, w: pp.w, h: pp.h, f: pp.f });
+  }
+  function plexIdSet(){
+    var o = {};
+    if(plexLib) plexLib.movies.concat(plexLib.episodes || []).forEach(function(r){ o[r.k] = true; });
+    return o;
+  }
+  // opts: connect (find the server first), quiet (no status line), manual (the refresh button)
+  function plexSync(opts){
+    opts = opts || {};
+    var s = plexServer();
+    if(plexSyncBusy || !s) return Promise.resolve(null);
+    plexSyncBusy = true;
+    plexNote = '';
+    renderPlexSettings();
+    syncVideoRefreshBtn();
+    var before = plexLib && plexLib.serverId === s.id ? plexIdSet() : null;
+    return (opts.connect || !plexBaseOk ? plexConnect() : Promise.resolve(plexAccount.base)).then(function(){
+      return plexApi('/library/sections');
+    }).then(function(d){
+      var dirs = ((d && d.MediaContainer) || {}).Directory || [];
+      var lib = { serverId: s.id, at: Date.now(), movies: [], shows: [], episodes: [] };
+      var chain = Promise.resolve();
+      dirs.forEach(function(dir){
+        if(dir.type === 'movie'){
+          chain = chain.then(function(){ return plexAll(dir.key, 1); })
+            .then(function(ms){ ms.forEach(function(m){ lib.movies.push(plexMovieRec(m)); }); });
+        } else if(dir.type === 'show'){
+          chain = chain.then(function(){ return plexAll(dir.key, 2); })
+            .then(function(ss){ ss.forEach(function(x){ lib.shows.push(plexShowRec(x)); }); })
+            .then(function(){ return plexAll(dir.key, 4); })
+            .then(function(es){ es.forEach(function(e){ lib.episodes.push(plexEpRec(e)); }); });
+        }
+      });
+      return chain.then(function(){ return lib; });
+    }).then(function(lib){
+      plexLib = lib;
+      plexLibUnsaved = !vsave(PLEX_LIB_KEY, plexLib);
+      plexMergeProgress();
+      invalidateVideoLib();
+      plexSyncBusy = false;
+      var after = plexIdSet(), added = 0, removed = 0;
+      if(before){
+        Object.keys(after).forEach(function(k){ if(!before[k]) added++; });
+        Object.keys(before).forEach(function(k){ if(!after[k]) removed++; });
+      }
+      renderPlexSettings();
+      syncVideoRefreshBtn();
+      refreshVideoPages();
+      refreshContinueWatching();
+      if(opts.manual) setStatus(before ? 'Plex: ' + changeSummary(added, removed, 'video') : 'Plex: ' + plexCountText() + '.', false);
+      return { added: added, removed: removed };
+    })['catch'](function(err){
+      plexSyncBusy = false;
+      var msg = err && err.message === 'Unreachable'
+        ? 'Couldn’t reach ' + plexServerName() + '. Check that it is on and that Remote Access is turned on in Plex.'
+        : 'Couldn’t load the Plex library. Try Sync again.';
+      renderPlexSettings(msg);
+      syncVideoRefreshBtn();
+      if(opts.manual) setStatus(msg, true);
+      return null;
+    });
+  }
+  function plexCountText(){
+    if(!plexLib) return '';
+    var showKeys = {};
+    plexLib.episodes.forEach(function(e){ showKeys[e.gk || e.st] = true; });
+    var m = plexLib.movies.length, n = Object.keys(showKeys).length;
+    return m + ' movie' + (m === 1 ? '' : 's') + ' · ' + n + ' show' + (n === 1 ? '' : 's');
+  }
+  // Plex's watch state for anything Amplify has no newer state for.
+  function plexMergeProgress(){
+    if(!plexLib) return;
+    var changed = false;
+    plexLib.movies.concat(plexLib.episodes).forEach(function(r){
+      var id = plexId(r.k), p = videoProgress[id];
+      var seenAt = (r.lv || 0) * 1000;
+      var watched = r.vc > 0 && !r.vo;
+      if(!p){
+        if(r.vo > 0 || r.vc > 0){
+          videoProgress[id] = { pos: r.vo || (watched ? r.d : 0), dur: r.d, at: seenAt || (r.ad || 0) * 1000, watched: watched };
+          changed = true;
+        }
+      } else if(seenAt && seenAt > (p.at || 0) + 60000){
+        p.watched = watched; p.pos = r.vo || (watched ? r.d : 0); p.dur = r.d || p.dur; p.at = seenAt;
+        changed = true;
+      }
+    });
+    if(changed) vsave(VIDEO_PROGRESS_KEY, videoProgress);
+  }
+  // Into the library that buildVideoLibrary is making: movies beside the local ones, episodes
+  // into the show of the same name (a show only on Plex gets its own entry).
+  function plexAddToLibrary(movies, showsByKey, byId){
+    var srv = plexServer();
+    if(!srv || !plexLib || plexLib.serverId !== srv.id || !plexAccount.base) return;
+    var localMovie = {};
+    movies.forEach(function(m){ localMovie[showKeyOf(m.title) + '|' + (m.year || '')] = true; });
+    plexLib.movies.forEach(function(r){
+      if(!r.p || localMovie[showKeyOf(r.t) + '|' + (r.y || '')]) return;
+      var id = plexId(r.k), ed = videoEdits[id] || {};
+      var item = { type: 'video', id: id, uri: plexMediaUrl(r.p), fileName: r.f || r.t, relPath: '', size: 0,
+        addedAt: (r.ad || 0) * 1000, duration: r.d || 0, width: r.w || 0, height: r.h || 0, still: '', subs: [],
+        plex: true, plexKey: r.k, plexPart: r.p, summary: r.s || '',
+        kind: 'movie', title: ed.title || r.t, year: ed.year != null ? ed.year : (r.y || ''),
+        poster: plexImg(r.th, 400, 600), backdrop: plexImg(r.a, 1280, 720) };
+      movies.push(item);
+      byId[id] = item;
+    });
+    var showRec = {};
+    plexLib.shows.forEach(function(r){ showRec[r.k] = r; });
+    var have = {};
+    Object.keys(showsByKey).forEach(function(k){
+      showsByKey[k].episodes.forEach(function(e){ have[k + '|' + e.season + '|' + e.episode] = true; });
+    });
+    plexLib.episodes.forEach(function(r){
+      if(!r.p) return;
+      var sr = showRec[r.gk] || {};
+      var title = r.st || sr.t || 'Unknown Show';
+      var key = showKeyOf(title);
+      if(have[key + '|' + r.sn + '|' + r.en]) return;
+      var s = showsByKey[key];
+      if(!s) s = showsByKey[key] = { key: key, title: title, episodes: [], addedAt: 0, poster: '', backdrop: '', seasonPosters: {} };
+      if(!s.poster && sr.th) s.poster = plexImg(sr.th, 400, 600);
+      if(!s.backdrop && sr.a) s.backdrop = plexImg(sr.a, 1280, 720);
+      if(!s.plexSummary && sr.s) s.plexSummary = sr.s;
+      var id = plexId(r.k), ed = videoEdits[id] || {};
+      var item = { type: 'video', id: id, uri: plexMediaUrl(r.p), fileName: r.f || r.t, relPath: '', size: 0,
+        addedAt: (r.ad || 0) * 1000, duration: r.d || 0, width: r.w || 0, height: r.h || 0, still: '',
+        thumb: plexImg(r.th, 640, 360), subs: [], plex: true, plexKey: r.k, plexPart: r.p,
+        kind: 'episode', show: s.title, showKey: key, season: r.sn, episode: r.en, epTitle: ed.title || r.t || '' };
+      s.episodes.push(item);
+      s.addedAt = Math.max(s.addedAt, item.addedAt);
+      byId[id] = item;
+    });
+  }
+  // Before playing: make sure of the server, and bring the server's subtitle files (the
+  // ones inside the video file come with it anyway).
+  function plexPrepare(t){
+    var ready = plexBaseOk ? Promise.resolve() : plexConnect()['catch'](function(){});
+    return ready.then(function(){
+      t.uri = plexMediaUrl(t.plexPart) || t.uri;
+      return plexApi('/library/metadata/' + encodeURIComponent(t.plexKey), 5000);
+    }).then(function(d){
+      var m = (((d && d.MediaContainer) || {}).Metadata || [])[0] || {};
+      var part = (((m.Media || [])[0] || {}).Part || [])[0] || {};
+      return (part.Stream || []).filter(function(st){
+        return st.streamType === 3 && st.key && /^(srt|ass|ssa|vtt|webvtt|subrip)$/i.test(st.codec || '');
+      }).map(function(st){
+        var codec = String(st.codec || 'srt').toLowerCase();
+        var ext = codec === 'subrip' ? 'srt' : (codec === 'webvtt' ? 'vtt' : codec);
+        var code = String(st.languageTag || st.languageCode || '').slice(0, 2).toLowerCase();
+        var label = st.displayTitle || st.title || st.language || 'Subtitles';
+        return { uri: plexMediaUrl(st.key), name: 'plex.' + ext, label: label, language: code };
+      });
+    })['catch'](function(){ return []; });
+  }
+  // Progress back to Plex: every 30 seconds while playing, on pause, and watched once it is.
+  var plexReported = {};
+  function plexReport(id, paused){
+    var k = plexKeyOf(id);
+    if(!k || !plexServer() || !plexAccount.base) return;
+    var p = videoProgress[id];
+    if(!p) return;
+    var r = plexReported[id] || (plexReported[id] = { at: 0, scrobbled: false });
+    if(p.watched){
+      if(!r.scrobbled){ r.scrobbled = true; plexApi('/:/scrobble?identifier=com.plexapp.plugins.library&key=' + encodeURIComponent(k))['catch'](function(){}); }
+      return;
+    }
+    r.scrobbled = false;
+    var now = Date.now();
+    if(!paused && now - r.at < 30000) return;
+    r.at = now;
+    plexApi('/:/progress?identifier=com.plexapp.plugins.library&key=' + encodeURIComponent(k) + '&time=' + Math.round((p.pos || 0) * 1000) +
+      '&state=' + (paused ? 'paused' : 'playing'))['catch'](function(){});
+  }
+  function plexMarkWatched(id, watched){
+    var k = plexKeyOf(id);
+    if(!k || !plexServer() || !plexAccount.base) return;
+    var r = plexReported[id] || (plexReported[id] = { at: 0, scrobbled: false });
+    r.scrobbled = !!watched;
+    plexApi('/:/' + (watched ? 'scrobble' : 'unscrobble') + '?identifier=com.plexapp.plugins.library&key=' + encodeURIComponent(k))['catch'](function(){});
+  }
+  function syncVideoRefreshBtn(){
+    if(typeof videoRefreshHeaderBtnEl === 'undefined' || !videoRefreshHeaderBtnEl) return;
+    videoRefreshHeaderBtnEl.classList.toggle('refreshing', videoScanBusy || plexSyncBusy);
+  }
+  function timeAgoShort(ms){
+    var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if(s < 60) return 'just now';
+    var m = Math.round(s / 60);
+    if(m < 60) return m + ' min ago';
+    var h = Math.round(m / 60);
+    if(h < 24) return h + ' hour' + (h === 1 ? '' : 's') + ' ago';
+    var d = Math.round(h / 24);
+    return d + ' day' + (d === 1 ? '' : 's') + ' ago';
+  }
+
+  // ---- Settings
+  function renderPlexSettings(note){
+    if(note !== undefined) plexNote = note || '';
+    var box = document.getElementById('plexSettingsBody'), status = document.getElementById('plexStatus');
+    if(!box || !status) return;
+    box.innerHTML = '';
+    function line(text, cls){
+      var d = document.createElement('div');
+      d.className = cls || 'plex-line';
+      d.textContent = text;
+      box.appendChild(d);
+      return d;
+    }
+    function button(label, id, fn){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'settings-data-btn';
+      b.id = id;
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      return b;
+    }
+    function pair(a, b){
+      var w = document.createElement('div');
+      w.className = 'settings-data-actions settings-actions-pair';
+      w.appendChild(a); w.appendChild(b);
+      box.appendChild(w);
+    }
+    status.classList.remove('on');
+    if(plexSignIn){
+      status.textContent = 'Signing in…';
+      if(!plexSignIn.id){
+        line('Asking Plex for a sign-in code…', 'plex-line dim');
+      } else {
+        line('Approve Amplify on the Plex page that opened. Signing in finishes here by itself.', 'plex-line dim');
+        line(plexSignIn.code, 'plex-code');
+        var url = plexSignIn.url;
+        pair(button('Open Plex Page', 'plexOpenBtn', function(){ try{ window.open(url, '_blank'); }catch(e){} }),
+             button('Cancel', 'plexCancelBtn', plexCancelSignIn));
+      }
+    } else if(!plexSignedIn()){
+      status.textContent = '';
+      line('Add the movies and TV shows on your Plex server to Video.', 'plex-line dim');
+      var b = button('Sign In with Plex', 'plexSignInBtn', plexStartSignIn);
+      b.classList.add('settings-wide-btn');
+      box.appendChild(b);
+    } else {
+      status.textContent = plexSyncBusy ? 'Syncing…' : (plexBaseOk ? 'Connected' : (plexAccount.base ? 'Saved library' : 'Not connected'));
+      if(plexBaseOk && !plexSyncBusy) status.classList.add('on');
+      if(plexAccount.user) line('Signed in as ' + plexAccount.user);
+      var servers = plexAccount.servers || [];
+      if(servers.length > 1){
+        var sel = document.createElement('select');
+        sel.className = 'settings-select plex-server-select';
+        sel.id = 'plexServerSelect';
+        sel.setAttribute('aria-label', 'Plex server');
+        servers.forEach(function(s){
+          var o = document.createElement('option');
+          o.value = s.id; o.textContent = s.name;
+          if(plexServer() && s.id === plexServer().id) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function(){ plexChooseServer(sel.value); });
+        box.appendChild(sel);
+      } else if(servers.length){
+        line('Server: ' + servers[0].name);
+      }
+      if(plexLib && plexServer() && plexLib.serverId === plexServer().id){
+        line(plexCountText() + ' · synced ' + timeAgoShort(plexLib.at), 'plex-line dim');
+      } else if(plexSyncBusy){
+        line('Loading your library…', 'plex-line dim');
+      }
+      var sync = button(plexSyncBusy ? 'Syncing…' : 'Sync Now', 'plexSyncBtn', function(){ plexSync({ connect: true, manual: true }); });
+      sync.disabled = plexSyncBusy || !servers.length;
+      pair(sync, button('Sign Out', 'plexSignOutBtn', plexSignOut));
+      if(plexLibUnsaved) line('The library is too large to keep on the phone; it loads again each time Amplify starts.', 'plex-note');
+    }
+    if(plexNote) line(plexNote, 'plex-note');
+  }
+  // On start-up: find the server again, and sync when the saved library is old.
+  setTimeout(function(){
+    renderPlexSettings();
+    if(!plexServer()) return;
+    plexConnect().then(function(){
+      invalidateVideoLib();
+      if(!plexLib || plexLib.serverId !== plexServer().id || Date.now() - (plexLib.at || 0) > PLEX_STALE_MS) return plexSync({ quiet: true });
+      plexMergeProgress();
+      renderPlexSettings();
+      refreshVideoPages();
+    }, function(){ renderPlexSettings(); });
+  }, 1500);
 
   // ---- display helpers
   function videoTitle(v){
@@ -13989,6 +14553,7 @@
     p.at = Date.now();
     videoProgress[v.id] = p;
     vsave(VIDEO_PROGRESS_KEY, videoProgress);
+    if(isPlexId(v.id)) plexMarkWatched(v.id, !!watched);
   }
 
   // What to watch next in a show: the episode after the last one watched (or the one in
@@ -14339,14 +14904,17 @@
     var items = sortedVideoItems(tab);
     videoReorderHeaderBtnEl.style.display = 'none';
     videoSortHeaderBtnEl.style.display = items.length > 1 ? '' : 'none';
-    videoRefreshHeaderBtnEl.style.display = videoFolders.length ? '' : 'none';
-    videoRefreshHeaderBtnEl.classList.toggle('refreshing', videoScanBusy);
+    videoRefreshHeaderBtnEl.style.display = videoFolders.length || plexServer() ? '' : 'none';
+    videoRefreshHeaderBtnEl.classList.toggle('refreshing', videoScanBusy || plexSyncBusy);
     if(!items.length){
       var empty = document.createElement('div');
       empty.className = 'empty-state v-empty';
-      var none = !videoFolders.length;
+      var none = !videoFolders.length && !plexServer();
+      var what = tab === 'shows' ? 'TV shows' : 'movies';
       empty.textContent = none
-        ? 'Add a folder from your phone to watch your own ' + (tab === 'shows' ? 'TV shows' : 'movies') + ' here.'
+        ? 'Add a folder from your phone, or sign in to Plex in Settings, to watch your own ' + what + ' here.'
+        : (!videoFolders.length && plexSyncBusy) ? 'Loading your Plex library\u2026'
+        : !videoFolders.length ? 'No ' + what + ' on ' + plexServerName() + '.'
         : (tab === 'shows' ? 'No TV shows in your folders. Episodes are found by names like “Show S01E02” or a “Season 1” folder.' : 'No movies in your folders.');
       stationsGrid.appendChild(empty);
       var add = document.createElement('button');
@@ -14409,8 +14977,19 @@
     return b;
   }
   function appendVideoFoldersSection(){
-    if(!videoFolders.length) return;
-    appendGridSection('Folders').classList.add('ch-row-label', 'v-folders-label');
+    var plexOn = !!plexServer();
+    if(!videoFolders.length && !plexOn) return;
+    appendGridSection(plexOn ? 'Sources' : 'Folders').classList.add('ch-row-label', 'v-folders-label');
+    if(plexOn){
+      var prow = document.createElement('div');
+      prow.className = 'v-folder-row v-plex-row';
+      var pname = document.createElement('div');
+      pname.className = 'v-folder-name';
+      pname.textContent = 'Plex \u00b7 ' + plexServerName() + (plexBaseOk || plexSyncBusy ? '' : ' (not connected)');
+      prow.appendChild(pname);
+      prow.addEventListener('click', function(){ renderPlexSettings(); openSettings(); });
+      stationsGrid.appendChild(prow);
+    }
     videoFolders.forEach(function(fo){
       var row = document.createElement('div');
       row.className = 'v-folder-row';
@@ -14433,8 +15012,8 @@
     var again = document.createElement('button');
     again.type = 'button';
     again.className = 'settings-select';
-    again.textContent = 'Scan Again';
-    again.addEventListener('click', rescanVideoFolders);
+    again.textContent = videoFolders.length ? 'Scan Again' : 'Sync Plex';
+    again.addEventListener('click', function(){ rescanVideoFolders(); if(plexServer()) plexSync({ connect: true, manual: true }); });
     var add = document.createElement('button');
     add.type = 'button';
     add.className = 'settings-select';
@@ -14534,11 +15113,11 @@
       w.innerHTML = '<i class="fa-solid fa-check"></i> Watched';
       wrap.appendChild(w);
     }
-    var ov = wikiOverview(wikiRecord(v, 'movie'), v.title, videoPosterUrl(v));
+    var ov = wikiOverview(wikiRecord(v, 'movie') || (v.summary ? { extract: v.summary } : null), v.title, videoPosterUrl(v));
     if(ov) wrap.appendChild(ov);
     var file = document.createElement('div');
     file.className = 'vd-file';
-    file.textContent = v.relPath || v.fileName;
+    file.textContent = v.plex ? 'Plex \u00b7 ' + plexServerName() : (v.relPath || v.fileName);
     wrap.appendChild(file);
     stationsGrid.appendChild(wrap);
   }
@@ -14569,7 +15148,7 @@
     }
     actions.appendChild(buildVideoMoreBtn(s, 'show'));
     wrap.appendChild(actions);
-    var sov = wikiOverview(wikiRecord(s, 'show'), s.title, showPosterUrl(s));
+    var sov = wikiOverview(wikiRecord(s, 'show') || (s.plexSummary ? { extract: s.plexSummary } : null), s.title, showPosterUrl(s));
     if(sov) wrap.appendChild(sov);
     stationsGrid.appendChild(wrap);
     if(seasons.length > 1){
@@ -14683,7 +15262,7 @@
         vsave(VIDEO_EDITS_KEY, videoEdits);
         refresh();
       });
-      if(what === 'movie'){
+      if(what === 'movie' && !x.plex){
         item('This Is a TV Episode', function(){
           var show = window.prompt('Which show is it from?', '');
           if(show == null || !show.trim()) return;
@@ -14698,7 +15277,7 @@
           invalidateVideoLib();
           goBack();
         });
-      } else {
+      } else if(!x.plex){
         item('This Is a Movie', function(){
           var ed = videoEdits[x.id] || {};
           ed.kind = 'movie';
@@ -14708,7 +15287,7 @@
           refresh();
         });
       }
-      if(what === 'movie') item('Fix Movie Info', function(){ openVideoWikiDialog(x, 'movie'); });
+      if(what === 'movie' && !x.plex) item('Fix Movie Info', function(){ openVideoWikiDialog(x, 'movie'); });
       item(what === 'movie' ? 'Change Poster' : 'Change Picture', function(){
         openArtUrlDialogFor({ key: 'video:' + x.id, title: what === 'movie' ? 'Poster' : 'Episode Picture',
           name: what === 'movie' ? (x.title + (x.year ? ' ' + x.year : '') + ' movie poster') : (x.show + ' ' + episodeCode(x) + (x.epTitle ? ' ' + x.epTitle : '')),
@@ -14728,6 +15307,7 @@
   // ---- playing
   function videoToTrack(v){
     var t = { type: 'video', id: v.id, uri: v.uri, videoKind: v.kind, favicon: videoPosterUrl(v), duration: v.duration || 0 };
+    if(v.plex){ t.plex = true; t.plexKey = v.plexKey; t.plexPart = v.plexPart; }
     if(v.kind === 'episode'){
       t.name = v.show;
       t.show = v.show; t.showKey = v.showKey; t.season = v.season; t.episode = v.episode; t.epTitle = v.epTitle;
@@ -14754,9 +15334,19 @@
     function stillWanted(){ return currentStation === t; }
     cancelNextUp();
     var v0 = vlib().byId[t.id];
+    // A Plex video: the server checked and its subtitle files fetched first; one more try
+    // after finding the server again if it fails (the phone may have left home).
+    if(t.plex && !t._plexSubs){
+      plexPrepare(t).then(function(subs){
+        if(!stillWanted()) return;
+        t._plexSubs = subs;
+        playLocalVideo(t);
+      });
+      return;
+    }
     try{
       audio._loadExtra = {
-        subs: ((v0 && v0.subs) || []).map(function(sb){ var l = subtitleLang(sb.name, v0.fileName); return { uri: sb.uri, name: sb.name, label: l.label, language: l.code }; }),
+        subs: t.plex ? t._plexSubs.slice() : ((v0 && v0.subs) || []).map(function(sb){ var l = subtitleLang(sb.name, v0.fileName); return { uri: sb.uri, name: sb.name, label: l.label, language: l.code }; }),
         textOff: videoSubsOff
       };
     }catch(e){}
@@ -14771,6 +15361,21 @@
       onPlaybackSuccess(t);
     })['catch'](function(err){
       if(!stillWanted()) return;
+      if(t.plex && !t._plexRetried){
+        t._plexRetried = true;
+        plexBaseOk = false;
+        plexConnect().then(function(){
+          if(!stillWanted()) return;
+          t.uri = plexMediaUrl(t.plexPart) || t.uri;
+          t._plexSubs = null;   // fetched again from the server just found
+          playLocalVideo(t);
+        }, function(){
+          if(!stillWanted()) return;
+          attemptInProgress = false;
+          showPlaybackFailure(t, t.uri, err);
+        });
+        return;
+      }
       attemptInProgress = false;
       showPlaybackFailure(t, t.uri, err);
     });
@@ -14791,6 +15396,7 @@
     var pos = audio.currentTime || 0;
     if(!pos && !force) return;
     setVideoProgress(t.id, pos, dur);
+    if(t.plex) plexReport(t.id, !!force && audio.paused);
   }
   audio.addEventListener('timeupdate', function(){ noteVideoPosition(false); });
   audio.addEventListener('pause', function(){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); });
@@ -14801,6 +15407,7 @@
     var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
     setVideoProgress(t.id, dur, dur);
     vsave(VIDEO_PROGRESS_KEY, videoProgress);
+    if(t.plex) plexReport(t.id, true);
     if(typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
     setPlayingUI(false);
     syncSeekBar();
@@ -15101,8 +15708,9 @@
       if(r && r.ok && r.v !== VIDEO_WIKI_VERSION) return true;   // matched before posters came through
       return !r || (!r.ok && !r.manual && Date.now() - (r.at || 0) > week);
     }
-    lib.movies.forEach(function(m){ var t = wikiTarget(m, 'movie'); if(need(t)) todo.push(t); });
-    lib.shows.forEach(function(s){ var t = wikiTarget(s, 'show'); if(need(t)) todo.push(t); });
+    // Plex brings its own posters and descriptions.
+    lib.movies.forEach(function(m){ if(m.plex) return; var t = wikiTarget(m, 'movie'); if(need(t)) todo.push(t); });
+    lib.shows.forEach(function(s){ if(s.episodes.every(function(e){ return e.plex; })) return; var t = wikiTarget(s, 'show'); if(need(t)) todo.push(t); });
     if(!todo.length) return;
     videoWikiRunning = true;
     (function next(){
