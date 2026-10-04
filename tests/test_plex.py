@@ -53,6 +53,8 @@ META501 = {'MediaContainer': {'Metadata': [{'ratingKey': '501', 'Media': [{'Part
 
 META502 = {'MediaContainer': {'Metadata': [{'ratingKey': '502', 'Media': [{'container': 'avi', 'videoCodec': 'mpeg4', 'audioCodec': 'mp3',
   'Part': [{'key': '/library/parts/502/1/file.avi', 'container': 'avi', 'Stream': [{'streamType': 1, 'codec': 'mpeg4', 'bitDepth': 8}, {'streamType': 2, 'codec': 'mp3', 'selected': True}]}]}]}]}}
+META500 = {'MediaContainer': {'Metadata': [{'ratingKey': '500', 'Media': [{'container': 'avi', 'videoCodec': 'mpeg4', 'audioCodec': 'mp3',
+  'Part': [{'key': '/library/parts/500/1/file.avi', 'container': 'avi', 'Stream': [{'streamType': 1, 'codec': 'mpeg4', 'bitDepth': 8, 'profile': 'advanced simple'}, {'streamType': 2, 'codec': 'mp3'}]}]}]}]}}
 META503 = {'MediaContainer': {'Metadata': [{'ratingKey': '503', 'Media': [{'container': 'mkv', 'videoCodec': 'h264',
   'Part': [{'key': '/library/parts/503/1/file.mkv', 'container': 'mkv', 'Stream': [{'streamType': 1, 'codec': 'h264', 'bitDepth': 8, 'profile': 'high'}, {'streamType': 2, 'codec': 'aac'}]}]}]}]}}
 FAILLOAD = """(function(){ var P=window.Capacitor.Plugins.AmplifyPlayer; window.Capacitor.Plugins.AmplifyPlayer=new Proxy({}, {get:function(t,k){
@@ -111,6 +113,7 @@ async def proute(r):
             return await jr(r, {'MediaContainer': {'totalSize': len(lst), 'Metadata': lst}})
         if p == '/library/metadata/501': return await jr(r, META501)
         if p == '/library/metadata/502': return await jr(r, META502)
+        if p == '/library/metadata/500': return await jr(r, META500)
         if p == '/library/metadata/503': return await jr(r, META503)
         if p.startswith('/library/metadata/'): return await jr(r, {'MediaContainer': {'Metadata': [{}]}})
         if p.startswith('/photo/'): return await r.fulfill(status=200, content_type='image/png', headers=CORS, body=png(q.get('url', [''])[0]))
@@ -310,6 +313,33 @@ async def main():
         urls = await pg.evaluate("(n)=>window.__loadArgs.slice(n).map(function(a){return a.url;})", n0)
         check(len(urls) >= 2 and urls[0].endswith('/library/parts/503/1/file.mkv?X-Plex-Token=SRVTOKEN') and 'path=%2Flibrary%2Fmetadata%2F503' in urls[-1] and '/start.m3u8' in urls[-1],
               f'plain H.264 plays the original; when the phone fails on it, Plex converts it {urls}')
+        await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
+        # Inception: the phone's own copy, also on Plex as an Xvid AVI -> converted by Plex
+        async def details(pg):
+            await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.getElementById('npVideoInfoBtn').click()"); await pg.wait_for_timeout(400)
+            return await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#videoDetails .v-info-row, #videoDetails .v-info-action, #videoDetails .v-menu-note'),function(r){return r.textContent;})")
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
+        await open_movie('Inception')
+        await pg.evaluate("document.querySelector('.vd-play').click()"); await pg.wait_for_timeout(1500)
+        la = await pg.evaluate("window.__loadArgs.slice(-1)[0].url")
+        check('/transcode/universal/start.m3u8' in la and 'path=%2Flibrary%2Fmetadata%2F500' in la, f'a phone copy whose Plex twin says Xvid plays through Plex conversion {la[:120]}')
+        d = await details(pg)
+        check(d[0] == 'SourceThis phone (also on Plex)' and any(x.startswith('VideoMPEG-4 (Xvid/DivX)') for x in d) and any(x.startswith('PlayingConverted by Plex') for x in d)
+              and d[-1] == 'Play the Original File', f'Video Details for it {d}')
+        await pg.screenshot(path=f'{SHOTS}/plex-details.png')
+        await pg.evaluate("document.querySelector('#videoDetails .v-info-action').click()"); await pg.wait_for_timeout(1500)
+        la = await pg.evaluate("window.__loadArgs.slice(-1)[0].url")
+        check(la.startswith('content://doc/') and 'Inception' in la, f'Play the Original File plays the phone copy {la}')
+        await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(200)
+        await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
+        await open_movie('The Matrix')
+        await pg.evaluate("document.querySelector('.vd-play').click()"); await pg.wait_for_timeout(1200)
+        d = await details(pg)
+        mb = await pg.evaluate("getComputedStyle(document.getElementById('npPlexModeBtn')).display")
+        check(d[0] == 'SourceThis phone' and 'isn’t on your Plex server' in d[-1] and mb == 'none', f'a phone-only video says Plex can\'t convert it {d} {mb}')
+        await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(200)
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
         wiki = [x[1] for x in REQ if x[0] == 'WIKI' and ('Dune' in x[1] or 'Severance' in x[1] or 'Heat' in x[1])]
         check(not wiki, f'no Wikipedia lookups for Plex titles {wiki[:3]}')

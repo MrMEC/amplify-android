@@ -4040,6 +4040,12 @@
     text-align:center; padding:8px; border-radius:10px; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
   }
   #settingsPanel .plex-server-select{ width:100%; }
+  /* Video Details (build 133) */
+  .v-info-menu{ width:min(340px, calc(100vw - 32px)); padding-bottom:6px; }
+  .v-info-row{ display:flex; gap:12px; padding:6px 14px; font-size:13.5px; line-height:1.4; }
+  .v-info-k{ flex:0 0 76px; color:var(--text-dim); }
+  .v-info-v{ flex:1; min-width:0; overflow-wrap:anywhere; color:var(--text); }
+  .v-info-action{ margin-top:6px; border-top:1px solid var(--border); color:var(--accent) !important; font-weight:600; }
   /* Libraries (build 131): a switch per Plex library */
   #settingsPanel .plex-libs-head{ font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin-top:4px; }
   #settingsPanel .plex-libs{ display:flex; flex-direction:column; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
@@ -5401,6 +5407,10 @@
                   <!-- A Plex video: play the original file, or let Plex convert it (build 132). -->
                   <button type="button" class="np-menu-item" id="npPlexModeBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h12l-3-3M20 16H8l3 3"/></svg><span id="npPlexModeLabel">Let Plex Convert It</span>
+                  </button>
+                  <!-- A video of your own or from Plex: where it comes from, its format, how it plays (build 133). -->
+                  <button type="button" class="np-menu-item" id="npVideoInfoBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>Video Details</span>
                   </button>
                   <!-- A stream added by its link: give it a proper name. -->
                   <button type="button" class="np-menu-item" id="npRenameBtn" role="menuitem" style="display:none;">
@@ -14323,9 +14333,14 @@
     var srv = plexServer();
     if(!srv || !plexLib || plexLib.serverId !== srv.id || !plexAccount.base) return;
     var localMovie = {};
-    movies.forEach(function(m){ localMovie[showKeyOf(m.title) + '|' + (m.year || '')] = true; });
+    movies.forEach(function(m){ localMovie[showKeyOf(m.title) + '|' + (m.year || '')] = m; });
+    // A title both on the phone and on Plex shows once, the phone's copy; it remembers its Plex
+    // twin (build 133), so a format the phone can't decode is played through Plex's conversion.
+    function twin(local, r){ if(local && !local.plex && !local.plexKey){ local.plexTwin = true; local.plexKey = r.k; local.plexPart = r.p; } }
     plexLib.movies.forEach(function(r){
-      if(!r.p || !plexIncluded(r) || localMovie[showKeyOf(r.t) + '|' + (r.y || '')]) return;
+      if(!r.p || !plexIncluded(r)) return;
+      var lm = localMovie[showKeyOf(r.t) + '|' + (r.y || '')];
+      if(lm){ twin(lm, r); return; }
       var id = plexId(r.k), ed = videoEdits[id] || {};
       var item = { type: 'video', id: id, uri: plexMediaUrl(r.p), fileName: r.f || r.t, relPath: '', size: 0,
         addedAt: (r.ad || 0) * 1000, duration: r.d || 0, width: r.w || 0, height: r.h || 0, still: '', subs: [],
@@ -14339,14 +14354,15 @@
     plexLib.shows.forEach(function(r){ showRec[r.k] = r; });
     var have = {};
     Object.keys(showsByKey).forEach(function(k){
-      showsByKey[k].episodes.forEach(function(e){ have[k + '|' + e.season + '|' + e.episode] = true; });
+      showsByKey[k].episodes.forEach(function(e){ have[k + '|' + e.season + '|' + e.episode] = e; });
     });
     plexLib.episodes.forEach(function(r){
       if(!r.p || !plexIncluded(r)) return;
       var sr = showRec[r.gk] || {};
       var title = r.st || sr.t || 'Unknown Show';
       var key = showKeyOf(title);
-      if(have[key + '|' + r.sn + '|' + r.en]) return;
+      var le = have[key + '|' + r.sn + '|' + r.en];
+      if(le){ twin(le, r); return; }
       var s = showsByKey[key];
       if(!s) s = showsByKey[key] = { key: key, title: title, episodes: [], addedAt: 0, poster: '', backdrop: '', seasonPosters: {} };
       if(!s.poster && sr.th) s.poster = plexImg(sr.th, 400, 600);
@@ -14386,14 +14402,15 @@
     var ct = String(part.container || med.container || '').toLowerCase();
     var ac = String(a.codec || med.audioCodec || '').toLowerCase();
     var why = [];
-    if(!vc) return { ok: true, why: '' };
+    var info = { vc: vc, prof: prof, depth: depth, ct: ct, ac: ac };
+    if(!vc) return { ok: true, why: '', info: info };
     if(ct && !/^(mkv|mp4|mov|m4v|webm|mpegts|ts)$/.test(ct)) why.push(ct.toUpperCase() + ' file');
     if(vc === 'h264'){ if(depth > 8 || /10|4:2:2|4:4:4/.test(prof)) why.push('10-bit H.264'); }
     else if(vc === 'hevc' || vc === 'h265'){ if(depth > 10 || /4:2:2|4:4:4|rext/.test(prof)) why.push('HEVC ' + prof); }
     else if(vc !== 'vp9' && vc !== 'vp8') why.push(({ mpeg4: 'MPEG-4 (Xvid/DivX)', msmpeg4: 'MPEG-4 (DivX)', msmpeg4v3: 'MPEG-4 (DivX)',
       mpeg2video: 'MPEG-2', mpeg1video: 'MPEG-1', vc1: 'VC-1', wmv3: 'WMV', wmv2: 'WMV', av1: 'AV1' })[vc] || vc.toUpperCase());
     if(ac && !/^(aac|mp3|mp2|ac3|eac3|opus|vorbis|flac|pcm|alac)$/.test(ac)) why.push(ac.toUpperCase() + ' audio');
-    return { ok: !why.length, why: why.join(', ') };
+    return { ok: !why.length, why: why.join(', '), info: info };
   }
   function plexBaseIsLocal(){
     var s = plexServer();
@@ -14437,10 +14454,12 @@
         return (((d && d.MediaContainer) || {}).Metadata || [])[0] || null;
       }, function(){ return null; });
     }).then(function(m){
-      var dec = m ? plexCanDirectPlay(m) : { ok: true, why: '' };
+      var dec = m ? plexCanDirectPlay(m) : { ok: true, why: '', info: null };
       var pref = plexModes[t.id];
       var convert = !!t._plexForce || pref === 'transcode' || (pref !== 'direct' && !dec.ok);
       t._plexWhy = dec.why;
+      t._plexInfo = dec.info;
+      t._plexMeta = !!m;
       plexStopSession();
       if(convert && plexAccount && plexAccount.base){
         plexSession = 'amplify-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -14448,11 +14467,16 @@
         t.uri = plexTranscodeUrl(t, plexSession);
       } else {
         t._plexMode = 'direct';
-        t.uri = plexMediaUrl(t.plexPart) || t.uri;
+        // The phone's own copy plays from the phone; a Plex title plays the server's file.
+        if(!t.plexTwin) t.uri = plexMediaUrl(t.plexPart) || t.uri;
       }
       if(currentStation === t) syncNpTracksBtn(t);
       return m ? plexSubsFrom(m) : [];
-    })['catch'](function(){ return []; });
+    })['catch'](function(){
+      if(!t._plexMode) t._plexMode = 'direct';
+      if(currentStation === t) syncNpTracksBtn(t);
+      return [];
+    });
   }
   // Progress back to Plex: every 30 seconds while playing, on pause, and watched once it is.
   var plexReported = {};
@@ -15471,6 +15495,7 @@
   function videoToTrack(v){
     var t = { type: 'video', id: v.id, uri: v.uri, videoKind: v.kind, favicon: videoPosterUrl(v), duration: v.duration || 0 };
     if(v.plex){ t.plex = true; t.plexKey = v.plexKey; t.plexPart = v.plexPart; }
+    else if(v.plexTwin){ t.plexTwin = true; t.plexKey = v.plexKey; t.plexPart = v.plexPart; }
     if(v.kind === 'episode'){
       t.name = v.show;
       t.show = v.show; t.showKey = v.showKey; t.season = v.season; t.episode = v.episode; t.epTitle = v.epTitle;
@@ -15499,7 +15524,7 @@
     var v0 = vlib().byId[t.id];
     // A Plex video: the server checked and its subtitle files fetched first; one more try
     // after finding the server again if it fails (the phone may have left home).
-    if(t.plex && !t._plexSubs){
+    if((t.plex || t.plexTwin) && !t._plexSubs && plexServer()){
       plexPrepare(t).then(function(subs){
         if(!stillWanted()) return;
         t._plexSubs = subs;
@@ -15509,7 +15534,7 @@
     }
     try{
       audio._loadExtra = {
-        subs: t.plex ? t._plexSubs.slice() : ((v0 && v0.subs) || []).map(function(sb){ var l = subtitleLang(sb.name, v0.fileName); return { uri: sb.uri, name: sb.name, label: l.label, language: l.code }; }),
+        subs: (t.plex || (t.plexTwin && t._plexMode === 'transcode')) ? (t._plexSubs || []).slice() : ((v0 && v0.subs) || []).map(function(sb){ var l = subtitleLang(sb.name, v0.fileName); return { uri: sb.uri, name: sb.name, label: l.label, language: l.code }; }),
         textOff: videoSubsOff
       };
     }catch(e){}
@@ -15524,13 +15549,12 @@
       onPlaybackSuccess(t);
     })['catch'](function(err){
       if(!stillWanted()) return;
-      if(t.plex && !t._plexRetried){
+      if((t.plex || (t.plexTwin && t._plexMode === 'direct')) && !t._plexRetried && plexServer()){
         t._plexRetried = true;
         plexBaseOk = false;
         if(t._plexMode === 'direct') t._plexForce = true;   // the phone couldn't play the original: let Plex convert it
         plexConnect().then(function(){
           if(!stillWanted()) return;
-          t.uri = plexMediaUrl(t.plexPart) || t.uri;
           t._plexSubs = null;   // fetched again from the server just found
           playLocalVideo(t);
         }, function(){
@@ -15717,10 +15741,14 @@
     if(npTracksBtn) npTracksBtn.style.display = isLocalVideo(st) && !!videoPlugin2() ? '' : 'none';
     var pb = document.getElementById('npPlexModeBtn');
     if(pb){
-      var on = !!(st && st.plex && st._plexMode);
+      // Now Playing may be holding a copy of the item; the playing one carries the decision.
+      var cur = (currentStation && st && currentStation.id === st.id) ? currentStation : st;
+      var on = !!(cur && (cur.plex || cur.plexTwin) && cur._plexMode);
       pb.style.display = on ? '' : 'none';
-      if(on) document.getElementById('npPlexModeLabel').textContent = st._plexMode === 'transcode' ? 'Play the Original File' : 'Let Plex Convert It';
+      if(on) document.getElementById('npPlexModeLabel').textContent = cur._plexMode === 'transcode' ? 'Play the Original File' : 'Let Plex Convert It';
     }
+    var ib = document.getElementById('npVideoInfoBtn');
+    if(ib) ib.style.display = isLocalVideo(st) ? '' : 'none';
   }
   (function(){
     var pb = document.getElementById('npPlexModeBtn');
@@ -15729,7 +15757,7 @@
       e.stopPropagation();
       closeNpMenu();
       var cur = currentStation;
-      if(!cur || !cur.plex || !cur._plexMode) return;
+      if(!cur || !(cur.plex || cur.plexTwin) || !cur._plexMode) return;
       plexModes[cur.id] = cur._plexMode === 'transcode' ? 'direct' : 'transcode';
       vsave(PLEX_MODE_KEY, plexModes);
       noteVideoPosition(true);
@@ -15737,6 +15765,80 @@
       var v = vlib().byId[cur.id];
       if(v) startNextEpisode(v);
       setStatus(plexModes[cur.id] === 'transcode' ? 'Plex is converting this video for your phone.' : 'Playing the original file.', false);
+    });
+  })();
+  // Video Details: where the playing video comes from, its format (from Plex when Plex has it),
+  // and whether it plays as the original file or converted by Plex.
+  function videoDetailLines(t){
+    var v = vlib().byId[t.id] || {};
+    var lines = [];
+    if(t.plex) lines.push(['Source', 'Plex \u00b7 ' + plexServerName()]);
+    else lines.push(['Source', 'This phone' + (t.plexTwin ? ' (also on Plex)' : '')]);
+    if(!t.plex && (v.relPath || v.fileName)) lines.push(['File', v.relPath || v.fileName]);
+    var inf = t._plexInfo;
+    if(inf && inf.vc){
+      var names = { h264: 'H.264', hevc: 'HEVC', h265: 'HEVC', mpeg4: 'MPEG-4 (Xvid/DivX)', msmpeg4: 'MPEG-4 (DivX)', msmpeg4v3: 'MPEG-4 (DivX)',
+        mpeg2video: 'MPEG-2', vc1: 'VC-1', av1: 'AV1', vp9: 'VP9' };
+      lines.push(['Video', (names[inf.vc] || inf.vc.toUpperCase()) + (inf.prof ? ' ' + inf.prof : '') + (inf.depth > 8 ? ' \u00b7 ' + inf.depth + '-bit' : '')]);
+      if(inf.ac) lines.push(['Audio', inf.ac.toUpperCase()]);
+      if(inf.ct) lines.push(['File type', inf.ct.toUpperCase()]);
+    } else if(t.plex || t.plexTwin){
+      lines.push(['Format', t._plexMeta === false ? 'Plex didn\u2019t answer' : 'Not known']);
+    } else {
+      lines.push(['Format', 'Not known (only Plex titles can be checked)']);
+    }
+    if(t.plex || t.plexTwin){
+      lines.push(['Playing', t._plexMode === 'transcode' ? 'Converted by Plex' + (t._plexWhy ? ' (' + t._plexWhy + ')' : '') : 'Original file']);
+    }
+    var q = videoQuality(v);
+    if(q) lines.push(['Size', (v.width || 0) + '\u00d7' + (v.height || 0) + ' \u00b7 ' + q]);
+    return lines;
+  }
+  (function(){
+    var ib = document.getElementById('npVideoInfoBtn');
+    if(!ib) return;
+    ib.addEventListener('click', function(e){
+      e.stopPropagation();
+      closeNpMenu();
+      var cur = currentStation;
+      if(!cur || !isLocalVideo(cur)) return;
+      setTimeout(function(){
+        closeVideoMenu();
+        var m = document.createElement('div');
+        m.className = 'ch-sort-menu v-menu v-info-menu';
+        m.id = 'videoDetails';
+        m.setAttribute('role', 'dialog');
+        var h = document.createElement('div');
+        h.className = 'v-menu-head';
+        h.textContent = 'Video Details';
+        m.appendChild(h);
+        videoDetailLines(cur).forEach(function(l){
+          var row = document.createElement('div');
+          row.className = 'v-info-row';
+          var k = document.createElement('span'); k.className = 'v-info-k'; k.textContent = l[0];
+          var val = document.createElement('span'); val.className = 'v-info-v'; val.textContent = l[1];
+          row.appendChild(k); row.appendChild(val);
+          m.appendChild(row);
+        });
+        if((cur.plex || cur.plexTwin) && cur._plexMode){
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'np-menu-item v-info-action';
+          b.textContent = cur._plexMode === 'transcode' ? 'Play the Original File' : 'Let Plex Convert It';
+          b.addEventListener('click', function(ev){ ev.stopPropagation(); closeVideoMenu(); document.getElementById('npPlexModeBtn').click(); });
+          m.appendChild(b);
+        } else if(!cur.plex && !cur.plexTwin){
+          var n = document.createElement('div');
+          n.className = 'v-menu-note';
+          n.textContent = plexServer() ? 'This video isn\u2019t on your Plex server, so Plex can\u2019t convert it.' : 'Sign in to Plex in Settings to let Plex convert videos your phone can\u2019t play.';
+          m.appendChild(n);
+        }
+        document.body.appendChild(m);
+        var mr = m.getBoundingClientRect();
+        m.style.left = Math.max(8, Math.round((window.innerWidth - mr.width) / 2)) + 'px';
+        m.style.top = Math.max(8, Math.round((window.innerHeight - mr.height) / 2)) + 'px';
+        videoMenu = m;
+      }, 0);
     });
   })();
 
