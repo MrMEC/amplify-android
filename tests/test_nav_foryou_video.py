@@ -1,4 +1,4 @@
-"""Home For You row, Video tab (Stations removed), true back links for saved searches and
+"""Home For You row (called My Stations since build 120), Video tab (Stations removed), true back links for saved searches and
 podcast pages. Run: python3 tests/test_nav_foryou_video.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools
 from playwright.async_api import async_playwright
@@ -65,15 +65,15 @@ async def main():
         # Home -> For You page -> saved search -> back to For You -> back to Home
         await pg.evaluate("document.getElementById('forYouHomeHeading').click()"); await pg.wait_for_timeout(700)
         i = await info(pg)
-        check(i['heading'] == 'For You' and i['back'] == 'Home', f'For You page has a back link to Home {i}')
+        check(i['heading'] == 'My Stations' and i['back'] == 'Home', f'For You page has a back link to Home {i}')
         add = await pg.evaluate("getComputedStyle(document.getElementById('forYouAddHeaderBtn')).display!=='none'")
         check(add, 'For You page keeps Add Search')
         await pg.screenshot(path=f'{SHOTS}/nav-foryou-page.png')
         await pg.evaluate("document.querySelector('#stationsGrid .tile').click()"); await pg.wait_for_timeout(900)
         i = await info(pg)
-        check(i['back'] == 'For You', f'saved search from the For You page: back says For You {i}')
+        check(i['back'] == 'My Stations', f'saved search from the For You page: back says For You {i}')
         await click_back(pg)
-        check((await info(pg))['heading'] == 'For You', 'back returns to the For You page')
+        check((await info(pg))['heading'] == 'My Stations', 'back returns to the For You page')
         await click_back(pg)
         check((await info(pg))['home'], '...and then Home')
 
@@ -105,7 +105,7 @@ async def main():
         check((await info(pg))['nav'] == 'podcasts', 'Podcasts tab opens')
         # drawer: For You + Video entries, no Stations
         side = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.sidebar-row-link .sidebar-row-label'),function(e){return e.textContent.trim();})")
-        check('Stations' not in side and 'For You' in side and 'Video' in side, f'sidebar/drawer entries {side}')
+        check('Stations' not in side and 'My Stations' in side and 'Video' in side, f'sidebar/drawer entries {side}')
         await pg.evaluate("document.getElementById('hamburgerBtn').click()"); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{SHOTS}/nav-drawer.png')
         check(not errs, f'no page errors {errs[:3]}')

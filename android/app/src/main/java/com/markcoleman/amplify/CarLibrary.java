@@ -236,7 +236,7 @@ final class CarLibrary {
     linkedHashMap.put("lib:songs", "Songs");
     linkedHashMap.put("lib:playlists", "Playlists");
     linkedHashMap.put("lib:genres", "Genres");
-    linkedHashMap.put("st:foryou", "For You");
+    linkedHashMap.put("st:foryou", "My Stations");
     linkedHashMap.put("st:recent", "Recent Stations");
     linkedHashMap.put("st:top", "Top Stations");
     linkedHashMap.put("pod:latest", "Latest");

@@ -57,7 +57,8 @@
     --danger: #e0665a;
     --shadow: 0 6px 16px rgba(0,0,0,.45);
     --art-bg: #262b34;
-    --logo-grad-start: #ffffff;
+    /* The A: its dark version on the dark theme, its light one on the light theme (build 120). */
+    --logo-grad-start: #000000;
   }
   html[data-theme="light"]{
     --bg: #f1f2f3;
@@ -75,7 +76,7 @@
     --accent-dim: #9195ab;
     --accent-text: #ffffff;
     --danger: #b33a2c;
-    --logo-grad-start: #000000;
+    --logo-grad-start: #ffffff;
     --shadow: 0 6px 16px rgba(20,20,35,.18);
     --art-bg: #dcdde1;
   }
@@ -1159,8 +1160,21 @@
      overlapped the words. The row now starts 14px under the heading, the same as Favorite
      Artists above it, and the space above matches that section's too. */
   .tile-grid > .grid-section-label.cl-section-label{ margin-top:6px; margin-bottom:-10px; }
-  .fav-artists-block .grid-section-label{ margin:0 0 14px; }
-  .fav-artists-block .edit-link-btn{ margin-left:2px; }
+  .fav-artists-block .grid-section-label{ margin:0 0 8px; }
+  /* Favorite Artists as stacked rows (build 120), with Edit as a word on the far right. */
+  .fav-artists-head{ display:flex; align-items:center; justify-content:space-between; }
+  .section-text-btn{ border:none; background:none; color:var(--accent); font:inherit; font-size:14px; font-weight:600;
+    letter-spacing:0; text-transform:none; cursor:pointer; padding:4px 2px 4px 10px; }
+  .section-text-btn:hover{ text-decoration:underline; }
+  .fav-artists-list{ display:flex; flex-direction:column; }
+  .fav-artists-list .row-item{ padding:7px 4px; gap:14px; border-radius:12px; }
+  .fav-artists-list .row-thumb.fav-artist-thumb{ width:52px; height:52px; border-radius:50%; font-size:20px; }
+  .fav-artists-list .row-thumb.fav-artist-thumb img{ object-position:var(--portrait-crop); }
+  .fav-artists-list .row-name{ font-size:15px; font-weight:600; }
+  .fav-artists-list.editing .row-item{ cursor:default; }
+  .fav-artists-list.editing .row-item:hover{ background:transparent; }
+  .fav-artists-list .row-drag-handle{ width:28px; height:52px; font-size:16px; margin-left:-4px; }
+  .fav-artists-list .fav-remove-btn{ width:44px; height:44px; font-size:17px; }
   /* Same sideways-scroller as .cl-row (Continue Listening, Recent Songs/Stations) -- spelled
      out again rather than shared with it because .tile-grid > .cl-row's own rule (right below)
      only reaches a direct child of the grid, and this row now sits a level deeper inside
@@ -4732,8 +4746,8 @@
 
     <div class="sidebar-section">
       <div class="aside-heading-row">
-        <h2 id="forYouHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open For You">
-          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.4 5.2 5.6.6-4.2 3.8 1.2 5.6L12 15.9l-5 2.8 1.2-5.6L4 9.3l5.6-.6z"/></svg>For You</span>
+        <h2 id="forYouHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open My Stations">
+          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.4 5.2 5.6.6-4.2 3.8 1.2 5.6L12 15.9l-5 2.8 1.2-5.6L4 9.3l5.6-.6z"/></svg>My Stations</span>
           <i class="fa-solid fa-chevron-right sidebar-row-chevron" aria-hidden="true"></i>
         </h2>
       </div>
@@ -4872,7 +4886,7 @@
            where searches are added and reordered. -->
       <div class="home-section for-you-section" id="forYouSection" style="display:none;">
         <div class="home-section-head">
-          <h2 class="home-heading-link" id="forYouHomeHeading" role="button" tabindex="0">For You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+          <h2 class="home-heading-link" id="forYouHomeHeading" role="button" tabindex="0">My Stations<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
         </div>
         <div class="tile-grid" id="forYouGrid"></div>
       </div>
@@ -4912,7 +4926,7 @@
               <path d="M18.4 14.2l3.1 2.8-3.1 2.8"/>
             </svg><span class="btn-text">Shuffle</span>
           </button>
-          <button type="button" class="clear-search-btn" id="saveSearchBtn" style="display:none;" title="Save this search to For You">
+          <button type="button" class="clear-search-btn" id="saveSearchBtn" style="display:none;" title="Save this search to My Stations">
             <i class="fa-solid fa-floppy-disk"></i><span class="btn-text">Save search</span>
           </button>
           <button type="button" class="clear-search-btn" id="clearSearchBtn" style="display:none;" title="Clear this search">
@@ -12069,40 +12083,27 @@
     closeDrawer();
   });
 
-  // A sideways-scrolling row of just the favourited artists, on the My Library home page
-  // above Recent Songs -- smaller circular tiles than the Artists page's own grid, so more
-  // than two sit across a phone screen at once. Absent entirely when there are no favourite
-  // artists, same as every other favourites list in the app.
-  //
-  // Reordering is opt-in via its own small pencil/check button (favArtistsEditing), the same
-  // pattern the Favorites/Genres/Playlists/For You lists already use -- NOT wired up
-  // permanently the way the plain grid's drag-to-reorder is. A sideways-scrolling row is the
-  // one place that distinction actually matters: `.tile-draggable` sets `touch-action:none`
-  // (see its rule) so a finger pressed on the tile is never handed to the browser's own
-  // scrolling, and `enableTouchReorder` claims a touch the instant it lands, with no hold or
-  // movement threshold of its own to tell a swipe-to-scroll from a drag-to-reorder. Wired up
-  // unconditionally, as a first pass here did, that combination meant every swipe across a
-  // tile was read as a reorder drag instead of a scroll -- each move re-measuring the row and
-  // re-inserting the dragged tile into the DOM rather than the browser just panning it, which
-  // is what made the row so heavy to scroll. Off by default, the tiles carry none of that:
-  // plain taps open the artist page and the row scrolls exactly like Continue Listening or
-  // Recent Songs beside it. It only costs the row its own native scroll while Reorder is on,
-  // which is the same trade-off every other reorder mode in the app already makes.
+  // My Library's Favorite Artists (build 120): a stacked list of rows (round portrait and
+  // name), not a sideways row of circles. "Edit" on the far right of the heading turns each
+  // row into an edit row -- a grip to drag it into place (finger or mouse) and a button to
+  // take the artist off the list -- and "Done" puts it back. A plain row opens the artist.
   function buildFavoriteArtistsBlock(){
     var favArtists = favorites.filter(isArtistFav).map(artistEntryForFav);
-    if(!favArtists.length) return null;
+    if(!favArtists.length){ favArtistsEditing = false; return null; }
 
     var block = document.createElement('div');
     block.className = 'fav-artists-block';
 
     var label = document.createElement('div');
-    label.className = 'grid-section-label';
-    label.textContent = 'Favorite Artists';
+    label.className = 'grid-section-label fav-artists-head';
+    var title = document.createElement('span');
+    title.textContent = 'Favorite Artists';
+    label.appendChild(title);
     var editBtn = document.createElement('button');
     editBtn.type = 'button';
-    editBtn.className = 'edit-link-btn';
-    updateEditLinkIcon(editBtn, favArtistsEditing);
-    editBtn.classList.toggle('editing', favArtistsEditing);
+    editBtn.className = 'section-text-btn fav-artists-edit';
+    editBtn.textContent = favArtistsEditing ? 'Done' : 'Edit';
+    editBtn.setAttribute('aria-pressed', favArtistsEditing ? 'true' : 'false');
     editBtn.addEventListener('click', function(e){
       e.stopPropagation();
       setFavoriteArtistsEditing(!favArtistsEditing);
@@ -12110,26 +12111,89 @@
     label.appendChild(editBtn);
     block.appendChild(label);
 
-    var row = document.createElement('div');
-    row.className = 'fav-artists-row';
-    favArtists.forEach(function(entry){
-      row.appendChild(buildEntityTile({
-        key: artistArtKey(entry.key),
-        entity: 'artist',
-        name: entry.name,
-        renderArt: function(el){ renderArtistArt(el, entry); },
-        // No heart here -- every artist in this row is a favourite by definition, so the icon
-        // was redundant clutter on an already-small circle. The main Artists list tile
-        // (buildArtistTile) keeps its own, since that grid mixes favourited and unfavourited
-        // artists together and the heart is how you tell which is which there.
-        onClick: function(){ openArtistPage(entry.key); },
-        draggable: favArtistsEditing,
-        container: row,
-        onReorder: function(){ reorderFavoriteArtistsFromDom(row); }
-      }));
-    });
-    block.appendChild(row);
+    var list = document.createElement('div');
+    list.className = 'fav-artists-list' + (favArtistsEditing ? ' editing' : '');
+    favArtists.forEach(function(entry){ list.appendChild(buildFavoriteArtistRow(entry, list)); });
+    block.appendChild(list);
     return block;
+  }
+  function buildFavoriteArtistRow(entry, list){
+    var row = document.createElement('div');
+    row.className = 'row-item fav-artist-row';
+    row.dataset.key = artistArtKey(entry.key);
+    row.dataset.artistKey = entry.key;
+    var handle = null;
+    if(favArtistsEditing){
+      handle = document.createElement('div');
+      handle.className = 'row-drag-handle';
+      handle.setAttribute('aria-hidden', 'true');
+      handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
+      row.appendChild(handle);
+    }
+    var thumb = document.createElement('div');
+    thumb.className = 'row-thumb fav-artist-thumb';
+    renderArtistArt(thumb, entry);
+    row.appendChild(thumb);
+    var name = document.createElement('div');
+    name.className = 'row-name';
+    name.textContent = entry.name;
+    row.appendChild(name);
+    if(!favArtistsEditing){
+      row.addEventListener('click', function(){ openArtistPage(entry.key); });
+      return row;
+    }
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'row-fav fav-remove-btn';
+    remove.title = 'Remove from Favorite Artists';
+    remove.setAttribute('aria-label', 'Remove ' + entry.name + ' from Favorite Artists');
+    remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    remove.addEventListener('click', function(e){
+      e.stopPropagation();
+      removeFavoriteArtist(entry.key);
+    });
+    row.appendChild(remove);
+    // Mouse: native drag and drop. Touch: the grip alone starts a drag, so the page still
+    // scrolls under a finger anywhere else on the row.
+    row.draggable = true;
+    row.addEventListener('dragstart', function(e){
+      row.classList.add('dragging');
+      if(e.dataTransfer){ e.dataTransfer.effectAllowed = 'move'; try{ e.dataTransfer.setData('text/plain', row.dataset.key); }catch(err){} }
+    });
+    row.addEventListener('dragend', function(){ row.classList.remove('dragging'); reorderFavoriteArtistsFromRows(list); });
+    row.addEventListener('dragover', function(e){
+      e.preventDefault();
+      var dragging = list.querySelector('.row-item.dragging');
+      if(!dragging || dragging === row) return;
+      var rect = row.getBoundingClientRect();
+      list.insertBefore(dragging, (e.clientY - rect.top) < rect.height / 2 ? row : row.nextSibling);
+    });
+    enableTouchReorder({ item: row, handle: handle, list: list, selector: '.row-item', onDrop: function(){ reorderFavoriteArtistsFromRows(list); } });
+    return row;
+  }
+  function reorderFavoriteArtistsFromRows(list){
+    var order = Array.prototype.map.call(list.querySelectorAll('.fav-artist-row'), function(el){ return el.dataset.artistKey; });
+    var artistFavs = favorites.filter(isArtistFav);
+    var byKey = {};
+    artistFavs.forEach(function(f){ byKey[f.artistKey] = f; });
+    var reordered = order.map(function(k){ return byKey[k]; }).filter(Boolean);
+    if(reordered.length !== artistFavs.length) return;
+    var i = 0;
+    favorites = favorites.map(function(f){ return isArtistFav(f) ? reordered[i++] : f; });
+    saveFavorites();
+  }
+  function removeFavoriteArtist(artistKey){
+    var gone = null;
+    favorites = favorites.filter(function(f){
+      if(isArtistFav(f) && f.artistKey === artistKey){ gone = f; return false; }
+      return true;
+    });
+    if(!gone) return;
+    saveFavorites();
+    renderFavoritesList();
+    refreshFavIcons(gone);
+    updateNowPlayingFavState();
+    setFavoriteArtistsEditing(favArtistsEditing); // redraw the list in place, still editing
   }
 
   // beforeNode: where to (re)insert the block if it isn't just being appended at the current
@@ -14657,7 +14721,7 @@
     onStationsHomeView = true;
     setDetailBackToHistory(function(){ loadTopStations(); }, 'Home');
     renderCustomSearchList();
-    stationsHeading.textContent = 'For You';
+    stationsHeading.textContent = 'My Stations';
     pageTitle.style.display = 'none';
     albumPlayBtn.style.display = 'none';
     libraryShuffleBtn.style.display = 'none';
@@ -19991,7 +20055,7 @@
     }
     if(onPodcastsView) return entry('Podcasts', function(){ openPodcastsHome(); });
     if(onMyLibraryHomeView) return entry('My Library', function(){ openMyLibraryHome(); });
-    if(onStationsHomeView) return entry('For You', function(){ openStationsHome(); });
+    if(onStationsHomeView) return entry('My Stations', function(){ openStationsHome(); });
     if(onVideoView) return entry('Video', function(){ openVideoHome(); });
     if(onAddChannelsView) return entry('Add Channels', function(){ openAddChannelsPage(); });
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
@@ -24465,7 +24529,7 @@
       save.className = 'clear-search-btn search-save-btn';
       save.id = 'searchSaveBtn';
       save.textContent = 'Save as Custom Station';
-      save.title = 'Save this search to For You';
+      save.title = 'Save this search to My Stations';
       save.addEventListener('click', function(){ saveSearchBtn.click(); });
       bar.appendChild(save);
       stationsGrid.appendChild(bar);
