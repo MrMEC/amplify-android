@@ -30,6 +30,7 @@ MOVIES = [
   {'ratingKey': '500', 'title': 'Inception', 'year': 2010, 'thumb': '/library/metadata/500/thumb/1', 'duration': 8880000, 'addedAt': NOW - 900000, 'Media': part(500)},
   {'ratingKey': '501', 'title': 'Dune', 'year': 2021, 'summary': 'Paul Atreides leads nomadic tribes in a battle to control the desert planet Arrakis.',
    'thumb': '/library/metadata/501/thumb/1', 'art': '/library/metadata/501/art/1', 'duration': 9300000, 'addedAt': NOW - 100, 'Media': part(501, 3840, 2160)},
+  {'ratingKey': '503', 'title': 'Alien', 'year': 1979, 'thumb': '/library/metadata/503/thumb/1', 'duration': 7020000, 'addedAt': NOW - 6000, 'Media': part(503)},
   {'ratingKey': '502', 'title': 'Heat', 'year': 1995, 'thumb': '/library/metadata/502/thumb/1', 'duration': 10200000, 'addedAt': NOW - 5000,
    'viewCount': 1, 'lastViewedAt': NOW - 86400, 'Media': part(502)},
 ]
@@ -50,6 +51,15 @@ META501 = {'MediaContainer': {'Metadata': [{'ratingKey': '501', 'Media': [{'Part
   {'streamType': 3, 'key': '/library/streams/9001', 'codec': 'srt', 'languageTag': 'en', 'displayTitle': 'English (SRT External)'},
   {'streamType': 3, 'codec': 'pgs', 'languageTag': 'fr', 'displayTitle': 'French (PGS)'}]}]}]}]}}
 
+META502 = {'MediaContainer': {'Metadata': [{'ratingKey': '502', 'Media': [{'container': 'avi', 'videoCodec': 'mpeg4', 'audioCodec': 'mp3',
+  'Part': [{'key': '/library/parts/502/1/file.avi', 'container': 'avi', 'Stream': [{'streamType': 1, 'codec': 'mpeg4', 'bitDepth': 8}, {'streamType': 2, 'codec': 'mp3', 'selected': True}]}]}]}]}}
+META503 = {'MediaContainer': {'Metadata': [{'ratingKey': '503', 'Media': [{'container': 'mkv', 'videoCodec': 'h264',
+  'Part': [{'key': '/library/parts/503/1/file.mkv', 'container': 'mkv', 'Stream': [{'streamType': 1, 'codec': 'h264', 'bitDepth': 8, 'profile': 'high'}, {'streamType': 2, 'codec': 'aac'}]}]}]}]}}
+FAILLOAD = """(function(){ var P=window.Capacitor.Plugins.AmplifyPlayer; window.Capacitor.Plugins.AmplifyPlayer=new Proxy({}, {get:function(t,k){
+  if(k==='load') return function(a){ if(/parts\\/503\\//.test(a.url)){ window.__loadArgs.push(a); window.__cur=a.id;
+      setTimeout(function(){ window.__emit('error',{id:a.id,code:4003,name:'ERROR_CODE_DECODING_FAILED'}); },60); return Promise.resolve({}); }
+    return P.load(a); };
+  return P[k]; }}); })();"""
 def png(seed):
     h = hashlib.md5(seed.encode()).digest()
     w, hh = 40, 60
@@ -100,6 +110,8 @@ async def proute(r):
             lst = SHOWS if t == '2' else EPS
             return await jr(r, {'MediaContainer': {'totalSize': len(lst), 'Metadata': lst}})
         if p == '/library/metadata/501': return await jr(r, META501)
+        if p == '/library/metadata/502': return await jr(r, META502)
+        if p == '/library/metadata/503': return await jr(r, META503)
         if p.startswith('/library/metadata/'): return await jr(r, {'MediaContainer': {'Metadata': [{}]}})
         if p.startswith('/photo/'): return await r.fulfill(status=200, content_type='image/png', headers=CORS, body=png(q.get('url', [''])[0]))
         if p.startswith('/:/'): return await r.fulfill(status=200, headers=CORS, body='')
@@ -132,6 +144,7 @@ async def main():
         await ctx.add_init_script(MOCK)
         await ctx.add_init_script(EXT)
         await ctx.add_init_script(OPEN)
+        await ctx.add_init_script(FAILLOAD)
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e) + ' @ ' + (e.stack or '')[:300]))
         dialogs = []
         async def ondialog(d):
@@ -168,15 +181,15 @@ async def main():
         check(status == 'Connected' and t[0] == 'Signed in as Mark', f'signed in {status} {t}')
         sel = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#plexServerSelect option'),function(o){return [o.textContent,o.selected];})")
         check(sel == [['Home Server', True], ['Friend Server', False]], f'servers to choose from, the owned one first and chosen {sel}')
-        check(any('4 movies · 2 shows' in x for x in t), f'library counted {t}')
+        check(any('5 movies · 2 shows' in x for x in t), f'library counted {t}')
         libs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#plexLibraries .plex-lib'),function(b){return [b.querySelector('.plex-lib-name').textContent,b.querySelector('.plex-lib-sub').textContent,b.getAttribute('aria-checked')];})")
-        check(libs == [['Movies', '3 movies', 'true'], ['TV Shows', '2 shows', 'true'], ['Home Movies', '1 movie', 'true']], f'every movie and show library listed with a switch, all on (music left out) {libs}')
+        check(libs == [['Movies', '4 movies', 'true'], ['TV Shows', '2 shows', 'true'], ['Home Movies', '1 movie', 'true']], f'every movie and show library listed with a switch, all on (music left out) {libs}')
         await pg.evaluate("document.getElementById('plexLibraries').scrollIntoView()"); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'{SHOTS}/plex-libraries-on.png')
         await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"4\"]').click()"); await pg.wait_for_timeout(300)
         t = await plex_texts(pg)
         libs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#plexLibraries .plex-lib'),function(b){return b.getAttribute('aria-checked');})")
-        check(libs == ['true', 'true', 'false'] and any('3 movies · 2 shows' in x for x in t), f'Home Movies switched off, count follows {libs} {t}')
+        check(libs == ['true', 'true', 'false'] and any('4 movies · 2 shows' in x for x in t), f'Home Movies switched off, count follows {libs} {t}')
         await pg.evaluate("document.getElementById('plexLibraries').scrollIntoView()"); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'{SHOTS}/plex-libraries-off.png')
         tokens = [x for x in REQ if x[1].startswith('https://plex.tv/api/v2/user') or x[1].startswith('https://plex.tv/api/v2/resources')]
@@ -196,7 +209,7 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(500)
         await tab(pg, 'movies')
         mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')
-        check(sorted(mv) == ['Arrival', 'Dune', 'Heat', 'Inception', 'The Matrix'], f'Plex movies beside the local ones, Inception once, Home Movies left out {mv}')
+        check(sorted(mv) == ['Alien', 'Arrival', 'Dune', 'Heat', 'Inception', 'The Matrix'], f'Plex movies beside the local ones, Inception once, Home Movies left out {mv}')
         check(mv[0] == 'Dune', f'Recently Added puts the newest Plex movie first {mv}')
         imgs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){var i=t.querySelector('img');return [t.querySelector('.tile-name').textContent, i?i.getAttribute('src'):''];})")
         dune = [x[1] for x in imgs if x[0] == 'Dune'][0]
@@ -260,6 +273,44 @@ async def main():
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.v-menu .np-menu-item'),function(b){return b.textContent==='Mark Watched';}).click()"); await pg.wait_for_timeout(600)
         scr = [x[1] for x in plexreqs('/:/scrobble')]
         check(any('key=501' in x for x in scr), f'Mark Watched tells Plex {scr}')
+        # Heat: an Xvid AVI, converted by Plex
+        async def open_movie(name):
+            await tab(pg, 'shows'); await tab(pg, 'movies')
+            await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(t){return t.querySelector('.tile-name').textContent===n;}).click()", name); await pg.wait_for_timeout(600)
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
+        await open_movie('Heat')
+        await pg.evaluate("document.querySelector('.vd-play').click()"); await pg.wait_for_timeout(1500)
+        la = await pg.evaluate("window.__loadArgs.slice(-1)[0].url")
+        q = parse_qs(urlparse(la).query)
+        check(la.startswith(REMOTE + '/video/:/transcode/universal/start.m3u8?') and q.get('path') == ['/library/metadata/502'] and q.get('protocol') == ['hls']
+              and q.get('X-Plex-Token') == ['SRVTOKEN'] and q.get('directStream') == ['1'] and q.get('location') == ['wan'] and 'videoCodec=h264' in q.get('X-Plex-Client-Profile-Extra', [''])[0],
+              f'an Xvid AVI is converted by Plex (HLS, H.264) {la[:160]}')
+        sess1 = q.get('session', [''])[0]
+        await pg.evaluate("document.getElementById('npMenuBtn') && document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
+        lbl = await pg.evaluate("[getComputedStyle(document.getElementById('npPlexModeBtn')).display, document.getElementById('npPlexModeLabel').textContent]")
+        check(lbl == ['flex', 'Play the Original File'] or (lbl[0] != 'none' and lbl[1] == 'Play the Original File'), f'Now Playing menu offers the original file {lbl}')
+        await pg.screenshot(path=f'{SHOTS}/plex-np-menu.png')
+        await pg.evaluate("document.getElementById('npPlexModeBtn').click()"); await pg.wait_for_timeout(1500)
+        la = await pg.evaluate("window.__loadArgs.slice(-1)[0].url")
+        stops = [x[1] for x in plexreqs('/transcode/universal/stop')]
+        check(la == REMOTE + '/library/parts/502/1/file.mkv?X-Plex-Token=SRVTOKEN' and any(sess1 in x for x in stops), f'switched to the original, the conversion stopped {la} {stops}')
+        await pg.evaluate("document.getElementById('npMenuBtn') && document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
+        lbl = await pg.evaluate("document.getElementById('npPlexModeLabel').textContent")
+        check(lbl == 'Let Plex Convert It', f'and the menu offers converting again {lbl}')
+        await pg.evaluate("document.getElementById('npPlexModeBtn').click()"); await pg.wait_for_timeout(1500)
+        la = await pg.evaluate("window.__loadArgs.slice(-1)[0].url")
+        mode = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerPlexMode'))")
+        check('/transcode/universal/start.m3u8' in la and list(mode.values()) == ['transcode'], f'converted again, the choice kept for this video {mode}')
+        await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
+        # Alien: H.264 that the phone fails on -> retried converted
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
+        await open_movie('Alien')
+        n0 = await pg.evaluate("window.__loadArgs.length")
+        await pg.evaluate("document.querySelector('.vd-play').click()"); await pg.wait_for_timeout(3000)
+        urls = await pg.evaluate("(n)=>window.__loadArgs.slice(n).map(function(a){return a.url;})", n0)
+        check(len(urls) >= 2 and urls[0].endswith('/library/parts/503/1/file.mkv?X-Plex-Token=SRVTOKEN') and 'path=%2Flibrary%2Fmetadata%2F503' in urls[-1] and '/start.m3u8' in urls[-1],
+              f'plain H.264 plays the original; when the phone fails on it, Plex converts it {urls}')
+        await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
         wiki = [x[1] for x in REQ if x[0] == 'WIKI' and ('Dune' in x[1] or 'Severance' in x[1] or 'Heat' in x[1])]
         check(not wiki, f'no Wikipedia lookups for Plex titles {wiki[:3]}')
 

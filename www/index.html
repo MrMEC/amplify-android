@@ -5398,6 +5398,10 @@
                   <button type="button" class="np-menu-item" id="npTracksBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h2M11 11h6"/></svg><span>Subtitles &amp; Audio</span>
                   </button>
+                  <!-- A Plex video: play the original file, or let Plex convert it (build 132). -->
+                  <button type="button" class="np-menu-item" id="npPlexModeBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h12l-3-3M20 16H8l3 3"/></svg><span id="npPlexModeLabel">Let Plex Convert It</span>
+                  </button>
                   <!-- A stream added by its link: give it a proper name. -->
                   <button type="button" class="np-menu-item" id="npRenameBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7V5h11v2M9.5 5v14M7.5 19h4"/><path d="M15 12h5M17.5 12v7M16 19h3"/></svg><span>Rename</span>
@@ -14358,25 +14362,96 @@
       byId[id] = item;
     });
   }
-  // Before playing: make sure of the server, and bring the server's subtitle files (the
-  // ones inside the video file come with it anyway).
+  // Before playing: make sure of the server, bring the server's subtitle files (the ones
+  // inside the video file come with it anyway), and decide how to play it (build 132). The
+  // original file plays when the phone can decode it; otherwise Plex converts it on the fly
+  // (HLS from the universal transcoder, H.264/AAC, the video only remuxed when it is already
+  // fine). What a phone can't decode often shows no error at all -- the sound plays over a
+  // green picture -- so this is decided from the file's codecs rather than waiting for a
+  // failure: MPEG-4 Part 2 (Xvid/DivX), MPEG-2, VC-1, AV1, 10-bit H.264, AVI/WMV containers and
+  // DTS/TrueHD audio are converted. The Now Playing menu can switch any video either way
+  // (kept per video in radioPlayerPlexMode), and a direct play that fails is retried converted.
+  var PLEX_MODE_KEY = 'radioPlayerPlexMode';
+  var plexModes = vload(PLEX_MODE_KEY, {});
+  if(!plexModes || typeof plexModes !== 'object') plexModes = {};
+  var plexSession = '';
+  function plexCanDirectPlay(m){
+    var med = (m.Media || [])[0] || {}, part = (med.Part || [])[0] || {}, streams = part.Stream || [];
+    var v = streams.filter(function(x){ return x.streamType === 1; })[0] || {};
+    var auds = streams.filter(function(x){ return x.streamType === 2; });
+    var a = auds.filter(function(x){ return x.selected; })[0] || auds[0] || {};
+    var vc = String(v.codec || med.videoCodec || '').toLowerCase();
+    var prof = String(v.profile || med.videoProfile || '').toLowerCase();
+    var depth = v.bitDepth || 8;
+    var ct = String(part.container || med.container || '').toLowerCase();
+    var ac = String(a.codec || med.audioCodec || '').toLowerCase();
+    var why = [];
+    if(!vc) return { ok: true, why: '' };
+    if(ct && !/^(mkv|mp4|mov|m4v|webm|mpegts|ts)$/.test(ct)) why.push(ct.toUpperCase() + ' file');
+    if(vc === 'h264'){ if(depth > 8 || /10|4:2:2|4:4:4/.test(prof)) why.push('10-bit H.264'); }
+    else if(vc === 'hevc' || vc === 'h265'){ if(depth > 10 || /4:2:2|4:4:4|rext/.test(prof)) why.push('HEVC ' + prof); }
+    else if(vc !== 'vp9' && vc !== 'vp8') why.push(({ mpeg4: 'MPEG-4 (Xvid/DivX)', msmpeg4: 'MPEG-4 (DivX)', msmpeg4v3: 'MPEG-4 (DivX)',
+      mpeg2video: 'MPEG-2', mpeg1video: 'MPEG-1', vc1: 'VC-1', wmv3: 'WMV', wmv2: 'WMV', av1: 'AV1' })[vc] || vc.toUpperCase());
+    if(ac && !/^(aac|mp3|mp2|ac3|eac3|opus|vorbis|flac|pcm|alac)$/.test(ac)) why.push(ac.toUpperCase() + ' audio');
+    return { ok: !why.length, why: why.join(', ') };
+  }
+  function plexBaseIsLocal(){
+    var s = plexServer();
+    if(!s || !plexAccount.base) return false;
+    return s.conns.some(function(c){ return c.uri === plexAccount.base && c.local && !c.relay; });
+  }
+  function plexTranscodeUrl(t, session){
+    var extra = 'add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,mp3)' +
+      '+add-limitation(scope=videoCodec&scopeName=h264&type=upperBound&name=video.bitDepth&value=8)';
+    var q = ['path=' + encodeURIComponent('/library/metadata/' + t.plexKey), 'mediaIndex=0', 'partIndex=0', 'protocol=hls', 'offset=0',
+      'fastSeek=1', 'directPlay=0', 'directStream=1', 'directStreamAudio=1', 'videoQuality=100', 'videoResolution=1920x1080',
+      'maxVideoBitrate=' + (plexBaseIsLocal() ? 20000 : 8000), 'subtitles=none', 'copyts=1', 'autoAdjustQuality=0',
+      'location=' + (plexBaseIsLocal() ? 'lan' : 'wan'), 'session=' + session, 'X-Plex-Session-Identifier=' + session,
+      'X-Plex-Client-Identifier=' + encodeURIComponent(plexClientId), 'X-Plex-Product=Amplify', 'X-Plex-Version=1.0',
+      'X-Plex-Platform=Chrome', 'X-Plex-Client-Profile-Extra=' + encodeURIComponent(extra)];
+    return plexWithToken(plexAccount.base + '/video/:/transcode/universal/start.m3u8?' + q.join('&'));
+  }
+  // The server stops a conversion nobody asks for after a while; this says so straight away.
+  function plexStopSession(){
+    if(!plexSession) return;
+    var sess = plexSession;
+    plexSession = '';
+    plexApi('/video/:/transcode/universal/stop?session=' + encodeURIComponent(sess))['catch'](function(){});
+  }
+  function plexSubsFrom(m){
+    var part = (((m.Media || [])[0] || {}).Part || [])[0] || {};
+    return (part.Stream || []).filter(function(st){
+      return st.streamType === 3 && st.key && /^(srt|ass|ssa|vtt|webvtt|subrip)$/i.test(st.codec || '');
+    }).map(function(st){
+      var codec = String(st.codec || 'srt').toLowerCase();
+      var ext = codec === 'subrip' ? 'srt' : (codec === 'webvtt' ? 'vtt' : codec);
+      var code = String(st.languageTag || st.languageCode || '').slice(0, 2).toLowerCase();
+      var label = st.displayTitle || st.title || st.language || 'Subtitles';
+      return { uri: plexMediaUrl(st.key), name: 'plex.' + ext, label: label, language: code };
+    });
+  }
   function plexPrepare(t){
     var ready = plexBaseOk ? Promise.resolve() : plexConnect()['catch'](function(){});
     return ready.then(function(){
-      t.uri = plexMediaUrl(t.plexPart) || t.uri;
-      return plexApi('/library/metadata/' + encodeURIComponent(t.plexKey), 5000);
-    }).then(function(d){
-      var m = (((d && d.MediaContainer) || {}).Metadata || [])[0] || {};
-      var part = (((m.Media || [])[0] || {}).Part || [])[0] || {};
-      return (part.Stream || []).filter(function(st){
-        return st.streamType === 3 && st.key && /^(srt|ass|ssa|vtt|webvtt|subrip)$/i.test(st.codec || '');
-      }).map(function(st){
-        var codec = String(st.codec || 'srt').toLowerCase();
-        var ext = codec === 'subrip' ? 'srt' : (codec === 'webvtt' ? 'vtt' : codec);
-        var code = String(st.languageTag || st.languageCode || '').slice(0, 2).toLowerCase();
-        var label = st.displayTitle || st.title || st.language || 'Subtitles';
-        return { uri: plexMediaUrl(st.key), name: 'plex.' + ext, label: label, language: code };
-      });
+      return plexApi('/library/metadata/' + encodeURIComponent(t.plexKey), 5000).then(function(d){
+        return (((d && d.MediaContainer) || {}).Metadata || [])[0] || null;
+      }, function(){ return null; });
+    }).then(function(m){
+      var dec = m ? plexCanDirectPlay(m) : { ok: true, why: '' };
+      var pref = plexModes[t.id];
+      var convert = !!t._plexForce || pref === 'transcode' || (pref !== 'direct' && !dec.ok);
+      t._plexWhy = dec.why;
+      plexStopSession();
+      if(convert && plexAccount && plexAccount.base){
+        plexSession = 'amplify-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        t._plexMode = 'transcode';
+        t.uri = plexTranscodeUrl(t, plexSession);
+      } else {
+        t._plexMode = 'direct';
+        t.uri = plexMediaUrl(t.plexPart) || t.uri;
+      }
+      if(currentStation === t) syncNpTracksBtn(t);
+      return m ? plexSubsFrom(m) : [];
     })['catch'](function(){ return []; });
   }
   // Progress back to Plex: every 30 seconds while playing, on pause, and watched once it is.
@@ -15452,6 +15527,7 @@
       if(t.plex && !t._plexRetried){
         t._plexRetried = true;
         plexBaseOk = false;
+        if(t._plexMode === 'direct') t._plexForce = true;   // the phone couldn't play the original: let Plex convert it
         plexConnect().then(function(){
           if(!stillWanted()) return;
           t.uri = plexMediaUrl(t.plexPart) || t.uri;
@@ -15495,7 +15571,7 @@
     var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
     setVideoProgress(t.id, dur, dur);
     vsave(VIDEO_PROGRESS_KEY, videoProgress);
-    if(t.plex) plexReport(t.id, true);
+    if(t.plex){ plexReport(t.id, true); plexStopSession(); }
     if(typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
     setPlayingUI(false);
     syncSeekBar();
@@ -15639,7 +15715,30 @@
   }
   function syncNpTracksBtn(st){
     if(npTracksBtn) npTracksBtn.style.display = isLocalVideo(st) && !!videoPlugin2() ? '' : 'none';
+    var pb = document.getElementById('npPlexModeBtn');
+    if(pb){
+      var on = !!(st && st.plex && st._plexMode);
+      pb.style.display = on ? '' : 'none';
+      if(on) document.getElementById('npPlexModeLabel').textContent = st._plexMode === 'transcode' ? 'Play the Original File' : 'Let Plex Convert It';
+    }
   }
+  (function(){
+    var pb = document.getElementById('npPlexModeBtn');
+    if(!pb) return;
+    pb.addEventListener('click', function(e){
+      e.stopPropagation();
+      closeNpMenu();
+      var cur = currentStation;
+      if(!cur || !cur.plex || !cur._plexMode) return;
+      plexModes[cur.id] = cur._plexMode === 'transcode' ? 'direct' : 'transcode';
+      vsave(PLEX_MODE_KEY, plexModes);
+      noteVideoPosition(true);
+      vsave(VIDEO_PROGRESS_KEY, videoProgress);
+      var v = vlib().byId[cur.id];
+      if(v) startNextEpisode(v);
+      setStatus(plexModes[cur.id] === 'transcode' ? 'Plex is converting this video for your phone.' : 'Playing the original file.', false);
+    });
+  })();
 
   // ---- the next episode, after a short countdown
   var npNextUp = document.getElementById('npNextUp');
