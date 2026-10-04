@@ -2998,6 +2998,7 @@
   .ch-sort-line{ display:flex; align-items:center; gap:12px; }
   .ch-sort-label{ flex:0 0 52px; font-size:12.5px; font-weight:700; color:var(--text-dim); }
   .ch-sort-tabs.home-tabs{ margin:0; flex-wrap:nowrap; }
+  .fav-artists-block .ch-sort-opts{ display:flex; flex-direction:column; gap:10px; margin:2px 0 12px; }
   .tile-grid > .video-tabs + .grid-section-label, .tile-grid > .video-tabs + .grid-section-label.ch-row-label{ margin-top:4px; }
   .tile-grid > .video-tabs.vd-seasons{ margin:4px 0 -18px; }
   .v-progress{ position:absolute; left:8px; right:8px; bottom:8px; height:4px; border-radius:2px; background:rgba(255,255,255,.35); overflow:hidden; z-index:2; }
@@ -6817,6 +6818,11 @@
   var stationPlaylistStationsEditing = false; // true while renaming/reordering stations WITHIN the active playlist
   var genresEditing = false; // true while the Genres list is in drag-to-reorder mode
   var favArtistsEditing = false; // true while the My Library home page's Favorite Artists row is in drag-to-reorder mode
+  // How My Library's Favorite Artists are listed (build 129): 'az' (default) or 'manual' (the
+  // favourites' own stored order, set by dragging in Edit). The stored order is never changed by
+  // A to Z, so switching back to Manual finds it intact.
+  var FAV_ARTIST_ORDER_KEY = 'radioPlayerFavArtistOrder';
+  var favArtistOrder = (function(){ try{ return localStorage.getItem(FAV_ARTIST_ORDER_KEY) === 'manual' ? 'manual' : 'az'; }catch(e){ return 'az'; } })();
   var storageWorks = true;
   var onHomeView = true; // true only while the Top Stations home view (not a search/tag view) is showing
   var homeTab = 'top'; // which home tab is showing: 'top', 'recent' or (mobile only) 'favorites'
@@ -12551,6 +12557,7 @@
   function buildFavoriteArtistsBlock(){
     var favArtists = favorites.filter(isArtistFav).map(artistEntryForFav);
     if(!favArtists.length){ favArtistsEditing = false; return null; }
+    if(favArtistOrder === 'az') favArtists.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name || ''), alphaSortKey(b.name || '')); });
 
     var block = document.createElement('div');
     block.className = 'fav-artists-block';
@@ -12571,6 +12578,7 @@
     });
     label.appendChild(editBtn);
     block.appendChild(label);
+    if(favArtistsEditing) block.appendChild(buildFavArtistOrderOptions());
 
     var list = document.createElement('div');
     list.className = 'fav-artists-list' + (favArtistsEditing ? ' editing' : '');
@@ -12578,13 +12586,51 @@
     block.appendChild(list);
     return block;
   }
+  // Edit's Order option, drawn like My Channels' (A to Z / Manual pills).
+  function buildFavArtistOrderOptions(){
+    var box = document.createElement('div');
+    box.className = 'ch-sort-opts fav-artists-order';
+    var line = document.createElement('div');
+    line.className = 'ch-sort-line';
+    var label = document.createElement('span');
+    label.className = 'ch-sort-label';
+    label.textContent = 'Order';
+    line.appendChild(label);
+    var tabs = document.createElement('div');
+    tabs.className = 'home-tabs ch-sort-tabs';
+    tabs.setAttribute('role', 'radiogroup');
+    tabs.setAttribute('aria-label', 'Order');
+    [['az', 'A to Z'], ['manual', 'Manual']].forEach(function(o){
+      var b = document.createElement('button');
+      b.type = 'button';
+      var on = favArtistOrder === o[0];
+      b.className = 'home-tab' + (on ? ' active' : '');
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.dataset.opt = o[0];
+      b.textContent = o[1];
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(favArtistOrder === o[0]) return;
+        favArtistOrder = o[0];
+        try{ localStorage.setItem(FAV_ARTIST_ORDER_KEY, o[0]); }catch(err){}
+        setFavoriteArtistsEditing(true);   // redraw in place, still editing
+      });
+      tabs.appendChild(b);
+    });
+    line.appendChild(tabs);
+    box.appendChild(line);
+    return box;
+  }
   function buildFavoriteArtistRow(entry, list){
     var row = document.createElement('div');
     row.className = 'row-item fav-artist-row';
     row.dataset.key = artistArtKey(entry.key);
     row.dataset.artistKey = entry.key;
     var handle = null;
-    if(favArtistsEditing){
+    // Grips only in Manual: in A to Z the order isn't the listener's to set.
+    var dragging = favArtistsEditing && favArtistOrder === 'manual';
+    if(dragging){
       handle = document.createElement('div');
       handle.className = 'row-drag-handle';
       handle.setAttribute('aria-hidden', 'true');
@@ -12614,6 +12660,7 @@
       removeFavoriteArtist(entry.key);
     });
     row.appendChild(remove);
+    if(!dragging) return row;
     // Mouse: native drag and drop. Touch: the grip alone starts a drag, so the page still
     // scrolls under a finger anywhere else on the row.
     row.draggable = true;

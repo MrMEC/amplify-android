@@ -1,7 +1,7 @@
 """Build 120: the A logo's dark version on the dark theme and light one on the light theme;
 My Library's Favorite Artists as stacked rows with Edit (a word, far right) for dragging rows
 into order and removing artists; For You renamed My Stations (Home, its page, the save button,
-Android Auto). Run: python3 tests/test_fav_artists.py (screenshots in /tmp/claude-0/t/shots)"""
+Android Auto). Build 129: A to Z by default, Order A to Z / Manual in Edit, grips only in Manual. Run: python3 tests/test_fav_artists.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess
 from playwright.async_api import async_playwright
 
@@ -109,13 +109,15 @@ async def main():
             await pg.wait_for_timeout(500)
             if len(await pg.evaluate('__t.tracks()')) >= 4: break
         await pg.evaluate("document.getElementById('addMusicOverlay').classList.remove('open')")
-        for n in ('Alpha', 'Bravo', 'Charlie', 'Delta'): await pg.evaluate(f"__f.fav('{n}')")
+        # favourited out of alphabetical order
+        for n in ('Delta', 'Bravo', 'Alpha', 'Charlie'): await pg.evaluate(f"__f.fav('{n}')")
         await pg.evaluate('__f.library()'); await pg.wait_for_timeout(700)
         rows = await pg.evaluate(ROWS)
         print(rows)
-        check([r['name'] for r in rows] == ['Alpha', 'Bravo', 'Charlie', 'Delta'], 'Favorite Artists listed, in favourite order')
+        check([r['name'] for r in rows] == ['Alpha', 'Bravo', 'Charlie', 'Delta'], 'Favorite Artists listed A to Z by default (build 129)')
         check(all(rows[i + 1]['top'] >= rows[i]['bottom'] - 1 and rows[i + 1]['left'] == rows[0]['left'] for i in range(3)), 'stacked as rows, one under another')
         check(all(r['round'] == '50%' and not r['grip'] and not r['trash'] for r in rows), 'round portraits; no grips or remove buttons until Edit')
+        check(not await pg.evaluate("!!document.querySelector('.fav-artists-order')"), 'no order options until Edit')
         ed = await pg.evaluate("""(()=>{ var b = document.querySelector('.fav-artists-edit'), g = document.getElementById('stationsGrid').getBoundingClientRect(), r = b.getBoundingClientRect();
           return { text: b.textContent, icon: !!b.querySelector('i, svg'), right: Math.round(g.right - r.right) }; })()""")
         check(ed['text'] == 'Edit' and not ed['icon'] and ed['right'] <= 4, f'"Edit" as a word, on the far right {ed}')
@@ -124,13 +126,25 @@ async def main():
         check(await pg.evaluate("document.body.classList.contains('artist-open') && /Bravo/.test(document.getElementById('artistHeroName').textContent)"), 'a row opens the artist')
         await pg.evaluate('__f.library()'); await pg.wait_for_timeout(700)
 
-        # Edit
+        OPTS = "Array.from(document.querySelectorAll('.fav-artists-order .home-tab')).map(function(b){ return b.textContent + (b.classList.contains('active') ? '*' : ''); })"
+        # Edit in A to Z: order options, remove buttons, no grips
         await pg.evaluate("document.querySelector('.fav-artists-edit').click()"); await pg.wait_for_timeout(300)
+        check(await pg.evaluate(OPTS) == ['A to Z*', 'Manual'], 'Edit shows Order: A to Z (chosen) / Manual')
         rows = await pg.evaluate(ROWS)
-        check(all(r['grip'] and r['trash'] for r in rows), 'Edit: every row gets a grip and a remove button')
+        check([r['name'] for r in rows] == ['Alpha', 'Bravo', 'Charlie', 'Delta'] and all(r['trash'] and not r['grip'] for r in rows), 'A to Z: remove buttons but no grips')
         check(await pg.evaluate("document.querySelector('.fav-artists-edit').textContent") == 'Done', 'the button now says Done')
+        geo = await pg.evaluate("""(()=>{ var h = document.querySelector('.fav-artists-head').getBoundingClientRect(), o = document.querySelector('.fav-artists-order').getBoundingClientRect(), r = document.querySelector('.fav-artist-row').getBoundingClientRect();
+          return { below: o.top >= h.bottom - 1, above: o.bottom <= r.top + 1 }; })()""")
+        check(geo['below'] and geo['above'], 'the options sit between the heading and the rows')
+        await pg.screenshot(path=f'{shots}/favart-edit-az.png')
+        # Manual: the favourites' own order, with grips
+        await pg.evaluate("document.querySelector('.fav-artists-order .home-tab[data-opt=manual]').click()"); await pg.wait_for_timeout(300)
+        check(await pg.evaluate(OPTS) == ['A to Z', 'Manual*'], 'Manual chosen')
+        rows = await pg.evaluate(ROWS)
+        check([r['name'] for r in rows] == ['Delta', 'Bravo', 'Alpha', 'Charlie'] and all(r['grip'] and r['trash'] for r in rows), f'Manual: favourite order, with grips {[r["name"] for r in rows]}')
+        check(await pg.evaluate("document.querySelector('.fav-artists-edit').textContent") == 'Done', 'still editing')
         await pg.screenshot(path=f'{shots}/favart-edit.png')
-        # finger drag Delta (4th) to the top
+        # finger drag Charlie (4th) to the top
         await pg.evaluate("""([i, yTo]) => new Promise(function(res){
               var rows = document.querySelectorAll('.fav-artist-row');
               var h = rows[i].querySelector('.row-drag-handle'), r = h.getBoundingClientRect();
@@ -143,24 +157,32 @@ async def main():
             })""", [3, rows[0]['top'] + 8])
         await pg.wait_for_timeout(300)
         names = [r['name'] for r in await pg.evaluate(ROWS)]
-        check(names == ['Delta', 'Alpha', 'Bravo', 'Charlie'], f'a finger on the grip drags a row into place {names}')
+        check(names == ['Charlie', 'Delta', 'Bravo', 'Alpha'], f'a finger on the grip drags a row into place {names}')
         check(await pg.evaluate('__f.order()') == names, 'the new order is saved')
         # tapping a row in Edit doesn't navigate
         await pg.evaluate("document.querySelectorAll('.fav-artist-row')[0].click()"); await pg.wait_for_timeout(300)
         check(not await pg.evaluate("document.body.classList.contains('artist-open')"), 'in Edit, tapping a row does not open the artist')
+        # back to A to Z and to Manual again: the manual order is kept
+        await pg.evaluate("document.querySelector('.fav-artists-order .home-tab[data-opt=az]').click()"); await pg.wait_for_timeout(300)
+        rows = await pg.evaluate(ROWS)
+        check([r['name'] for r in rows] == ['Alpha', 'Bravo', 'Charlie', 'Delta'] and not any(r['grip'] for r in rows), 'A to Z again: alphabetical, grips gone')
+        await pg.evaluate("document.querySelector('.fav-artists-order .home-tab[data-opt=manual]').click()"); await pg.wait_for_timeout(300)
+        check([r['name'] for r in await pg.evaluate(ROWS)] == ['Charlie', 'Delta', 'Bravo', 'Alpha'], 'Manual again: the dragged order is still there')
         # remove Bravo
         await pg.evaluate("Array.from(document.querySelectorAll('.fav-artist-row')).filter(function(r){ return /Bravo/.test(r.textContent); })[0].querySelector('.fav-remove-btn').click()")
         await pg.wait_for_timeout(300)
         rows = await pg.evaluate(ROWS)
-        check([r['name'] for r in rows] == ['Delta', 'Alpha', 'Charlie'] and all(r['grip'] for r in rows), f'remove takes the artist off the list, still in Edit {[r["name"] for r in rows]}')
-        check(await pg.evaluate('__f.order()') == ['Delta', 'Alpha', 'Charlie'], 'and out of favourites')
+        check([r['name'] for r in rows] == ['Charlie', 'Delta', 'Alpha'] and all(r['grip'] for r in rows), f'remove takes the artist off the list, still in Edit {[r["name"] for r in rows]}')
+        check(await pg.evaluate('__f.order()') == ['Charlie', 'Delta', 'Alpha'], 'and out of favourites')
         await pg.evaluate("document.querySelector('.fav-artists-edit').click()"); await pg.wait_for_timeout(300)
         rows = await pg.evaluate(ROWS)
-        check(not any(r['grip'] or r['trash'] for r in rows) and await pg.evaluate("document.querySelector('.fav-artists-edit').textContent") == 'Edit', 'Done: plain rows again')
-        # restart keeps it
+        check(not any(r['grip'] or r['trash'] for r in rows) and await pg.evaluate("document.querySelector('.fav-artists-edit').textContent") == 'Edit'
+              and not await pg.evaluate("!!document.querySelector('.fav-artists-order')"), 'Done: plain rows again, options hidden')
+        check([r['name'] for r in rows] == ['Charlie', 'Delta', 'Alpha'], 'Manual order shown outside Edit too')
+        # restart keeps order and the Manual choice
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate('__f.library()'); await pg.wait_for_timeout(900)
-        check([r['name'] for r in await pg.evaluate(ROWS)] == ['Delta', 'Alpha', 'Charlie'], 'order and removal kept after a restart')
+        check([r['name'] for r in await pg.evaluate(ROWS)] == ['Charlie', 'Delta', 'Alpha'], 'order, Manual and removal kept after a restart')
         # removing every artist removes the section
         await pg.evaluate("document.querySelector('.fav-artists-edit').click()"); await pg.wait_for_timeout(200)
         for _ in range(3):
