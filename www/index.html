@@ -446,6 +446,8 @@
        until it is asked for. */
     .search-bar-wrap{ display:none; }
     .browse-view{ padding-top:76px; }
+    /* While a page slides in (slideInPage), the page is its own layer for the trip. */
+    body.page-sliding .browse-view{ will-change:transform; }
   }
   .search-input-wrap{ position:relative; flex:1; min-width:0; }
   .search-input-wrap input{
@@ -20455,6 +20457,29 @@
     }
   }
 
+  // ---------- detail pages slide in ----------
+  // Opening an artist or album page (going forward, not Back) slides the page in from the
+  // right edge, on phones. Only a transform animates, so the compositor runs it; the page is
+  // drawn in full before it starts. Not for a page restored by Back, nor one opened behind the
+  // landscape screen (Cover Flow), nor with the system's "Remove animations" setting.
+  var pageSlideAnim = null;
+  function slideInPage(){
+    if(navReplaying || openingBehindNowPlaying || !isMobileLayout() || !browseView.animate) return;
+    if(document.body.classList.contains('rotate-lock')) return;
+    try{ if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; }catch(e){}
+    if(pageSlideAnim){ try{ pageSlideAnim.cancel(); }catch(e){} }
+    document.body.classList.add('page-sliding');
+    // From exactly the right edge of the screen: the column can sit inset from the left, so
+    // its own width (100%) would leave a sliver showing on the first frame.
+    var dx = Math.ceil(window.innerWidth - browseView.getBoundingClientRect().left) + 2;
+    var a = pageSlideAnim = browseView.animate([
+      { transform: 'translate3d(' + dx + 'px, 0, 0)' },
+      { transform: 'translate3d(0, 0, 0)' }
+    ], { duration: 360, easing: 'cubic-bezier(.22, .8, .24, 1)' });
+    var done = function(){ if(pageSlideAnim === a){ pageSlideAnim = null; document.body.classList.remove('page-sliding'); } };
+    a.onfinish = done; a.oncancel = done;
+  }
+
   function openArtistPage(key){
     // Captured before enterLibraryChrome() resets the active view out from under it.
     pushView();
@@ -20470,6 +20495,7 @@
       if(activeArtistKey === key && !activeAlbumKey) renderArtistPage(key);
     });
     renderArtistPage(key);
+    slideInPage();
   }
 
   // A playlist named after the artist is treated as theirs, so "Prince" in Playlists shows
@@ -21076,6 +21102,7 @@
       setDetailBackToHistory(function(){ runLibrarySection('albums'); }, 'Albums');
     }
     renderAlbumPage(key);
+    slideInPage();
   }
 
   function renderAlbumPage(key){
