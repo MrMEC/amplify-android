@@ -94,8 +94,13 @@
        their full, unclipped geometry to the page: clip-path is a paint-time effect only, so it
        hides the overshoot on screen without shrinking the box that geometry comes from, and
        that overshoot was what let the page itself scroll a few pixels sideways on a phone.
-       Hidden here rather than chased at each source, so it holds for whatever bleeds next. */
+       Hidden here rather than chased at each source, so it holds for whatever bleeds next.
+       clip where supported: 'hidden' made <body> a scroll container of its own (one that
+       never scrolls), which silently broke position:sticky for everything inside it -- the
+       search tabs (build 119) need sticky to work. clip trims the overshoot the same way
+       without that side effect. */
     overflow-x:hidden;
+    overflow-x:clip;
   }
   /* The clearance for the fixed player bar belongs to the column, not to the page. On the
      page it ended the grid 96px above the bottom of the document -- and a sticky element
@@ -936,7 +941,15 @@
   /* The search page has no heading row: no "Results for", count, save or clear above the tabs
      (build 118). Save Search lives on the Stations tab instead. */
   body.search-view #sectionHeadingRow{ display:none; }
-  .search-tab-actions{ grid-column:1 / -1; display:flex; justify-content:flex-end; margin-bottom:-8px; }
+  .search-tab-actions{ grid-column:1 / -1; display:flex; justify-content:center; margin-bottom:-8px; }
+  /* The tabs stay put under the header while the results scroll (build 119). */
+  @media (max-width: 900px){
+    body.search-view #searchTabs{
+      position:sticky; top:60px; z-index:20; background:var(--main-bg);
+      margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
+      padding:10px var(--main-pad); margin-top:-10px; margin-bottom:14px;
+    }
+  }
   .clear-search-btn.search-save-btn{ padding:7px 14px; }
   .recent-searches-head{ grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; }
   .recent-searches-clear{ border:none; background:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; padding:4px 6px; }
@@ -24427,7 +24440,6 @@
       setResultCount(null);
       return;
     }
-    if(group.id === 'channels' || group.id === 'playlists') stationsGrid.classList.add('grid-songs');
     if(group.id === 'stations' && !items.length && searchState.pending){
       stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
       setResultCount(null);
@@ -24444,7 +24456,7 @@
       return;
     }
 
-    // Save Search sits on the Stations tab, on the right above the results (build 118).
+    // Save as Custom Station sits on the Stations tab, centred above the results (build 119).
     if(group.id === 'stations'){
       var bar = document.createElement('div');
       bar.className = 'search-tab-actions';
@@ -24452,7 +24464,7 @@
       save.type = 'button';
       save.className = 'clear-search-btn search-save-btn';
       save.id = 'searchSaveBtn';
-      save.textContent = 'Save Search';
+      save.textContent = 'Save as Custom Station';
       save.title = 'Save this search to For You';
       save.addEventListener('click', function(){ saveSearchBtn.click(); });
       bar.appendChild(save);
@@ -24479,7 +24491,11 @@
           });
         })(stationsGrid.lastElementChild);
       } else if(group.id === 'channels'){
-        stationsGrid.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url) }));
+        // Stacked in a list of their own, exactly like My Channels on the Video page (rows
+        // straight in the grid were pulled up over each other by the grid's row spacing fix).
+        var chList = stationsGrid.querySelector(':scope > .ch-list');
+        if(!chList){ chList = document.createElement('div'); chList.className = 'ch-list'; stationsGrid.appendChild(chList); }
+        chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url) }));
       } else if(group.id === 'playlists'){
         stationsGrid.appendChild(buildEntityTile({
           key: 'playlist-' + item.id, entity: 'playlist', name: item.label, row: true,

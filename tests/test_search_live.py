@@ -13,7 +13,8 @@ shots = '/tmp/claude-0/t/shots'
 os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
-HOOK = ("window.__t = { tracks: function(){ return libraryTracks.map(function(t){ return t.name; }); },"
+HOOK = ("window.videoChannelsAdd = function(c){ addVideoChannel(c); };"
+        "window.__t = { tracks: function(){ return libraryTracks.map(function(t){ return t.name; }); },"
         " mk: function(){ stationPlaylists.push({ id: 'pl_mix', label: 'Mix', stations: [{ stationuuid: 'st-1', name: 'Radio One', url: 'http://radio.example/one', urlToResolve: 'http://radio.example/one', favicon: '' }] });"
         "   stationPlaylists.push({ id: 'pl_empty', label: 'Empty', stations: [] }); saveStationPlaylists(); renderStationPlaylistList(); },"
         " pl: function(label){ var p = stationPlaylists.filter(function(x){ return x.label === label; })[0]; return p ? p.stations.map(function(s){ return s.name; }) : null; },"
@@ -150,6 +151,14 @@ async def main():
         titles = [r[1] for r in s2['rows']]
         check(titles.index('Ray of Light') < titles.index('Raye'), 'closest names first: "Ray of Light" (starts with ray) above Raye (contains it)')
         await pg.screenshot(path=f'{shots}/search-top.png')
+        # the tabs stay fixed under the header as the results scroll
+        t0 = await pg.evaluate("document.getElementById('searchTabs').getBoundingClientRect().top")
+        await pg.evaluate("window.scrollTo(0, 500)"); await pg.wait_for_timeout(300)
+        tb = await pg.evaluate("""(()=>{ var t = document.getElementById('searchTabs').getBoundingClientRect();
+          var el = document.elementFromPoint(200, t.top + t.height / 2); return { top: t.top, y: window.scrollY, onTop: !!(el && el.closest('#searchTabs')) }; })()""")
+        check(tb['y'] > 100 and 58 <= tb['top'] <= 72 and tb['onTop'], f'tabs stay fixed under the header while scrolling (was {t0}, now {tb})')
+        await pg.screenshot(path=f'{shots}/search-sticky.png')
+        await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(200)
         # no heading row above the tabs (no "Results for", count, save or clear icons)
         hr = await pg.evaluate("""(()=>{ var r = document.getElementById('sectionHeadingRow');
           return { shown: getComputedStyle(r).display !== 'none' && r.getBoundingClientRect().height > 0,
@@ -162,11 +171,11 @@ async def main():
         sv = await pg.evaluate("""(()=>{ var b = document.getElementById('searchSaveBtn'); if(!b) return null;
           var r = b.getBoundingClientRect(), g = document.getElementById('stationsGrid').getBoundingClientRect();
           var first = document.querySelector('#stationsGrid .tile:not(.search-tab-actions)');
-          return { text: b.textContent.trim(), icon: !!b.querySelector('i, svg'), right: Math.round(g.right - r.right), gridLeft: g.left, left: r.left,
+          return { text: b.textContent.trim(), icon: !!b.querySelector('i, svg'), mid: Math.round((r.left + r.right) / 2), gridMid: Math.round((g.left + g.right) / 2),
                    above: first ? r.bottom <= first.getBoundingClientRect().top + 1 : null, shownText: getComputedStyle(b).textTransform }; })()""")
         print('save', sv)
-        check(sv and sv['text'] == 'Save Search' and not sv['icon'], f'Stations tab has a "Save Search" button with no icon {sv}')
-        check(sv and sv['right'] <= 2 and sv['left'] > sv['gridLeft'] + 150 and sv['above'], f'on the far right, above the results {sv}')
+        check(sv and sv['text'] == 'Save as Custom Station' and not sv['icon'], f'Stations tab has a "Save as Custom Station" button with no icon {sv}')
+        check(sv and abs(sv['mid'] - sv['gridMid']) <= 2 and sv['above'], f'centred, above the results {sv}')
         await pg.screenshot(path=f'{shots}/search-stations-save.png')
         await pg.evaluate("document.getElementById('searchSaveBtn').click()"); await pg.wait_for_timeout(300)
         md = await pg.evaluate("[document.getElementById('customSearchOverlay').classList.contains('open'), document.getElementById('customSearchQueryInput').value]")
@@ -178,6 +187,15 @@ async def main():
         await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).filter(function(b){ return /^Channels/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(300)
         ch = await pg.evaluate(STATE)
         check('Ray TV News' in ch['names'] and 'Search all TV channels' in ch['names'], f"Channels tab: your channel, and a way to search the whole directory {ch['names']}")
+        # more channels, to check the rows' spacing: add three to My Channels and search again
+        await pg.evaluate("""(()=>{ ['Ray One','Ray Two','Ray Three'].forEach(function(n, i){ videoChannelsAdd({ id: 'link:r' + i, name: n, url: 'http://tv.example/r' + i + '.m3u8', logo: '', cats: [], src: 'link' }); }); })()""")
+        await pg.fill('#searchSheetInput', 'ray '); await pg.wait_for_timeout(300); await pg.fill('#searchSheetInput', 'ray'); await pg.wait_for_timeout(1200)
+        await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).filter(function(b){ return /^Channels/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(300)
+        rows = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .ch-item')).map(function(r){ var b = r.getBoundingClientRect(), a = r.querySelector('.tile-art').getBoundingClientRect(); return [Math.round(b.top), Math.round(b.bottom), Math.round(a.top), Math.round(a.bottom)]; })")
+        print('channel rows', rows)
+        check(len(rows) == 4 and all(rows[i + 1][0] >= rows[i][1] - 1 for i in range(len(rows) - 1)), f'channel rows stack without overlapping {rows}')
+        check(all(r[2] >= r[0] and r[3] <= r[1] for r in rows) and all(r[1] - r[0] >= 50 for r in rows), 'each logo sits inside its own row, with room around it')
+        await pg.screenshot(path=f'{shots}/search-channels.png')
         await pg.screenshot(path=f'{shots}/search-channels.png')
         await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab'))[0].click()"); await pg.wait_for_timeout(300)
 
