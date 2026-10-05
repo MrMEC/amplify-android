@@ -12974,7 +12974,7 @@
     if(!ch || !ch.url || findVideoChannel(ch.url)) return false;
     videoChannels.push({ id: ch.id || ('link:' + ch.url), name: ch.name || 'Channel', url: ch.url, logo: ch.logo || '',
       country: ch.country || '', cats: ch.cats || [], catNames: (ch.cats || []).map(categoryName),
-      src: ch.src || 'link', adult: isAdultChannel(ch) || undefined, addedAt: Date.now() });
+      src: ch.src || 'link', adult: isAdultChannel(ch) || undefined, gridKey: ch.gridKey || undefined, addedAt: Date.now() });
     saveVideoChannels();
     return true;
   }
@@ -13501,7 +13501,8 @@
     var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = e.name; text.appendChild(n);
     var subBits = [];
     if(e.country) subBits.push((iptvIndex && iptvIndex.countries[e.country]) || e.country);
-    if(e.cats && e.cats.length && iptvIndex) subBits.push(e.cats.map(function(c){ return iptvIndex.cats[c] || c; }).join(', '));
+    if(e.src === 'plex') subBits.push(['Plex'].concat((e.cats || []).slice(0, 2)).join(' · '));
+    else if(e.cats && e.cats.length && iptvIndex) subBits.push(e.cats.map(function(c){ return iptvIndex.cats[c] || c; }).join(', '));
     if(subBits.length){ var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = subBits.join(' · '); text.appendChild(sb); }
     row.appendChild(text);
     var add = document.createElement('button');
@@ -13577,8 +13578,12 @@
       tools.className = 'ch-tools';
       var tabs = document.createElement('div');
       tabs.className = 'home-tabs';
-      // Short labels: all three have to fit across a phone.
-      [['recommended', 'Recommended'], ['all', 'All'], ['link', 'Link']].forEach(function(t){
+      // Short labels: they all have to fit across a phone. Plex only while signed in to Plex.
+      if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
+      var tabList = [['recommended', 'Recommended'], ['all', 'All']];
+      if(plexSignedIn()) tabList.push(['plex', 'Plex']);
+      tabList.push(['link', 'Link']);
+      tabList.forEach(function(t){
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'home-tab' + (addChannelsTab === t[0] ? ' active' : '');
@@ -13602,7 +13607,8 @@
     stationsGrid.appendChild(body);
     if(addChannelsTab === 'link'){ renderLinkResults(body); return; }
     body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-    var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; }) : loadFreeTv();
+    var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; })
+      : addChannelsTab === 'plex' ? loadPlexLive() : loadFreeTv();
     var tab = addChannelsTab;
     loader.then(function(list){
       if(!onAddChannelsView || addChannelsTab !== tab) return;
@@ -13611,7 +13617,7 @@
       var host = document.createElement('div');
       host.style.display = 'contents';
       stationsGrid.appendChild(host);
-      var entries = filterChannels(list, true);
+      var entries = filterChannels(list, addChannelsTab !== 'plex');
       if(!entries.length){
         host.innerHTML = '<div class="empty-state">No channels match. Try another country, category or name.</div>';
         setResultCount(0, 'channel');
@@ -13620,7 +13626,9 @@
       renderChannelList(host, entries);
     }, function(err){
       if(!onAddChannelsView || addChannelsTab !== tab) return;
-      body.innerHTML = '<div class="empty-state">Couldn’t load the channel list (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>';
+      body.innerHTML = tab === 'plex'
+        ? '<div class="empty-state">Couldn’t load Plex’s channels (' + ((err && err.message) || 'network error') + '). Check your connection, or sign in to Plex again in Settings.</div>'
+        : '<div class="empty-state">Couldn’t load the channel list (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>';
     });
   }
   function buildBrowseTools(tools){
@@ -13654,6 +13662,16 @@
       if(e.country) countries[e.country] = true;
       (e.cats || []).forEach(function(c){ cats[c] = true; });
     });
+    if(addChannelsTab === 'plex'){
+      addChannelsState.country = '';
+      var pk = Object.keys(cats).sort(function(a, b){ return a.localeCompare(b); });
+      if(addChannelsState.cat && !cats[addChannelsState.cat]) addChannelsState.cat = '';
+      if(pk.length){
+        host.appendChild(selectEl([['', 'All categories']].concat(pk.map(function(c){ return [c, c]; })), addChannelsState.cat,
+          function(v){ addChannelsState.cat = v; addChannelsState.shown = 60; renderAddChannels(true); }, 'Category'));
+      }
+      return;
+    }
     var cOpts = [['', 'All countries']].concat(Object.keys(countries).map(function(c){
       return [c, (iptvIndex && addChannelsTab === 'all' && iptvIndex.countries[c]) || c];
     }).sort(function(a, b){ return a[1].localeCompare(b[1]); }));
@@ -14057,6 +14075,89 @@
   function plexKeyOf(id){ var m = /^plex:[^:]*:(.+)$/.exec(String(id || '')); return m ? m[1] : ''; }
   function isPlexId(id){ return /^plex:/.test(String(id || '')); }
 
+  // ---- Plex Live TV channels (build 137)
+  // Plex's free live channels, as their own source in Add Channels (the Plex tab, shown while
+  // signed in). The list comes from Plex's channel service with the account's token; a channel
+  // is added to My Channels like any other, with its stream address stored WITHOUT the token
+  // (so Export never carries it). The token is put on at play time (plexLiveUrl), on the phone
+  // and in the car. A channel added while signed in keeps playing only while signed in.
+  var PLEX_LIVE_BASE = 'https://epg.provider.plex.tv';
+  var PLEX_LIVE_KEY = 'radioPlayerPlexLive';
+  var PLEX_LIVE_STALE_MS = 12 * 3600 * 1000;
+  var plexLiveList = null, plexLivePromise = null;
+  function isPlexLiveUrl(u){ return /^https?:\/\/epg\.provider\.plex\.tv\//i.test(String(u || '')); }
+  function plexLiveUrl(u){
+    if(!isPlexLiveUrl(u) || !plexSignedIn() || /[?&]X-Plex-Token=/.test(u)) return u;
+    return u + (u.indexOf('?') === -1 ? '?' : '&') + 'X-Plex-Token=' + encodeURIComponent(plexAccount.token);
+  }
+  // What the car hands back has the token on; it is taken off before anything is saved.
+  function plexLiveStrip(u){
+    if(!isPlexLiveUrl(u)) return u;
+    return String(u).replace(/([?&])X-Plex-Token=[^&]*(&?)/i, function(m, a, b){ return b ? a : ''; }).replace(/[?&]$/, '');
+  }
+  function plexGenreNames(c){
+    var out = [];
+    function add(v){
+      v = String(v || '').trim();
+      if(v && out.indexOf(v) === -1) out.push(v);
+    }
+    (Array.isArray(c.Genre) ? c.Genre : []).forEach(function(g){ add(g && (g.tag || g.title || g.name)); });
+    if(Array.isArray(c.genres)) c.genres.forEach(function(g){ add(typeof g === 'string' ? g : g && (g.tag || g.title)); });
+    if(typeof c.genre === 'string') add(c.genre);
+    return out;
+  }
+  // Turns Plex's answer into Add Channels entries. Read defensively: the service is not a
+  // documented one, so every field has a fallback, and anything without a name or an id is left
+  // out rather than guessed.
+  function plexLiveEntries(d){
+    var mc = (d && (d.MediaContainer || d)) || {};
+    var raw = mc.Channel || mc.Metadata || mc.channels || [];
+    var list = [], seen = {};
+    (Array.isArray(raw) ? raw : []).forEach(function(c){
+      if(!c) return;
+      var id = String(c.id || c.ratingKey || c.key || '').replace(/^\/+/, '');
+      var name = String(c.title || c.name || c.callSign || '').trim();
+      if(!id || !name || seen[id]) return;
+      if(c.drm === true || c.drm === 1) return;   // can't be played outside Plex's own apps
+      var media = Array.isArray(c.Media) ? c.Media[0] : null;
+      var part = media && Array.isArray(media.Part) ? media.Part[0] : null;
+      var key = part && part.key ? String(part.key) : '/library/parts/' + id + '.m3u8';
+      if(!/^\//.test(key)) key = '/' + key;
+      var url = /^https?:/i.test(key) ? key.replace(/[?&]X-Plex-Token=[^&]*/i, '') : PLEX_LIVE_BASE + key;
+      var genres = plexGenreNames(c);
+      seen[id] = true;
+      list.push({ id: 'plexlive:' + id, name: name, url: url, logo: c.thumb || c.logo || '',
+        cats: genres, catNames: genres.slice(), country: '', src: 'plex',
+        gridKey: c.gridKey || c.slug || '', callSign: c.callSign || '' });
+    });
+    list.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+    return list;
+  }
+  // The list is kept a while (it changes rarely) so the tab opens at once; a failed refresh
+  // falls back to the kept copy.
+  function loadPlexLive(force){
+    if(!plexSignedIn()) return Promise.reject(Object.assign(new Error('Not signed in to Plex'), { code: 'SIGNED_OUT' }));
+    var saved = vload(PLEX_LIVE_KEY, null);
+    if(saved && saved.user !== plexAccount.user) saved = null;
+    if(!force && plexLiveList) return Promise.resolve(plexLiveList);
+    if(!force && saved && Array.isArray(saved.list) && saved.list.length && Date.now() - (saved.at || 0) < PLEX_LIVE_STALE_MS){
+      plexLiveList = saved.list;
+      return Promise.resolve(plexLiveList);
+    }
+    if(plexLivePromise) return plexLivePromise;
+    plexLivePromise = plexRequest('GET', PLEX_LIVE_BASE + '/lineups/plex/channels', plexAccount.token, 20000).then(function(d){
+      var list = plexLiveEntries(d);
+      if(!list.length) throw new Error('Plex sent no channels');
+      plexLiveList = list;
+      vsave(PLEX_LIVE_KEY, { at: Date.now(), user: plexAccount.user, list: list });
+      return list;
+    })['catch'](function(e){
+      if(saved && Array.isArray(saved.list) && saved.list.length){ plexLiveList = saved.list; return plexLiveList; }
+      throw e;
+    }).then(function(l){ plexLivePromise = null; return l; }, function(e){ plexLivePromise = null; throw e; });
+    return plexLivePromise;
+  }
+
   // ---- signing in
   function plexStartSignIn(){
     if(plexSignIn) return;
@@ -14136,6 +14237,7 @@
       plexRequest('DELETE', 'https://plex.tv/api/v2/devices/' + encodeURIComponent(plexClientId), plexAccount.token)['catch'](function(){});
     }
     plexAccount = null; plexLib = null; plexBaseOk = false;
+    plexLiveList = null; try{ localStorage.removeItem(PLEX_LIVE_KEY); }catch(e){}
     savePlexAccount();
     try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){}
     invalidateVideoLib();
@@ -28067,7 +28169,7 @@
       });
     }
 
-    var url = station.urlToResolve;
+    var url = plexLiveUrl(station.urlToResolve);
     var canFallback = looksLikePlaylist(url);
     function stillWanted(){ return currentStation === station; }
     function fail(urlTried, err){
@@ -28718,7 +28820,7 @@
       var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
       // place: the location line the phone's Now Playing shows under a station, which the
       // car's Now Playing card repeats (sub stays the genre tags the car's lists show).
-      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: s.urlToResolve };
+      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: plexLiveUrl(s.urlToResolve) };
     }
     // ---- pictures: the car shows the same art as the phone ----
     // Custom cover art the user set wins, then the logo the page looked up for a station
@@ -29242,7 +29344,7 @@
                 if(favKey(pools[i][j]) === it.k){ obj = pools[i][j]; break; }
               }
             }
-            if(!obj) obj = { name: it.title || 'Station', urlToResolve: it.url, favicon: it.art || '' };
+            if(!obj) obj = { name: it.title || 'Station', urlToResolve: plexLiveStrip(it.url), favicon: it.art || '' };
           }
           if(!obj || isBlacklisted(obj)) return;
           // Folded into Recent here and drawn once at the end: recordRecent redraws the
@@ -29289,7 +29391,7 @@
             if(spools[a][b] && !isLocalTrack(spools[a][b]) && favKey(spools[a][b]) === it.k) return spools[a][b];
           }
         }
-        var o = { name: it.title || 'Station', urlToResolve: it.url, favicon: it.art || '' };
+        var o = { name: it.title || 'Station', urlToResolve: plexLiveStrip(it.url), favicon: it.art || '' };
         if(/^[0-9a-f-]{36}$/i.test(it.k || '')) o.stationuuid = it.k;
         return o;
       }
