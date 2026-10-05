@@ -90,7 +90,7 @@ async def main():
         await pg.evaluate("document.getElementById('videoAddHeaderBtn').click()"); await pg.wait_for_timeout(1200)
         back = await pg.evaluate("document.getElementById('detailBackLabel').textContent")
         r = await rows(pg)
-        check(back == 'Video' and [x['name'] for x in r] == ['PBS'], f'Recommended (Free-TV) opens on your country (USA), back says Video {back} {r}')
+        check(back == 'Watch' and [x['name'] for x in r] == ['PBS'], f'Recommended (Free-TV) opens on your country (USA), back says Video {back} {r}')
         await pg.evaluate("document.querySelector('.ch-row .ch-add').click()"); await pg.wait_for_timeout(200)
         check((await rows(pg))[0]['added'], '+ adds PBS (button turns into a check)')
         await pg.screenshot(path=f'{SHOTS}/ch-recommended.png')
@@ -156,7 +156,7 @@ async def main():
 
         await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(700)
         t = await my_tiles(pg)
-        labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return x!=='Continue Watching';})")
+        labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return !/^Continue Watching/.test(x);})")
         rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row:not(.vw-row)').length===0 && document.querySelectorAll('#stationsGrid > .tile.tile-row.ch-item').length")
         check(labels == ['News', 'Other'] and rows_ok == 5, f'back to Video: stacked rows under a heading per category, uncategorised last {labels} rows={rows_ok}')
         check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z by default, within each category {[x["name"] for x in t]}')
@@ -171,7 +171,7 @@ async def main():
         check(lk2 == 'Remove from My Channels', f'a saved channel offers Remove from My Channels ({lk2})')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')
-        lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return x!=='Continue Watching';})"
+        lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return !/^Continue Watching/.test(x);})"
         EDIT = "document.getElementById('videoReorderHeaderBtn').click()"
         opts = "Array.prototype.map.call(document.querySelectorAll('.ch-sort-opts .home-tab'),function(b){return b.textContent+(b.classList.contains('active')?'*':'');})"
         pick = "(v)=>document.querySelector('.ch-sort-opts [data-opt='+v+']').click()"

@@ -164,7 +164,7 @@ async def main():
         # Settings: signed out
         await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(400)
         t = await plex_texts(pg)
-        check(t == ['Add the movies and TV shows on your Plex server to Video.', 'Sign In with Plex'], f'Settings > Plex signed out {t}')
+        check(t == ['Add the movies and TV shows on your Plex server to Watch.', 'Sign In with Plex'], f'Settings > Plex signed out {t}')
         await pg.evaluate("document.getElementById('plexSettingsRow').scrollIntoView()"); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'{SHOTS}/plex-settings-out.png')
         await pg.evaluate("document.getElementById('plexSignInBtn').click()"); await pg.wait_for_timeout(600)

@@ -46,7 +46,7 @@ async def main():
         await pg.goto('http://127.0.0.1:8774/index.html'); await pg.wait_for_timeout(3000)
 
         navs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.mobile-nav-btn'),function(b){return b.dataset.nav+':'+b.textContent.trim();})")
-        check(navs == ['home:Home', 'library:Library', 'podcasts:Podcasts', 'video:Video', 'search:Search'], f'bottom nav {navs}')
+        check(navs == ['home:Home', 'library:Library', 'podcasts:Podcasts', 'video:Watch', 'search:Search'], f'bottom nav {navs}')
         order = await pg.evaluate("""(()=>{var ids=['recentSection','forYouSection','homeTopHeading'];
           return ids.map(function(i){var e=document.getElementById(i);return e&&e.offsetParent?Math.round(e.getBoundingClientRect().top+scrollY):null;});})()""")
         check(order[0] is not None and order[1] is not None and order[0] < order[1] < order[2], f'For You sits under Continue Listening, above Top Stations {order}')
@@ -81,13 +81,13 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(700)
         i = await info(pg)
         grid = await pg.evaluate("(document.querySelector('#stationsGrid .grid-section-label')||{}).textContent||''")
-        check(i['heading'] == 'Video' and i['back'] is None and i['nav'] == 'video' and grid.startswith('My Channels'), f'Video page: My Channels, tab active {i} {grid}')
+        check(i['heading'] == 'Watch' and i['back'] is None and i['nav'] == 'video' and grid.startswith('My Channels'), f'Video page: My Channels, tab active {i} {grid}')
         await pg.screenshot(path=f'{SHOTS}/nav-video.png')
         await pg.evaluate("document.querySelector('#customSearchList .cs-row, #customSearchList [class*=cs]').click()"); await pg.wait_for_timeout(900)
         i = await info(pg)
-        check(i['back'] == 'Video', f'saved search opened while on Video: back says Video {i}')
+        check(i['back'] == 'Watch', f'saved search opened while on Video: back says Video {i}')
         await click_back(pg)
-        check((await info(pg))['heading'] == 'Video', 'back returns to Video')
+        check((await info(pg))['heading'] == 'Watch', 'back returns to Video')
 
         # Search -> Podcasts tab -> show page -> back to the results on the Podcasts tab
         await pg.evaluate("(()=>{var i=document.getElementById('searchInput');i.value='news';document.getElementById('searchBtn').click();})()"); await pg.wait_for_timeout(1500)
@@ -105,7 +105,7 @@ async def main():
         check((await info(pg))['nav'] == 'podcasts', 'Podcasts tab opens')
         # drawer: For You + Video entries, no Stations
         side = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.sidebar-row-link .sidebar-row-label'),function(e){return e.textContent.trim();})")
-        check('Stations' not in side and 'My Stations' in side and 'Video' in side, f'sidebar/drawer entries {side}')
+        check('Stations' not in side and 'My Stations' in side and 'Watch' in side, f'sidebar/drawer entries {side}')
         await pg.evaluate("document.getElementById('hamburgerBtn').click()"); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{SHOTS}/nav-drawer.png')
         check(not errs, f'no page errors {errs[:3]}')

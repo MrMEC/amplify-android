@@ -1260,6 +1260,20 @@
     .tile-grid > :has(+ .grid-section-spacer){ margin-bottom:-20px; }
   }
   .tile-grid > .podcast-date-heading:first-child{ margin-top:-8px; }
+  /* Continue Listening (Podcasts) / Continue Watching (Watch) as accordions (build 138): the
+     heading is the whole-width button; the chevron turns when open. */
+  .grid-section-label.acc-head{ cursor:pointer; align-items:center; user-select:none; -webkit-tap-highlight-color:transparent;
+    font-size:15px; color:var(--text); padding:10px 0; border-bottom:1px solid var(--border); }
+  .grid-section-label.acc-head .acc-chev{ width:20px; height:20px; margin-left:auto; flex:none; fill:none; stroke:var(--text-dim);
+    stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; transition:transform .22s ease; }
+  .grid-section-label.acc-head.open .acc-chev{ transform:rotate(180deg); }
+  .grid-section-label.acc-head .grid-section-count{ font-size:12.5px; }
+  .tile-grid > .cl-row[hidden]{ display:none; }
+  /* The plain label's negative margins pull the next row up into it; a heading that is a
+     button with its own padding and rule keeps a normal gap instead (both widths). */
+  .tile-grid > .grid-section-label.acc-head.acc-head{ margin:-6px 0 -12px; }
+  .tile-grid > .grid-section-label.acc-head.acc-head:first-child{ margin-top:-4px; }
+  .grid-section-label.acc-head:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
   .grid-section-label .grid-section-count{
     font-size:11px; font-weight:600; letter-spacing:0; color:var(--text-faint);
     text-transform:none; font-variant-numeric:tabular-nums;
@@ -2244,6 +2258,12 @@
     top:-30px; bottom:-20px; left:-12%; right:-12%;
     background:radial-gradient(ellipse 62% 54% at 50% 48%,
       rgba(0,0,0,.42) 0, rgba(0,0,0,.26) 46%, rgba(0,0,0,0) 76%);
+    /* Build 138: a dark version of the screen's own colour (--np-shade, from the artwork)
+       rather than black, so the shade blends into the background instead of greying it. */
+    background:radial-gradient(ellipse 62% 54% at 50% 48%,
+      color-mix(in srgb, var(--np-shade, #000) 62%, transparent) 0,
+      color-mix(in srgb, var(--np-shade, #000) 38%, transparent) 46%,
+      color-mix(in srgb, var(--np-shade, #000) 0%, transparent) 76%);
     pointer-events:none;
   }
   /* width:100% is not decoration here. The screen is a flex column with align-items:flex-start
@@ -3857,6 +3877,20 @@
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ bottom:0; }
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .np-backdrop-clip{ height:100vh; }
     body.np-immersive #npArtWrap{ cursor:zoom-out; }
+    /* Build 138: in Immersive View the favourite, the progress bar, the three-dot menu and the
+       Up Next row fade away (their space is kept, so Play stays where it was), and Play and
+       the skip buttons take the artwork's colour. */
+    .now-playing-screen .np-fav-btn, .now-playing-screen .np-menu-wrap, #npSeek, #npUpNext{
+      transition: opacity .35s ease, visibility 0s linear 0s, transform .15s ease;
+    }
+    body.np-immersive .now-playing-screen .np-fav-btn, body.np-immersive .now-playing-screen .np-menu-wrap,
+    body.np-immersive #npSeek, body.np-immersive #npUpNext{
+      opacity:0; visibility:hidden; pointer-events:none;
+      transition: opacity .35s ease, visibility 0s linear .35s, transform .15s ease;
+    }
+    .now-playing-screen .np-play-btn{ transition: filter .15s ease, transform .15s ease, background-color .5s ease, color .5s ease; }
+    body.np-immersive .now-playing-screen .np-play-btn{ background:var(--np-vivid, #fff); color:var(--np-on-vivid, #111); }
+    body.np-immersive .now-playing-screen .np-step-btn, body.np-immersive .now-playing-screen .np-skip-btn{ color:var(--np-vivid, #fff); }
     /* The moving wash (see immSetBg): one tiny canvas, repainted each frame and scaled up
        to fill, so the GPU only ever blends a single layer for it. */
     .np-imm-bg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
@@ -4894,8 +4928,8 @@
 
     <div class="sidebar-section">
       <div class="aside-heading-row">
-        <h2 id="videoHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open Video">
-          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"/><path d="M16 10.3 21.5 7v10L16 13.7z"/></svg>Video</span>
+        <h2 id="videoHeading" class="sidebar-row-link" role="button" tabindex="0" title="Open Watch">
+          <span class="sidebar-row-label"><svg class="sidebar-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M10 8.7v6.6a.7.7 0 0 0 1.06.6l5.3-3.3a.7.7 0 0 0 0-1.2l-5.3-3.3a.7.7 0 0 0-1.06.6z"/></svg>Watch</span>
           <i class="fa-solid fa-chevron-right sidebar-row-chevron" aria-hidden="true"></i>
         </h2>
       </div>
@@ -5577,9 +5611,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v4"/><path d="M8.5 21.5h7"/></svg>
     <span>Podcasts</span>
   </button>
-  <button type="button" class="mobile-nav-btn" data-nav="video" aria-label="Video">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"/><path d="M16 10.3 21.5 7v10L16 13.7z"/></svg>
-    <span>Video</span>
+  <button type="button" class="mobile-nav-btn" data-nav="video" aria-label="Watch">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M10 8.7v6.6a.7.7 0 0 0 1.06.6l5.3-3.3a.7.7 0 0 0 0-1.2l-5.3-3.3a.7.7 0 0 0-1.06.6z"/></svg>
+    <span>Watch</span>
   </button>
   <button type="button" class="mobile-nav-btn" data-nav="search" aria-label="Search" aria-expanded="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
@@ -7386,7 +7420,7 @@
     var was = document.body.classList.contains('np-immersive');
     document.body.classList.toggle('np-immersive', on);
     if(on === was) return;
-    if(on){ startImmersiveMotion(); nativeVideoUi({ awake: true }); }
+    if(on){ try{ closeNpMenu(); }catch(e){} startImmersiveMotion(); nativeVideoUi({ awake: true }); }
     else { stopImmersiveMotion(); nativeVideoUi({}); }
   }
 
@@ -8435,7 +8469,53 @@
     return 'hsl(' + Math.round(h) + ',' + Math.round(s * 100) + '%,' + Math.round(l * 100) + '%)';
   }
 
+  // Two colours derived from the tint (build 138), written beside it so they always follow the
+  // artwork: --np-shade, the same hue much darker, which pools under the title instead of a
+  // plain black shade (that read as grey over a coloured screen); and --np-vivid, the same hue
+  // bright enough to colour Immersive View's play and skip buttons (with --np-on-vivid for the
+  // icon on the play button). A colourless tint (the fallback) keeps black and white.
+  function npTintDerived(colour){
+    var m = /hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)/i.exec(String(colour || ''));
+    if(!m) return { shade: '#08090b', vivid: '#ffffff', on: '#111111' };
+    var h = Math.round(+m[1]), sat = +m[2], l = +m[3];
+    return {
+      shade: 'hsl(' + h + ',' + Math.round(Math.min(72, sat + 10)) + '%,' + Math.max(5, Math.round(l * 0.42)) + '%)',
+      vivid: 'hsl(' + h + ',' + Math.round(Math.max(58, Math.min(86, sat * 1.6))) + '%,66%)',
+      on: 'hsl(' + h + ',55%,12%)'
+    };
+  }
+  // A copy of a picture whose pixels can be read: fetched natively (CapacitorHttp, no CORS on
+  // the phone) and drawn from a blob URL. Resolves { img, done } or null; never rejects.
+  var readableCopyBusy = {};
+  function readableImageCopy(src){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform());
+    if(!src || !/^https?:/i.test(src) || !native || !H || typeof H.request !== 'function') return Promise.resolve(null);
+    if(readableCopyBusy[src]) return readableCopyBusy[src];
+    var job = Promise.resolve(H.request({ url: src, method: 'GET', responseType: 'blob', connectTimeout: 8000, readTimeout: 8000 })).then(function(r){
+      if(!r || r.status < 200 || r.status >= 300 || typeof r.data !== 'string' || !r.data) return null;
+      var bin = atob(r.data.replace(/^data:[^,]*,/, ''));
+      if(bin.length > 4 * 1024 * 1024) return null;
+      var bytes = new Uint8Array(bin.length);
+      for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([bytes]));
+      return new Promise(function(resolve){
+        var im = new Image();
+        im.onload = function(){ resolve({ img: im, done: function(){ try{ URL.revokeObjectURL(url); }catch(e){} } }); };
+        im.onerror = function(){ try{ URL.revokeObjectURL(url); }catch(e){} resolve(null); };
+        im.src = url;
+      });
+    })['catch'](function(){ return null; }).then(function(x){ delete readableCopyBusy[src]; return x; });
+    readableCopyBusy[src] = job;
+    return job;
+  }
   function applyNpTint(colour){
+    var dv = npTintDerived(colour || NP_TINT_FALLBACK);
+    [nowPlayingScreen, document.body].forEach(function(el){
+      el.style.setProperty('--np-shade', dv.shade);
+      el.style.setProperty('--np-vivid', dv.vivid);
+      el.style.setProperty('--np-on-vivid', dv.on);
+    });
     nowPlayingScreen.style.setProperty('--np-tint', colour || NP_TINT_FALLBACK);
     // Same colour, written to body too -- the sidebar sits outside the scroll container this
     // is normally scoped to, and body is the nearest ancestor the two panels share (see
@@ -8569,8 +8649,21 @@
     function read(){
       if(!img.naturalWidth) return;
       // Cross-origin artwork taints the canvas and this returns null, which is the common
-      // case for stations. The blurred backdrop is what carries the colour there.
+      // case for stations. Since build 138 the phone then reads a copy of the picture through
+      // the native side (no cross-site rule there), so a station's screen gets its colour too
+      // -- the shade under the title and Immersive View's buttons follow it.
       var colour = dominantColorFrom(img);
+      if(!colour && npTintCache[src] === undefined){
+        readableImageCopy(src).then(function(copy){
+          if(!copy) return;
+          var c = dominantColorFrom(copy.img);
+          var pc = dominantColorFrom(copy.img, PAGE_TINT_OPTS);
+          copy.done();
+          if(!c) return;
+          npTintCache[src] = c; pageTintCache[src] = pc;
+          if(current()){ applyNpTint(c); if(pc) applyPageTint(pc); }
+        });
+      }
       npTintCache[src] = colour;
       if(current()) applyNpTint(colour);
       // The desktop sidebar's own glow: not a separate blurred copy of the picture (that
@@ -12460,13 +12553,14 @@
       if(onPodcastsView !== true || podcastTab !== 'latest') return;
       resetStationsGrid();
       if(inProgress.length){
-        appendGridSection('Continue Listening');
+        var clLabel = appendGridSection('Continue Listening');
         var row = document.createElement('div');
         row.className = 'cl-row';
         inProgress.forEach(function(rec){
           row.appendChild(buildContinueListeningTile(rec));
         });
         stationsGrid.appendChild(row);
+        makeSectionAccordion(clLabel, row, 'podcastContinue', inProgress.length);
       }
       // No "Latest Episodes" label: the tab above already says Latest, and the first date
       // heading starts the list.
@@ -13044,7 +13138,7 @@
     enterLibraryChrome();
     onVideoView = true;
     setDetailBack(null);
-    stationsHeading.textContent = 'Video';
+    stationsHeading.textContent = 'Watch';
     pageTitle.style.display = 'none';
     albumPlayBtn.style.display = 'none';
     libraryShuffleBtn.style.display = 'none';
@@ -13475,7 +13569,7 @@
       addChannelsState.pickDefault = addChannelsTab === 'recommended' && countryByTab.recommended == null;
     }
     onAddChannelsView = true;
-    setDetailBackToHistory(function(){ openVideoHome(); }, 'Video');
+    setDetailBackToHistory(function(){ openVideoHome(); }, 'Watch');
     stationsHeading.textContent = 'Add Channels';
     pageTitle.style.display = 'none';
     albumPlayBtn.style.display = 'none';
@@ -14231,7 +14325,7 @@
     });
   }
   function plexSignOut(){
-    if(!window.confirm('Sign out of Plex? Your Plex movies and shows leave Video. What you watched stays on Plex.')) return;
+    if(!window.confirm('Sign out of Plex? Your Plex movies and shows leave Watch. What you watched stays on Plex.')) return;
     if(plexAccount && plexAccount.token){
       // Tell plex.tv this device is gone; nothing waits on it.
       plexRequest('DELETE', 'https://plex.tv/api/v2/devices/' + encodeURIComponent(plexClientId), plexAccount.token)['catch'](function(){});
@@ -14676,7 +14770,7 @@
       }
     } else if(!plexSignedIn()){
       status.textContent = '';
-      line('Add the movies and TV shows on your Plex server to Video.', 'plex-line dim');
+      line('Add the movies and TV shows on your Plex server to Watch.', 'plex-line dim');
       var b = button('Sign In with Plex', 'plexSignInBtn', plexStartSignIn);
       b.classList.add('settings-wide-btn');
       box.appendChild(b);
@@ -15075,11 +15169,13 @@
   function appendContinueWatching(){
     var list = continueWatchingEntries();
     if(!list.length) return;
-    appendGridSection('Continue Watching').classList.add('ch-row-label');
+    var cwLabel = appendGridSection('Continue Watching');
+    cwLabel.classList.add('ch-row-label');
     var row = document.createElement('div');
     row.className = 'cl-row vw-row';
     list.forEach(function(e){ row.appendChild(buildContinueEntryTile(e)); });
     stationsGrid.appendChild(row);
+    makeSectionAccordion(cwLabel, row, 'watchContinue', list.length);
   }
   // One Continue Watching tile: a video (its still or poster, how far along) or a channel
   // (its logo), with the three-dot menu in the top right corner like Continue Listening's.
@@ -15345,7 +15441,7 @@
   function enterVideoDetail(title){
     enterLibraryChrome();
     onVideoDetailView = true;
-    setDetailBackToHistory(function(){ openVideoHome(); }, 'Video');
+    setDetailBackToHistory(function(){ openVideoHome(); }, 'Watch');
     // The title is in the page itself, beside the poster.
     stationsHeading.textContent = '';
     document.body.classList.add('vdetail-open');
@@ -21456,6 +21552,35 @@
     return el;
   }
 
+  // A section heading that opens and closes the row under it (build 138): Continue Listening on
+  // Podcasts and Continue Watching on Watch. Closed by default; opening one is remembered until
+  // the app is restarted, so a redraw (a new episode, a channel watched) doesn't fold it away.
+  var sectionAccOpen = {};
+  var ACC_CHEVRON = '<svg class="acc-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  function makeSectionAccordion(label, row, id, count){
+    var open = !!sectionAccOpen[id];
+    label.classList.add('acc-head');
+    label.dataset.acc = id;
+    label.setAttribute('role', 'button');
+    label.setAttribute('tabindex', '0');
+    if(typeof count === 'number'){
+      var c = document.createElement('span');
+      c.className = 'grid-section-count';
+      c.textContent = String(count);
+      label.appendChild(c);
+    }
+    label.insertAdjacentHTML('beforeend', ACC_CHEVRON);
+    function paint(){
+      label.classList.toggle('open', open);
+      label.setAttribute('aria-expanded', open ? 'true' : 'false');
+      row.hidden = !open;
+    }
+    function toggle(){ open = !open; sectionAccOpen[id] = open; paint(); }
+    label.addEventListener('click', toggle);
+    label.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+    paint();
+  }
+
   // ---------- sidebar ----------
   function renderLibraryList(){
     libraryList.innerHTML = '';
@@ -21610,7 +21735,7 @@
     if(onPodcastsView) return entry('Podcasts', function(){ openPodcastsHome(); });
     if(onMyLibraryHomeView) return entry('My Library', function(){ openMyLibraryHome(); });
     if(onStationsHomeView) return entry('My Stations', function(){ openStationsHome(); });
-    if(onVideoView) return entry('Video', function(){ openVideoHome(); });
+    if(onVideoView) return entry('Watch', function(){ openVideoHome(); });
     if(onAddChannelsView) return entry('Add Channels', function(){ openAddChannelsPage(); });
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
