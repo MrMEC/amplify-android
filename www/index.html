@@ -948,8 +948,17 @@
   .top-result-chev{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:14px; }
   .song-row.search-more-row{ cursor:pointer; }
   .song-row .song-row-art.search-more-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); font-size:20px; }
-  .song-row.recent-search-row .song-row-art.search-more-art{ width:44px; height:44px; font-size:16px; background:none; }
+  /* Recent Searches (build 135): flush with the heading, rows close together, an X each. */
+  .song-row.recent-search-row{ padding:0; min-height:46px; gap:12px; border-radius:8px; }
+  .song-row.recent-search-row .song-row-art.search-more-art{ width:20px; height:20px; margin:0; font-size:16px; background:none; justify-content:flex-start; border-radius:0; }
   .song-row.recent-search-row .song-row-title{ font-weight:500; }
+  .recent-search-del{
+    flex-shrink:0; width:40px; height:40px; margin-right:-6px; border:none; background:none; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; color:var(--text-faint); cursor:pointer; padding:0;
+  }
+  .recent-search-del:hover{ color:var(--text); background:var(--panel-2); }
+  .recent-search-del svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+  .tile-grid > .grid-section-label.recent-searches-head{ margin:4px 0 14px; }
   /* The search page has no heading row: no "Results for", count, save or clear above the tabs
      (build 118). Save Search lives on the Stations tab instead. */
   body.search-view #sectionHeadingRow{ display:none; }
@@ -26746,6 +26755,22 @@
         flushSearchRemote();
       });
       row.classList.add('recent-search-row');
+      // An X on each row takes just that search off the list (build 135).
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'recent-search-del';
+      del.title = 'Remove';
+      del.setAttribute('aria-label', 'Remove ' + q + ' from recent searches');
+      del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      del.addEventListener('click', function(e){
+        e.stopPropagation();
+        recentSearches = recentSearches.filter(function(x){ return x !== q; });
+        saveRecentSearches();
+        var y = window.scrollY;
+        renderSearchHome();
+        window.scrollTo(0, y);
+      });
+      row.appendChild(del);
       stationsGrid.appendChild(row);
     });
   }
