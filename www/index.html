@@ -4040,6 +4040,10 @@
     text-align:center; padding:8px; border-radius:10px; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
   }
   #settingsPanel .plex-server-select{ width:100%; }
+  /* Movies & TV search rows (build 134): posters keep their 2:3 shape, episodes 16:9 */
+  .song-row .song-row-art.video-result-art{ width:38px; height:56px; margin:0 9px; border-radius:6px; overflow:hidden; background:var(--art-bg); flex-shrink:0; }
+  .song-row .song-row-art.video-result-art.wide{ width:72px; height:41px; margin:7px 0 8px; }
+  .video-result-art img{ width:100%; height:100%; object-fit:cover; display:block; }
   /* Video Details (build 133) */
   .v-info-menu{ width:min(340px, calc(100vw - 32px)); padding-bottom:6px; }
   .v-info-row{ display:flex; gap:12px; padding:6px 14px; font-size:13.5px; line-height:1.4; }
@@ -15112,6 +15116,20 @@
       stationsGrid.appendChild(add);
     } else {
       items.forEach(function(x){ stationsGrid.appendChild(tab === 'shows' ? buildShowTile(x) : buildMovieTile(x)); });
+      // The A to Z rail (build 134). In A to Z order a letter jumps straight there; in Recently
+      // Added a letter first switches the tab to A to Z, then jumps.
+      var tiles = azItemsFromGrid('.tile.vposter', '.tile-name');
+      buildAzRail(tiles);
+      if((videoSortBy[tab] || 'recent') !== 'az'){
+        azBeforeJump = function(letter){
+          videoSortBy[tab] = 'az';
+          vsave(VIDEO_SORT_KEY, videoSortBy);
+          renderVideoHome();
+          var landed = azScrollToLetter(letter);
+          if(landed) azMarkActive(landed);
+          return true;
+        };
+      }
     }
     appendVideoFoldersSection();
   }
@@ -23225,7 +23243,10 @@
     }
   }
 
+  // A page can step in before a letter jumps (Video's Recently Added switches to A to Z first).
+  var azBeforeJump = null;
   function hideAzRail(){
+    azBeforeJump = null;
     if(!azRail) return;
     azRail.style.display = 'none';
     document.body.classList.remove('az-on');
@@ -23279,6 +23300,7 @@
     azRail.addEventListener('click', function(e){
       var btn = e.target.closest ? e.target.closest('.az-letter') : null;
       if(!btn || azDragLetter !== null) return;
+      if(azBeforeJump && azBeforeJump(btn.dataset.letter)) return;
       var landed = azScrollToLetter(btn.dataset.letter);
       if(landed) azMarkActive(landed);
     });
@@ -23313,6 +23335,7 @@
       azHideBubble();
       // Jumping happens on release, not during the drag: the list staying still is what makes
       // it possible to read the bubble and change your mind on the way.
+      if(azBeforeJump && azBeforeJump(letter)){ setTimeout(function(){ azDragLetter = null; }, 0); return; }
       var landed = azScrollToLetter(letter);
       azMarkActive(landed || letter);
       // Cleared after the handlers above have run, so the click this gesture also produces is
@@ -25943,6 +25966,7 @@
       searchState.songs = searchLocalTracks(q);
       searchState.channels = searchChannels(q);
       searchState.playlists = searchPlaylists(q);
+      searchState.videos = searchVideos(q);
       applySearchResults();
       return;
     }
@@ -25966,6 +25990,7 @@
     { id: 'albums', label: 'Albums', noun: 'album' },
     { id: 'songs', label: 'Songs', noun: 'song' },
     { id: 'podcasts', label: 'Podcasts', noun: 'show' },
+    { id: 'videos', label: 'Movies & TV', noun: 'video' },
     { id: 'channels', label: 'Channels', noun: 'channel' },
     { id: 'playlists', label: 'Playlists', noun: 'playlist' }
   ];
@@ -25984,7 +26009,7 @@
     var savedSearch = JSON.parse(localStorage.getItem(LAST_SEARCH_KEY) || 'null');
     if(savedSearch && typeof savedSearch.q === 'string' && savedSearch.q){
       lastSearch = { q: savedSearch.q, stations: savedSearch.stations || [], podcasts: savedSearch.podcasts || [],
-        artists: [], albums: [], songs: [], channels: [], playlists: [], tab: savedSearch.tab || null, pending: false, podcastsPending: false, restored: true };
+        artists: [], albums: [], songs: [], channels: [], playlists: [], videos: [], tab: savedSearch.tab || null, pending: false, podcastsPending: false, restored: true };
     }
   }catch(e){}
   var lastSearchSaveTimer = null;
@@ -26159,6 +26184,7 @@
       songs: searchLocalTracks(q),
       channels: searchChannels(q),
       playlists: searchPlaylists(q),
+      videos: searchVideos(q),
       tab: prevTab,
       pending: true,
       podcastsPending: true
@@ -26309,6 +26335,7 @@
       return;
     }
 
+    if(group.id === 'videos') stationsGrid.classList.add('grid-songs');
     // Save as Custom Station sits on the Stations tab, centred above the results (build 119).
     if(group.id === 'stations'){
       var bar = document.createElement('div');
@@ -26349,6 +26376,8 @@
         var chList = stationsGrid.querySelector(':scope > .ch-list');
         if(!chList){ chList = document.createElement('div'); chList.className = 'ch-list'; stationsGrid.appendChild(chList); }
         chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url) }));
+      } else if(group.id === 'videos'){
+        stationsGrid.appendChild(buildVideoResultRow(item, false));
       } else if(group.id === 'playlists'){
         stationsGrid.appendChild(buildEntityTile({
           key: 'playlist-' + item.id, entity: 'playlist', name: item.label, row: true,
@@ -26445,6 +26474,69 @@
       function(pl){ return pl.label; }, pq);
   }
 
+  // ---------- search: Movies & TV (build 134) ----------
+  // Movies and shows from Video's Movies and TV Shows (phone folders and Plex alike, the
+  // library as it shows there, Plex libraries switched off left out), matched on the title
+  // (and a movie's year); episodes match on their own title, after the movies and shows.
+  function searchVideos(q){
+    var pq = parseSearchQuery(q);
+    if(pq.empty) return [];
+    var lib;
+    try{ lib = vlib(); }catch(e){ return []; }
+    var out = [];
+    lib.movies.forEach(function(m){ if(matchesQuery([m.title, m.year], pq)) out.push({ kind: 'movie', name: m.title, x: m }); });
+    lib.shows.forEach(function(sh){ if(matchesQuery([sh.title], pq)) out.push({ kind: 'show', name: sh.title, x: sh }); });
+    var nameOf = function(r){ return r.name; };
+    var top = rankByMatch(out, nameOf, pq);
+    var eps = [];
+    lib.shows.forEach(function(sh){
+      sh.episodes.forEach(function(e){ if(e.epTitle && matchesQuery([e.epTitle], pq)) eps.push({ kind: 'episode', name: e.epTitle, x: e }); });
+    });
+    return top.concat(rankByMatch(eps, nameOf, pq).slice(0, 40));
+  }
+  function buildVideoResultRow(r, inTop){
+    var x = r.x;
+    var row = document.createElement('div');
+    row.className = 'tile song-row video-result-row' + (inTop ? ' top-result-row' : '');
+    row.dataset.kind = 'videos';
+    row.dataset.vkind = r.kind;
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art video-result-art' + (r.kind === 'episode' ? ' wide' : '');
+    var url = r.kind === 'show' ? showPosterUrl(x) : (r.kind === 'episode' ? (episodeImageUrl(x) || videoPosterUrl(x)) : videoPosterUrl(x));
+    if(url) art.appendChild(vImg(url));
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div');
+    t.className = 'tile-name song-row-title';
+    t.textContent = r.kind === 'episode' ? x.epTitle : x.title;
+    body.appendChild(t);
+    var sub = document.createElement('div');
+    sub.className = 'song-row-sub';
+    var from = r.kind === 'show' ? (x.episodes.every(function(e){ return e.plex; }) ? ' \u00b7 Plex' : '') : (x.plex ? ' \u00b7 Plex' : '');
+    if(r.kind === 'movie') sub.textContent = 'Movie' + (x.year ? ' \u00b7 ' + x.year : '') + from;
+    else if(r.kind === 'show') sub.textContent = 'TV Show \u00b7 ' + (x.seasons.length > 1 ? x.seasons.length + ' seasons' : plural(x.episodes.length, 'episode', 'episodes')) + from;
+    else sub.textContent = 'Episode \u00b7 ' + x.show + ' ' + episodeCode(x);
+    body.appendChild(sub);
+    row.appendChild(body);
+    if(r.kind === 'episode'){
+      row.dataset.key = 'video:' + x.id;
+      if(currentStation && isLocalVideo(currentStation) && currentStation.id === x.id) row.classList.add('playing');
+      row.addEventListener('click', function(){ playVideo(x); });
+    } else {
+      var chev = document.createElement('span');
+      chev.className = 'top-result-chev';
+      chev.setAttribute('aria-hidden', 'true');
+      chev.innerHTML = ROW_CHEVRON_SVG;
+      row.appendChild(chev);
+      row.addEventListener('click', function(){
+        pushView();
+        if(r.kind === 'movie') openVideoMovie(x.id); else openVideoShow(x.key);
+      });
+    }
+    return row;
+  }
+
   // ---------- search: Top Results ----------
   // The closest few of every kind in one list, like a music app's top hits: each kind
   // offers its best few, every one is scored by how well its name answers the search (the
@@ -26457,6 +26549,7 @@
     { id: 'albums', take: 3, bias: 1.5, name: function(a){ return a.album; } },
     { id: 'playlists', take: 2, bias: 1.5, name: function(p){ return p.label; } },
     { id: 'stations', take: 5, bias: 2, name: function(s){ return s.name; } },
+    { id: 'videos', take: 4, bias: 1.5, name: function(r){ return r.name; } },
     { id: 'channels', take: 3, bias: 2.5, name: function(c){ return c.name; } },
     { id: 'podcasts', take: 3, bias: 2.5, name: function(sh){ return sh.collectionName; } }
   ];
@@ -26483,6 +26576,7 @@
     stations: 'Station', channels: 'TV Channel', podcasts: 'Podcast' };
   function buildTopResultRow(r){
     var item = r.item, kind = r.kind;
+    if(kind === 'videos') return buildVideoResultRow(item, true);
     var row = document.createElement('div');
     row.className = 'tile song-row top-result-row';
     row.dataset.kind = kind;
