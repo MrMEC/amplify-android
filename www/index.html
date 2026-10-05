@@ -21134,6 +21134,11 @@
 
   function renderArtistArt(container, entry){
     container.innerHTML = '';
+    // Every box showing an artist's picture is marked, so a portrait arriving later (or a
+    // cover set by hand) repaints all of them -- list tiles, Favorite Artists rows, search
+    // rows, Home rows -- not just the grid tiles and the open page.
+    container._artistEntry = entry;
+    if(container.dataset) container.dataset.artistArt = entry.key;
     var token = beginArtRender(container);
     var key = artistArtKey(entry.key);
     applyPlaceholderArt(container, key);
@@ -21160,17 +21165,20 @@
 
     // The path almost every tile takes after the first pass: already worked out, painted
     // with no await and no lookup of any kind.
+    // Whatever is painted, the artist's portrait is still asked for when nothing is saved
+    // about them yet. Build 134 and earlier asked only when the artist had no picture at all,
+    // so anyone whose songs carry a cover kept showing an album cover in the Artists list
+    // until their page was opened (the only other place that looks). The lookup is still
+    // only for tiles scrolled into view, one at a time, and every answer -- a portrait or
+    // "none" -- is saved, so each artist is asked about once, not on every visit.
     if(Object.prototype.hasOwnProperty.call(artistArtResolved, entry.key)){
       var memo = artistArtResolved[entry.key];
-      if(memo){ paint(memo); return; }
+      if(memo) paint(memo);
       requestArtistPortrait(entry, container);
       return;
     }
     resolveArtistArtUrl(entry).then(function(url){
-      if(url){ paintLater(url); return; }
-      // Nothing on this device and nothing of the station's own: only now is an artist
-      // worth a request, which is what keeps a 260-artist library from opening with 260
-      // lookups.
+      if(url) paintLater(url);
       requestArtistPortrait(entry, container);
     })['catch'](function(){});
   }
@@ -21197,16 +21205,25 @@
       var open = findArtistEntry(activeArtistKey);
       if(open) renderArtistArt(artistHeroArt, open);
     }
+    document.querySelectorAll('[data-artist-art]').forEach(function(box){
+      if(box.querySelector('img') || !box.isConnected) return;
+      renderArtistArt(box, findArtistEntry(box.dataset.artistArt) || box._artistEntry);
+    });
   }
   function refreshArtistArt(entry){
     delete artistArtResolved[entry.key];
     var key = artistArtKey(entry.key);
+    var done = [];
     document.querySelectorAll('.tile[data-entity="artist"]').forEach(function(el){
       if(el.dataset.key !== key) return;
       var art = el.querySelector('.tile-art');
-      if(art) renderArtistArt(art, entry);
+      if(art){ renderArtistArt(art, entry); done.push(art); }
     });
-    if(activeArtistKey === entry.key) renderArtistArt(artistHeroArt, entry);
+    if(activeArtistKey === entry.key){ renderArtistArt(artistHeroArt, entry); done.push(artistHeroArt); }
+    document.querySelectorAll('[data-artist-art]').forEach(function(box){
+      if(box.dataset.artistArt !== entry.key || done.indexOf(box) >= 0) return;
+      renderArtistArt(box, box._artistEntry || entry);
+    });
   }
 
   // ---------- a non-track tile (an artist or an album) ----------
