@@ -4628,16 +4628,27 @@
   }
   .now-playing-screen .np-seek-range::-webkit-slider-thumb{ background:var(--np-vivid, #fff); }
   .now-playing-screen .np-seek-range::-moz-range-thumb{ background:var(--np-vivid, #fff); }
-  .now-playing-screen .np-upnext{ background:color-mix(in srgb, var(--np-vivid, #fff) 50%, transparent); border-color:color-mix(in srgb, var(--np-vivid, #fff) 60%, transparent); }
-  .now-playing-screen .np-upnext:hover{ background:color-mix(in srgb, var(--np-vivid, #fff) 60%, transparent); }
+  /* Build 140: lighter still (Mark: not transparent enough at 50%). */
+  .now-playing-screen .np-upnext{ background:color-mix(in srgb, var(--np-vivid, #fff) 24%, transparent); border-color:color-mix(in srgb, var(--np-vivid, #fff) 38%, transparent); }
+  .now-playing-screen .np-upnext:hover{ background:color-mix(in srgb, var(--np-vivid, #fff) 32%, transparent); }
   .now-playing-screen .np-upnext-label, .now-playing-screen .np-upnext-sub{ color:rgba(255,255,255,.86); }
   .now-playing-screen .np-upnext{ text-shadow:0 1px 3px rgba(0,0,0,.35); }
   .now-playing-screen .np-play-btn, .now-playing-screen .np-step-btn, .now-playing-screen .np-skip-btn,
   .now-playing-screen .np-fav-btn, .now-playing-screen .np-menu-btn{
     transition: filter .15s ease, transform .15s ease, opacity .35s ease, background-color .5s ease, color .5s ease;
   }
+  /* The close button (top left) and the menu button (top right) too (build 140). */
+  .now-playing-screen .np-float .np-back{ color:var(--np-vivid, #fff); transition: color .5s ease, background .15s ease, border-color .15s ease, transform .38s cubic-bezier(.4,0,.2,1), opacity .3s ease; }
+  /* Immersive View: Play and the skip buttons see-through (build 140). */
+  body.np-immersive .now-playing-screen .np-play-btn{ background:color-mix(in srgb, var(--np-vivid, #fff) 55%, transparent); }
+  body.np-immersive .now-playing-screen .np-step-btn, body.np-immersive .now-playing-screen .np-skip-btn{ color:color-mix(in srgb, var(--np-vivid, #fff) 60%, transparent); }
   @media (max-width: 900px){
     body.np-open .mobile-nav-btn.active{ color:var(--np-vivid, var(--accent)); }
+    body.np-open .sidebar-top .hamburger-btn span,
+    body.np-open.album-open .sidebar-top .hamburger-btn span,
+    body.np-open.artist-open .sidebar-top .hamburger-btn span{ background:var(--np-vivid, #fff); transition: background-color .5s ease; }
+    /* The search box that takes the mini player's place while Now Playing is open. */
+    body.np-open #searchSheetGo{ background:var(--np-vivid, var(--accent)); border-color:var(--np-vivid, var(--accent)); color:var(--np-on-vivid, var(--accent-text)); }
   }
 
   /* ---------- Queue (Up Next) ---------- */

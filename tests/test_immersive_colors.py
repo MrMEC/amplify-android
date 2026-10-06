@@ -15,7 +15,9 @@ from playwright.async_api import async_playwright
 
 def parse_rgb(s):
     m = re.match(r'rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)', s or '')
-    return tuple(float(x) for x in m.groups()) if m else None
+    if m: return tuple(float(x) for x in m.groups())
+    m = re.match(r'color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)', s or '')
+    return tuple(round(float(x) * 255) for x in m.groups()) if m else None
 def hue(rgb):
     h, l, s = colorsys.rgb_to_hls(*(c / 255 for c in rgb))
     return h * 360, s, l
@@ -88,7 +90,10 @@ async def main():
         check(sg and parse_rgb(sg[0]) == v, f"progress bar's played part in the bright colour {cols['seek'][:120]}")
         up = re.match(r'rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)', cols['upnext']) or re.match(r'color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) / ([\d.]+)', cols['upnext'])
         print('upnext', cols['upnext'])
-        check(up and abs(float(up.group(4)) - 0.5) < 0.02, f"Up Next row: the colour at 50% ({cols['upnext']})")
+        check(up and abs(float(up.group(4)) - 0.24) < 0.02, f"Up Next row: the colour, lighter (24%) ({cols['upnext']})")
+        top = await pg.evaluate("""(()=>({ back: getComputedStyle(document.getElementById('npBackBtn')).color,
+          ham: getComputedStyle(document.querySelector('.sidebar-top .hamburger-btn span')).backgroundColor }))()""")
+        check(parse_rgb(top['back']) == v and parse_rgb(top['ham']) == v, f"close (top left) and menu (top right) in the colour {top}")
         check(parse_rgb(cols['nav']) == v, f"tab bar's selected icon ({cols['navKey']}) in the bright colour while Now Playing is open {cols['nav']}")
         await pg.evaluate("(()=>{ var ic = document.getElementById('importPanelClose'); if(ic) ic.click(); var r = document.getElementById('npSeekRange'); r.value = 400; r.dispatchEvent(new Event('input')); })()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/immcol-song-normal.png')
@@ -99,8 +104,12 @@ async def main():
         check(not gone, f'immersive: favourite, menu, progress bar and Up Next faded and untappable (not: {gone})')
         check(s1['play']['x'] == s0['play']['x'], f"Play stays in place ({s0['play']['x']} -> {s1['play']['x']})")
         check(parse_rgb(s1['playBg']) == parse_rgb(s1['vivid']) and parse_rgb(s1['nextFg']) == parse_rgb(s1['vivid']),
-              f"immersive: Play filled and skip buttons drawn in the bright colour {s1['playBg']} {s1['nextFg']} {s1['vivid']}")
+              f"immersive: Play and skip still the artwork colour {s1['playBg']} {s1['nextFg']} {s1['vivid']}")
         await pg.screenshot(path=f'{shots}/immcol-song-imm.png')
+        tr = await pg.evaluate("""(()=>({ play: getComputedStyle(document.getElementById('npPlayBtn')).backgroundColor, next: getComputedStyle(document.getElementById('npNextBtn')).color }))()""")
+        print('immersive see-through', tr)
+        alpha = lambda c: float((re.search(r'/\s*([\d.]+)\)', c) or re.search(r'rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)', c)).group(1))
+        check(abs(alpha(tr['play']) - 0.55) < 0.03 and abs(alpha(tr['next']) - 0.6) < 0.03, f"Immersive View only: Play and skip see-through {tr}")
         await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(900)
         s2 = await pg.evaluate(ST)
         check(s2['fav']['op'] == 1 and s2['seek']['op'] == 1 and parse_rgb(s2['playBg']) == parse_rgb(s2['vivid']), 'leaving immersive brings them back, still coloured')
@@ -131,11 +140,22 @@ async def main():
             check(close(ph, th) and ps > 0.4, f'[{name}] Play button pixels are the artwork colour on screen {c}')
             await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(600)
 
+        # ---- the search box opened from the tab bar over Now Playing ----
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(500)
+        go = await pg.evaluate("(()=>{ var c = getComputedStyle(document.getElementById('searchSheetGo')); return [c.backgroundColor, document.body.classList.contains('np-open'), getComputedStyle(document.getElementById('searchSheet')).display]; })()")
+        vv = parse_rgb((await pg.evaluate(ST))['vivid'])
+        check(go[1] and parse_rgb(go[0]) == vv, f'search button in the colour while Now Playing is open {go}')
+        await pg.screenshot(path=f'{shots}/immcol-search.png')
+        await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(400)
         # ---- closing Now Playing: the tab bar's colour goes back ----
         await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(300)
         await pg.evaluate('__t.closeNp()'); await pg.wait_for_timeout(900)
         back = await pg.evaluate("(()=>{ var p = document.createElement('div'); p.style.color = getComputedStyle(document.body).getPropertyValue('--accent'); document.body.appendChild(p); var a = getComputedStyle(p).color; p.remove(); return [getComputedStyle(document.querySelector('.mobile-nav-btn.active')).color, a]; })()")
         check(back[0] == back[1], f'after closing Now Playing the selected tab is the app colour again {back}')
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(500)
+        go2 = await pg.evaluate("(()=>{ var p = document.createElement('div'); p.style.color = getComputedStyle(document.body).getPropertyValue('--accent'); document.body.appendChild(p); var a = getComputedStyle(p).color; p.remove(); return [getComputedStyle(document.getElementById('searchSheetGo')).backgroundColor, a]; })()")
+        check(go2[0] == go2[1], f'search button back to the app colour away from Now Playing {go2}')
+        await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'{shots}/immcol-closed.png')
         await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(900)
         # ---- a menu open when entering immersive closes ----
