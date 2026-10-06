@@ -36,9 +36,9 @@ async def main():
                 check(vis != 'none', 'Play shows on an artist page with songs and no station')
             await pg.click('#artistPlayBtn'); await pg.wait_for_timeout(500)
             s = await q()
-            check(sorted(s['list']) == ['Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6'] and s['cur'] == s['list'][0] and s['idx'] == 0 and s['label'] == 'Bob Radio',
+            check(sorted(s['list'][:5]) == ['Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6'] and set(s['list']) == {'Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6'} and s['cur'] == s['list'][0] and s['idx'] == 0 and s['label'] == 'Bob Radio',
                   f'try {i}: all of Bob songs, and only his, queued with the first playing {s}')
-            orders.add(tuple(s['list']))
+            orders.add(tuple(s['list'][:5]))
             await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(600)
             await pg.click('#artistPlayBtn'); await pg.wait_for_timeout(400)
         check(len(orders) >= 3, f'shuffled: a different order each time ({len(orders)} different orders in 6 tries)')

@@ -382,6 +382,12 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     }
     String str4 = str(mediaMetadata.title);
     String strJoinDot3 = joinDot(str(mediaMetadata.artist), str(mediaMetadata.albumTitle));
+    // Build 151: what plays next, on the car's Now Playing (the line under the title becomes
+    // "Artist · Next: Title · Artist"; the phone's lock screen keeps its own title and artist).
+    String next = nextLine();
+    if (next != null) {
+      strJoinDot3 = joinDot(str(mediaMetadata.artist), "Next: " + next);
+    }
     MediaMetadata.Builder builderBuildUpon = mediaMetadata.buildUpon();
     if (str4.isEmpty()) {
       str4 = null;
@@ -389,6 +395,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     return builderBuildUpon
         .setDisplayTitle(str4)
         .setSubtitle(strJoinDot3.isEmpty() ? null : strJoinDot3)
+        .setDescription(next == null ? null : "Next: " + next)
         .build();
   }
 
@@ -567,6 +574,49 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     super.setMediaItem(mediaItem, z);
   }
 
+  /** The title (and artist, for a song) of the item that plays next, or null (build 151). */
+  @Nullable
+  private String nextLine() {
+    MediaItem next = null;
+    try {
+      if (this.nativeMode) {
+        Player w = getWrappedPlayer();
+        int i = w.getNextMediaItemIndex();
+        if (i >= 0 && i < w.getMediaItemCount()) {
+          next = w.getMediaItemAt(i);
+        }
+      } else if (pageActive() && !this.pageQueue.isEmpty()) {
+        next = this.pageQueue.get(0);
+      }
+    } catch (RuntimeException e) {
+      next = null;
+    }
+    if (next == null) {
+      return null;
+    }
+    MediaMetadata m = next.mediaMetadata;
+    String t = str(m.title);
+    if (t.isEmpty()) {
+      return null;
+    }
+    boolean live = m.extras != null && m.extras.getBoolean("amplify.live", false);
+    return live ? t : joinDot(t, str(m.artist));
+  }
+
+  /** The phone's queue as the car shows it, while the phone is playing (build 151). */
+  @Nullable
+  public List<MediaItem> pageQueueNow() {
+    return pageActive() ? new ArrayList<>(this.pageQueue) : null;
+  }
+
+  private void notifyMetadataChanged() {
+    MediaMetadata mediaMetadata = getMediaMetadata();
+    Iterator it = new ArrayList(this.wrapped.values()).iterator();
+    while (it.hasNext()) {
+      ((SkipListener) it.next()).listener.onMediaMetadataChanged(mediaMetadata);
+    }
+  }
+
   public void setPageQueue(String str, List<MediaItem> list) {
     boolean zPageActive = pageActive();
     ArrayList arrayList = (list == null || list.isEmpty()) ? null : new ArrayList(list);
@@ -577,6 +627,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     this.pageQueueFor = str;
     if (zPageActive || pageActive()) {
       notifyTimelineChanged();
+      notifyMetadataChanged();
     }
   }
 
@@ -903,6 +954,8 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     @Override // androidx.media3.common.Player.Listener
     public void onTimelineChanged(Timeline timeline, int i) {
       this.listener.onTimelineChanged(this.forwardingPlayer.getCurrentTimeline(), i);
+      // What plays next may have changed: the car's Now Playing says it (build 151).
+      this.listener.onMediaMetadataChanged(this.forwardingPlayer.getMediaMetadata());
     }
 
     @Override

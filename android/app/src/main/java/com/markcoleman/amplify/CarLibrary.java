@@ -1057,6 +1057,14 @@ final class CarLibrary {
     if (artist == null) {
       return out;
     }
+    // Just this artist's own songs (build 151): their albums can be compilations with others.
+    JSONArray ids = artist.optJSONArray("radio");
+    if (ids != null) {
+      for (int i = 0; i < ids.length(); i++) {
+        out.add(songRef(ids.optString(i), null));
+      }
+      return out;
+    }
     JSONArray albums = artist.optJSONArray("albums");
     if (albums != null) {
       for (int i = 0; i < albums.length(); i++) {

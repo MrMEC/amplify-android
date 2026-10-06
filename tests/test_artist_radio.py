@@ -63,7 +63,7 @@ async def main():
         await pg.click('#stationsGrid .tile[data-key^="artistradio:"]'); await pg.wait_for_timeout(600)
         s = await q(); print(s)
         bob = ['Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6']
-        check(sorted(s['list']) == bob and s['cur'] == s['list'][0] and s['label'] == 'Bob Radio', f'plays all of Bob’s songs, shuffled, as "Bob Radio" {s}')
+        check(sorted(s['list'][:5]) == bob and set(s['list']) == set(bob) and len(s['list']) >= 13 and s['cur'] == s['list'][0] and s['label'] == 'Bob Radio', f'plays all of Bob’s songs, shuffled, as "Bob Radio", a dozen songs ahead {s}')
         rk = pb['tiles'][0]['key']
         check((await pg.evaluate('__t.recent()'))[:2].count(rk) == 1, f'goes into Recent {await pg.evaluate("__t.recent()")}')
         # never runs out

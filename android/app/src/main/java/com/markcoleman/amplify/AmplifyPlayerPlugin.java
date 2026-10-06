@@ -1330,7 +1330,56 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       str = "idle";
     }
     jSObject.put("state", str);
+    // Build 151: when it was sent, and whether the phone will carry on with its queue by
+    // itself if the page doesn't answer (so a page that was asleep doesn't skip a song).
+    jSObject.put("at", System.currentTimeMillis());
+    if (playbackState == 4) {
+      jSObject.put("takeover", willTakeOverPageQueue());
+    }
     return jSObject;
+  }
+
+  // ---- the phone carries on by itself (build 151) ----
+  // A song the page started ends while the page is asleep (screen off, or in the car with the
+  // phone in a pocket): nothing would start the next one until the app was opened again. So
+  // if the page hasn't loaded anything two seconds after a song ends, the player takes the
+  // queue the page last handed it (the one the car shows) and plays on from it, as if the car
+  // had started it. The page follows it when it wakes, and ignores the late "ended".
+  private static final long PAGE_TAKEOVER_MS = 2000L;
+  private String pageEndedFor;
+  private final Runnable pageTakeover = this::takeOverPageQueue;
+
+  private boolean willTakeOverPageQueue() {
+    SkipAwarePlayer sp = sessionPlayer();
+    if (sp == null || sp.isNativeMode()) return false;
+    List<MediaItem> q = sp.pageQueueNow();
+    return q != null && !q.isEmpty();
+  }
+
+  private void schedulePageTakeover() {
+    main.removeCallbacks(pageTakeover);
+    ExoPlayer p = exo();
+    if (p == null || !willTakeOverPageQueue()) return;
+    MediaItem cur = p.getCurrentMediaItem();
+    pageEndedFor = cur == null ? null : cur.mediaId;
+    main.postDelayed(pageTakeover, PAGE_TAKEOVER_MS);
+  }
+
+  private void takeOverPageQueue() {
+    SkipAwarePlayer sp = sessionPlayer();
+    ExoPlayer p = exo();
+    if (sp == null || p == null || sp.isNativeMode() || p.getPlaybackState() != Player.STATE_ENDED) return;
+    MediaItem cur = p.getCurrentMediaItem();
+    if (cur == null || pageEndedFor == null || !pageEndedFor.equals(cur.mediaId)) return;
+    List<MediaItem> q = sp.pageQueueNow();
+    if (q == null || q.isEmpty()) return;
+    try {
+      sp.setMediaItems(new ArrayList<>(q), 0, 0L);
+      sp.prepare();
+      sp.play();
+    } catch (RuntimeException e) {
+      // Left as it was: the page picks up when it wakes.
+    }
   }
 
   public void emitState(boolean z) {
@@ -1804,6 +1853,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onPlaybackStateChanged(int state) {
+      if (state == Player.STATE_ENDED) schedulePageTakeover();
+      else main.removeCallbacks(pageTakeover);
       emitState(false);
     }
 

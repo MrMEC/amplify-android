@@ -509,6 +509,41 @@ public class PlaybackService extends MediaLibraryService {
     }
   }
 
+  // An artist's Radio started in the car never runs out (build 151): two songs from the end,
+  // another shuffle of the artist's songs is added.
+  private boolean radioTopping;
+
+  void topUpArtistRadio(MediaItem item) {
+    if (item == null || item.mediaId == null || radioTopping) return;
+    String id = item.mediaId;
+    if (!id.startsWith(CarLibrary.RADIO_PREFIX)) return;
+    int bar = id.indexOf('|');
+    if (bar < 0) return;
+    if (this.exo.getMediaItemCount() - this.exo.getCurrentMediaItemIndex() > 2) return;
+    final String listId = id.substring(0, bar);
+    radioTopping = true;
+    this.io.execute(
+        () -> {
+          List<MediaItem> more = null;
+          try {
+            CarLibrary.Queue q = this.car.queueFor(CarLibrary.SHUFFLE_PREFIX + listId);
+            if (q != null) more = q.items;
+          } catch (Exception e) {
+            more = null;
+          }
+          final List<MediaItem> add = more;
+          this.main.post(
+              () -> {
+                radioTopping = false;
+                if (add == null || add.isEmpty() || this.player == null || !this.player.isNativeMode()) return;
+                MediaItem cur = this.exo.getCurrentMediaItem();
+                if (cur == null || cur.mediaId == null || !cur.mediaId.startsWith(listId + "|")) return;
+                this.exo.addMediaItems(add);
+                logCar("artist radio: added " + add.size());
+              });
+        });
+  }
+
   private String extendCarQueue(String str, JSONArray jSONArray) {
     MediaItem currentMediaItem = this.exo.getCurrentMediaItem();
     if (currentMediaItem == null || currentMediaItem.mediaMetadata.extras == null) {
@@ -895,6 +930,7 @@ public class PlaybackService extends MediaLibraryService {
           || mediaItem == null) {
         return;
       }
+      PlaybackService.this.topUpArtistRadio(mediaItem);
       Bundle bundle = mediaItem.mediaMetadata.extras;
       PlaybackService.this.exo.setPlaybackSpeed(
           bundle != null && bundle.getString("amplify.guid") != null

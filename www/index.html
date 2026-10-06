@@ -6571,6 +6571,9 @@
     }
     if(ev.state === 'ended' && !a._ended){
       a._ended = true; a._playing = false;
+      // Heard late (the page was asleep): the phone has already carried on with the queue by
+      // itself (build 151), and the page follows that instead of starting the next song too.
+      if(ev.takeover && ev.at && Date.now() - ev.at > 1500) return;
       if(!a._paused){ a._paused = true; a._emit('pause'); }
       a._emit('ended');
     }
@@ -24231,15 +24234,19 @@
   // library now) is added, with the last few played moved to the back of it.
   function topUpArtistRadio(){
     if(!radioCtx || queueLabel !== radioCtx.label || !playQueue.length) return;
-    if(queueIndex < playQueue.length - 2) return;
+    // Kept a dozen songs ahead, so the queue the phone hands the player (and the car) is long
+    // enough to carry on with by itself while the app is asleep (build 151).
+    if(queueIndex < playQueue.length - 12) return;
     var songs = artistRadioSongs(radioCtx.key);
     if(songs.length < 2) return;
     var keep = Math.min(3, songs.length - 1);
-    var lately = playQueue.slice(-keep).map(favKey);
-    var next = shuffled(songs);
-    var fresh = next.filter(function(t){ return lately.indexOf(favKey(t)) === -1; });
-    var later = next.filter(function(t){ return lately.indexOf(favKey(t)) !== -1; });
-    playQueue = playQueue.concat(fresh, later);
+    for(var round = 0; round < 12 && queueIndex >= playQueue.length - 12; round++){
+      var lately = playQueue.slice(-keep).map(favKey);
+      var next = shuffled(songs);
+      var fresh = next.filter(function(t){ return lately.indexOf(favKey(t)) === -1; });
+      var later = next.filter(function(t){ return lately.indexOf(favKey(t)) !== -1; });
+      playQueue = playQueue.concat(fresh, later);
+    }
   }
 
   // Shuffle for a list that can hold anything playable -- stations, songs, episodes -- such
@@ -29811,6 +29818,11 @@
           art: (artistArt && artistArt[entry.key]) ||
             (own.length ? (albumArt[own[0].key] || '') : ((stations[0] && stations[0].art) || '')),
           albums: own.map(function(al){ return al.key; }),
+          // Their Radio's songs: just their own (build 151), only for artists that have one.
+          radio: (function(){
+            var ids = (entry.tracks || []).filter(function(t){ return t.srcUri && !isBlacklisted(t); }).map(favKey);
+            return ids.length >= ARTIST_RADIO_MIN ? ids : undefined;
+          })(),
           stations: stations
         };
       }).filter(Boolean);
