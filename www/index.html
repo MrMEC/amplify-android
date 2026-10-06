@@ -2155,6 +2155,14 @@
      scales to the height and throws away the sides, which is why the covers came out zoomed
      in with their edges cut off. Matching the box to the artwork's own shape means the left
      and right edges land exactly on the edges of the screen with nothing lost. */
+  /* Build 150: an artist's Radio wears a small radio badge in the corner of its picture. */
+  .art-radio{ position:relative; }
+  .art-radio::after{
+    content:''; position:absolute; right:6%; bottom:6%; width:26%; height:26%; max-width:30px; max-height:30px; min-width:16px; min-height:16px;
+    border-radius:50%; background-color:rgba(0,0,0,.6); pointer-events:none; z-index:2;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='2' fill='white'/%3E%3Cpath d='M16.24 7.76a6 6 0 0 1 0 8.48M7.76 16.24a6 6 0 0 1 0-8.48M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14'/%3E%3C/svg%3E");
+    background-size:62%; background-position:center; background-repeat:no-repeat;
+  }
   .np-art-wrap{
     /* overflow is visible so the defocus twin's halo can carry past the bottom edge of the
        box; the image itself is sized to the box and never overflows it. Full width, height
@@ -5378,6 +5386,9 @@
                   <button type="button" class="np-menu-item" id="artistArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit artist image</span>
                   </button>
+                  <button type="button" class="np-menu-item" id="artistRadioArtBtn" role="menuitem" style="display:none;">
+                    <i class="fa-solid fa-pen"></i><span>Edit radio cover</span>
+                  </button>
                   <button type="button" class="np-menu-item" id="artistInfoFixBtn" role="menuitem">
                     <i class="fa-solid fa-magnifying-glass"></i><span>Fix artist info</span>
                   </button>
@@ -6918,6 +6929,7 @@
   var artistShuffleBtn = document.getElementById('artistShuffleBtn');
   var artistFavBtn = document.getElementById('artistFavBtn');
   var artistArtEditBtn = document.getElementById('artistArtEditBtn');
+  var artistRadioArtBtn = document.getElementById('artistRadioArtBtn');
   var artistMenuBtn = document.getElementById('artistMenuBtn');
   var artistMenu = document.getElementById('artistMenu');
   var artistHeroBio = document.getElementById('artistHeroBio');
@@ -9811,6 +9823,8 @@
     // Same shape the album tiles already use for their dataset key, so a favourited album
     // and the album's own tile are one identity rather than two.
     if(s && s.type === 'album') return 'album:' + (s.albumKey || '');
+    // An artist's Radio (build 150): their own songs, shuffled, played like a station.
+    if(s && s.type === 'artistRadio') return 'artistradio:' + (s.artistKey || '');
     return s.stationuuid || s.urlToResolve || s.name;
   }
   // The favourite record for an album. Kept to the same three-field shape as the artist one
@@ -9833,6 +9847,26 @@
     return { type: 'artist', artistKey: entry.key, name: entry.name };
   }
   function isArtistFav(s){ return !!(s && s.type === 'artist'); }
+  // ---------- Artist Radio (build 150) ----------
+  // Every artist with at least ARTIST_RADIO_MIN songs in the library gets "<artist> Radio": a
+  // station made of their own songs, shuffled, that never runs out (it reshuffles as it nears
+  // the end). It is worked out from the library each time, so it appears the moment an artist
+  // reaches three songs and goes when they drop below. It can be favourited like any station,
+  // and its cover can be set by hand (otherwise it shows the artist's picture).
+  var ARTIST_RADIO_MIN = 3;
+  function isArtistRadio(s){ return !!(s && s.type === 'artistRadio'); }
+  function artistRadioRecord(entry){
+    return { type: 'artistRadio', artistKey: entry.key, name: (entry.name || 'Artist') + ' Radio', stationuuid: 'artistradio:' + entry.key };
+  }
+  function artistRadioSongs(key){
+    var e = key ? findArtistEntry(key) : null;
+    return e ? (e.tracks || []).filter(function(t){ return isLocalTrack(t) && !isBlacklisted(t); }) : [];
+  }
+  // The artist's Radio, or null when they have fewer than three songs.
+  function artistRadioFor(entry){
+    return entry && artistRadioSongs(entry.key).length >= ARTIST_RADIO_MIN ? artistRadioRecord(entry) : null;
+  }
+  function artistRadioAvailable(s){ return artistRadioSongs(s && s.artistKey).length >= ARTIST_RADIO_MIN; }
   // The index is built from the library plus the station directory, and neither is
   // guaranteed to be loaded -- or still to contain this artist -- when a stored favourite
   // is rendered. The stand-in carries enough for the art chain (a custom override, a
@@ -10207,6 +10241,11 @@
 
   function renderStationArt(container, station){
     container.innerHTML = '';
+    // A box that showed an artist's picture before stops being refreshed as one.
+    container._artistEntry = null;
+    container._radio = false;
+    if(container.dataset && container.dataset.artistArt) delete container.dataset.artistArt;
+    if(container.classList) container.classList.toggle('art-radio', isArtistRadio(station));
     var token = beginArtRender(container);
     var key = favKey(station);
     applyPlaceholderArt(container, key);
@@ -10231,6 +10270,14 @@
     if(customUrl){
       paint(customUrl);
       return; // user-supplied art is authoritative -- never overridden by the lookup chain
+    }
+    // An artist's Radio with no cover of its own wears the artist's picture.
+    if(isArtistRadio(station)){
+      var re = findArtistEntry(station.artistKey) || { key: station.artistKey, name: String(station.name || '').replace(/ Radio$/, ''), tracks: [], stations: [] };
+      renderArtistArt(container, re);
+      container.classList.add('art-radio');
+      container._radio = true;
+      return;
     }
 
     // A local track's art comes from the file's own embedded picture. There is no homepage,
@@ -10531,6 +10578,7 @@
       if(isLocalTrack(s)) return !libraryById[favKey(s)];
       if(isAlbumFav(s)) return !albumEntryForFav(s).tracks.length;
       if(isArtistFav(s)) return known && !findArtistEntry(s.artistKey);
+      if(isArtistRadio(s)) return !artistRadioAvailable(s);
       return false;
     }
     var changed = {};
@@ -21616,6 +21664,7 @@
 
   function renderArtistArt(container, entry){
     container.innerHTML = '';
+    if(container.classList) container.classList.remove('art-radio');
     // Every box showing an artist's picture is marked, so a portrait arriving later (or a
     // cover set by hand) repaints all of them -- list tiles, Favorite Artists rows, search
     // rows, Home rows -- not just the grid tiles and the open page.
@@ -21705,6 +21754,7 @@
     document.querySelectorAll('[data-artist-art]').forEach(function(box){
       if(box.dataset.artistArt !== entry.key || done.indexOf(box) >= 0) return;
       renderArtistArt(box, box._artistEntry || entry);
+      if(box._radio) box.classList.add('art-radio');
     });
   }
 
@@ -22670,9 +22720,12 @@
       if(p.stations.some(function(item){ return ownStations.some(function(st){ return sameStation(st, item); }); })){ hostPl = p; return true; }
       return false;
     });
-    if(ownStations.length && !hostPl){
-      appendGridSection(ownStations.length === 1 ? 'Station' : 'Stations', ownStations.length);
-      ownStations.forEach(function(st){
+    // Their Radio (three songs or more, build 150) leads the Stations section.
+    var radio = artistRadioFor(entry);
+    var listed = (radio ? [radio] : []).concat(hostPl ? [] : ownStations);
+    if(listed.length){
+      appendGridSection(listed.length === 1 ? 'Station' : 'Stations', listed.length);
+      listed.forEach(function(st){
         stationsGrid.appendChild(buildTile(st));
         total++;
       });
@@ -23208,7 +23261,8 @@
 
     // Play starts the artist's station if they have one, otherwise all their songs shuffled
     // (build 149; before, it started their first song).
-    var first = entry.stations[0] || entry.tracks.slice().sort(byTrackOrder)[0] || null;
+    var radio = artistRadioFor(entry);
+    var first = entry.stations[0] || radio || entry.tracks.slice().sort(byTrackOrder)[0] || null;
     artistPlayBtn.style.display = first ? '' : 'none';
     // Anything of this artist's already playing (their station, or any of their songs) makes
     // the pill a Pause/Resume for it rather than a restart from the top.
@@ -23223,8 +23277,10 @@
     } : null;
     artistPlayBtn.onclick = first ? function(){
       if(artistPillOwns(currentStation)){ togglePlayPause(); return; }
-      // Build 149: no station of their own -> all of this artist's songs, shuffled.
+      // No station of their own: their Radio (build 150), or with fewer than three songs, all
+      // of their songs shuffled (build 149).
       var songs = (entry.tracks || []).filter(function(t){ return !isBlacklisted(t); });
+      if(!(entry.stations || []).length && radio){ playStation(radio); return; }
       if(!(entry.stations || []).length && songs.length){ playShuffled(songs, entry.name); return; }
       // Everything playable the page lists above the albums (their stations, Featuring),
       // in page order, becomes the queue and plays from the top, so Next reaches every entry.
@@ -23278,6 +23334,20 @@
       closeArtistMenu();
       openArtistInfoDialog(entry);
     };
+
+    // The Radio's own cover (build 150): only while they have one.
+    var radioForArt = artistRadioFor(entry);
+    artistRadioArtBtn.style.display = radioForArt ? '' : 'none';
+    artistRadioArtBtn.onclick = radioForArt ? function(){
+      closeArtistMenu();
+      openArtUrlDialogFor({
+        key: favKey(radioForArt),
+        name: entry.name,
+        title: radioForArt.name + ' Cover',
+        suggest: { kind: 'artist', name: entry.name },
+        refresh: function(){ refreshStationArt(radioForArt); }
+      });
+    } : null;
 
     artistArtEditBtn.onclick = function(){
       closeArtistMenu();
@@ -24073,6 +24143,7 @@
   var playingFromUpNext = false; // the current track came out of Up Next, not playQueue
   var keepContextOnce = false;   // see clearQueue
   var queuePanelOpen = false;
+  var radioCtx = null;           // { key, label } while an artist's Radio is the queue (build 150)
 
   function libraryPlayOrder(){
     // sortLibrary() already maintains exactly this order on libraryTracks.
@@ -24091,6 +24162,7 @@
     playQueue = (list || []).filter(function(t){ return t && queueable(t); });
     queueIndex = track ? indexOfTrack(playQueue, track) : -1;
     queueLabel = label || '';
+    radioCtx = null;
     playingFromUpNext = false;
     updateStepButtons();
     onQueueContextChanged();
@@ -24102,6 +24174,7 @@
     playQueue = [];
     queueIndex = -1;
     queueLabel = '';
+    radioCtx = null;
     playingFromUpNext = false;
     updateStepButtons();
     onQueueContextChanged();
@@ -24136,6 +24209,39 @@
     setQueue(order, order[0], label || 'Shuffle');
     playStation(order[0]);
   }
+  // An artist's Radio: all their songs, shuffled, as the queue, labelled "<artist> Radio" (the
+  // Now Playing subtitle). It goes into Recent Stations like any station.
+  function playArtistRadio(radio){
+    var entry = findArtistEntry(radio.artistKey);
+    var songs = artistRadioSongs(radio.artistKey);
+    if(!entry || songs.length < ARTIST_RADIO_MIN){
+      setStatus((radio.name || 'This radio') + ' needs at least ' + ARTIST_RADIO_MIN + ' songs by the artist in your library.', true);
+      return;
+    }
+    var rec = artistRadioRecord(entry);
+    var order = shuffled(songs);
+    setQueue(order, order[0], rec.name);
+    radioCtx = { key: rec.artistKey, label: rec.name };
+    recordRecent(rec);
+    playStation(order[0]);
+    onQueueContextChanged();
+  }
+  window.__amplifyPlayArtistRadio = function(key){ var e = findArtistEntry(key); var r = artistRadioFor(e); if(r) playStation(r); return !!r; };
+  // Never runs out: nearing the end, another shuffle of the artist's songs (as they are in the
+  // library now) is added, with the last few played moved to the back of it.
+  function topUpArtistRadio(){
+    if(!radioCtx || queueLabel !== radioCtx.label || !playQueue.length) return;
+    if(queueIndex < playQueue.length - 2) return;
+    var songs = artistRadioSongs(radioCtx.key);
+    if(songs.length < 2) return;
+    var keep = Math.min(3, songs.length - 1);
+    var lately = playQueue.slice(-keep).map(favKey);
+    var next = shuffled(songs);
+    var fresh = next.filter(function(t){ return lately.indexOf(favKey(t)) === -1; });
+    var later = next.filter(function(t){ return lately.indexOf(favKey(t)) !== -1; });
+    playQueue = playQueue.concat(fresh, later);
+  }
+
   // Shuffle for a list that can hold anything playable -- stations, songs, episodes -- such
   // as Favorites. An artist or album favourite takes part as one of its own songs, picked at
   // random, so each favourite has the same chance of coming up whatever its size.
@@ -24143,8 +24249,8 @@
     var pool = [];
     (list || []).forEach(function(f){
       if(!f || isBlacklisted(f)) return;
-      if(isArtistFav(f) || isAlbumFav(f)){
-        var tracks = isArtistFav(f)
+      if(isArtistFav(f) || isAlbumFav(f) || isArtistRadio(f)){
+        var tracks = (isArtistFav(f) || isArtistRadio(f))
           ? ((findArtistEntry(f.artistKey || artistMatchKey(f.name || '')) || {}).tracks || [])
           : (albumEntryForFav(f).tracks || []);
         tracks = tracks.filter(function(t){ return !isBlacklisted(t); });
@@ -24252,7 +24358,7 @@
   // Songs, episodes and stations can all be lined up. A station never ends on its own, so
   // one reached in Up Next plays until Next moves on. Artists and albums are pages, not
   // things to play, so they are never queued themselves (an album queues its songs).
-  function queueable(t){ return !!t && t.type !== 'artist' && t.type !== 'album' && !isBlacklisted(t); }
+  function queueable(t){ return !!t && t.type !== 'artist' && t.type !== 'album' && t.type !== 'artistRadio' && !isBlacklisted(t); }
   (function loadUpNext(){
     try{
       var raw = JSON.parse(localStorage.getItem(UP_NEXT_KEY) || '[]');
@@ -24330,6 +24436,7 @@
   }
   // Everything that shows the queue, brought up to date together.
   function onQueueContextChanged(){
+    topUpArtistRadio();
     updateStepButtons();
     if(currentStation && HAS_MEDIA_SESSION) setMediaSessionHandlers(isLocalTrack(currentStation), isPodcastTrack(currentStation));
     if(nowPlayingScreen.style.display === 'flex') syncNpStepVisibility();
@@ -28551,6 +28658,7 @@
   // so a stream keeps the directory click-ping and the .m3u/.pls fallback below while a
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
+    if(isArtistRadio(track)) return playArtistRadio(track);
     if(reconnectState && reconnectState.station !== track) cancelReconnect();
     cancelNextUp();
     if(isLocalTrack(track)) return playLocalTrack(track);
@@ -29306,6 +29414,15 @@
     var carNet = { at: 0, top: null, forYou: {} };
     var carTimer = null, carBusy = false, carAgain = false;
 
+    // An artist's Radio in the car (build 150): a playable row the car turns into all of the
+    // artist's songs, shuffled (CarLibrary's "radio" entry). Its own cover if it has one,
+    // otherwise the artist's picture (filled in like an artist row's, below).
+    function carRadio(s){
+      if(!isArtistRadio(s) || !artistRadioAvailable(s)) return null;
+      var entry = findArtistEntry(s.artistKey);
+      var custom = getCustomArtUrl(favKey(s));
+      return { t: 'radio', key: s.artistKey, title: entry ? artistRadioRecord(entry).name : (s.name || 'Radio'), art: custom ? carImage(favKey(s), custom) : '' };
+    }
     function carStation(s){
       if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album') return null;
       if(!s.urlToResolve || isBlacklisted(s)) return null;
@@ -29420,6 +29537,7 @@
           if(isLocalTrack(f)) return carSong(f);
           if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
           if(f && f.type === 'album') return { t: 'album', key: resolveAlbumKey(f.albumKey || ''), title: f.name || f.album || '' };
+          if(isArtistRadio(f)) return carRadio(f);
           return carStation(f);
         }));
         lists.recentSongs = compact(recentStations.filter(isLocalTrack).map(carSong));
@@ -29443,7 +29561,7 @@
           }));
         });
         lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
-          .slice(0, RECENT_LIMIT).map(carStation));
+          .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : carStation(s); }));
         lists.topStations = compact((carNet.top || []).map(carStation));
         lists['continue'] = compact((r[1] || []).map(function(rec){ return carEpisode(podcastTrackFromProgress(rec), prog); }));
         lists.podLatest = latestOf(podcastSubs, prog);
@@ -29479,7 +29597,7 @@
         var jobs = [];
         Object.keys(cat.lists || {}).forEach(function(k){
           (cat.lists[k] || []).forEach(function(e){
-            if(e && e.t === 'artist' && e.key){
+            if(e && (e.t === 'artist' || (e.t === 'radio' && !e.art)) && e.key){
               jobs.push(carArtistArt(e.key, e.title).then(function(a){ if(a) e.art = a; }));
             }
           });

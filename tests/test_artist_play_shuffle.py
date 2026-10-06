@@ -1,4 +1,4 @@
-"""Build 149: Play on an artist page with no station of their own plays all of the artist's songs
+"""Build 149 (Radio since build 150): Play on an artist page with no station of their own plays all of the artist's songs
 shuffled (the queue is just their songs, in a random order); with a station, Play still starts it.
 Run: python3 tests/test_artist_play_shuffle.py"""
 import asyncio, os
@@ -36,7 +36,7 @@ async def main():
                 check(vis != 'none', 'Play shows on an artist page with songs and no station')
             await pg.click('#artistPlayBtn'); await pg.wait_for_timeout(500)
             s = await q()
-            check(sorted(s['list']) == ['Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6'] and s['cur'] == s['list'][0] and s['idx'] == 0 and s['label'] == 'Bob',
+            check(sorted(s['list']) == ['Song 2', 'Song 3', 'Song 4', 'Song 5', 'Song 6'] and s['cur'] == s['list'][0] and s['idx'] == 0 and s['label'] == 'Bob Radio',
                   f'try {i}: all of Bob songs, and only his, queued with the first playing {s}')
             orders.add(tuple(s['list']))
             await pg.evaluate("__t.openArtist('Ann')"); await pg.wait_for_timeout(600)

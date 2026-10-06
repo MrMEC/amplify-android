@@ -611,6 +611,10 @@ final class CarLibrary {
       if (str.startsWith("artist:")) {
         return artistItems(dec(str.substring(7)));
       }
+      // An artist's Radio (build 150): all of the artist's songs (played shuffled).
+      if (str.startsWith(RADIO_PREFIX)) {
+        return artistRadioSongs(dec(str.substring(RADIO_PREFIX.length())));
+      }
       if (str.startsWith("album:")) {
         return albumItems(dec(str.substring(6)));
       }
@@ -745,6 +749,8 @@ final class CarLibrary {
             jSONObject.optString("title", "Artist"),
             strEmptyToNull,
             jSONObject.optString("art"));
+      case "radio":
+        return radioItem(jSONObject, strEmptyToNull);
       case "show":
         return showFolder(jSONObject, strEmptyToNull);
       case "album":
@@ -1042,6 +1048,58 @@ final class CarLibrary {
   }
 
   static final String SHUFFLE_PREFIX = "shuffle:";
+  static final String RADIO_PREFIX = "artistradio:";
+
+  /** An artist's songs only (no stations), for their Radio. */
+  private synchronized List<JSONObject> artistRadioSongs(String key) {
+    ArrayList<JSONObject> out = new ArrayList<>();
+    JSONObject artist = this.artistsByKey.get(key);
+    if (artist == null) {
+      return out;
+    }
+    JSONArray albums = artist.optJSONArray("albums");
+    if (albums != null) {
+      for (int i = 0; i < albums.length(); i++) {
+        out.addAll(albumItems(albums.optString(i)));
+      }
+    }
+    return out;
+  }
+
+  /**
+   * An artist's Radio row (build 150): plays all of the artist's songs in a random order, through
+   * the same path as an album's Shuffle row.
+   */
+  private MediaItem radioItem(JSONObject e, String group) {
+    String key = e.optString("key");
+    Uri art = ArtProvider.uriFor(e.optString("art"));
+    if (art == null) {
+      JSONObject artist;
+      synchronized (this) {
+        artist = this.artistsByKey.get(key);
+      }
+      if (artist != null) {
+        art = ArtProvider.uriFor(artist.optString("art"));
+      }
+    }
+    MediaMetadata.Builder md =
+        new MediaMetadata.Builder()
+            .setTitle(e.optString("title", "Radio"))
+            .setArtist("Artist Radio")
+            .setArtworkUri(art)
+            .setIsPlayable(true)
+            .setIsBrowsable(false)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION);
+    if (group != null) {
+      Bundle bundle = new Bundle();
+      bundle.putString("android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT", group);
+      md.setExtras(bundle);
+    }
+    return new MediaItem.Builder()
+        .setMediaId(SHUFFLE_PREFIX + RADIO_PREFIX + enc(key))
+        .setMediaMetadata(md.build())
+        .build();
+  }
 
   /** The Shuffle row at the top of an album or playlist in the car. */
   private MediaItem shuffleItem(String listId) {

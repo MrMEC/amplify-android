@@ -16,7 +16,7 @@ HOOK = ("window.__t = { tracks: function(){ return libraryTracks.map(function(t)
         " stations: function(){ artistStations = [{ stationuuid: 'ex-zed', name: 'Exclusively Zed', url: 'http://radio.example/zed', favicon: '', tags: '' }];"
         "   artistStationsFailed = false; artistStationsPromise = Promise.resolve(artistStations); onArtistStationsChanged(); },"
         " seed: function(){ var T = function(n){ return libraryTracks.filter(function(t){ return t.name === n; })[0]; };"
-        "   var plays = {}; [['Alpha', 5], ['Bravo', 9], ['Charlie', 4], ['Zed', 3]].forEach(function(a){ plays[artistMatchKey(a[0])] = { name: a[0], count: a[1], last: Date.now() }; });"
+        "   var plays = {}; [['Alpha', 8], ['Bravo', 9], ['Charlie', 7], ['Zed', 6]].forEach(function(a){ plays[artistMatchKey(a[0])] = { name: a[0], count: a[1], last: Date.now() }; });"
         "   saveArtistPlays(plays);"
         "   var bravoAlbum = buildAlbumIndex().filter(function(a){ return a.artist === 'Bravo'; })[0];"
         "   favorites = [T('Bravo 1'), artistFavRecord(findArtistEntry(artistMatchKey('Bravo'))), albumFavRecord(bravoAlbum), T('Alpha 1'), artistFavRecord(findArtistEntry(artistMatchKey('Alpha')))]; saveFavorites();"
