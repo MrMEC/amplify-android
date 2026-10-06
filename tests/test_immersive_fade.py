@@ -49,6 +49,17 @@ async def main():
             px.sort()
             return px[int(len(px) * .98)] - px[int(len(px) * .02)]
 
+        SEAMOFF = "(function(o){ document.querySelector('#nowPlayingScreen .np-imm-fade').style.display = o ? 'none' : ''; document.querySelector('#nowPlayingScreen .np-below').style.visibility = o ? 'hidden' : ''; })"
+        async def seam(tag):
+            # with the motion held still: the fade over the page vs the page with no fade and no list
+            a = Image.open(io.BytesIO(await pg.screenshot())).convert('RGB')
+            await pg.evaluate(SEAMOFF + "(true)"); await pg.wait_for_timeout(150)
+            bb = Image.open(io.BytesIO(await pg.screenshot())).convert('RGB')
+            await pg.evaluate(SEAMOFF + "(false)")
+            box = (0, int(844 * 2 * .80), 780, 844 * 2)
+            pa, pb = list(a.crop(box).resize((39, 17)).getdata()), list(bb.crop(box).resize((39, 17)).getdata())
+            d = sum(abs(pa[k][c] - pb[k][c]) for k in range(len(pa)) for c in range(3)) / (len(pa) * 3)
+            return d
         n0 = await pg.evaluate(INFO)
         print(n0)
         check(n0['heading'] and n0['hTop'] is not None and n0['hTop'] < n0['H'], f"the 'More from' heading is on screen in normal view {n0}")
@@ -67,12 +78,8 @@ async def main():
         png1 = await pg.screenshot(); await pg.screenshot(path=f'{shots}/imm-fade-on.png')
         c1 = region_contrast(png1, (hbox[0], n1['hTop'], hbox[2], n1['hBottom']))
         check(c0 > 60 and c1 < 6, f"'More from' is readable in normal view (contrast {c0}) and hidden in Immersive View (contrast {c1})")
-        # the bottom edge is the page's colour
-        im = Image.open(io.BytesIO(png1)).convert('RGB')
-        bot = im.getpixel((390, 844 * 2 - 6))
-        m = re.findall(r'\d+', (await pg.evaluate("(function(){ var d=document.createElement('div'); d.style.color=getComputedStyle(document.getElementById('nowPlayingScreen')).getPropertyValue('--np-tint'); document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()")))
-        tint = tuple(int(v) for v in m[:3])
-        check(max(abs(bot[k] - tint[k]) for k in range(3)) <= 4, f'the bottom of the screen is the page colour {bot} vs {tint}')
+        d = await seam('song')
+        check(d < 4, f'the bottom of the screen matches the page behind it (no visible edge): mean difference {d:.1f}')
 
         # the artwork: a deeper zoom, random moves, small rotations that never show a corner
         PATH = """(()=>{ var a = document.getElementById('npArt').getAnimations().filter(function(a){ return a.effect.getKeyframes().some(function(k){ return k.transform; }); });
@@ -105,6 +112,36 @@ async def main():
         await pg.evaluate("__t.ui(true)")
         await pg.wait_for_timeout(5000)
         await pg.screenshot(path=f'{shots}/imm-fade-motion.png')
+
+        # a station with artwork: the moving wash shows in the fade too
+        import subprocess as _sp
+        _sp.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=300x300', '-frames:v', '1', f'{root}/cov1.png'], check=True)
+        async def covers(route):
+            await route.fulfill(status=200, content_type='image/png', body=open(f'{root}/' + route.request.url.rsplit('/', 1)[1], 'rb').read())
+        await pg.route('https://covers.example/**', covers)
+        await pg.evaluate("__t.play({ stationuuid: 'st-c1', name: 'Cover One', url: 'http://radio.example/c1', urlToResolve: 'http://radio.example/c1', favicon: 'http://covers.example/cov1.png', tags: '' })")
+        await pg.wait_for_timeout(900); await pg.evaluate("__t.ui(true)"); await pg.wait_for_timeout(4200)
+        W = """(()=>{ var f = document.getElementById('npImmFadeWash'), c = document.querySelector('canvas.np-imm-bg');
+          return { op: +getComputedStyle(f).opacity, ft: f.dataset.t, wt: c && c.dataset.t, fw: f.width, fh: f.height, cw: c && c.width, ch: c && c.height,
+            fr: f.getBoundingClientRect().top, fb: f.getBoundingClientRect().bottom, cr: c && c.getBoundingClientRect().top, cb: c && c.getBoundingClientRect().bottom }; })()"""
+        w1 = await pg.evaluate(W); print(w1)
+        check(w1['wt'] is not None and w1['op'] == 1 and w1['ft'] == w1['wt'] and w1['fw'] == w1['cw'] and w1['fh'] == w1['ch'], f'the fade carries the wash, frame for frame {w1}')
+        check(abs(w1['fr'] - w1['cr']) < 2 and abs(w1['fb'] - w1['cb']) < 2, f'lined up with the wash behind it {w1}')
+        await pg.screenshot(path=f'{shots}/imm-fade-wash1.png')
+        async def low():
+            im = Image.open(io.BytesIO(await pg.screenshot())).convert('RGB').resize((39, 84))
+            px = [im.getpixel((x, y)) for x in range(39) for y in range(72, 84)]
+            return tuple(sum(p[q] for p in px) / len(px) for q in range(3))
+        l1 = await low(); await pg.wait_for_timeout(3500); l2 = await low(); await pg.wait_for_timeout(3500); l3 = await low()
+        await pg.screenshot(path=f'{shots}/imm-fade-wash2.png')
+        dl = max(max(abs(l1[q] - l2[q]) for q in range(3)), max(abs(l2[q] - l3[q]) for q in range(3)))
+        check(dl > 3, f'the colours at the very bottom keep shifting ({l1} -> {l2} -> {l3}, {dl:.1f})')
+        w2 = await pg.evaluate(W)
+        check(w2['ft'] != w1['ft'] and w2['ft'] == w2['wt'], f'and still in step with the wash {w2["ft"]} {w2["wt"]}')
+        await pg.evaluate("__t.ui(false)"); await pg.wait_for_timeout(3600)
+        d2 = await seam('wash')
+        check(d2 < 4, f'with the wash, the fade matches the page behind it: mean difference {d2:.1f}')
+        await pg.evaluate("__t.ui(true)")
 
         # leaving Immersive View takes the shade away again
         await tap_art(); await pg.wait_for_timeout(900)

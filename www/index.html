@@ -3905,11 +3905,9 @@
     .np-imm-fade{ display:none; }
     body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen:not(.np-channel) .np-imm-fade{
       display:block; position:fixed; left:0; right:0; bottom:0; height:34vh; z-index:2; pointer-events:none;
-      background:linear-gradient(to bottom,
-        color-mix(in srgb, var(--np-tint, #1c1d22) 0%, transparent) 0%,
-        color-mix(in srgb, var(--np-tint, #1c1d22) 30%, transparent) 18%,
-        color-mix(in srgb, var(--np-tint, #1c1d22) 78%, transparent) 36%,
-        var(--np-tint, #1c1d22) 52%);
+      overflow:hidden; background:var(--np-tint, #1c1d22);
+      -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.3) 18%, rgba(0,0,0,.78) 36%, #000 52%);
+      mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.3) 18%, rgba(0,0,0,.78) 36%, #000 52%);
       opacity:0; visibility:hidden;
       transition: opacity .5s ease, visibility 0s linear .5s;
     }
@@ -3917,6 +3915,17 @@
       opacity:1; visibility:visible; transition: opacity .5s ease, visibility 0s linear 0s;
     }
     body.np-immersive .now-playing-screen .np-hero{ z-index:3; }
+    /* Build 145: the fade is a window onto the moving colour wash behind it. Its inner layers
+       are the full screen's height, pinned so the slice showing through lines up exactly
+       with the wash underneath (the wash, copied each frame from the same 64px canvas, and
+       the page's own bottom shade). So the colours keep shifting down here too, and the edge
+       of the fade can't be seen. With no wash (no artwork, or Remove animations) the plain
+       page colour shows instead. */
+    .np-imm-fade-wash, .np-imm-fade-scrim{ position:absolute; left:0; right:0; bottom:0; height:100vh; }
+    .np-imm-fade-wash{ width:100%; opacity:0; }
+    .np-imm-fade-scrim{
+      background:linear-gradient(to bottom, rgba(0,0,0,.24) 0, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 52%, rgba(0,0,0,.30) 100%);
+    }
     /* A TV channel's Now Playing keeps the tab bar, and holds the header, video, name and
        controls still: only the channel list under them scrolls. (Not in landscape or full
        screen, which have the whole screen to themselves.) */
@@ -5615,7 +5624,7 @@
       </div>
       <!-- Immersive View only: the page's colour rising from the bottom of the screen, over
            "More from" and the rest of the list, so only the artwork and the controls show. -->
-      <div class="np-imm-fade" aria-hidden="true"></div>
+      <div class="np-imm-fade" aria-hidden="true"><canvas class="np-imm-fade-wash" id="npImmFadeWash" width="64" height="64"></canvas><div class="np-imm-fade-scrim"></div></div>
     </div>
   </main>
 
@@ -7631,6 +7640,31 @@
     });
     c.dataset.layers = String(w.layers.length);
     c.dataset.t = String(Math.round(t));
+    immFadeCopy(c);
+  }
+  // Build 145: the bottom fade shows the same wash (see .np-imm-fade-wash).
+  var npImmFadeWash = document.getElementById('npImmFadeWash');
+  function immFadeCopy(c){
+    var f = npImmFadeWash;
+    if(!f) return;
+    if(f.width !== c.width || f.height !== c.height){ f.width = c.width; f.height = c.height; }
+    var x = f._ctx || (f._ctx = f.getContext('2d'));
+    x.clearRect(0, 0, f.width, f.height);
+    x.drawImage(c, 0, 0);
+    f.dataset.t = c.dataset.t;
+  }
+  function immFadeOpacity(op, ms){
+    var f = npImmFadeWash;
+    if(!f) return;
+    if(f._anim){ try{ f._anim.cancel(); }catch(e){} f._anim = null; }
+    if(ms && f.animate){
+      try{
+        f._anim = f.animate([{ opacity: getComputedStyle(f).opacity }, { opacity: op }], { duration: ms, easing: 'ease-in-out' });
+        f._anim.onfinish = function(){ f.style.opacity = op; f._anim = null; };
+        return;
+      }catch(e){}
+    }
+    f.style.opacity = op;
   }
   function immWashKick(){
     var w = imm.wash;
@@ -7684,6 +7718,9 @@
         // Once it's up, the page's own blurred backdrop underneath is hidden: it's covered
         // anyway, and leaving it there doubles what the phone draws every frame.
         immWashDraw(w);
+        clearTimeout(immFadeOpacity._t);
+        immFadeOpacity(0, 0);
+        immFadeOpacity(1, 3000);
         try{
           var a = c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 3000, easing: 'ease-in-out' });
           a.onfinish = function(){ if(immOn() && imm.wash === w) document.body.classList.add('np-imm-wash'); };
@@ -7703,6 +7740,9 @@
     var w = imm.wash;
     if(w){ cancelAnimationFrame(w.raf); w.el.remove(); }
     imm.wash = null;
+    // Kept while the fade itself fades out, then cleared for next time.
+    clearTimeout(immFadeOpacity._t);
+    immFadeOpacity._t = setTimeout(function(){ if(!imm.wash) immFadeOpacity(0, 0); }, 600);
     document.body.classList.remove('np-imm-wash');
   }
   function startImmersiveMotion(){
