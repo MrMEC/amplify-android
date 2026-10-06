@@ -4639,7 +4639,18 @@
   }
   /* The close button (top left) and the menu button (top right) too (build 140). */
   .now-playing-screen .np-float .np-back{ color:var(--np-vivid, #fff); transition: color .5s ease, background .15s ease, border-color .15s ease, transform .38s cubic-bezier(.4,0,.2,1), opacity .3s ease; }
+  /* Build 142: the "More from ..." / "Related Stations" headings, each list row's three-dot
+     button and Up Next's "Next" label in the colour too. */
+  .now-playing-screen .np-related-heading, .now-playing-screen .np-upnext-label{ color:var(--np-vivid, #fff); transition: color .5s ease; }
+  body .now-playing-screen .row-more-btn, body .now-playing-screen .tile-more{ color:var(--np-vivid, #fff); }
   @media (max-width: 900px){
+    /* Build 142: the mini player drops away while Now Playing is open (same slide as when
+       Search takes its place) and comes back when the screen closes. Search still rises into
+       its slot from the tab bar; closing Search doesn't bring the mini player back here. */
+    body.np-open:not(.rotate-lock) .player-bar{
+      transform:translateY(calc(100% + var(--player-bar-bottom) + 24px));
+      opacity:0; pointer-events:none;
+    }
     body.np-open .mobile-nav-btn.active{ color:var(--np-vivid, var(--accent)); }
     body.np-open .sidebar-top .hamburger-btn span,
     body.np-open.album-open .sidebar-top .hamburger-btn span,

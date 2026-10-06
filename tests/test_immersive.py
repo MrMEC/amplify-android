@@ -53,8 +53,8 @@ async def main():
             await pg.evaluate(start_js); await pg.wait_for_timeout(600)
             await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(900)
             s0 = await st()
-            check(not s0['imm'] and s0['nav']['top'] < s0['H'] and s0['bar']['bottom'] < s0['H'] and s0['back']['top'] >= 0 and s0['menu']['top'] >= 0,
-                  f'{kind}: normal view shows corner buttons, mini player and tab bar {s0}')
+            check(not s0['imm'] and s0['nav']['top'] < s0['H'] and s0['bar']['top'] >= s0['H'] and s0['back']['top'] >= 0 and s0['menu']['top'] >= 0,
+                  f'{kind}: normal view shows corner buttons and tab bar; the mini player is down out of sight (build 142) {s0}')
             await pg.screenshot(path=f'{shots}/immersive-{kind}-off.png')
             await tap_art()
             mid = []

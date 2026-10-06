@@ -54,7 +54,7 @@ async def main():
         bar = await pg.evaluate("""(()=>{var b=document.getElementById('playerBar'), nav=document.getElementById('mobileNav');
           var r=b.getBoundingClientRect(), hit=document.elementFromPoint(r.left+r.width/2, r.top+r.height/2);
           return {shown:getComputedStyle(b).display!=='none' && !!hit && b.contains(hit), bottom:Math.round(r.bottom), navTop:Math.round(nav.getBoundingClientRect().top)};})()""")
-        check(bar['shown'] and bar['bottom'] <= bar['navTop'], f'the mini player shows above the tab bar on a station Now Playing {bar}')
+        check(not bar['shown'] and bar['bottom'] > bar['navTop'], f'the mini player is hidden (slid down behind the tab bar) on a station Now Playing (build 142) {bar}')
         await pg.screenshot(path=f'{SHOTS}/np-station-nav.png')
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(500)
         st = await pg.evaluate("""(()=>{var s=document.getElementById('searchSheet'), r=s.getBoundingClientRect(), hit=document.elementFromPoint(r.left+r.width/2, r.top+r.height/2);

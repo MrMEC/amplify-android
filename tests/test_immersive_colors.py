@@ -38,6 +38,9 @@ ST = """(()=>{ function r(id){ var el = document.getElementById(id) || document.
   probe.remove(); return out; })()"""
 
 
+BAR = """(()=>{ var b = document.getElementById('playerBar'), r = b.getBoundingClientRect(), c = getComputedStyle(b), sh = document.getElementById('searchSheet'), sr = sh.getBoundingClientRect();
+  return { top: Math.round(r.top), op: parseFloat(c.opacity), pe: c.pointerEvents, H: innerHeight, sheetTop: Math.round(sr.top), sheetOpen: sh.classList.contains('open') }; })()"""
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
@@ -91,6 +94,16 @@ async def main():
         up = re.match(r'rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)', cols['upnext']) or re.match(r'color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) / ([\d.]+)', cols['upnext'])
         print('upnext', cols['upnext'])
         check(up and abs(float(up.group(4)) - 0.24) < 0.02, f"Up Next row: the colour, lighter (24%) ({cols['upnext']})")
+        bar = await pg.evaluate(BAR)
+        check(bar['top'] >= bar['H'] and bar['op'] == 0 and bar['pe'] == 'none', f'mini player slid off the bottom while Now Playing is open {bar}')
+        more = await pg.evaluate("""(()=>({ head: getComputedStyle(document.querySelector('.now-playing-screen .np-related-heading')).color,
+          headText: document.querySelector('.now-playing-screen .np-related-heading').textContent,
+          dots: Array.from(document.querySelectorAll('.now-playing-screen .row-more-btn, .now-playing-screen .tile-more')).filter(function(b){ return b.offsetParent; }).map(function(b){ return getComputedStyle(b).color; }),
+          label: getComputedStyle(document.getElementById('npUpNextLabel') || document.querySelector('.np-upnext-label')).color }))()""")
+        print('more from', more)
+        check(parse_rgb(more['head']) == v and more['headText'], f"'{more['headText']}' heading in the colour {more['head']}")
+        check(more['dots'] and all(parse_rgb(d) == v for d in more['dots']), f"every three-dot button in the list in the colour ({len(more['dots'])}) {more['dots'][:3]}")
+        check(parse_rgb(more['label']) == v, f"Up Next's 'Next' label in the colour {more['label']}")
         top = await pg.evaluate("""(()=>({ back: getComputedStyle(document.getElementById('npBackBtn')).color,
           ham: getComputedStyle(document.querySelector('.sidebar-top .hamburger-btn span')).backgroundColor }))()""")
         check(parse_rgb(top['back']) == v and parse_rgb(top['ham']) == v, f"close (top left) and menu (top right) in the colour {top}")
@@ -146,12 +159,26 @@ async def main():
         vv = parse_rgb((await pg.evaluate(ST))['vivid'])
         check(go[1] and parse_rgb(go[0]) == vv, f'search button in the colour while Now Playing is open {go}')
         await pg.screenshot(path=f'{shots}/immcol-search.png')
-        await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(400)
+        bar = await pg.evaluate(BAR)
+        print('bar with search open over Now Playing', bar)
+        check(bar['sheetOpen'] and bar['sheetTop'] < bar['H'] - 60 and bar['top'] >= bar['H'] and bar['op'] == 0, f'Search rises in from the tab bar; the mini player stays down {bar}')
+        await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(700)
+        bar = await pg.evaluate(BAR)
+        check(bar['top'] >= bar['H'] and bar['op'] == 0 and bar['pe'] == 'none', f'closing Search on Now Playing does not bring the mini player back {bar}')
+        await pg.screenshot(path=f'{shots}/immcol-search-closed.png')
         # ---- closing Now Playing: the tab bar's colour goes back ----
         await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(300)
         await pg.evaluate('__t.closeNp()'); await pg.wait_for_timeout(900)
         back = await pg.evaluate("(()=>{ var p = document.createElement('div'); p.style.color = getComputedStyle(document.body).getPropertyValue('--accent'); document.body.appendChild(p); var a = getComputedStyle(p).color; p.remove(); return [getComputedStyle(document.querySelector('.mobile-nav-btn.active')).color, a]; })()")
         check(back[0] == back[1], f'after closing Now Playing the selected tab is the app colour again {back}')
+        bar = await pg.evaluate(BAR)
+        check(bar['top'] < bar['H'] - 60 and bar['op'] == 1 and bar['pe'] != 'none', f'the mini player slides back up once Now Playing closes {bar}')
+        fr = await pg.evaluate("""new Promise(function(res){ var b = document.getElementById('playerBar'), out = [], t0 = performance.now(); __t.openNp();
+          (function f(){ out.push(Math.round(b.getBoundingClientRect().top)); if(performance.now() - t0 < 700) requestAnimationFrame(f); else res(out); })(); })""")
+        mids = [t for t in fr if fr[0] + 6 < t < fr[-1] - 6]
+        print('bar frames opening Now Playing', fr[:3], fr[-2:], len(mids))
+        check(len(mids) >= 4 and fr[-1] >= 900, f'the mini player slides down (not a jump) as Now Playing opens ({len(mids)} in-between frames)')
+        await pg.evaluate('__t.closeNp()'); await pg.wait_for_timeout(900)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(500)
         go2 = await pg.evaluate("(()=>{ var p = document.createElement('div'); p.style.color = getComputedStyle(document.body).getPropertyValue('--accent'); document.body.appendChild(p); var a = getComputedStyle(p).color; p.remove(); return [getComputedStyle(document.getElementById('searchSheetGo')).backgroundColor, a]; })()")
         check(go2[0] == go2[1], f'search button back to the app colour away from Now Playing {go2}')
