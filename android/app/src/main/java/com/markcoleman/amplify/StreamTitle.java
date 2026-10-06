@@ -235,6 +235,75 @@ public final class StreamTitle {
     return strTrim;
   }
 
+  private static final Pattern ICY_TITLE_START =
+      Pattern.compile("streamtitle\\s*=\\s*'", Pattern.CASE_INSENSITIVE);
+  private static final Pattern ICY_NEXT_KEY = Pattern.compile("^\\s*\\w+\\s*=\\s*'");
+
+  /**
+   * The StreamTitle value from a raw ICY metadata block (build 148). Media3's own decoder ends the
+   * value at the first "';", and some servers' blocks don't fit that (an apostrophe in the song
+   * name followed by a semicolon, a missing final semicolon, escaped quotes), which cut titles
+   * off at the apostrophe ("Like You Don't Love Me" became "Like You Don"). Here the value runs
+   * to the "';" that is followed by another key or by the end of the block. Also decodes
+   * Windows-1252 (where the curly apostrophe is byte 0x92) when the block isn't valid UTF-8.
+   * Returns null when the block has no StreamTitle.
+   */
+  public static String icyTitle(byte[] bytes) {
+    if (bytes == null || bytes.length == 0) {
+      return null;
+    }
+    String s = icyDecode(bytes);
+    if (s == null) {
+      return null;
+    }
+    s = s.replace("\u0000", "").trim();
+    Matcher m = ICY_TITLE_START.matcher(s);
+    if (!m.find()) {
+      return null;
+    }
+    int start = m.end();
+    int end = -1;
+    int from = start;
+    while (true) {
+      int i = s.indexOf("';", from);
+      if (i < 0) {
+        break;
+      }
+      String rest = s.substring(i + 2);
+      if (rest.trim().isEmpty() || ICY_NEXT_KEY.matcher(rest).find()) {
+        end = i;
+        break;
+      }
+      from = i + 1;
+    }
+    if (end < 0) {
+      // No proper terminator: up to the last quote if the block ends with one, else to the end.
+      String tail = s.substring(start);
+      int q = tail.lastIndexOf('\'');
+      end = (q >= 0 && tail.substring(q + 1).replace(";", "").trim().isEmpty()) ? start + q : s.length();
+    }
+    String v = s.substring(start, end);
+    // Escaped apostrophes ("Don\\'t", "Don';t") back to plain ones.
+    v = v.replace("\\'", "'").replace("\\\\", "\\").replace("';", "'");
+    return v;
+  }
+
+  private static String icyDecode(byte[] bytes) {
+    try {
+      return java.nio.charset.StandardCharsets.UTF_8
+          .newDecoder()
+          .decode(java.nio.ByteBuffer.wrap(bytes))
+          .toString();
+    } catch (java.nio.charset.CharacterCodingException e) {
+      // not UTF-8
+    }
+    try {
+      return new String(bytes, "windows-1252");
+    } catch (java.io.UnsupportedEncodingException e) {
+      return new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+    }
+  }
+
   private static String norm(String str) {
     return str.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", "");
   }

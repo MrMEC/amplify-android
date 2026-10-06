@@ -50,6 +50,7 @@ import java.util.Map;
 public final class SkipAwarePlayer extends ForwardingPlayer {
   private String buttonsShown;
   private String lastRaw;
+  private String lastIcyBlock;
   private long lastRawAt;
   private String lastRawFor;
   private String lastVerdict;
@@ -170,6 +171,15 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     return sb.toString();
   }
 
+  /** The raw ICY block as text for the diagnostics (NULs dropped, at most 240 characters). */
+  private static String icyBlockText(byte[] bytes) {
+    if (bytes == null) {
+      return null;
+    }
+    String t = new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1).replace("\u0000", "").trim();
+    return t.length() > 240 ? t.substring(0, 240) + "..." : t;
+  }
+
   public String onAirDebug() {
     MediaItem currentMediaItem = getCurrentMediaItem();
     return "Stream titles: "
@@ -179,6 +189,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
             ? "never"
             : ((SystemClock.elapsedRealtime() - this.lastRawAt) / 1000) + " s ago")
         + (this.lastRaw == null ? "" : " (\"" + this.lastRaw + "\")")
+        + (this.lastIcyBlock == null ? "" : "; ICY block [" + this.lastIcyBlock + "]")
         + "; live "
         + (isLiveNow() ? "yes" : "no")
         + "; station \""
@@ -228,7 +239,17 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
       Metadata.Entry entry = metadata.get(i2);
       if (entry instanceof IcyInfo) {
         IcyInfo icyInfo = (IcyInfo) entry;
-        if (icyInfo.title != null) {
+        // Build 148: our own reading of the raw block, so an apostrophe can't cut the title off.
+        String mine = null;
+        try {
+          mine = StreamTitle.icyTitle(icyInfo.rawMetadata);
+          this.lastIcyBlock = icyBlockText(icyInfo.rawMetadata);
+        } catch (RuntimeException e) {
+          mine = null;
+        }
+        if (mine != null) {
+          str = mine;
+        } else if (icyInfo.title != null) {
           str = icyInfo.title;
         }
       } else if (entry instanceof TextInformationFrame) {
