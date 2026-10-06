@@ -4642,8 +4642,10 @@
   body .now-playing-screen .np-fav-btn.on, body .now-playing-screen .np-menu-btn,
   body.rotate-lock .now-playing-screen .np-step-btn, body.rotate-lock .now-playing-screen .np-skip-btn{ color:var(--np-vivid, #fff); }
   .now-playing-screen .np-seek-range, body.rotate-lock .now-playing-screen .np-seek-range{
+    /* Build 144: the unplayed part is the same colour, mostly see-through, so the bar reads as
+       one piece and the played part still stands out against it. */
     background:linear-gradient(to right, var(--np-vivid, #fff) 0%, var(--np-vivid, #fff) var(--seek-pct, 0%),
-      rgba(255,255,255,.28) var(--seek-pct, 0%), rgba(255,255,255,.28) 100%);
+      color-mix(in srgb, var(--np-vivid, #fff) 30%, transparent) var(--seek-pct, 0%), color-mix(in srgb, var(--np-vivid, #fff) 30%, transparent) 100%);
   }
   .now-playing-screen .np-seek-range::-webkit-slider-thumb{ background:var(--np-vivid, #fff); }
   .now-playing-screen .np-seek-range::-moz-range-thumb{ background:var(--np-vivid, #fff); }
@@ -4794,6 +4796,18 @@
     padding:7px 14px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer;
   }
   .queue-clear:hover{ background:rgba(255,255,255,.12); }
+  /* Build 144: Shuffle in the header's top right; Clear at the end of the Up Next heading. */
+  .queue-heading-row .queue-clear{ margin-left:auto; padding:4px 12px; font-size:12px; align-self:center; margin-bottom:6px; }
+  .queue-shuffle{ transition: opacity .2s ease, background .15s ease, color .5s ease; }
+  body.np-open .queue-shuffle{ color:var(--np-vivid, #fff); }
+  .queue-shuffle[hidden]{ display:flex; visibility:hidden; opacity:0; pointer-events:none; }
+  .queue-shuffle svg{ width:20px; height:20px; stroke-width:2; }
+  .queue-shuffle.spin svg{ animation: queueShuffleSpin .5s cubic-bezier(.3,.7,.3,1); }
+  @keyframes queueShuffleSpin{ 0%{ transform:scale(1); } 40%{ transform:scale(.78) rotate(-12deg); } 100%{ transform:scale(1) rotate(0); } }
+  /* The new order settles in, top to bottom. */
+  .queue-panel.shuffling .queue-row:not(.now){ animation: queueRowIn .42s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(min(var(--qi, 0), 12) * 28ms); }
+  @keyframes queueRowIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){ .queue-panel.shuffling .queue-row, .queue-shuffle.spin svg{ animation:none; } }
   .queue-scroll{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 10px 24px; -webkit-overflow-scrolling:touch; }
   .queue-section{ margin-top:14px; }
   /* The rest of the album / playlist / shuffle carries straight on under Up Next, as one list. */
@@ -6118,7 +6132,16 @@
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>
     </button>
     <div class="queue-title">Queue</div>
-    <button type="button" class="queue-clear" id="queueClearBtn">Clear</button>
+    <!-- Build 144: shuffles everything coming up (Up Next and the rest after it). -->
+    <button type="button" class="queue-close queue-shuffle" id="queueShuffleBtn" title="Shuffle queue" aria-label="Shuffle the queue">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/>
+        <path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/>
+        <path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/>
+        <path d="M18.4 3.2L21.5 6l-3.1 2.8"/>
+        <path d="M18.4 14.2l3.1 2.8-3.1 2.8"/>
+      </svg>
+    </button>
   </div>
   <div class="queue-scroll" id="queueScroll">
     <div class="queue-section" id="queueNowSection">
@@ -6129,6 +6152,8 @@
       <div class="queue-heading-row">
         <div class="queue-heading">Up Next</div>
         <span class="queue-count" id="queueUpCount"></span>
+        <!-- Clear moved here from the header in build 144, where Shuffle now sits. -->
+        <button type="button" class="queue-clear" id="queueClearBtn">Clear</button>
       </div>
       <div class="queue-list" id="queueUpList"></div>
       <div class="queue-empty" id="queueUpEmpty">Your queue is empty.</div>
@@ -6915,6 +6940,7 @@
   var npQueueMenuBtn = document.getElementById('npQueueMenuBtn');
   var queuePanel = document.getElementById('queuePanel');
   var queueCloseBtn = document.getElementById('queueCloseBtn');
+  var queueShuffleBtn = document.getElementById('queueShuffleBtn');
   var queueClearBtn = document.getElementById('queueClearBtn');
   var queueScroll = document.getElementById('queueScroll');
   var queueNowSection = document.getElementById('queueNowSection');
@@ -24311,6 +24337,8 @@
     // One count beside Up Next for everything that is coming.
     var total = upNext.length + rest.length;
     queueUpCount.textContent = total ? String(total) : '';
+    queueShuffleBtn.hidden = total < 2;
+    Array.prototype.forEach.call(queuePanel.querySelectorAll('#queueUpList .queue-row, #queueCtxList .queue-row'), function(r, i){ r.style.setProperty('--qi', i); });
     // "Your queue is empty" only when nothing at all is coming.
     queueUpEmpty.style.display = (upNext.length || rest.length) ? 'none' : '';
   }
@@ -24345,8 +24373,41 @@
   // On a desktop the whole header row -- arrow, title and the space after it -- closes the
   // sheet; only Clear keeps its own job.
   document.querySelector('.queue-head').addEventListener('click', function(e){
-    if(isPhoneLayout() || queueClearBtn.contains(e.target) || queueCloseBtn.contains(e.target)) return;
+    if(isPhoneLayout() || queueClearBtn.contains(e.target) || queueCloseBtn.contains(e.target) || queueShuffleBtn.contains(e.target)) return;
     closeQueuePanel();
+  });
+  // Build 144: Shuffle puts everything coming up in a new random order -- Up Next among
+  // itself, and the rest of the album / playlist / library after it among itself -- so what
+  // you queued still plays before the rest. The current track isn't touched.
+  function shuffleUpcoming(){
+    var start = queueRestStart();
+    var rest = start >= 0 ? playQueue.slice(start) : [];
+    if(upNext.length + rest.length < 2) return false;
+    function mix(list){
+      if(list.length < 2) return list;
+      var keys = list.map(favKey).join('\n'), out = list;
+      for(var tries = 0; tries < 6; tries++){
+        out = shuffled(list);
+        if(out.map(favKey).join('\n') !== keys) break;
+      }
+      return out;
+    }
+    upNext = mix(upNext);
+    if(rest.length) playQueue = playQueue.slice(0, start).concat(mix(rest));
+    onUpNextChanged();
+    if(queuePanelOpen) renderQueuePanel();
+    return true;
+  }
+  window.__amplifyShuffleUpcoming = shuffleUpcoming;
+  queueShuffleBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(!shuffleUpcoming()) return;
+    queueScroll.scrollTop = 0;
+    queuePanel.classList.remove('shuffling'); queueShuffleBtn.classList.remove('spin');
+    void queuePanel.offsetWidth;
+    queuePanel.classList.add('shuffling'); queueShuffleBtn.classList.add('spin');
+    clearTimeout(queueShuffleBtn._t);
+    queueShuffleBtn._t = setTimeout(function(){ queuePanel.classList.remove('shuffling'); queueShuffleBtn.classList.remove('spin'); }, 900);
   });
   queueClearBtn.addEventListener('click', function(){
     if(!upNext.length) return;

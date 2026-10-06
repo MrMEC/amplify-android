@@ -91,6 +91,14 @@ async def main():
         check(parse_rgb(cols['fav']) == v and parse_rgb(cols['menu']) == v, f"favourite and menu in the bright colour {cols['fav']} {cols['menu']}")
         sg = re.findall(r'rgba?\([^)]*\)', cols['seek'])
         check(sg and parse_rgb(sg[0]) == v, f"progress bar's played part in the bright colour {cols['seek'][:120]}")
+        # build 144: the unplayed part is the same colour at 30%
+        un = re.findall(r'color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) / ([\d.]+)\)', cols['seek']) or [(m[0], m[1], m[2], m[3]) for m in re.findall(r'rgba\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)', cols['seek'])]
+        print('seek track', cols['seek'])
+        ok = False
+        for u in un:
+            rgb = tuple(float(x) * (255 if float(max(u[:3], key=float)) <= 1 else 1) for x in u[:3])
+            if max(abs(rgb[k] - v[k]) for k in range(3)) <= 3 and abs(float(u[3]) - .3) < .02: ok = True
+        check(ok, f"progress bar's unplayed part is the same colour, 30% opaque {cols['seek'][:220]}")
         up = re.match(r'rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)', cols['upnext']) or re.match(r'color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) / ([\d.]+)', cols['upnext'])
         print('upnext', cols['upnext'])
         check(up and abs(float(up.group(4)) - 0.24) < 0.02, f"Up Next row: the colour, lighter (24%) ({cols['upnext']})")
