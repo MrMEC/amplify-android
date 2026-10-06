@@ -1,12 +1,12 @@
 """Build 138: the Video section is called Watch (circle play icon) in the tab bar and the drawer;
-Continue Listening on Podcasts and Continue Watching on Watch are accordions, closed by default.
+Continue Listening on Podcasts and Continue Watching on Watch are accordions, open by default (build 141); after visiting a Library page, opening Watch highlights Watch in the tab bar.
 Run: python3 tests/test_watch_accordions.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools, sys
 from playwright.async_api import async_playwright
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = '/tmp/claude-0/t/srv-acc'; SHOTS = '/tmp/claude-0/t/shots'
 shutil.rmtree(ROOT, ignore_errors=True); os.makedirs(ROOT); os.makedirs(SHOTS, exist_ok=True)
-HOOK = ("window.__a = { watch: function(){ videoChannels.forEach(function(c){ recordChannelWatch(channelToStation(c)); }); },"
+HOOK = ("window.__a = { artists: function(){ runLibrarySection('artists'); }, nav: function(){ var b = document.querySelector('.mobile-nav-btn.active'); return b ? b.dataset.nav : null; }, watch: function(){ videoChannels.forEach(function(c){ recordChannelWatch(channelToStation(c)); }); },"
         " pod: function(){ var eps = [1,2,3].map(function(i){ return { guid: 'ep' + i, name: 'Episode ' + i, collectionId: 77, collectionName: 'Show ' + i,"
         "   artistName: 'Host', favicon: '', episodeUrl: 'https://pod.example/' + i + '.mp3', duration: 3600, type: 'podcast' }; });"
         "   return Promise.all(eps.map(function(e, i){ return savePodcastProgress(e, 300 + i * 60, 3600); })); } };\n")
@@ -68,12 +68,22 @@ async def main():
 
             # ---- Watch: Continue Watching ----
             await pg.evaluate('__a.watch()'); await pg.wait_for_timeout(200)
+            # Library first (the screenshot Mark sent: Library stayed lit on Watch)
+            await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=library]').click()"); await pg.wait_for_timeout(500)
+            await pg.evaluate('__a.artists()'); await pg.wait_for_timeout(600)
+            check(await pg.evaluate('__a.nav()') == 'library', f'[{theme}] on Artists the Library tab is lit')
             await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
+            lit = await pg.evaluate('__a.nav()')
+            check(lit == 'video', f'[{theme}] Watch opened from a Library page lights Watch, not Library ({lit})')
             head = await pg.evaluate("document.getElementById('stationsHeading').textContent")
             check(head == 'Watch', f'[{theme}] page heading reads Watch ({head})')
+            a0 = await pg.evaluate(ACC, 'watchContinue')
+            check(a0 and a0['expanded'] == 'true' and a0['rowShown'] and a0['tiles'] == 2 and a0['chev'], f'[{theme}] Continue Watching open by default {a0}')
+            await pg.screenshot(path=f'{SHOTS}/acc-watch-default-{theme}.png')
+            await pg.evaluate("document.querySelector('.acc-head[data-acc=watchContinue]').click()"); await pg.wait_for_timeout(500)
             a = await pg.evaluate(ACC, 'watchContinue')
             print(a)
-            check(a and a['expanded'] == 'false' and not a['rowShown'] and a['chev'], f'[{theme}] Continue Watching closed by default {a}')
+            check(a and a['expanded'] == 'false' and not a['rowShown'], f'[{theme}] tapping closes it {a}')
             check(a and a['text'] == 'Continue Watching', f'[{theme}] heading has no count ({a and a["text"]})')
             check(a and a['headH'] >= 40, f'[{theme}] heading is a comfortable tap target ({a and a["headH"]}px)')
             gap_closed = a['nextTop'] - a['headBottom'] if a else None
@@ -98,6 +108,9 @@ async def main():
             fr = await pg.evaluate(SAMPLE, 'watchContinue')
             a4 = await pg.evaluate(ACC, 'watchContinue')
             check(not a4['rowShown'], f'[{theme}] tapping again closes it')
+            await pg.evaluate("document.querySelector('.video-tabs [data-vtab=movies]').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.querySelector('.video-tabs [data-vtab=channels]').click()"); await pg.wait_for_timeout(300)
+            check(not (await pg.evaluate(ACC, 'watchContinue'))['rowShown'], f'[{theme}] a closed one stays closed across a redraw')
             check(smooth(fr, o3['nextTop'], a4['nextTop']) and a4['nextTop'] - a4['headBottom'] == gap_closed, f'[{theme}] closing slides back up to exactly the closed spacing ({fr[0]} -> {fr[-1]}, gap {a4["nextTop"] - a4["headBottom"]})')
 
             # ---- Podcasts: Continue Listening ----
@@ -106,11 +119,13 @@ async def main():
             print('podcasts grid', await pg.evaluate("Array.prototype.map.call(document.getElementById('stationsGrid').children,function(e){return e.className+':'+e.textContent.slice(0,40);}).slice(0,6)"))
             c = await pg.evaluate(ACC, 'podcastContinue')
             print(c)
-            check(c and c['expanded'] == 'false' and not c['rowShown'] and c['text'] == 'Continue Listening', f'[{theme}] Continue Listening on Podcasts closed by default, no count {c}')
-            await pg.screenshot(path=f'{SHOTS}/acc-pod-closed-{theme}.png')
-            await pg.evaluate("document.querySelector('.acc-head[data-acc=podcastContinue]').click()"); await pg.wait_for_timeout(400)
+            check(c and c['expanded'] == 'true' and c['rowShown'] and c['tiles'] == 3 and c['text'] == 'Continue Listening' and c['rowTop'] - c['headBottom'] >= 8,
+                  f'[{theme}] Continue Listening on Podcasts open by default with the three episodes, no count {c}')
+            await pg.evaluate("document.querySelector('.acc-head[data-acc=podcastContinue]').click()"); await pg.wait_for_timeout(500)
             c2 = await pg.evaluate(ACC, 'podcastContinue')
-            check(c2['rowShown'] and c2['tiles'] == 3 and c2['rowTop'] - c2['headBottom'] >= 8, f'[{theme}] opens with the three episodes {c2}')
+            check(not c2['rowShown'], f'[{theme}] and closes when tapped {c2}')
+            await pg.screenshot(path=f'{SHOTS}/acc-pod-closed-{theme}.png')
+            await pg.evaluate("document.querySelector('.acc-head[data-acc=podcastContinue]').click()"); await pg.wait_for_timeout(500)
             await pg.screenshot(path=f'{SHOTS}/acc-pod-open-{theme}.png')
             # Home's Continue Listening is untouched (not an accordion)
             await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(600)

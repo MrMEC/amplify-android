@@ -109,7 +109,7 @@ async def main():
         tr = await pg.evaluate("""(()=>({ play: getComputedStyle(document.getElementById('npPlayBtn')).backgroundColor, next: getComputedStyle(document.getElementById('npNextBtn')).color }))()""")
         print('immersive see-through', tr)
         alpha = lambda c: float((re.search(r'/\s*([\d.]+)\)', c) or re.search(r'rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)', c)).group(1))
-        check(abs(alpha(tr['play']) - 0.55) < 0.03 and abs(alpha(tr['next']) - 0.6) < 0.03, f"Immersive View only: Play and skip see-through {tr}")
+        check(parse_rgb(tr['play']) == parse_rgb(s1['vivid']) and 'color(' not in tr['play'] and '/ ' not in tr['next'], f"Immersive View: Play and skip solid, as in the normal view {tr}")
         await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(900)
         s2 = await pg.evaluate(ST)
         check(s2['fav']['op'] == 1 and s2['seek']['op'] == 1 and parse_rgb(s2['playBg']) == parse_rgb(s2['vivid']), 'leaving immersive brings them back, still coloured')

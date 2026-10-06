@@ -4639,9 +4639,6 @@
   }
   /* The close button (top left) and the menu button (top right) too (build 140). */
   .now-playing-screen .np-float .np-back{ color:var(--np-vivid, #fff); transition: color .5s ease, background .15s ease, border-color .15s ease, transform .38s cubic-bezier(.4,0,.2,1), opacity .3s ease; }
-  /* Immersive View: Play and the skip buttons see-through (build 140). */
-  body.np-immersive .now-playing-screen .np-play-btn{ background:color-mix(in srgb, var(--np-vivid, #fff) 55%, transparent); }
-  body.np-immersive .now-playing-screen .np-step-btn, body.np-immersive .now-playing-screen .np-skip-btn{ color:color-mix(in srgb, var(--np-vivid, #fff) 60%, transparent); }
   @media (max-width: 900px){
     body.np-open .mobile-nav-btn.active{ color:var(--np-vivid, var(--accent)); }
     body.np-open .sidebar-top .hamburger-btn span,
@@ -13171,9 +13168,18 @@
     if(onVideoView) renderVideoHome();
   }
 
+  // Watch's pages are not in My Library. Every Library page sets these when it opens and the
+  // other sections clear them, but Watch didn't, so after an artist, album or Library list the
+  // tab bar went on highlighting Library while Watch was showing (build 141).
+  function clearLibraryPlace(){
+    activeLibrarySection = null;
+    activeArtistKey = null;
+    activeAlbumKey = null;
+  }
   function openVideoHome(){
     enterLibraryChrome();
     onVideoView = true;
+    clearLibraryPlace();
     setDetailBack(null);
     stationsHeading.textContent = 'Watch';
     pageTitle.style.display = 'none';
@@ -13606,6 +13612,7 @@
       addChannelsState.pickDefault = addChannelsTab === 'recommended' && countryByTab.recommended == null;
     }
     onAddChannelsView = true;
+    clearLibraryPlace();
     setDetailBackToHistory(function(){ openVideoHome(); }, 'Watch');
     stationsHeading.textContent = 'Add Channels';
     pageTitle.style.display = 'none';
@@ -15478,6 +15485,7 @@
   function enterVideoDetail(title){
     enterLibraryChrome();
     onVideoDetailView = true;
+    clearLibraryPlace();
     setDetailBackToHistory(function(){ openVideoHome(); }, 'Watch');
     // The title is in the page itself, beside the poster.
     stationsHeading.textContent = '';
@@ -21590,12 +21598,13 @@
   }
 
   // A section heading that opens and closes the row under it (build 138): Continue Listening on
-  // Podcasts and Continue Watching on Watch. Closed by default; opening one is remembered until
-  // the app is restarted, so a redraw (a new episode, a channel watched) doesn't fold it away.
+  // Podcasts and Continue Watching on Watch. Open by default; closing one is remembered until
+  // the app is restarted, so a redraw (a new episode, a channel watched) doesn't open it again.
   var sectionAccOpen = {};
   var ACC_CHEVRON = '<svg class="acc-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   function makeSectionAccordion(label, row, id, count){
-    var open = !!sectionAccOpen[id];
+    // Open by default (build 141); closing one is remembered until the app restarts.
+    var open = sectionAccOpen[id] !== false;
     label.classList.add('acc-head');
     label.dataset.acc = id;
     label.setAttribute('role', 'button');
@@ -27290,9 +27299,9 @@
     if(document.body.classList.contains('search-open')) return 'search';
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
+    if(onVideoView || onAddChannelsView || onVideoDetailView) return 'video';
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
-    if(onVideoView || onAddChannelsView || onVideoDetailView) return 'video';
     // For You (and its searches) lives on Home now.
     if(onHomeView || activeHomeSection || onStationsHomeView || activeCustomSearchId) return 'home';
     return null;
