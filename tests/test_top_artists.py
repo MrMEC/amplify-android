@@ -14,7 +14,7 @@ os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
 HOOK = ("window.__t = { tracks: function(){ return libraryTracks; }, runLibrarySection: runLibrarySection,"
-        " plays: function(){ return loadArtistPlays(); }, openTop: function(){ openHomeSectionPage('topArtists'); },"
+        " plays: function(){ return loadArtistPlays(); }, setPlays: function(p){ saveArtistPlays(p); }, openTop: function(){ openHomeSectionPage('topArtists'); },"
         " playSong: function(title){ var t = libraryTracks.filter(function(x){ return x.name === title; })[0]; playEntity(t); },"
         " toggle: function(){ togglePlayPause(); }, playing: function(){ return uiIsPlaying; },"
         " cur: function(){ return currentStation && currentStation.name; },"
@@ -134,18 +134,23 @@ async def main():
         c = await counts()
         check(c == {'Alpha': 2, 'Bravo': 3, 'Charlie': 1}, f'totals {c}')
 
+        # Build 149: an artist needs 5 plays to be listed. Raise Bravo to 7 and Alpha to 5, leave
+        # Charlie under 5; then put the real counts back for the rest of the test.
+        saved = await pg.evaluate('__t.plays()')
+        await pg.evaluate("""(function(){ var p = __t.plays(); Object.keys(p).forEach(function(k){ var n = p[k].name; p[k].count = n === 'Bravo' ? 7 : n === 'Alpha' ? 5 : 4; }); __t.setPlays(p); })()""")
         # The Top Artists page: most played first, with the count on the far right of each row.
         await pg.evaluate('__t.openTop()'); await pg.wait_for_timeout(800)
         rows = await pg.evaluate("""Array.from(document.querySelectorAll('#stationsGrid .row-item')).map(function(r){
           var c=r.querySelector('.row-count'), n=r.querySelector('.row-name'); var rr=r.getBoundingClientRect(), cr=c?c.getBoundingClientRect():null, nr=n.getBoundingClientRect();
           return { name: n.textContent, count: c ? c.textContent : null, rightGap: cr ? Math.round(rr.right - cr.right) : null, afterName: cr ? cr.left >= nr.right : null }; })""")
         print(rows)
-        check([(r['name'], r['count']) for r in rows] == [('Bravo', '3 plays'), ('Alpha', '2 plays'), ('Charlie', '1 play')],
-              'Top Artists lists Bravo 3, Alpha 2, Charlie 1, in that order')
+        check([(r['name'], r['count']) for r in rows] == [('Bravo', '7 plays'), ('Alpha', '5 plays')],
+              'Top Artists lists Bravo 7, Alpha 5, in that order; Charlie (4 plays) is left out')
         check(all(r['rightGap'] is not None and r['rightGap'] <= 14 and r['afterName'] for r in rows), 'counts sit at the far right of each row')
         # The page clock is under the test's control; let it run so the page paints first.
         await pg.clock.run_for(2000); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{shots}/top-artists-counts.png')
+        await pg.evaluate('__t.setPlays(%s)' % __import__('json').dumps(saved))
         # ---- stations (build 121) ----
         # An artist station counts like songs: once at 20 seconds, then every 3.5 minutes more.
         base = await counts()

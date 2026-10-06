@@ -10374,6 +10374,7 @@
   var ARTIST_PLAYS_LIMIT = 500; // artists kept; the least-played are dropped past this
   var TOP_ARTISTS_MAX = 20;
   var TOP_ARTISTS_MIN = 3;
+  var TOP_ARTISTS_MIN_PLAYS = 5; // fewer plays than this and an artist isn't in Top Artists (build 149)
   var topArtistsShown = false;
   // Counts kept before plays needed 20 seconds of listening included every song skipped
   // past, so they were cleared once (Mark asked for a fresh start). The marker makes sure
@@ -10562,7 +10563,8 @@
     var known = artistIndexKnown();
     return Object.keys(plays).filter(function(k){
       // An artist with nothing left in the library (and no station) is never listed.
-      return plays[k] && plays[k].count > 0 && (!known || !!findArtistEntry(k));
+      // Build 149: an artist needs at least TOP_ARTISTS_MIN_PLAYS plays to be listed.
+      return plays[k] && plays[k].count >= TOP_ARTISTS_MIN_PLAYS && (!known || !!findArtistEntry(k));
     }).sort(function(a, b){
       return (plays[b].count - plays[a].count) || ((plays[b].last || 0) - (plays[a].last || 0));
     }).slice(0, TOP_ARTISTS_MAX).map(function(k){
@@ -23204,8 +23206,8 @@
     // header of an artist page is for the artist, not for arithmetic about them.
     artistHeroSub.textContent = '';
 
-    // Play starts the artist's station if they have one, otherwise their first song --
-    // the same "just play this" affordance a station page gives.
+    // Play starts the artist's station if they have one, otherwise all their songs shuffled
+    // (build 149; before, it started their first song).
     var first = entry.stations[0] || entry.tracks.slice().sort(byTrackOrder)[0] || null;
     artistPlayBtn.style.display = first ? '' : 'none';
     // Anything of this artist's already playing (their station, or any of their songs) makes
@@ -23221,6 +23223,9 @@
     } : null;
     artistPlayBtn.onclick = first ? function(){
       if(artistPillOwns(currentStation)){ togglePlayPause(); return; }
+      // Build 149: no station of their own -> all of this artist's songs, shuffled.
+      var songs = (entry.tracks || []).filter(function(t){ return !isBlacklisted(t); });
+      if(!(entry.stations || []).length && songs.length){ playShuffled(songs, entry.name); return; }
       // Everything playable the page lists above the albums (their stations, Featuring),
       // in page order, becomes the queue and plays from the top, so Next reaches every entry.
       var list = [], seen = {};
