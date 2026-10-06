@@ -100,7 +100,7 @@ async def main():
           document.getAnimations().forEach(function(a){ var t = a.effect && a.effect.target; if(!t || a.playState === 'finished') return;
             var kf = a.effect.getKeyframes(); var moving = kf.some(function(k){ return k.transform; });
             if(!moving) return;
-            if(t.id === 'npArt') out.art++; else if(t.closest('.np-imm-bg')) out.bg++; else out.other++;
+            if(t.id === 'npArt') out.art++; else if(t.closest('.np-imm-bg')) out.bg++; else if(t.id === 'npImmReflectCv' || t.id === 'npPlayGlow' || t.closest('.np-imm-orbs')) out.extra = (out.extra || 0) + 1; else out.other++;
             out.composite.push(a.effect.composite); out.filters.push(getComputedStyle(t).filter); rates.push(+a.playbackRate.toFixed(2)); });
           out.rates = rates;
           out.artT = getComputedStyle(document.getElementById('npArt')).transform;
@@ -158,12 +158,12 @@ async def main():
         # leaving stops it all and lets the screen sleep again
         await tap_art(); await pg.wait_for_timeout(500)
         a3 = await pg.evaluate(ANIMS)
-        check(a3['art'] + a3['bg'] + a3['other'] == 0 and a3['canvases'] == 0 and not a3['vui'][-1].get('awake'), f"leaving Immersive View stops the motion and the keep-awake {a3}")
+        check(a3['art'] + a3['bg'] + a3['other'] + a3.get('extra', 0) == 0 and a3['canvases'] == 0 and not a3['vui'][-1].get('awake'), f"leaving Immersive View stops the motion and the keep-awake {a3}")
         # Remove animations: no motion
         await pg.emulate_media(reduced_motion='reduce')
         await tap_art(); await pg.wait_for_timeout(600)
         a4 = await pg.evaluate(ANIMS)
-        check(a4['art'] + a4['bg'] == 0 and a4['canvases'] == 0 and (await st())['imm'], f"with Remove animations on, Immersive View still works but holds still {a4}")
+        check(a4['art'] + a4['bg'] + a4.get('extra', 0) == 0 and a4['canvases'] == 0 and (await st())['imm'], f"with Remove animations on, Immersive View still works but holds still {a4}")
         await tap_art(); await pg.wait_for_timeout(400)
         await pg.emulate_media(reduced_motion='no-preference')
 

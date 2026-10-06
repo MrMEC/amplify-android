@@ -3923,6 +3923,36 @@
        page colour shows instead. */
     .np-imm-fade-wash, .np-imm-fade-scrim{ position:absolute; left:0; right:0; bottom:0; height:100vh; }
     .np-imm-fade-wash{ width:100%; opacity:0; }
+    /* Build 146: more movement in the lower half.
+       The glow: a soft disc of the artwork's colour behind Play, slowly breathing.
+       The reflection: the cover, flipped, blurred once into a small canvas and faded out
+       downwards, under the controls; it zooms and turns with the artwork, mirrored.
+       The orbs: soft circles of light that rise slowly from random places, at random sizes,
+       and fade away. All of it only in Immersive View, and only transform and opacity move. */
+    .np-controls{ position:relative; }
+    .np-controls > :not(.np-play-glow){ position:relative; }
+    .np-play-glow{
+      position:absolute; left:50%; top:50%; width:210px; height:210px; margin:-105px 0 0 -105px;
+      border-radius:50%; pointer-events:none; opacity:0;
+      background:radial-gradient(circle, color-mix(in srgb, var(--np-vivid, #fff) 78%, transparent) 0%,
+        color-mix(in srgb, var(--np-vivid, #fff) 30%, transparent) 40%, transparent 70%);
+      transition: opacity .6s ease;
+    }
+    body.np-immersive .np-play-glow{ opacity:1; will-change:transform, opacity; }
+    .np-imm-reflect, .np-imm-orbs{ display:none; }
+    body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen:not(.np-channel) :is(.np-imm-reflect, .np-imm-orbs){
+      display:block; position:fixed; left:0; right:0; bottom:0; z-index:2; pointer-events:none; overflow:hidden;
+    }
+    .np-imm-reflect{ top:60vh;
+      -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.36) 16%, rgba(0,0,0,.15) 52%, transparent 90%);
+      mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.36) 16%, rgba(0,0,0,.15) 52%, transparent 90%);
+    }
+    .np-imm-reflect canvas{ position:absolute; left:0; top:0; width:100vw; height:100vw; opacity:0; transform-origin:50% 0; }
+    .np-imm-orbs{ height:55vh;
+      -webkit-mask-image:linear-gradient(to bottom, transparent 0%, #000 30%);
+      mask-image:linear-gradient(to bottom, transparent 0%, #000 30%);
+    }
+    .np-imm-orb{ position:absolute; border-radius:50%; opacity:0; will-change:transform, opacity; }
     .np-imm-fade-scrim{
       background:linear-gradient(to bottom, rgba(0,0,0,.24) 0, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 52%, rgba(0,0,0,.30) 100%);
     }
@@ -5508,6 +5538,7 @@
                    circles, so these use the same plain Unicode rotate arrow
                    podcastRefreshHeaderBtn's Refresh button already uses instead. -->
               <button type="button" class="np-skip-btn" id="npSkipBackBtn" title="Back 15 seconds" aria-label="Back 15 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+              <span class="np-play-glow" id="npPlayGlow" aria-hidden="true"></span>
               <button class="np-play-btn" id="npPlayBtn" disabled><i class="fa-solid fa-play"></i></button>
               <button type="button" class="np-skip-btn" id="npSkipFwdBtn" title="Forward 30 seconds" aria-label="Forward 30 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
               <button class="np-step-btn" id="npNextBtn" title="Next track" aria-label="Next track">
@@ -5625,6 +5656,10 @@
       <!-- Immersive View only: the page's colour rising from the bottom of the screen, over
            "More from" and the rest of the list, so only the artwork and the controls show. -->
       <div class="np-imm-fade" aria-hidden="true"><canvas class="np-imm-fade-wash" id="npImmFadeWash" width="64" height="64"></canvas><div class="np-imm-fade-scrim"></div></div>
+      <!-- Build 146, Immersive View only: the cover's reflection under the controls, and soft
+           orbs of light drifting up the lower half of the screen. -->
+      <div class="np-imm-reflect" id="npImmReflect" aria-hidden="true"><canvas id="npImmReflectCv" width="128" height="128"></canvas></div>
+      <div class="np-imm-orbs" id="npImmOrbs" aria-hidden="true"></div>
     </div>
   </main>
 
@@ -7542,7 +7577,12 @@
     try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
   }
   function immOn(){ return document.body.classList.contains('np-immersive'); }
-  function immAnims(){ return imm.art ? [imm.art] : []; }
+  function immAnims(){
+    var out = imm.art ? [imm.art] : [];
+    if(imm.refl) out.push(imm.refl);
+    if(imm.glow) out.push(imm.glow);
+    return out.concat(imm.orbs || []);
+  }
   // Build 143: a deeper zoom, and a path of its own each time round. Every cycle (in and
   // back out) picks one of a few moves at random -- a straight push in, a slow turn one way,
   // or a sway that turns one way and then the other -- with a new direction and a small
@@ -7565,8 +7605,19 @@
   }
   function startArtMotion(){
     if(imm.art){ try{ imm.art.onfinish = null; imm.art.cancel(); }catch(e){} imm.art = null; }
+    if(imm.refl){ try{ imm.refl.cancel(); }catch(e){} imm.refl = null; }
     if(!immOn() || reducedMotion() || !npArt.animate) return;
     var path = immArtPath();
+    // The reflection moves with the artwork, mirrored top to bottom.
+    try{
+      imm.refl = npImmReflectCv.animate(path.frames.map(function(k){
+        var m = /translate3d\(([-\d.]+)%, ([-\d.]+)%, 0\) rotate\(([-\d.]+)deg\) scale\(([-\d.]+)\)/.exec(k.transform);
+        var o = { transform: 'translate3d(' + m[1] + '%, ' + (-m[2]) + '%, 0) rotate(' + (-m[3]) + 'deg) scale(' + m[4] + ')' };
+        if(k.offset != null) o.offset = k.offset;
+        return o;
+      }), { duration: IMM_ART_MS, iterations: 2, direction: 'alternate', easing: 'ease-in-out' });
+      imm.refl.playbackRate = imm.rate;
+    }catch(e){ imm.refl = null; }
     try{
       // In and back out once, then a fresh random move from the same resting frame.
       var a = imm.art = npArt.animate(path.frames, { duration: IMM_ART_MS, iterations: 2, direction: 'alternate', easing: 'ease-in-out' });
@@ -7693,11 +7744,12 @@
     if(url === imm.bgUrl) return;
     imm.bgUrl = url;
     var mySeq = ++imm.seq;
-    if(!url){ immWashRemove(); return; }
+    if(!url){ immWashRemove(); immReflectClear(); return; }
     var img = new Image();
     img.decoding = 'async';
     img.onload = function(){
       if(mySeq !== imm.seq || !immOn()) return;
+      immReflectDraw(img);
       var srcs;
       try{
         var tint = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-tint') || '#1c1d22';
@@ -7745,10 +7797,103 @@
     immFadeOpacity._t = setTimeout(function(){ if(!imm.wash) immFadeOpacity(0, 0); }, 600);
     document.body.classList.remove('np-imm-wash');
   }
+  // ---- Build 146: reflection, glow and orbs ----
+  var npImmReflect = document.getElementById('npImmReflect');
+  var npImmReflectCv = document.getElementById('npImmReflectCv');
+  var npImmOrbs = document.getElementById('npImmOrbs');
+  var npPlayGlow = document.getElementById('npPlayGlow');
+  // The cover, upside down and blurred once, into a 128px canvas the phone scales up.
+  function immReflectDraw(img){
+    try{
+      var c = npImmReflectCv, x = c.getContext('2d');
+      x.clearRect(0, 0, 128, 128);
+      x.save();
+      x.filter = 'blur(7px) saturate(1.3)';
+      x.translate(0, 128); x.scale(1, -1);
+      x.drawImage(img, -8, -8, 144, 144);
+      x.restore();
+      c.dataset.drawn = String((+c.dataset.drawn || 0) + 1);
+      var a = c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1300, easing: 'ease-out' });
+      a.onfinish = function(){ c.style.opacity = 1; };
+    }catch(e){}
+  }
+  function immReflectClear(){
+    npImmReflectCv.style.opacity = 0;
+    try{ npImmReflectCv.getContext('2d').clearRect(0, 0, 128, 128); }catch(e){}
+  }
+  // Starts just under the controls, wherever they sit on this phone.
+  function immReflectPlace(){
+    var ctl = document.querySelector('#nowPlayingScreen .np-controls');
+    if(!ctl || !immOn()) return;
+    var b = ctl.getBoundingClientRect().bottom;
+    if(b > 0) npImmReflect.style.top = Math.round(b + 10) + 'px';
+  }
+  function immGlowStart(){
+    if(imm.glow){ try{ imm.glow.cancel(); }catch(e){} }
+    try{
+      imm.glow = npPlayGlow.animate([
+        { transform: 'scale(.82)', opacity: .45 },
+        { transform: 'scale(1.18)', opacity: .95 }
+      ], { duration: 3400, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+      imm.glow.playbackRate = imm.rate;
+    }catch(e){ imm.glow = null; }
+  }
+  // One orb: a random size and place in the lower half, rising slowly while it fades in and
+  // then gradually out. A new one every couple of seconds while the music plays.
+  var IMM_ORB_MAX = 7;
+  function immOrbSpawn(){
+    var orbs = imm.orbs || (imm.orbs = []);
+    if(orbs.length >= IMM_ORB_MAX) return;
+    var R = Math.random, W = innerWidth, H = npImmOrbs.clientHeight || innerHeight * .55;
+    var size = Math.round(36 + Math.pow(R(), 1.6) * 150);
+    var x = Math.round(R() * (W - size * .5) - size * .25);
+    var y = Math.round(H * (.35 + R() * .6) - size / 2);
+    var rise = Math.round(H * (.25 + R() * .3)), drift = Math.round((R() - .5) * 70);
+    var peak = (.32 + R() * .4).toFixed(2), dur = Math.round(11000 + R() * 9000);
+    var mix = R() < .6 ? 'var(--np-vivid, #fff)' : 'color-mix(in srgb, var(--np-vivid, #fff) 55%, #fff)';
+    var el = document.createElement('div');
+    el.className = 'np-imm-orb';
+    el.style.cssText = 'width:' + size + 'px;height:' + size + 'px;left:' + x + 'px;top:' + y + 'px;' +
+      'background:radial-gradient(circle, color-mix(in srgb, ' + mix + ' 70%, transparent) 0%, color-mix(in srgb, ' + mix + ' 25%, transparent) 42%, transparent 70%);';
+    npImmOrbs.appendChild(el);
+    var a;
+    try{
+      a = el.animate([
+        { transform: 'translate3d(0, 0, 0) scale(.7)', opacity: 0 },
+        { transform: 'translate3d(' + Math.round(drift * .4) + 'px, ' + Math.round(-rise * .3) + 'px, 0) scale(.95)', opacity: peak, offset: .3 },
+        { transform: 'translate3d(' + drift + 'px, ' + (-rise) + 'px, 0) scale(1.12)', opacity: 0 }
+      ], { duration: dur, easing: 'linear', fill: 'both' });
+    }catch(e){ el.remove(); return; }
+    a.playbackRate = imm.rate;
+    orbs.push(a);
+    a.onfinish = function(){ el.remove(); var i = orbs.indexOf(a); if(i !== -1) orbs.splice(i, 1); };
+  }
+  function immOrbTick(){
+    clearTimeout(imm.orbTimer);
+    if(!immOn()) return;
+    if(imm.rate > .5) immOrbSpawn();
+    imm.orbTimer = setTimeout(immOrbTick, 1300 + Math.random() * 1700);
+  }
+  function immExtrasStop(){
+    clearTimeout(imm.orbTimer); clearTimeout(imm.placeTimer);
+    (imm.orbs || []).forEach(function(a){ try{ a.cancel(); }catch(e){} });
+    imm.orbs = [];
+    npImmOrbs.innerHTML = '';
+    if(imm.glow){ try{ imm.glow.cancel(); }catch(e){} imm.glow = null; }
+    if(imm.refl){ try{ imm.refl.cancel(); }catch(e){} imm.refl = null; }
+    immReflectClear();
+  }
+  window.addEventListener('resize', function(){ if(immOn()) immReflectPlace(); });
+
   function startImmersiveMotion(){
     if(reducedMotion() || !npArt.animate) return;
     imm.rate = 0;
     imm.bgUrl = null;
+    immReflectPlace();
+    clearTimeout(imm.placeTimer);
+    imm.placeTimer = setTimeout(immReflectPlace, 450);
+    immGlowStart();
+    immOrbTick();
     startArtMotion();
     immSetBg(immBgUrl());
     syncImmersiveMotion();
@@ -7757,6 +7902,7 @@
     cancelAnimationFrame(imm.rampRaf);
     imm.seq++;
     if(imm.art){ try{ imm.art.cancel(); }catch(e){} }
+    immExtrasStop();
     immWashRemove();
     imm.art = null; imm.rate = 0; imm.bgUrl = null;
     Array.prototype.forEach.call(document.querySelectorAll('.np-imm-bg'), function(g){ g.remove(); });
