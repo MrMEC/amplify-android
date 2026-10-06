@@ -77,7 +77,20 @@ async def main():
               'normal: favourite, menu and progress bar showing')
         has_upnext = bool(s0['upnext'] and s0['upnext']['shown'])
         print('up next shown', has_upnext)
-        check(parse_rgb(s0['playBg']) == (255, 255, 255), f"normal: Play stays white ({s0['playBg']})")
+        check(parse_rgb(s0['playBg']) == parse_rgb(s0['vivid']) and parse_rgb(s0['nextFg']) == parse_rgb(s0['vivid']), f"normal: Play and skip already in the bright colour ({s0['playBg']} {s0['nextFg']} {s0['vivid']})")
+        cols = await pg.evaluate("""(()=>{ var q = function(s){ return getComputedStyle(document.querySelector(s)); };
+          return { fav: q('#npFavBtn').color, menu: q('#npMenuBtn').color, seek: q('#npSeekRange').backgroundImage, upnext: q('#npUpNext').backgroundColor,
+            nav: q('.mobile-nav-btn.active').color, navKey: document.querySelector('.mobile-nav-btn.active').dataset.nav }; })()""")
+        print('colours', cols)
+        v = parse_rgb(s0['vivid'])
+        check(parse_rgb(cols['fav']) == v and parse_rgb(cols['menu']) == v, f"favourite and menu in the bright colour {cols['fav']} {cols['menu']}")
+        sg = re.findall(r'rgba?\([^)]*\)', cols['seek'])
+        check(sg and parse_rgb(sg[0]) == v, f"progress bar's played part in the bright colour {cols['seek'][:120]}")
+        up = re.match(r'rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)', cols['upnext']) or re.match(r'color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) / ([\d.]+)', cols['upnext'])
+        print('upnext', cols['upnext'])
+        check(up and abs(float(up.group(4)) - 0.5) < 0.02, f"Up Next row: the colour at 50% ({cols['upnext']})")
+        check(parse_rgb(cols['nav']) == v, f"tab bar's selected icon ({cols['navKey']}) in the bright colour while Now Playing is open {cols['nav']}")
+        await pg.evaluate("(()=>{ var ic = document.getElementById('importPanelClose'); if(ic) ic.click(); var r = document.getElementById('npSeekRange'); r.value = 400; r.dispatchEvent(new Event('input')); })()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/immcol-song-normal.png')
         await pg.evaluate('__t.imm(true)'); await pg.wait_for_timeout(900)
         s1 = await pg.evaluate(ST)
@@ -90,7 +103,7 @@ async def main():
         await pg.screenshot(path=f'{shots}/immcol-song-imm.png')
         await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(900)
         s2 = await pg.evaluate(ST)
-        check(s2['fav']['op'] == 1 and s2['seek']['op'] == 1 and parse_rgb(s2['playBg']) == (255, 255, 255), 'leaving immersive brings them back and Play turns white again')
+        check(s2['fav']['op'] == 1 and s2['seek']['op'] == 1 and parse_rgb(s2['playBg']) == parse_rgb(s2['vivid']), 'leaving immersive brings them back, still coloured')
 
         # ---- coloured covers: the colours follow the artwork ----
         for name, want_h in (('orange', 26), ('blue', 224), ('pale', 52)):
@@ -118,6 +131,13 @@ async def main():
             check(close(ph, th) and ps > 0.4, f'[{name}] Play button pixels are the artwork colour on screen {c}')
             await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(600)
 
+        # ---- closing Now Playing: the tab bar's colour goes back ----
+        await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(300)
+        await pg.evaluate('__t.closeNp()'); await pg.wait_for_timeout(900)
+        back = await pg.evaluate("(()=>{ var p = document.createElement('div'); p.style.color = getComputedStyle(document.body).getPropertyValue('--accent'); document.body.appendChild(p); var a = getComputedStyle(p).color; p.remove(); return [getComputedStyle(document.querySelector('.mobile-nav-btn.active')).color, a]; })()")
+        check(back[0] == back[1], f'after closing Now Playing the selected tab is the app colour again {back}')
+        await pg.screenshot(path=f'{shots}/immcol-closed.png')
+        await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(900)
         # ---- a menu open when entering immersive closes ----
         await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(200)
         await pg.evaluate('__t.imm(true)'); await pg.wait_for_timeout(500)

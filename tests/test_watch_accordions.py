@@ -41,6 +41,16 @@ ACC = """(id)=>{ var h = document.querySelector('#stationsGrid .acc-head[data-ac
     rowTop: Math.round(rb.top), rowBottom: Math.round(row.getBoundingClientRect().bottom), next: nx ? nx.className : '', nextTop: nb ? Math.round(nb.top) : null,
     chev: !!h.querySelector('.acc-chev'), chevRot: getComputedStyle(h.querySelector('.acc-chev')).transform }; }"""
 
+SAMPLE = """(id)=>new Promise(function(res){ var h = document.querySelector('#stationsGrid .acc-head[data-acc="' + id + '"]'), row = h.nextElementSibling, nx = row.nextElementSibling, out = [];
+  var t0 = performance.now(); h.click();
+  (function f(){ out.push([Math.round(performance.now() - t0), Math.round(nx.getBoundingClientRect().top), Math.round(row.getBoundingClientRect().height)]);
+    if(performance.now() - t0 < 600) requestAnimationFrame(f); else res(out); })(); })"""
+def smooth(frames, start, end):
+    tops = [f[1] for f in frames]
+    mids = [t for t in tops if min(start, end) + 4 < t < max(start, end) - 4]
+    mono = all((b - a) * (end - start) >= -1 for a, b in zip(tops, tops[1:]))
+    return len(mids) >= 5 and mono and abs(tops[0] - start) <= 3 and abs(tops[-1] - end) <= 1
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
@@ -64,12 +74,15 @@ async def main():
             a = await pg.evaluate(ACC, 'watchContinue')
             print(a)
             check(a and a['expanded'] == 'false' and not a['rowShown'] and a['chev'], f'[{theme}] Continue Watching closed by default {a}')
-            check(a and a['text'].startswith('Continue Watching') and a['text'].endswith('2'), f'[{theme}] heading shows the count')
+            check(a and a['text'] == 'Continue Watching', f'[{theme}] heading has no count ({a and a["text"]})')
             check(a and a['headH'] >= 40, f'[{theme}] heading is a comfortable tap target ({a and a["headH"]}px)')
             gap_closed = a['nextTop'] - a['headBottom'] if a else None
             await pg.screenshot(path=f'{SHOTS}/acc-watch-closed-{theme}.png')
-            await pg.evaluate("document.querySelector('.acc-head[data-acc=watchContinue]').click()"); await pg.wait_for_timeout(400)
+            fr = await pg.evaluate(SAMPLE, 'watchContinue')
             a2 = await pg.evaluate(ACC, 'watchContinue')
+            print('open frames', fr[:4], '...', fr[-2:])
+            check(smooth(fr, a['nextTop'], a2['nextTop']), f'[{theme}] opening slides: the tabs glide down in steps, never back, no jump at the start ({len(fr)} frames, {fr[0]} -> {fr[-1]})')
+            check(fr[-1][2] > 100 and any(0 < f[2] < fr[-1][2] - 10 for f in fr), f'[{theme}] the row grows from nothing to full height')
             print(a2)
             check(a2['expanded'] == 'true' and a2['rowShown'] and a2['tiles'] == 2, f'[{theme}] tapping opens it: both channels {a2}')
             check(a2['rowTop'] - a2['headBottom'] >= 8, f'[{theme}] row starts clear of the heading ({a2["rowTop"] - a2["headBottom"]}px)')
@@ -81,8 +94,11 @@ async def main():
             await pg.evaluate("document.querySelector('.video-tabs [data-vtab=channels]').click()"); await pg.wait_for_timeout(300)
             a3 = await pg.evaluate(ACC, 'watchContinue')
             check(a3['expanded'] == 'true' and a3['rowShown'], f'[{theme}] stays open across a redraw')
-            await pg.evaluate("document.querySelector('.acc-head[data-acc=watchContinue]').click()"); await pg.wait_for_timeout(300)
-            check(not (await pg.evaluate(ACC, 'watchContinue'))['rowShown'], f'[{theme}] tapping again closes it')
+            o3 = await pg.evaluate(ACC, 'watchContinue')
+            fr = await pg.evaluate(SAMPLE, 'watchContinue')
+            a4 = await pg.evaluate(ACC, 'watchContinue')
+            check(not a4['rowShown'], f'[{theme}] tapping again closes it')
+            check(smooth(fr, o3['nextTop'], a4['nextTop']) and a4['nextTop'] - a4['headBottom'] == gap_closed, f'[{theme}] closing slides back up to exactly the closed spacing ({fr[0]} -> {fr[-1]}, gap {a4["nextTop"] - a4["headBottom"]})')
 
             # ---- Podcasts: Continue Listening ----
             await pg.evaluate('__a.pod()'); await pg.wait_for_timeout(200)
@@ -90,7 +106,7 @@ async def main():
             print('podcasts grid', await pg.evaluate("Array.prototype.map.call(document.getElementById('stationsGrid').children,function(e){return e.className+':'+e.textContent.slice(0,40);}).slice(0,6)"))
             c = await pg.evaluate(ACC, 'podcastContinue')
             print(c)
-            check(c and c['expanded'] == 'false' and not c['rowShown'] and c['text'].endswith('3'), f'[{theme}] Continue Listening on Podcasts closed by default, count 3 {c}')
+            check(c and c['expanded'] == 'false' and not c['rowShown'] and c['text'] == 'Continue Listening', f'[{theme}] Continue Listening on Podcasts closed by default, no count {c}')
             await pg.screenshot(path=f'{SHOTS}/acc-pod-closed-{theme}.png')
             await pg.evaluate("document.querySelector('.acc-head[data-acc=podcastContinue]').click()"); await pg.wait_for_timeout(400)
             c2 = await pg.evaluate(ACC, 'podcastContinue')

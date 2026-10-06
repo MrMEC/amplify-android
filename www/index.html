@@ -3888,9 +3888,7 @@
       opacity:0; visibility:hidden; pointer-events:none;
       transition: opacity .35s ease, visibility 0s linear .35s, transform .15s ease;
     }
-    .now-playing-screen .np-play-btn{ transition: filter .15s ease, transform .15s ease, background-color .5s ease, color .5s ease; }
-    body.np-immersive .now-playing-screen .np-play-btn{ background:var(--np-vivid, #fff); color:var(--np-on-vivid, #111); }
-    body.np-immersive .now-playing-screen .np-step-btn, body.np-immersive .now-playing-screen .np-skip-btn{ color:var(--np-vivid, #fff); }
+
     /* The moving wash (see immSetBg): one tiny canvas, repainted each frame and scaled up
        to fill, so the GPU only ever blends a single layer for it. */
     .np-imm-bg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
@@ -4612,6 +4610,34 @@
   body.rotate-lock .np-seek-range{
     background:linear-gradient(to right, #fff 0%, #fff var(--seek-pct, 0%),
       rgba(255,255,255,.28) var(--seek-pct, 0%), rgba(255,255,255,.28) 100%);
+  }
+
+  /* ---------- Now Playing in the artwork's colour (build 139) ---------- */
+  /* Every control on Now Playing takes a bright version of the screen's colour (--np-vivid,
+     written by applyNpTint): Play is filled with it, the other buttons are drawn in it, and
+     the played part of the progress bar is it. The Up Next row sits on the same colour at half
+     strength. While Now Playing is open the tab bar's selected icon wears it too; it goes back
+     to the app's own colour the moment the screen closes. */
+  .now-playing-screen .np-play-btn{ background:var(--np-vivid, #fff); color:var(--np-on-vivid, #111); }
+  body .now-playing-screen .np-step-btn, body .now-playing-screen .np-skip-btn, body .now-playing-screen .np-fav-btn,
+  body .now-playing-screen .np-fav-btn.on, body .now-playing-screen .np-menu-btn,
+  body.rotate-lock .now-playing-screen .np-step-btn, body.rotate-lock .now-playing-screen .np-skip-btn{ color:var(--np-vivid, #fff); }
+  .now-playing-screen .np-seek-range, body.rotate-lock .now-playing-screen .np-seek-range{
+    background:linear-gradient(to right, var(--np-vivid, #fff) 0%, var(--np-vivid, #fff) var(--seek-pct, 0%),
+      rgba(255,255,255,.28) var(--seek-pct, 0%), rgba(255,255,255,.28) 100%);
+  }
+  .now-playing-screen .np-seek-range::-webkit-slider-thumb{ background:var(--np-vivid, #fff); }
+  .now-playing-screen .np-seek-range::-moz-range-thumb{ background:var(--np-vivid, #fff); }
+  .now-playing-screen .np-upnext{ background:color-mix(in srgb, var(--np-vivid, #fff) 50%, transparent); border-color:color-mix(in srgb, var(--np-vivid, #fff) 60%, transparent); }
+  .now-playing-screen .np-upnext:hover{ background:color-mix(in srgb, var(--np-vivid, #fff) 60%, transparent); }
+  .now-playing-screen .np-upnext-label, .now-playing-screen .np-upnext-sub{ color:rgba(255,255,255,.86); }
+  .now-playing-screen .np-upnext{ text-shadow:0 1px 3px rgba(0,0,0,.35); }
+  .now-playing-screen .np-play-btn, .now-playing-screen .np-step-btn, .now-playing-screen .np-skip-btn,
+  .now-playing-screen .np-fav-btn, .now-playing-screen .np-menu-btn{
+    transition: filter .15s ease, transform .15s ease, opacity .35s ease, background-color .5s ease, color .5s ease;
+  }
+  @media (max-width: 900px){
+    body.np-open .mobile-nav-btn.active{ color:var(--np-vivid, var(--accent)); }
   }
 
   /* ---------- Queue (Up Next) ---------- */
@@ -12560,7 +12586,7 @@
           row.appendChild(buildContinueListeningTile(rec));
         });
         stationsGrid.appendChild(row);
-        makeSectionAccordion(clLabel, row, 'podcastContinue', inProgress.length);
+        makeSectionAccordion(clLabel, row, 'podcastContinue');
       }
       // No "Latest Episodes" label: the tab above already says Latest, and the first date
       // heading starts the list.
@@ -15175,7 +15201,7 @@
     row.className = 'cl-row vw-row';
     list.forEach(function(e){ row.appendChild(buildContinueEntryTile(e)); });
     stationsGrid.appendChild(row);
-    makeSectionAccordion(cwLabel, row, 'watchContinue', list.length);
+    makeSectionAccordion(cwLabel, row, 'watchContinue');
   }
   // One Continue Watching tile: a video (its still or poster, how far along) or a channel
   // (its logo), with the three-dot menu in the top right corner like Continue Listening's.
@@ -21575,7 +21601,51 @@
       label.setAttribute('aria-expanded', open ? 'true' : 'false');
       row.hidden = !open;
     }
-    function toggle(){ open = !open; sectionAccOpen[id] = open; paint(); }
+    // Opens and closes by sliding (build 139): the row's height runs between 0 and its own,
+    // and its bottom margin is worked out by measuring, so whatever follows (tabs, the next
+    // list) glides along with it instead of jumping, on a phone or a desktop alike.
+    // Opens and closes by sliding (build 139): the row's height runs between 0 and its own, and
+    // the block under it is held where it would be (a grid's gap can't be cancelled by the row
+    // itself, so the compensation goes on the next block's top margin, worked out by
+    // measuring), so everything below glides along instead of jumping, on a phone or desktop.
+    var anims = [];
+    function nextEl(){ return row.nextElementSibling; }
+    function nextTop(){ var n = nextEl(); return n ? n.getBoundingClientRect().top : 0; }
+    function stopAnims(){ anims.forEach(function(a){ try{ a.cancel(); }catch(e){} }); anims = []; }
+    function toggle(){
+      stopAnims();
+      row.style.overflow = '';
+      var before = nextTop();
+      open = !open; sectionAccOpen[id] = open;
+      var reduce = false;
+      try{ reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+      var nx = nextEl();
+      if(reduce || !row.animate || !nx){ paint(); return; }
+      label.classList.toggle('open', open);
+      label.setAttribute('aria-expanded', open ? 'true' : 'false');
+      row.hidden = false;
+      var full = row.getBoundingClientRect().height;
+      var closedTop = before;
+      if(!open){ row.hidden = true; closedTop = nextTop(); row.hidden = false; }
+      row.style.overflow = 'hidden';
+      row.style.height = '0px';
+      var zeroTop = nextTop();
+      row.style.height = '';
+      var mt = parseFloat(getComputedStyle(nx).marginTop) || 0;
+      var mtZero = mt - (zeroTop - closedTop);
+      var opts = { duration: 320, easing: 'cubic-bezier(.4,0,.2,1)' };
+      var rowK = [{ height: '0px', opacity: 0 }, { height: full + 'px', opacity: 1 }];
+      var nxK = [{ marginTop: mtZero + 'px' }, { marginTop: mt + 'px' }];
+      if(!open){ rowK.reverse(); nxK.reverse(); }
+      var a1 = row.animate(rowK, opts), a2 = nx.animate(nxK, opts);
+      anims = [a1, a2];
+      a1.onfinish = function(){
+        if(anims[0] !== a1) return;
+        anims = [];
+        row.style.overflow = '';
+        paint();
+      };
+    }
     label.addEventListener('click', toggle);
     label.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
     paint();
