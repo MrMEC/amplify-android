@@ -3924,21 +3924,10 @@
     .np-imm-fade-wash, .np-imm-fade-scrim{ position:absolute; left:0; right:0; bottom:0; height:100vh; }
     .np-imm-fade-wash{ width:100%; opacity:0; }
     /* Build 146: more movement in the lower half.
-       The glow: a soft disc of the artwork's colour behind Play, slowly breathing.
        The reflection: the cover, flipped, blurred once into a small canvas and faded out
        downwards, under the controls; it zooms and turns with the artwork, mirrored.
        The orbs: soft circles of light that rise slowly from random places, at random sizes,
        and fade away. All of it only in Immersive View, and only transform and opacity move. */
-    .np-controls{ position:relative; }
-    .np-controls > :not(.np-play-glow){ position:relative; }
-    .np-play-glow{
-      position:absolute; left:50%; top:50%; width:210px; height:210px; margin:-105px 0 0 -105px;
-      border-radius:50%; pointer-events:none; opacity:0;
-      background:radial-gradient(circle, color-mix(in srgb, var(--np-vivid, #fff) 78%, transparent) 0%,
-        color-mix(in srgb, var(--np-vivid, #fff) 30%, transparent) 40%, transparent 70%);
-      transition: opacity .6s ease;
-    }
-    body.np-immersive .np-play-glow{ opacity:1; will-change:transform, opacity; }
     .np-imm-reflect, .np-imm-orbs{ display:none; }
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen:not(.np-channel) :is(.np-imm-reflect, .np-imm-orbs){
       display:block; position:fixed; left:0; right:0; bottom:0; z-index:2; pointer-events:none; overflow:hidden;
@@ -5538,7 +5527,6 @@
                    circles, so these use the same plain Unicode rotate arrow
                    podcastRefreshHeaderBtn's Refresh button already uses instead. -->
               <button type="button" class="np-skip-btn" id="npSkipBackBtn" title="Back 15 seconds" aria-label="Back 15 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
-              <span class="np-play-glow" id="npPlayGlow" aria-hidden="true"></span>
               <button class="np-play-btn" id="npPlayBtn" disabled><i class="fa-solid fa-play"></i></button>
               <button type="button" class="np-skip-btn" id="npSkipFwdBtn" title="Forward 30 seconds" aria-label="Forward 30 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
               <button class="np-step-btn" id="npNextBtn" title="Next track" aria-label="Next track">
@@ -7580,7 +7568,6 @@
   function immAnims(){
     var out = imm.art ? [imm.art] : [];
     if(imm.refl) out.push(imm.refl);
-    if(imm.glow) out.push(imm.glow);
     return out.concat(imm.orbs || []);
   }
   // Build 143: a deeper zoom, and a path of its own each time round. Every cycle (in and
@@ -7801,7 +7788,6 @@
   var npImmReflect = document.getElementById('npImmReflect');
   var npImmReflectCv = document.getElementById('npImmReflectCv');
   var npImmOrbs = document.getElementById('npImmOrbs');
-  var npPlayGlow = document.getElementById('npPlayGlow');
   // The cover, upside down and blurred once, into a 128px canvas the phone scales up.
   function immReflectDraw(img){
     try{
@@ -7827,16 +7813,6 @@
     if(!ctl || !immOn()) return;
     var b = ctl.getBoundingClientRect().bottom;
     if(b > 0) npImmReflect.style.top = Math.round(b + 10) + 'px';
-  }
-  function immGlowStart(){
-    if(imm.glow){ try{ imm.glow.cancel(); }catch(e){} }
-    try{
-      imm.glow = npPlayGlow.animate([
-        { transform: 'scale(.82)', opacity: .45 },
-        { transform: 'scale(1.18)', opacity: .95 }
-      ], { duration: 3400, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
-      imm.glow.playbackRate = imm.rate;
-    }catch(e){ imm.glow = null; }
   }
   // One orb: a random size and place in the lower half, rising slowly while it fades in and
   // then gradually out. A new one every couple of seconds while the music plays.
@@ -7879,7 +7855,6 @@
     (imm.orbs || []).forEach(function(a){ try{ a.cancel(); }catch(e){} });
     imm.orbs = [];
     npImmOrbs.innerHTML = '';
-    if(imm.glow){ try{ imm.glow.cancel(); }catch(e){} imm.glow = null; }
     if(imm.refl){ try{ imm.refl.cancel(); }catch(e){} imm.refl = null; }
     immReflectClear();
   }
@@ -7892,7 +7867,6 @@
     immReflectPlace();
     clearTimeout(imm.placeTimer);
     imm.placeTimer = setTimeout(immReflectPlace, 450);
-    immGlowStart();
     immOrbTick();
     startArtMotion();
     immSetBg(immBgUrl());
