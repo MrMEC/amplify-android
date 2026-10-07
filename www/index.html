@@ -14414,6 +14414,247 @@
   function vlib(){ return videoLib || buildVideoLibrary(); }
   function invalidateVideoLib(){ videoLib = null; }
 
+  // ================================================================
+  // Music videos in the music folders (build 152)
+  // ================================================================
+  // Video files that sit in the music folders (most are .mp4 or .avi, often named
+  // "Artist - Title") are listed on their artist's page under "Videos" and play like any of
+  // the phone's own videos. Picking or refreshing a music folder notes them; an .mp4 (or
+  // .m4v/.webm) is asked of the phone first, because it can just as well be sound only, and
+  // only one with a picture counts as a video (it is then kept out of the songs). Each video
+  // goes to an artist by its name ("Artist - Title") when that artist is in the library,
+  // otherwise by its folder: a folder named after the artist, or one whose songs are mostly
+  // theirs (looking up to three folders up).
+  var MV_KEY = 'radioPlayerMusicVideos';
+  var MV_EXT_RE = /\.(mp4|m4v|avi|mkv|mov|wmv|mpg|mpeg|3gp|flv|webm)$/i;
+  var MV_PROBE_RE = /\.(mp4|m4v|webm)$/i;
+  var musicVideos = (function(){
+    try{
+      var v = JSON.parse(localStorage.getItem(MV_KEY) || 'null');
+      if(v && Array.isArray(v.files)) return { files: v.files, probed: v.probed || {}, at: v.at || 0 };
+    }catch(e){}
+    return { files: [], probed: {}, at: 0 };
+  })();
+  var mvIndexCache = null;
+  function saveMusicVideos(){
+    mvIndexCache = null;
+    try{ localStorage.setItem(MV_KEY, JSON.stringify(musicVideos)); }catch(e){}
+  }
+  function mvProbeKey(f){ return f.uri + '|' + (f.size || 0); }
+  function isMusicVideoName(name){ return MV_EXT_RE.test(String(name || '')); }
+  // Notes the videos among a music folder's files (replacing what was noted for that folder
+  // before) and resolves to { uri: true } for each of them.
+  function captureMusicVideos(tree, files){
+    var cands = (files || []).filter(function(f){ return f && f.uri && isMusicVideoName(f.name); });
+    var P = videoPlugin2();
+    var todo = cands.filter(function(f){ return MV_PROBE_RE.test(f.name) && !Object.prototype.hasOwnProperty.call(musicVideos.probed, mvProbeKey(f)); });
+    function probe(){
+      if(!todo.length || !P || typeof P.videoInfo !== 'function') return Promise.resolve();
+      var f = todo.shift();
+      return P.videoInfo({ uri: f.uri, thumb: false }).then(function(r){
+        musicVideos.probed[mvProbeKey(f)] = (r && r.width > 0) ? 1 : 0;
+      }, function(){
+        musicVideos.probed[mvProbeKey(f)] = 0;
+      }).then(probe);
+    }
+    return probe().then(function(){
+      var set = {};
+      var vids = cands.filter(function(f){
+        if(!MV_PROBE_RE.test(f.name)) return true;
+        return musicVideos.probed[mvProbeKey(f)] === 1;
+      });
+      vids.forEach(function(f){ set[f.uri] = true; });
+      musicVideos.files = musicVideos.files.filter(function(x){ return x.tree !== tree; }).concat(vids.map(function(f){
+        return { uri: f.uri, name: f.name, relPath: normalizeRelPath(f.relPath || f.name), size: f.size || 0, lastModified: f.lastModified || 0, tree: tree || '' };
+      }));
+      musicVideos.at = Date.now();
+      saveMusicVideos();
+      return set;
+    });
+  }
+  // Songs that turn out to be videos (an .mp4 with a picture, added before build 152) leave
+  // the songs: they are on their artist's page as videos now.
+  function dropVideoSongs(set){
+    var gone = libraryTracks.filter(function(t){ return t.srcUri && set[t.srcUri]; });
+    return gone.reduce(function(p, t){ return p.then(function(){ return removeLocalTrack(t)['catch'](function(){}); }); }, Promise.resolve())
+      .then(function(){ return gone.length; });
+  }
+  function mvTidyTitle(s){
+    return String(s || '')
+      .replace(/\s*[\(\[][^\)\]]*\b(official|video|clip|hd|hq|4k|1080p?|720p?|480p?|lyrics?|audio|remaster(ed)?|explicit|dirty|clean|uncensored|version|mv)\b[^\)\]]*[\)\]]/gi, '')
+      .replace(/[_.]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  }
+  // artistKey -> [video item], built from the noted files and the library.
+  function musicVideoIndex(){
+    var sig = musicVideos.files.length + '|' + musicVideos.at + '|' + libraryTracks.length + '|' + blacklist.length;
+    if(mvIndexCache && mvIndexCache.sig === sig) return mvIndexCache.map;
+    var dirArtists = {};
+    libraryTracks.forEach(function(t){
+      if(isBlacklisted(t)) return;
+      var d = dirOfRelPath(normalizeRelPath(t.relPath || ''));
+      var k = artistMatchKey((t.artist || '').trim());
+      if(!k) return;
+      var m = dirArtists[d] = dirArtists[d] || { n: 0 };
+      m.n++; m[k] = (m[k] || 0) + 1;
+    });
+    function mainArtistOf(d){
+      var m = dirArtists[d];
+      if(!m) return '';
+      var best = '', n = 0;
+      Object.keys(m).forEach(function(k){ if(k !== 'n' && m[k] > n){ best = k; n = m[k]; } });
+      return n / m.n > 0.6 ? best : '';
+    }
+    function known(k){ return !!(k && findArtistEntry(k)); }
+    var map = {};
+    musicVideos.files.forEach(function(f){
+      var g = guessFromFilename(f.name);
+      var key = '', title = '';
+      var nameKey = g.artist ? artistMatchKey(g.artist) : '';
+      if(known(nameKey)){ key = nameKey; title = g.title; }
+      else {
+        var parts = dirOfRelPath(f.relPath).split('/');
+        for(var up = 0; up < 3 && parts.length > 1 && !key; up++){
+          var folderKey = artistMatchKey(parts[parts.length - 1]);
+          if(known(folderKey)) key = folderKey;
+          else {
+            var mk = mainArtistOf(parts.join('/'));
+            if(known(mk)) key = mk;
+          }
+          parts.pop();
+        }
+        if(key){
+          // "Artist - Title" with the artist spelled a little differently: the title alone.
+          title = (nameKey && (nameKey.indexOf(key) !== -1 || key.indexOf(nameKey) !== -1)) ? g.title
+            : (g.artist ? g.artist + ' - ' + g.title : g.title);
+        }
+      }
+      if(!key) return;
+      var info = videoInfo[f.uri] || {};
+      var entry = findArtistEntry(key);
+      var name = mvTidyTitle(title) || mvTidyTitle(f.name.replace(/\.[^.]+$/, ''));
+      var it = { type: 'video', videoKind: 'music', id: 'mv:' + f.relPath, uri: f.uri, fileName: f.name, relPath: f.relPath,
+        name: name, title: name, artist: entry ? entry.name : '', artistKey: key, size: f.size || 0,
+        duration: info.d || 0, still: info.t || '', favicon: info.t ? capUrl(info.t) : '' };
+      (map[key] = map[key] || []).push(it);
+    });
+    Object.keys(map).forEach(function(k){
+      map[k].sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+    });
+    mvIndexCache = { sig: sig, map: map };
+    return map;
+  }
+  function musicVideosFor(key){ return (musicVideoIndex()[key] || []).slice(); }
+  window.__amplifyMusicVideosFor = musicVideosFor;
+  // Still pictures for the videos on show, asked of the phone one at a time.
+  function ensureMusicVideoStills(list, onEach){
+    var P = videoPlugin2();
+    if(!P || typeof P.videoInfo !== 'function') return;
+    var todo = list.filter(function(v){ return !videoInfo[v.uri]; });
+    (function next(){
+      if(!todo.length) return;
+      var v = todo.shift();
+      P.videoInfo({ uri: v.uri }).then(function(r){
+        r = r || {};
+        videoInfo[v.uri] = { d: r.duration ? r.duration / 1000 : 0, w: r.width || 0, h: r.height || 0, t: r.thumb || '' };
+      }, function(){
+        videoInfo[v.uri] = { d: 0, w: 0, h: 0, t: '' };
+      }).then(function(){
+        vsave(VIDEO_INFO_KEY, videoInfo);
+        mvIndexCache = null;
+        var i = videoInfo[v.uri];
+        v.duration = i.d; v.still = i.t; v.favicon = i.t ? capUrl(i.t) : '';
+        if(onEach) onEach(v);
+        next();
+      });
+    })();
+  }
+  function playMusicVideo(v, list){
+    var q = (list && list.length) ? list : [v];
+    setQueue(q, v, (v.artist || 'Artist') + ' Videos');
+    playStation(v);
+    openNowPlaying(v, true);
+  }
+  // The section on an artist page: a sideways row of 16:9 stills, like Music Videos.
+  function buildMusicVideoTile(v, list){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'yt-tile mv-tile';
+    b.dataset.key = favKey(v);
+    var th = document.createElement('span');
+    th.className = 'yt-thumb';
+    function paintStill(){
+      var old = th.querySelector('img');
+      if(old) old.remove();
+      if(!v.still) return;
+      var img = document.createElement('img');
+      img.alt = ''; img.decoding = 'async';
+      img.src = capUrl(v.still);
+      img.onerror = function(){ img.remove(); };
+      th.insertBefore(img, th.firstChild);
+    }
+    paintStill();
+    b._paintStill = paintStill;
+    var pl = document.createElement('span');
+    pl.className = 'yt-play';
+    pl.innerHTML = YT_PLAY_SVG;
+    th.appendChild(pl);
+    var t = document.createElement('span');
+    t.className = 'yt-title';
+    t.textContent = v.name;
+    var d = document.createElement('span');
+    d.className = 'yt-date';
+    d.textContent = v.duration ? formatTime(v.duration) : '';
+    b._paintDur = function(){ d.textContent = v.duration ? formatTime(v.duration) : ''; };
+    b.appendChild(th); b.appendChild(t); b.appendChild(d);
+    b.addEventListener('click', function(){ playMusicVideo(v, list); });
+    return b;
+  }
+  function appendArtistMusicVideos(entry){
+    var list = musicVideosFor(entry.key);
+    if(!list.length) return 0;
+    var label = appendGridSection('Videos', list.length);
+    label.classList.add('artist-mvs-label');
+    var row = document.createElement('div');
+    row.className = 'artist-videos artist-mvs';
+    var tiles = {};
+    list.forEach(function(v){ var tile = buildMusicVideoTile(v, list); tiles[v.uri] = tile; row.appendChild(tile); });
+    stationsGrid.appendChild(row);
+    ensureMusicVideoStills(list, function(v){
+      var tile = tiles[v.uri];
+      if(tile && tile.isConnected){ tile._paintStill(); tile._paintDur(); }
+    });
+    return list.length;
+  }
+  // Once a session, a little after start: the music folders are listed again (nothing is
+  // imported), so videos already in them show up without a refresh.
+  function scanMusicFolderVideos(){
+    var P = videoPlugin2();
+    if(!P || typeof P.rescanMusicFolder !== 'function' || !libraryLoaded || libraryStorageError) return Promise.resolve(0);
+    var trees = musicFolderTrees();
+    var found = {};
+    var before = JSON.stringify(musicVideos.files.map(function(f){ return f.uri; }));
+    return trees.reduce(function(p, tree){
+      return p.then(function(){
+        return P.rescanMusicFolder({ treeUri: tree }).then(function(res){
+          return captureMusicVideos(tree, res && res.files).then(function(set){ Object.assign(found, set); });
+        }, function(){});
+      });
+    }, Promise.resolve()).then(function(){
+      return dropVideoSongs(found);
+    }).then(function(n){
+      if(n){ pruneStaleLibraryRefs(); renderLibraryList(); refreshLibraryView(); }
+      // An artist page on screen picks up videos that were found just now.
+      var changed = n || JSON.stringify(musicVideos.files.map(function(f){ return f.uri; })) !== before;
+      if(changed && !n && activeArtistKey && !activeAlbumKey && document.body.classList.contains('artist-open')) renderArtistPage(activeArtistKey);
+      return n;
+    });
+  }
+  window.__amplifyScanMusicVideos = scanMusicFolderVideos;
+  setTimeout(function tryScan(){
+    if(!libraryLoaded){ setTimeout(tryScan, 3000); return; }
+    scanMusicFolderVideos()['catch'](function(){});
+  }, 6000);
+
   // ---- Plex (build 130)
   // Sign in with a Plex account and the movies and TV shows on its server join Movies and TV
   // Shows, next to the phone's own folders: same tiles, details pages, Continue Watching,
@@ -16101,7 +16342,7 @@
     tryPlayUrl(t.uri).then(function(){
       if(!stillWanted()) return;
       var p = videoProgress[t.id];
-      if(p && !p.watched && p.pos > 5){
+      if(p && !p.watched && p.pos > 5 && t.videoKind !== 'music'){
         var at = p.pos;
         var seek = function(){ try{ audio.currentTime = at; }catch(e){} audio.removeEventListener('loadedmetadata', seek); };
         if(audio.readyState >= 1) seek(); else audio.addEventListener('loadedmetadata', seek);
@@ -16129,6 +16370,7 @@
     });
   }
   function subtitleForVideo(t){
+    if(t.videoKind === 'music') return [t.artist, formatRuntime(t.duration)].filter(Boolean).join(' · ') || 'Music video';
     if(t.videoKind === 'episode') return episodeCode(t) + (t.epTitle ? ' · ' + t.epTitle : '');
     return [t.year, formatRuntime(t.duration)].filter(Boolean).join(' · ') || 'Movie';
   }
@@ -16157,6 +16399,8 @@
     vsave(VIDEO_PROGRESS_KEY, videoProgress);
     if(t.plex){ plexReport(t.id, true); plexStopSession(); }
     if(typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
+    // A music video: on to the next of the artist's videos (build 152).
+    if(t.videoKind === 'music' && playNextInLine()) return;
     setPlayingUI(false);
     syncSeekBar();
     updateMediaSessionState();
@@ -16168,6 +16412,15 @@
     npCollectionGrid.classList.remove('grid-songs');
     npCollectionGrid.classList.add('np-ch-list');
     var lib = vlib(), list = [], heading = '';
+    if(t.videoKind === 'music'){
+      var mvs = musicVideosFor(t.artistKey);
+      var others = mvs.filter(function(m){ return m.id !== t.id; });
+      if(!others.length){ npCollection.style.display = 'none'; return; }
+      npCollection.style.display = '';
+      npCollectionHeading.textContent = 'More Videos by ' + (t.artist || 'This Artist');
+      others.forEach(function(v){ npCollectionGrid.appendChild(buildNpMusicVideoRow(v, mvs)); });
+      return;
+    }
     if(t.videoKind === 'episode'){
       var s = lib.showsByKey[t.showKey];
       if(s){
@@ -16185,6 +16438,28 @@
       var row = v.kind === 'episode' ? buildEpisodeRow(v) : buildNpMovieRow(v);
       npCollectionGrid.appendChild(row);
     });
+  }
+  function buildNpMusicVideoRow(v, list){
+    var row = document.createElement('div');
+    row.className = 'vep-row';
+    row.dataset.key = favKey(v);
+    var th = document.createElement('div');
+    th.className = 'vep-thumb';
+    if(v.still) th.appendChild(vImg(capUrl(v.still)));
+    row.appendChild(th);
+    var text = document.createElement('div');
+    text.className = 'vep-text';
+    var tt = document.createElement('div');
+    tt.className = 'vep-title';
+    tt.textContent = v.name;
+    text.appendChild(tt);
+    var sub = document.createElement('div');
+    sub.className = 'vep-sub';
+    sub.textContent = formatRuntime(v.duration) || '';
+    text.appendChild(sub);
+    row.appendChild(text);
+    row.addEventListener('click', function(){ playMusicVideo(v, list); });
+    return row;
   }
   function buildNpMovieRow(v){
     var row = document.createElement('div');
@@ -22754,6 +23029,9 @@
       });
     });
 
+    // Their videos from the music folders (build 152).
+    total += appendArtistMusicVideos(entry);
+
     if(albums.length){
       appendGridSection('Albums', albums.length);
       // The albums get a box of their own rather than going straight into the page grid,
@@ -23094,7 +23372,7 @@
     return b;
   }
   function clearArtistVideos(){
-    stationsGrid.querySelectorAll('.artist-videos-label, .artist-videos').forEach(function(el){ el.remove(); });
+    stationsGrid.querySelectorAll('.artist-videos-label, .artist-videos:not(.artist-mvs)').forEach(function(el){ el.remove(); });
   }
   function paintArtistVideos(entry, rec, loading){
     clearArtistVideos();
@@ -25139,7 +25417,10 @@
       });
       var artIndex = buildFolderArtIndex(stubs);
       var artStubs = Object.keys(artIndex).map(function(d){ return artIndex[d]; });
-      var audio = stubs.filter(isAudioFile);
+      return captureMusicVideos(res.treeUri, res.files).then(function(videoSet){
+      dropVideoSongs(videoSet);
+      // Videos are listed on their artist's page, not added as songs (build 152).
+      var audio = stubs.filter(function(st){ return isAudioFile(st) && !videoSet[st.amplifyEntry.uri]; });
       return Promise.all(artStubs.map(function(st){
         return nativeFileFromEntry(st.amplifyEntry)['catch'](function(){ return null; });
       })).then(function(artFiles){
@@ -25148,6 +25429,7 @@
           setStatus('That folder is very large; the first ' + stubs.length + ' files are being added.', false);
         }
         return importLocalFiles(list, { fromFolder: true });
+      });
       });
     })['catch'](function(err){
       var msg = (err && err.message) ? err.message : 'The folder could not be opened.';
@@ -26239,15 +26521,16 @@
     trees.forEach(function(tree){
       chain = chain.then(function(){
         return P.rescanMusicFolder({ treeUri: tree }).then(function(res){
+          return captureMusicVideos(tree, res.files).then(function(videoSet){
           var present = {};
           (res.files || []).forEach(function(f){ present[f.uri] = true; });
-          var gone = libraryTracks.filter(function(t){ return t.srcUri && t.srcUri.indexOf(tree + '/document/') === 0 && !present[t.srcUri]; });
+          var gone = libraryTracks.filter(function(t){ return t.srcUri && t.srcUri.indexOf(tree + '/document/') === 0 && (!present[t.srcUri] || videoSet[t.srcUri]); });
           var stubs = nativeMusicStubs(res);
           // A song whose tags were edited in Info & Tags keeps its place in the library;
           // its file's new size and date are remembered, so it isn't taken for a new song.
           var edited = {};
           libraryTracks.forEach(function(t){ if(t.srcUri && t.diskSize) edited[t.srcUri] = t; });
-          var fresh = stubs.filter(isAudioFile).filter(function(st){
+          var fresh = stubs.filter(function(st){ return isAudioFile(st) && !videoSet[st.amplifyEntry.uri]; }).filter(function(st){
             var e = st.amplifyEntry && edited[st.amplifyEntry.uri];
             if(e && e.diskSize === st.size && e.diskModified === st.lastModified) return false;
             return !libraryById[makeLocalTrackId(relPathOf(st), st.size, st.lastModified)];
@@ -26260,6 +26543,7 @@
           return gone.reduce(function(p, t){
             return p.then(function(){ return removeLocalTrack(t).then(function(){ removed++; }, function(){}); });
           }, Promise.resolve());
+          });
         }, function(){ failed++; });
       });
     });

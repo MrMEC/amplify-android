@@ -383,7 +383,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     String str4 = str(mediaMetadata.title);
     String strJoinDot3 = joinDot(str(mediaMetadata.artist), str(mediaMetadata.albumTitle));
     // Build 151: what plays next, on the car's Now Playing (the line under the title becomes
-    // "Artist · Next: Title · Artist"; the phone's lock screen keeps its own title and artist).
+    // "Artist · Next: Title"; the phone's lock screen keeps its own title and artist).
     String next = nextLine();
     if (next != null) {
       strJoinDot3 = joinDot(str(mediaMetadata.artist), "Next: " + next);
@@ -574,7 +574,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     super.setMediaItem(mediaItem, z);
   }
 
-  /** The title (and artist, for a song) of the item that plays next, or null (build 151). */
+  /** The title of the item that plays next, or null (build 151; title only since 152). */
   @Nullable
   private String nextLine() {
     MediaItem next = null;
@@ -599,8 +599,8 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     if (t.isEmpty()) {
       return null;
     }
-    boolean live = m.extras != null && m.extras.getBoolean("amplify.live", false);
-    return live ? t : joinDot(t, str(m.artist));
+    // Just the title (build 152): the artist is already on the line before it.
+    return t;
   }
 
   /** The phone's queue as the car shows it, while the phone is playing (build 151). */

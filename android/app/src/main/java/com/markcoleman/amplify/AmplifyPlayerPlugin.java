@@ -74,7 +74,9 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private static final List<String> FOLDER_EXTS =
       Arrays.asList(
           "mp3", "m4a", "m4b", "mp4", "aac", "flac", "ogg", "oga", "opus", "wav", "wma", "aiff",
-          "aif", "jpg", "jpeg", "png", "webp", "gif");
+          "aif", "jpg", "jpeg", "png", "webp", "gif",
+          // Music videos beside the songs (build 152): listed on their artist's page.
+          "m4v", "avi", "mkv", "mov", "wmv", "mpg", "mpeg", "3gp", "flv", "webm");
   private static final int FOLDER_MAX_DEPTH = 12;
   private static final int FOLDER_MAX_FILES = 20000;
   private boolean attached;
@@ -732,7 +734,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           String m = mime == null ? "" : mime;
           int dot = name.lastIndexOf('.');
           String ext = dot >= 0 ? name.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
-          if (!m.startsWith("audio/") && !m.startsWith("image/") && !FOLDER_EXTS.contains(ext)) {
+          if (!m.startsWith("audio/")
+              && !m.startsWith("image/")
+              && !m.startsWith("video/")
+              && !FOLDER_EXTS.contains(ext)) {
             continue;
           }
           JSObject f = new JSObject();
