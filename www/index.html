@@ -4984,7 +4984,7 @@
     --artist-ring: #d1d1d6;
   }
   /* What is playing: no ring, a soft glow in the theme colour under its cover, title in that colour. */
-  :root{ --play-glow: 0 10px 22px -3px color-mix(in srgb, var(--accent) 72%, transparent), 0 2px 10px color-mix(in srgb, var(--accent) 38%, transparent); }
+  :root{ --play-glow: 0 3px 20px 1px color-mix(in srgb, var(--accent) 62%, transparent), 0 0 8px color-mix(in srgb, var(--accent) 42%, transparent); } /* build 172: wraps the whole cover, top included */
   .tile.playing .tile-art, .tile.playing:hover .tile-art{ outline:none; box-shadow:var(--play-glow); }
   .tile.playing .tile-art.tile-art-icon{ box-shadow:none; }
   .tile.playing:not(.fav-card) .tile-name{ color:var(--accent); }
@@ -5000,7 +5000,7 @@
   /* Rows of covers get room inside the scroller so those shadows aren't sliced off; the
      negative margins give the space back so nothing moves. */
   body.home-stacked .home-row > .tile-grid, .tile-grid > .cl-row{
-    padding:8px 14px 24px; margin:-8px -14px -18px; scroll-padding-left:14px;
+    padding:22px 14px 26px; margin:-22px -14px -20px; scroll-padding-left:14px;
   }
   .tile-grid > .cl-row{ margin-bottom:-16px; }
   /* Artists: a thin grey ring round every portrait. */
