@@ -66,6 +66,15 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/vmini-moved.png')
         saved = await pg.evaluate("localStorage.getItem('radioPlayerVideoMiniPos')")
         check(saved and json.loads(saved)['x'] == r1[0], f'the spot is remembered ({saved})')
+        # drag by the picture itself (build 161): moves, and doesn't open Now Playing
+        r1 = await pg.evaluate("(()=>{var r=document.getElementById('videoMini').getBoundingClientRect(); return [r.left, r.top];})()")
+        pic = await pg.evaluate("(()=>{var r=document.getElementById('videoMiniBox').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2];})()")
+        await pg.mouse.move(pic[0], pic[1]); await pg.mouse.down()
+        for i in range(1, 9): await pg.mouse.move(pic[0] + i * 5, pic[1] + i * 20)
+        await pg.mouse.up(); await pg.wait_for_timeout(600)
+        r1b = await pg.evaluate("(()=>{var r=document.getElementById('videoMini').getBoundingClientRect(); return [r.left, r.top, document.getElementById('nowPlayingScreen').style.display];})()")
+        check(abs(r1b[0] - (r1[0] + 40)) <= 2 and abs(r1b[1] - (r1[1] + 160)) <= 2 and r1b[2] != 'flex', f'dragging the picture moves it and does not open Now Playing {r1} -> {r1b}')
+        r1 = r1b[:2]
         # dragged past the edge: kept on screen
         bar = await pg.evaluate("(()=>{var r=document.getElementById('videoMiniTitle').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2];})()")
         await pg.mouse.move(bar[0], bar[1]); await pg.mouse.down()

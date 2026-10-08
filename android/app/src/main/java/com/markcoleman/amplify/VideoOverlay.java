@@ -30,6 +30,9 @@ import androidx.media3.exoplayer.ExoPlayer;
 public final class VideoOverlay {
   interface Listener {
     void onTap();
+
+    /** A finger dragging the picture (build 161): phase start / move / end, distance in px. */
+    void onDrag(String phase, float dxPx, float dyPx);
   }
 
   /**
@@ -214,6 +217,50 @@ public final class VideoOverlay {
     box.setClickable(true);
     box.setContentDescription("Video. Tap for full screen.");
     box.setOnClickListener(v -> listener.onTap());
+    // A tap is a tap; a finger that moves drags the picture instead (the page decides what a
+    // drag does: it moves the floating window). Screen coordinates, so the box moving under
+    // the finger doesn't change the distance.
+    final int slop = android.view.ViewConfiguration.get(activity).getScaledTouchSlop();
+    box.setOnTouchListener(
+        new View.OnTouchListener() {
+          float x0, y0;
+          boolean dragging;
+
+          @Override
+          public boolean onTouch(View v, android.view.MotionEvent e) {
+            switch (e.getActionMasked()) {
+              case android.view.MotionEvent.ACTION_DOWN:
+                x0 = e.getRawX();
+                y0 = e.getRawY();
+                dragging = false;
+                return false; // the click still sees it
+              case android.view.MotionEvent.ACTION_MOVE:
+                float dx = e.getRawX() - x0, dy = e.getRawY() - y0;
+                if (!dragging && Math.hypot(dx, dy) > slop) {
+                  dragging = true;
+                  v.setPressed(false);
+                  v.cancelLongPress();
+                  listener.onDrag("start", 0f, 0f);
+                }
+                if (dragging) {
+                  listener.onDrag("move", dx, dy);
+                  return true;
+                }
+                return false;
+              case android.view.MotionEvent.ACTION_UP:
+              case android.view.MotionEvent.ACTION_CANCEL:
+                if (dragging) {
+                  dragging = false;
+                  listener.onDrag("end", e.getRawX() - x0, e.getRawY() - y0);
+                  v.setPressed(false);
+                  return true; // not a click
+                }
+                return false;
+              default:
+                return false;
+            }
+          }
+        });
     box.setVisibility(View.GONE);
     texture = new TextureView(activity);
     box.addView(

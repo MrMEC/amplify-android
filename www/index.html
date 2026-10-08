@@ -8862,34 +8862,66 @@
       if(!audio.paused) audio.pause();
       syncVideoMini();
     });
-    // Drag it by its bar to anywhere on screen; it stays exactly where it is let go.
-    (function(){
-      var bar = document.getElementById('videoMiniBar');
-      var drag = null;
-      bar.addEventListener('pointerdown', function(e){
+    // Drag it by the picture or by its bar to anywhere on screen; it stays exactly where it is
+    // let go (build 161). A tap on the picture still opens Now Playing.
+    var miniDrag = null, miniDragJustEnded = 0;
+    function miniDragStart(){
+      var r = videoMini.getBoundingClientRect();
+      miniDrag = { left: r.left, top: r.top };
+      videoMini.classList.add('dragging');
+    }
+    function miniDragMove(dx, dy){
+      if(!miniDrag) return;
+      videoMiniPos = moveVideoMini(miniDrag.left + dx, miniDrag.top + dy);
+    }
+    function miniDragEnd(inPage){
+      if(!miniDrag) return;
+      miniDrag = null;
+      // Only a drag in the page is followed by a click (the app keeps its own drags to itself).
+      if(inPage) miniDragJustEnded = Date.now();
+      videoMini.classList.remove('dragging');
+      try{ localStorage.setItem(VIDEO_MINI_POS_KEY, JSON.stringify(videoMiniPos)); }catch(err){}
+    }
+    // In the page: the bar, and the picture when the page draws it (a podcast's video).
+    [document.getElementById('videoMiniBar'), videoMiniBox].forEach(function(el){
+      var p = null;
+      el.addEventListener('pointerdown', function(e){
         if(e.target.closest('.video-mini-btn')) return;
-        var r = videoMini.getBoundingClientRect();
-        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: r.left, top: r.top, moved: false };
-        try{ bar.setPointerCapture(e.pointerId); }catch(err){}
+        p = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+        try{ el.setPointerCapture(e.pointerId); }catch(err){}
       });
-      bar.addEventListener('pointermove', function(e){
-        if(!drag || e.pointerId !== drag.id) return;
-        var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-        if(!drag.moved && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-        drag.moved = true;
-        videoMini.classList.add('dragging');
-        videoMiniPos = moveVideoMini(drag.left + dx, drag.top + dy);
+      el.addEventListener('pointermove', function(e){
+        if(!p || e.pointerId !== p.id) return;
+        var dx = e.clientX - p.x, dy = e.clientY - p.y;
+        if(!p.moved){
+          if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          p.moved = true;
+          miniDragStart();
+        }
+        miniDragMove(dx, dy);
       });
       function end(e){
-        if(!drag || (e && e.pointerId !== drag.id)) return;
-        var d = drag; drag = null;
-        videoMini.classList.remove('dragging');
-        if(!d.moved) return;
-        try{ localStorage.setItem(VIDEO_MINI_POS_KEY, JSON.stringify(videoMiniPos)); }catch(err){}
+        if(!p || (e && e.pointerId !== p.id)) return;
+        var moved = p.moved; p = null;
+        if(moved) miniDragEnd(true);
       }
-      bar.addEventListener('pointerup', end);
-      bar.addEventListener('pointercancel', end);
-    })();
+      el.addEventListener('pointerup', end);
+      el.addEventListener('pointercancel', end);
+    });
+    // A drag is not a tap: the click that follows letting go doesn't open Now Playing.
+    videoMiniBox.addEventListener('click', function(e){
+      if(Date.now() - miniDragJustEnded < 400){ e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
+    // On the picture the app draws natively (channels, videos of your own) the app sees the
+    // finger and reports the drag (distance from where it started, in page pixels).
+    if(videoPlugin){
+      videoPlugin.addListener('videodrag', function(ev){
+        if(!ev || !videoMiniOn) return;
+        if(ev.phase === 'start') miniDragStart();
+        else if(ev.phase === 'move') miniDragMove(ev.dx || 0, ev.dy || 0);
+        else miniDragEnd();
+      });
+    }
   }
 
   function renderNpRelated(station){

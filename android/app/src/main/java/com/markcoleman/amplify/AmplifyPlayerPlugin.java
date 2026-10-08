@@ -1671,10 +1671,24 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                 new VideoOverlay(
                     getActivity(),
                     getBridge().getWebView(),
-                    () -> {
-                      JSObject o = new JSObject();
-                      o.put("id", currentId);
-                      notifyListeners("videotap", o);
+                    new VideoOverlay.Listener() {
+                      @Override
+                      public void onTap() {
+                        JSObject o = new JSObject();
+                        o.put("id", currentId);
+                        notifyListeners("videotap", o);
+                      }
+
+                      @Override
+                      public void onDrag(String phase, float dxPx, float dyPx) {
+                        // In page pixels, as the page measures everything.
+                        float d = getContext().getResources().getDisplayMetrics().density;
+                        JSObject o = new JSObject();
+                        o.put("phase", phase);
+                        o.put("dx", dxPx / d);
+                        o.put("dy", dyPx / d);
+                        notifyListeners("videodrag", o);
+                      }
                     });
             video.setVideoSize(videoW, videoH, videoRatio);
           }

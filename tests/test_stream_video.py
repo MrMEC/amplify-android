@@ -142,6 +142,15 @@ async def app_mode(b, w, h, tag):
     check(not mini['hidden'] and v.get('show') and v.get('x') == mini['x'] and v.get('y') == mini['y'] and v.get('width') == mini['w'],
           f'[{tag}] closing Now Playing moves the picture into the floating window {mini}')
     await pg.evaluate(STANDIN); await pg.screenshot(path=f'{SHOTS}/stream-video-mini-{tag}.png')
+    # the app reports a finger dragging its picture (build 161): the window follows, the picture with it
+    m0 = await pg.evaluate("(()=>{var r=document.getElementById('videoMini').getBoundingClientRect(); return [r.left, r.top];})()")
+    await pg.evaluate("window.__emit('videodrag',{phase:'start',dx:0,dy:0})")
+    for i in range(1, 6):
+        await pg.evaluate("(d)=>window.__emit('videodrag',{phase:'move',dx:-d*10,dy:-d*30})", i); await pg.wait_for_timeout(30)
+    await pg.evaluate("window.__emit('videodrag',{phase:'end',dx:-50,dy:-150})"); await pg.wait_for_timeout(300)
+    m1 = await pg.evaluate("(()=>{var r=document.getElementById('videoMini').getBoundingClientRect(), b=document.getElementById('videoMiniBox').getBoundingClientRect(); return [r.left, r.top, Math.round(b.left), Math.round(b.top), window.__view];})()")
+    check(abs(m1[0] - (m0[0] - 50)) <= 2 and abs(m1[1] - (m0[1] - 150)) <= 2 and m1[4].get('x') == m1[2] and m1[4].get('y') == m1[3],
+          f'[{tag}] dragging the app-drawn picture moves the window and the picture with it {m0} -> {m1}')
     await pg.evaluate("document.getElementById('videoMiniBox').click()")
     await pg.wait_for_timeout(900)
     back = await state(pg)
