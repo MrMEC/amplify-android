@@ -31,7 +31,7 @@ jobs:
           mkdir m3 && cd m3 && unzip -q ../m3.aar classes.jar && cd ..
           for c in 'androidx.media3.common.SimpleBasePlayer' 'androidx.media3.common.SimpleBasePlayer$State' 'androidx.media3.common.SimpleBasePlayer$State$Builder' 'androidx.media3.common.SimpleBasePlayer$MediaItemData' 'androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder' 'androidx.media3.common.SimpleBasePlayer$PositionSupplier'; do
             echo "=== $c" >> ../out/media3.txt
-            javap -public -protected -cp m3/classes.jar "$c" >> ../out/media3.txt 2>&1 || true
+            javap -protected -cp m3/classes.jar "$c" >> ../out/media3.txt 2>&1 || true
           done
           cd ../out
           git init -q -b api-dump-out
