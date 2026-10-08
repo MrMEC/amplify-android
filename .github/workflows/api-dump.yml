@@ -27,6 +27,12 @@ jobs:
             javap -public -constants -cp classes.jar "$c" >> ../out/api.txt 2>&1 || true
           done
           if [ -d src ]; then mkdir -p ../out/src; find src -name 'MediaPlayer.java' -o -name 'IVLCVout.java' -o -name 'AWindow.java' -o -name 'Media.java' -o -name 'VideoHelper.java' | while read f; do cp "$f" ../out/src/; done; fi
+          curl -sSfL -o m3.aar https://dl.google.com/dl/android/maven2/androidx/media3/media3-common/1.8.0/media3-common-1.8.0.aar
+          mkdir m3 && cd m3 && unzip -q ../m3.aar classes.jar && cd ..
+          for c in 'androidx.media3.common.SimpleBasePlayer' 'androidx.media3.common.SimpleBasePlayer$State' 'androidx.media3.common.SimpleBasePlayer$State$Builder' 'androidx.media3.common.SimpleBasePlayer$MediaItemData' 'androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder' 'androidx.media3.common.SimpleBasePlayer$PositionSupplier'; do
+            echo "=== $c" >> ../out/media3.txt
+            javap -public -protected -cp m3/classes.jar "$c" >> ../out/media3.txt 2>&1 || true
+          done
           cd ../out
           git init -q -b api-dump-out
           git config user.name gha; git config user.email gha@users.noreply.github.com
