@@ -4939,17 +4939,16 @@
   .home-heading-link:hover, .home-heading-link:focus-visible{ color:var(--text); }
   .home-heading-chevron{ font-size:13px; color:var(--text-faint); }
   .grid-section-label{ font-size:19px; font-weight:800; letter-spacing:-.01em; color:var(--text); }
-  .grid-section-label.acc-head{ font-size:20px; font-weight:700; padding:12px 0; }
-  .grid-section-label.acc-head .acc-chev{ width:24px; height:24px; stroke:var(--text-faint); }
+  .grid-section-label.acc-head{ font-size:15px; font-weight:700; }
   .podcast-date-heading{
     font-size:13.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-dim);
-    padding:10px 2px 10px; border-top:1px solid var(--border);
   }
-  .tile-grid > .podcast-date-heading:first-child, .tile-grid > .acc-head + .podcast-date-heading{ border-top:none; }
   @media (max-width: 900px){
     .home-section-head h2{ font-size:24px; }
     .recent-col-heading{ font-size:22px; }
-    .section-heading, .section-heading-row .section-heading{ font-size:30px; line-height:1.15; }
+    .section-heading, .section-heading-row .section-heading{ font-size:26px; line-height:1.15; }
+    /* A page title stays on one line (Mark: "My Library" wrapped beside its three buttons). */
+    .section-heading-row:not(.is-search) .section-heading{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     body.home-stacked #homeTopHeading .section-heading, body.home-stacked .section-heading-row .section-heading{ font-size:24px; }
   }
   /* The menu button: a grey pill with the lines and the word Menu. */
