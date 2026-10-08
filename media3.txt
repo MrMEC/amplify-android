@@ -1,0 +1,251 @@
+=== androidx.media3.common.SimpleBasePlayer
+Compiled from "SimpleBasePlayer.java"
+public abstract class androidx.media3.common.SimpleBasePlayer extends androidx.media3.common.BasePlayer {
+  protected androidx.media3.common.SimpleBasePlayer(android.os.Looper);
+  protected androidx.media3.common.SimpleBasePlayer(android.os.Looper, androidx.media3.common.util.Clock);
+  public final void addListener(androidx.media3.common.Player$Listener);
+  public final void removeListener(androidx.media3.common.Player$Listener);
+  public final android.os.Looper getApplicationLooper();
+  public final androidx.media3.common.Player$Commands getAvailableCommands();
+  public final void setPlayWhenReady(boolean);
+  public final boolean getPlayWhenReady();
+  public final void setMediaItems(java.util.List<androidx.media3.common.MediaItem>, boolean);
+  public final void setMediaItems(java.util.List<androidx.media3.common.MediaItem>, int, long);
+  public final void addMediaItems(int, java.util.List<androidx.media3.common.MediaItem>);
+  public final void moveMediaItems(int, int, int);
+  public final void replaceMediaItems(int, int, java.util.List<androidx.media3.common.MediaItem>);
+  public final void removeMediaItems(int, int);
+  public final void prepare();
+  public final int getPlaybackState();
+  public final int getPlaybackSuppressionReason();
+  public final androidx.media3.common.PlaybackException getPlayerError();
+  public final void setRepeatMode(int);
+  public final int getRepeatMode();
+  public final void setShuffleModeEnabled(boolean);
+  public final boolean getShuffleModeEnabled();
+  public final boolean isLoading();
+  protected final void seekTo(int, long, int, boolean);
+  public final long getSeekBackIncrement();
+  public final long getSeekForwardIncrement();
+  public final long getMaxSeekToPreviousPosition();
+  public final void setPlaybackParameters(androidx.media3.common.PlaybackParameters);
+  public final androidx.media3.common.PlaybackParameters getPlaybackParameters();
+  public final void stop();
+  public final void release();
+  public final androidx.media3.common.Tracks getCurrentTracks();
+  public final androidx.media3.common.TrackSelectionParameters getTrackSelectionParameters();
+  public final void setTrackSelectionParameters(androidx.media3.common.TrackSelectionParameters);
+  public final androidx.media3.common.MediaMetadata getMediaMetadata();
+  public final androidx.media3.common.MediaMetadata getPlaylistMetadata();
+  public final void setPlaylistMetadata(androidx.media3.common.MediaMetadata);
+  public final androidx.media3.common.Timeline getCurrentTimeline();
+  public final int getCurrentPeriodIndex();
+  public final int getCurrentMediaItemIndex();
+  public final long getDuration();
+  public final long getCurrentPosition();
+  public final long getBufferedPosition();
+  public final long getTotalBufferedDuration();
+  public final boolean isPlayingAd();
+  public final int getCurrentAdGroupIndex();
+  public final int getCurrentAdIndexInAdGroup();
+  public final long getContentPosition();
+  public final long getContentBufferedPosition();
+  public final androidx.media3.common.AudioAttributes getAudioAttributes();
+  public final void setVolume(float);
+  public final float getVolume();
+  public final void setVideoSurface(android.view.Surface);
+  public final void setVideoSurfaceHolder(android.view.SurfaceHolder);
+  public final void setVideoSurfaceView(android.view.SurfaceView);
+  public final void setVideoTextureView(android.view.TextureView);
+  public final void clearVideoSurface();
+  public final void clearVideoSurface(android.view.Surface);
+  public final void clearVideoSurfaceHolder(android.view.SurfaceHolder);
+  public final void clearVideoSurfaceView(android.view.SurfaceView);
+  public final void clearVideoTextureView(android.view.TextureView);
+  public final androidx.media3.common.VideoSize getVideoSize();
+  public final androidx.media3.common.util.Size getSurfaceSize();
+  public final androidx.media3.common.text.CueGroup getCurrentCues();
+  public final androidx.media3.common.DeviceInfo getDeviceInfo();
+  public final int getDeviceVolume();
+  public final boolean isDeviceMuted();
+  public final void setDeviceVolume(int);
+  public final void setDeviceVolume(int, int);
+  public final void increaseDeviceVolume();
+  public final void increaseDeviceVolume(int);
+  public final void decreaseDeviceVolume();
+  public final void decreaseDeviceVolume(int);
+  public final void setDeviceMuted(boolean);
+  public final void setDeviceMuted(boolean, int);
+  public final void setAudioAttributes(androidx.media3.common.AudioAttributes, boolean);
+  protected final void invalidateState();
+  protected abstract androidx.media3.common.SimpleBasePlayer$State getState();
+  protected androidx.media3.common.SimpleBasePlayer$State getPlaceholderState(androidx.media3.common.SimpleBasePlayer$State);
+  protected androidx.media3.common.SimpleBasePlayer$MediaItemData getPlaceholderMediaItemData(androidx.media3.common.MediaItem);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetPlayWhenReady(boolean);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handlePrepare();
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleStop();
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleRelease();
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetRepeatMode(int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetShuffleModeEnabled(boolean);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetPlaybackParameters(androidx.media3.common.PlaybackParameters);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetTrackSelectionParameters(androidx.media3.common.TrackSelectionParameters);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetPlaylistMetadata(androidx.media3.common.MediaMetadata);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetVolume(float);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetDeviceVolume(int, int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleIncreaseDeviceVolume(int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleDecreaseDeviceVolume(int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetDeviceMuted(boolean, int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetAudioAttributes(androidx.media3.common.AudioAttributes, boolean);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetVideoOutput(java.lang.Object);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleClearVideoOutput(java.lang.Object);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSetMediaItems(java.util.List<androidx.media3.common.MediaItem>, int, long);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleAddMediaItems(int, java.util.List<androidx.media3.common.MediaItem>);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleMoveMediaItems(int, int, int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleReplaceMediaItems(int, int, java.util.List<androidx.media3.common.MediaItem>);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleRemoveMediaItems(int, int);
+  protected com.google.common.util.concurrent.ListenableFuture<?> handleSeek(int, long, int);
+  protected final void verifyApplicationThread();
+}
+=== androidx.media3.common.SimpleBasePlayer$State
+Compiled from "SimpleBasePlayer.java"
+public final class androidx.media3.common.SimpleBasePlayer$State {
+  public final androidx.media3.common.Player$Commands availableCommands;
+  public final boolean playWhenReady;
+  public final int playWhenReadyChangeReason;
+  public final int playbackState;
+  public final int playbackSuppressionReason;
+  public final androidx.media3.common.PlaybackException playerError;
+  public final int repeatMode;
+  public final boolean shuffleModeEnabled;
+  public final boolean isLoading;
+  public final long seekBackIncrementMs;
+  public final long seekForwardIncrementMs;
+  public final long maxSeekToPreviousPositionMs;
+  public final androidx.media3.common.PlaybackParameters playbackParameters;
+  public final androidx.media3.common.TrackSelectionParameters trackSelectionParameters;
+  public final androidx.media3.common.AudioAttributes audioAttributes;
+  public final float volume;
+  public final androidx.media3.common.VideoSize videoSize;
+  public final androidx.media3.common.text.CueGroup currentCues;
+  public final androidx.media3.common.DeviceInfo deviceInfo;
+  public final int deviceVolume;
+  public final boolean isDeviceMuted;
+  public final androidx.media3.common.util.Size surfaceSize;
+  public final boolean newlyRenderedFirstFrame;
+  public final androidx.media3.common.Metadata timedMetadata;
+  public final androidx.media3.common.Timeline timeline;
+  public final androidx.media3.common.Tracks currentTracks;
+  public final androidx.media3.common.MediaMetadata currentMetadata;
+  public final androidx.media3.common.MediaMetadata playlistMetadata;
+  public final int currentMediaItemIndex;
+  public final int currentAdGroupIndex;
+  public final int currentAdIndexInAdGroup;
+  public final androidx.media3.common.SimpleBasePlayer$PositionSupplier contentPositionMsSupplier;
+  public final androidx.media3.common.SimpleBasePlayer$PositionSupplier adPositionMsSupplier;
+  public final androidx.media3.common.SimpleBasePlayer$PositionSupplier contentBufferedPositionMsSupplier;
+  public final androidx.media3.common.SimpleBasePlayer$PositionSupplier adBufferedPositionMsSupplier;
+  public final androidx.media3.common.SimpleBasePlayer$PositionSupplier totalBufferedDurationMsSupplier;
+  public final boolean hasPositionDiscontinuity;
+  public final int positionDiscontinuityReason;
+  public final long discontinuityPositionMs;
+  public androidx.media3.common.SimpleBasePlayer$State$Builder buildUpon();
+  public com.google.common.collect.ImmutableList<androidx.media3.common.SimpleBasePlayer$MediaItemData> getPlaylist();
+  public boolean equals(java.lang.Object);
+  public int hashCode();
+}
+=== androidx.media3.common.SimpleBasePlayer$State$Builder
+Compiled from "SimpleBasePlayer.java"
+public final class androidx.media3.common.SimpleBasePlayer$State$Builder {
+  public androidx.media3.common.SimpleBasePlayer$State$Builder();
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setAvailableCommands(androidx.media3.common.Player$Commands);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlayWhenReady(boolean, int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlaybackState(int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlaybackSuppressionReason(int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlayerError(androidx.media3.common.PlaybackException);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setRepeatMode(int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setShuffleModeEnabled(boolean);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setIsLoading(boolean);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setSeekBackIncrementMs(long);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setSeekForwardIncrementMs(long);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setMaxSeekToPreviousPositionMs(long);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlaybackParameters(androidx.media3.common.PlaybackParameters);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setTrackSelectionParameters(androidx.media3.common.TrackSelectionParameters);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setAudioAttributes(androidx.media3.common.AudioAttributes);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setVolume(float);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setVideoSize(androidx.media3.common.VideoSize);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setCurrentCues(androidx.media3.common.text.CueGroup);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setDeviceInfo(androidx.media3.common.DeviceInfo);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setDeviceVolume(int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setIsDeviceMuted(boolean);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setSurfaceSize(androidx.media3.common.util.Size);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setNewlyRenderedFirstFrame(boolean);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setTimedMetadata(androidx.media3.common.Metadata);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlaylist(java.util.List<androidx.media3.common.SimpleBasePlayer$MediaItemData>);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlaylist(androidx.media3.common.Timeline, androidx.media3.common.Tracks, androidx.media3.common.MediaMetadata);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPlaylistMetadata(androidx.media3.common.MediaMetadata);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setCurrentMediaItemIndex(int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setCurrentAd(int, int);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setContentPositionMs(long);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setContentPositionMs(androidx.media3.common.SimpleBasePlayer$PositionSupplier);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setAdPositionMs(long);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setAdPositionMs(androidx.media3.common.SimpleBasePlayer$PositionSupplier);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setContentBufferedPositionMs(androidx.media3.common.SimpleBasePlayer$PositionSupplier);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setAdBufferedPositionMs(androidx.media3.common.SimpleBasePlayer$PositionSupplier);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setTotalBufferedDurationMs(androidx.media3.common.SimpleBasePlayer$PositionSupplier);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder setPositionDiscontinuity(int, long);
+  public androidx.media3.common.SimpleBasePlayer$State$Builder clearPositionDiscontinuity();
+  public androidx.media3.common.SimpleBasePlayer$State build();
+}
+=== androidx.media3.common.SimpleBasePlayer$MediaItemData
+Compiled from "SimpleBasePlayer.java"
+public final class androidx.media3.common.SimpleBasePlayer$MediaItemData {
+  public final java.lang.Object uid;
+  public final androidx.media3.common.Tracks tracks;
+  public final androidx.media3.common.MediaItem mediaItem;
+  public final androidx.media3.common.MediaMetadata mediaMetadata;
+  public final java.lang.Object manifest;
+  public final androidx.media3.common.MediaItem$LiveConfiguration liveConfiguration;
+  public final long presentationStartTimeMs;
+  public final long windowStartTimeMs;
+  public final long elapsedRealtimeEpochOffsetMs;
+  public final boolean isSeekable;
+  public final boolean isDynamic;
+  public final long defaultPositionUs;
+  public final long durationUs;
+  public final long positionInFirstPeriodUs;
+  public final boolean isPlaceholder;
+  public final com.google.common.collect.ImmutableList<androidx.media3.common.SimpleBasePlayer$PeriodData> periods;
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder buildUpon();
+  public boolean equals(java.lang.Object);
+  public int hashCode();
+}
+=== androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder
+Compiled from "SimpleBasePlayer.java"
+public final class androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder {
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder(java.lang.Object);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setUid(java.lang.Object);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setTracks(androidx.media3.common.Tracks);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setMediaItem(androidx.media3.common.MediaItem);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setMediaMetadata(androidx.media3.common.MediaMetadata);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setManifest(java.lang.Object);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setLiveConfiguration(androidx.media3.common.MediaItem$LiveConfiguration);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setPresentationStartTimeMs(long);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setWindowStartTimeMs(long);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setElapsedRealtimeEpochOffsetMs(long);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setIsSeekable(boolean);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setIsDynamic(boolean);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setDefaultPositionUs(long);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setDurationUs(long);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setPositionInFirstPeriodUs(long);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setIsPlaceholder(boolean);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData$Builder setPeriods(java.util.List<androidx.media3.common.SimpleBasePlayer$PeriodData>);
+  public androidx.media3.common.SimpleBasePlayer$MediaItemData build();
+}
+=== androidx.media3.common.SimpleBasePlayer$PositionSupplier
+Compiled from "SimpleBasePlayer.java"
+public interface androidx.media3.common.SimpleBasePlayer$PositionSupplier {
+  public static final androidx.media3.common.SimpleBasePlayer$PositionSupplier ZERO;
+  public static androidx.media3.common.SimpleBasePlayer$PositionSupplier getConstant(long);
+  public static androidx.media3.common.SimpleBasePlayer$PositionSupplier getExtrapolating(long, float);
+  public abstract long get();
+}

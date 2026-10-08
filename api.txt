@@ -1,0 +1,760 @@
+=== org.videolan.libvlc.AWindow
+Compiled from "AWindow.java"
+public class org.videolan.libvlc.AWindow implements org.videolan.libvlc.interfaces.IVLCVout {
+  public org.videolan.libvlc.AWindow(org.videolan.libvlc.AWindow$SurfaceCallback);
+  public void setVideoView(android.view.SurfaceView);
+  public void setVideoView(android.view.TextureView);
+  public void setVideoSurface(android.view.Surface, android.view.SurfaceHolder);
+  public void setVideoSurface(android.graphics.SurfaceTexture);
+  public void setSubtitlesView(android.view.SurfaceView);
+  public void setSubtitlesView(android.view.TextureView);
+  public void setSubtitlesSurface(android.view.Surface, android.view.SurfaceHolder);
+  public void setSubtitlesSurface(android.graphics.SurfaceTexture);
+  public void attachViews(org.videolan.libvlc.interfaces.IVLCVout$OnNewVideoLayoutListener);
+  public void attachViews();
+  public void detachViews();
+  public boolean areViewsAttached();
+  public void sendMouseEvent(int, int, int, int);
+  public void setWindowSize(int, int);
+  public void addCallback(org.videolan.libvlc.interfaces.IVLCVout$Callback);
+  public void removeCallback(org.videolan.libvlc.interfaces.IVLCVout$Callback);
+}
+=== org.videolan.libvlc.AWindow$1
+Compiled from "AWindow.java"
+class org.videolan.libvlc.AWindow$1 implements java.lang.Runnable {
+  public void run();
+}
+=== org.videolan.libvlc.AWindow$NativeLock
+Compiled from "AWindow.java"
+class org.videolan.libvlc.AWindow$NativeLock {
+}
+=== org.videolan.libvlc.AWindow$SurfaceCallback
+Compiled from "AWindow.java"
+public interface org.videolan.libvlc.AWindow$SurfaceCallback {
+  public abstract void onSurfacesCreated(org.videolan.libvlc.AWindow);
+  public abstract void onSurfacesDestroyed(org.videolan.libvlc.AWindow);
+}
+=== org.videolan.libvlc.AWindow$SurfaceHelper
+Compiled from "AWindow.java"
+class org.videolan.libvlc.AWindow$SurfaceHelper {
+  public void attach();
+  public void release();
+  public boolean isReady();
+  public android.view.Surface getSurface();
+}
+=== org.videolan.libvlc.AWindow$SurfaceHelper$1
+Compiled from "AWindow.java"
+class org.videolan.libvlc.AWindow$SurfaceHelper$1 implements android.view.SurfaceHolder$Callback {
+  public void surfaceCreated(android.view.SurfaceHolder);
+  public void surfaceChanged(android.view.SurfaceHolder, int, int, int);
+  public void surfaceDestroyed(android.view.SurfaceHolder);
+}
+=== org.videolan.libvlc.AWindow$SurfaceHelper$2
+Compiled from "AWindow.java"
+class org.videolan.libvlc.AWindow$SurfaceHelper$2 implements android.view.TextureView$SurfaceTextureListener {
+  public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture, int, int);
+  public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture, int, int);
+  public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture);
+  public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture);
+}
+=== org.videolan.libvlc.AWindow$SurfaceTextureThread
+Compiled from "AWindow.java"
+class org.videolan.libvlc.AWindow$SurfaceTextureThread implements java.lang.Runnable,android.graphics.SurfaceTexture$OnFrameAvailableListener {
+  public synchronized void onFrameAvailable(android.graphics.SurfaceTexture);
+  public void run();
+}
+=== org.videolan.libvlc.LibVLC
+Compiled from "LibVLC.java"
+public class org.videolan.libvlc.LibVLC extends org.videolan.libvlc.VLCObject<org.videolan.libvlc.interfaces.ILibVLC$Event> implements org.videolan.libvlc.interfaces.ILibVLC {
+  public org.videolan.libvlc.LibVLC(android.content.Context, java.util.List<java.lang.String>);
+  public org.videolan.libvlc.LibVLC(android.content.Context);
+  public static native java.lang.String version();
+  public static native int majorVersion();
+  public static native java.lang.String compiler();
+  public static native java.lang.String changeset();
+  public android.content.Context getAppContext();
+  public void setUserAgent(java.lang.String, java.lang.String);
+  public static synchronized void loadLibraries();
+  public long getInstance();
+  public org.videolan.libvlc.interfaces.ILibVLC getLibVLC();
+  public boolean isReleased();
+}
+=== org.videolan.libvlc.LibVLC$Event
+Compiled from "LibVLC.java"
+public class org.videolan.libvlc.LibVLC$Event extends org.videolan.libvlc.interfaces.AbstractVLCEvent {
+}
+=== org.videolan.libvlc.LibVLCFactory
+Compiled from "LibVLCFactory.java"
+public class org.videolan.libvlc.LibVLCFactory implements org.videolan.libvlc.interfaces.ILibVLCFactory {
+  public org.videolan.libvlc.LibVLCFactory();
+  public org.videolan.libvlc.interfaces.ILibVLC getFromOptions(android.content.Context, java.util.List<java.lang.String>);
+  public org.videolan.libvlc.interfaces.ILibVLC getFromContext(android.content.Context);
+}
+=== org.videolan.libvlc.Media
+Compiled from "Media.java"
+public class org.videolan.libvlc.Media extends org.videolan.libvlc.VLCObject<org.videolan.libvlc.interfaces.IMedia$Event> implements org.videolan.libvlc.interfaces.IMedia {
+  public org.videolan.libvlc.Media(org.videolan.libvlc.interfaces.ILibVLC, java.lang.String);
+  public org.videolan.libvlc.Media(org.videolan.libvlc.interfaces.ILibVLC, android.net.Uri);
+  public org.videolan.libvlc.Media(org.videolan.libvlc.interfaces.ILibVLC, java.io.FileDescriptor);
+  public org.videolan.libvlc.Media(org.videolan.libvlc.interfaces.ILibVLC, android.content.res.AssetFileDescriptor);
+  public void setEventListener(org.videolan.libvlc.interfaces.IMedia$EventListener);
+  public synchronized android.net.Uri getUri();
+  public long getDuration();
+  public int getState();
+  public org.videolan.libvlc.MediaList subItems();
+  public boolean parse(int);
+  public boolean parse();
+  public boolean parseAsync(int, int);
+  public boolean parseAsync(int);
+  public boolean parseAsync();
+  public synchronized boolean isParsed();
+  public int getType();
+  public int getTrackCount();
+  public org.videolan.libvlc.interfaces.IMedia$Track getTrack(int);
+  public java.lang.String getMeta(int);
+  public java.lang.String getMeta(int, boolean);
+  public void setHWDecoderEnabled(boolean, boolean);
+  public void setDefaultMediaPlayerOptions();
+  public void addOption(java.lang.String);
+  public void addSlave(org.videolan.libvlc.interfaces.IMedia$Slave);
+  public void clearSlaves();
+  public org.videolan.libvlc.interfaces.IMedia$Slave[] getSlaves();
+  public org.videolan.libvlc.interfaces.IMedia$Stats getStats();
+  public long getInstance();
+  public org.videolan.libvlc.interfaces.ILibVLC getLibVLC();
+  public boolean isReleased();
+  public org.videolan.libvlc.interfaces.IMediaList subItems();
+}
+=== org.videolan.libvlc.MediaDiscoverer
+Compiled from "MediaDiscoverer.java"
+public class org.videolan.libvlc.MediaDiscoverer extends org.videolan.libvlc.VLCObject<org.videolan.libvlc.MediaDiscoverer$Event> {
+  public org.videolan.libvlc.MediaDiscoverer(org.videolan.libvlc.interfaces.ILibVLC, java.lang.String);
+  public boolean start();
+  public void stop();
+  public void setEventListener(org.videolan.libvlc.MediaDiscoverer$EventListener);
+  public org.videolan.libvlc.MediaList getMediaList();
+  public static org.videolan.libvlc.MediaDiscoverer$Description[] list(org.videolan.libvlc.interfaces.ILibVLC, int);
+  public long getInstance();
+  public org.videolan.libvlc.interfaces.ILibVLC getLibVLC();
+  public boolean isReleased();
+}
+=== org.videolan.libvlc.MediaDiscoverer$Description
+Compiled from "MediaDiscoverer.java"
+public class org.videolan.libvlc.MediaDiscoverer$Description {
+  public final java.lang.String name;
+  public final java.lang.String longName;
+  public final int category;
+}
+=== org.videolan.libvlc.MediaDiscoverer$Description$Category
+Compiled from "MediaDiscoverer.java"
+public class org.videolan.libvlc.MediaDiscoverer$Description$Category {
+  public static final int Devices = 0;
+  public static final int Lan = 1;
+  public static final int Podcasts = 2;
+  public static final int LocalDirs = 3;
+  public org.videolan.libvlc.MediaDiscoverer$Description$Category();
+}
+=== org.videolan.libvlc.MediaDiscoverer$Event
+Compiled from "MediaDiscoverer.java"
+public class org.videolan.libvlc.MediaDiscoverer$Event extends org.videolan.libvlc.interfaces.AbstractVLCEvent {
+  public static final int Started = 1280;
+  public static final int Ended = 1281;
+}
+=== org.videolan.libvlc.MediaDiscoverer$EventListener
+Compiled from "MediaDiscoverer.java"
+public interface org.videolan.libvlc.MediaDiscoverer$EventListener extends org.videolan.libvlc.interfaces.AbstractVLCEvent$Listener<org.videolan.libvlc.MediaDiscoverer$Event> {
+}
+=== org.videolan.libvlc.MediaFactory
+Compiled from "MediaFactory.java"
+public class org.videolan.libvlc.MediaFactory implements org.videolan.libvlc.interfaces.IMediaFactory {
+  public org.videolan.libvlc.MediaFactory();
+  public org.videolan.libvlc.interfaces.IMedia getFromLocalPath(org.videolan.libvlc.interfaces.ILibVLC, java.lang.String);
+  public org.videolan.libvlc.interfaces.IMedia getFromUri(org.videolan.libvlc.interfaces.ILibVLC, android.net.Uri);
+  public org.videolan.libvlc.interfaces.IMedia getFromFileDescriptor(org.videolan.libvlc.interfaces.ILibVLC, java.io.FileDescriptor);
+  public org.videolan.libvlc.interfaces.IMedia getFromAssetFileDescriptor(org.videolan.libvlc.interfaces.ILibVLC, android.content.res.AssetFileDescriptor);
+}
+=== org.videolan.libvlc.MediaList
+Compiled from "MediaList.java"
+public class org.videolan.libvlc.MediaList extends org.videolan.libvlc.VLCObject<org.videolan.libvlc.interfaces.IMediaList$Event> implements org.videolan.libvlc.interfaces.IMediaList {
+  public org.videolan.libvlc.MediaList(org.videolan.libvlc.interfaces.ILibVLC);
+  public void setEventListener(org.videolan.libvlc.interfaces.IMediaList$EventListener, android.os.Handler);
+  public synchronized int getCount();
+  public synchronized org.videolan.libvlc.interfaces.IMedia getMediaAt(int);
+  public void onReleaseNative();
+  public synchronized boolean isLocked();
+  public long getInstance();
+  public org.videolan.libvlc.interfaces.ILibVLC getLibVLC();
+  public boolean isReleased();
+}
+=== org.videolan.libvlc.MediaPlayer
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer extends org.videolan.libvlc.VLCObject<org.videolan.libvlc.MediaPlayer$Event> {
+  public static final int SURFACE_SCALES_COUNT;
+  public org.videolan.libvlc.MediaPlayer(org.videolan.libvlc.interfaces.ILibVLC);
+  public org.videolan.libvlc.MediaPlayer(org.videolan.libvlc.interfaces.IMedia);
+  public org.videolan.libvlc.interfaces.IVLCVout getVLCVout();
+  public void attachViews(org.videolan.libvlc.util.VLCVideoLayout, org.videolan.libvlc.util.DisplayManager, boolean, boolean);
+  public void detachViews();
+  public void updateVideoSurfaces();
+  public void setVideoScale(org.videolan.libvlc.MediaPlayer$ScaleType);
+  public org.videolan.libvlc.MediaPlayer$ScaleType getVideoScale();
+  public void setMedia(org.videolan.libvlc.interfaces.IMedia);
+  public int setRenderer(org.videolan.libvlc.RendererItem);
+  public synchronized boolean hasMedia();
+  public synchronized org.videolan.libvlc.interfaces.IMedia getMedia();
+  public void play();
+  public void playAsset(android.content.Context, java.lang.String) throws java.io.IOException;
+  public void play(android.content.res.AssetFileDescriptor);
+  public void play(java.lang.String);
+  public void play(android.net.Uri);
+  public void play(org.videolan.libvlc.interfaces.IMedia);
+  public void stop();
+  public void setVideoTitleDisplay(int, int);
+  public float getScale();
+  public void setScale(float);
+  public java.lang.String getAspectRatio();
+  public void setAspectRatio(java.lang.String);
+  public boolean updateViewpoint(float, float, float, float, boolean);
+  public synchronized boolean setAudioOutput(java.lang.String);
+  public synchronized boolean setAudioDigitalOutputEnabled(boolean);
+  public synchronized boolean forceAudioDigitalEncodings(int[]);
+  public void setUseOrientationFromBounds(java.lang.Boolean);
+  public java.lang.Boolean useOrientationFromBounds();
+  public boolean setAudioOutputDevice(java.lang.String);
+  public org.videolan.libvlc.MediaPlayer$Title[] getTitles();
+  public org.videolan.libvlc.MediaPlayer$Chapter[] getChapters(int);
+  public int getVideoTracksCount();
+  public org.videolan.libvlc.MediaPlayer$TrackDescription[] getVideoTracks();
+  public int getVideoTrack();
+  public boolean setVideoTrack(int);
+  public void setVideoTrackEnabled(boolean);
+  public org.videolan.libvlc.interfaces.IMedia$VideoTrack getCurrentVideoTrack();
+  public int getAudioTracksCount();
+  public org.videolan.libvlc.MediaPlayer$TrackDescription[] getAudioTracks();
+  public int getAudioTrack();
+  public boolean setAudioTrack(int);
+  public long getAudioDelay();
+  public boolean setAudioDelay(long);
+  public int getSpuTracksCount();
+  public org.videolan.libvlc.MediaPlayer$TrackDescription[] getSpuTracks();
+  public int getSpuTrack();
+  public boolean setSpuTrack(int);
+  public long getSpuDelay();
+  public boolean setSpuDelay(long);
+  public boolean setEqualizer(org.videolan.libvlc.MediaPlayer$Equalizer);
+  public int getTeletext();
+  public void setTeletext(int);
+  public boolean addSlave(int, android.net.Uri, boolean);
+  public boolean record(java.lang.String);
+  public boolean addSlave(int, java.lang.String, boolean);
+  public native void setRate(float);
+  public native float getRate();
+  public native boolean isPlaying();
+  public native boolean isSeekable();
+  public native void pause();
+  public native int getPlayerState();
+  public native int getVolume();
+  public native int setVolume(int);
+  public native long getTime();
+  public long setTime(long, boolean);
+  public long setTime(long);
+  public native float getPosition();
+  public void setPosition(float, boolean);
+  public void setPosition(float);
+  public native long getLength();
+  public native int getTitle();
+  public native void setTitle(int);
+  public native int getChapter();
+  public native int previousChapter();
+  public native int nextChapter();
+  public native void setChapter(int);
+  public native void navigate(int);
+  public synchronized void setEventListener(org.videolan.libvlc.MediaPlayer$EventListener);
+  public boolean canDoPassthrough();
+  public native long nativeSetTime(long, boolean);
+  public native void nativeSetPosition(float, boolean);
+  public long getInstance();
+  public org.videolan.libvlc.interfaces.ILibVLC getLibVLC();
+  public boolean isReleased();
+}
+=== org.videolan.libvlc.MediaPlayer$1
+Compiled from "MediaPlayer.java"
+class org.videolan.libvlc.MediaPlayer$1 implements org.videolan.libvlc.AWindow$SurfaceCallback {
+  public void onSurfacesCreated(org.videolan.libvlc.AWindow);
+  public void onSurfacesDestroyed(org.videolan.libvlc.AWindow);
+}
+=== org.videolan.libvlc.MediaPlayer$2
+Compiled from "MediaPlayer.java"
+class org.videolan.libvlc.MediaPlayer$2 extends android.content.BroadcastReceiver {
+  public void onReceive(android.content.Context, android.content.Intent);
+}
+=== org.videolan.libvlc.MediaPlayer$3
+Compiled from "MediaPlayer.java"
+class org.videolan.libvlc.MediaPlayer$3 extends android.media.AudioDeviceCallback {
+  public void onAudioDevicesAdded(android.media.AudioDeviceInfo[]);
+  public void onAudioDevicesRemoved(android.media.AudioDeviceInfo[]);
+}
+=== org.videolan.libvlc.MediaPlayer$4
+Compiled from "MediaPlayer.java"
+class org.videolan.libvlc.MediaPlayer$4 implements java.lang.Runnable {
+  public void run();
+}
+=== org.videolan.libvlc.MediaPlayer$Chapter
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$Chapter {
+  public final long timeOffset;
+  public final long duration;
+  public final java.lang.String name;
+}
+=== org.videolan.libvlc.MediaPlayer$Equalizer
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$Equalizer {
+  public static org.videolan.libvlc.MediaPlayer$Equalizer create();
+  public static org.videolan.libvlc.MediaPlayer$Equalizer createFromPreset(int);
+  public static int getPresetCount();
+  public static java.lang.String getPresetName(int);
+  public static int getBandCount();
+  public static float getBandFrequency(int);
+  public float getPreAmp();
+  public boolean setPreAmp(float);
+  public float getAmp(int);
+  public boolean setAmp(int, float);
+}
+=== org.videolan.libvlc.MediaPlayer$Event
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$Event extends org.videolan.libvlc.interfaces.AbstractVLCEvent {
+  public static final int MediaChanged = 256;
+  public static final int Opening = 258;
+  public static final int Buffering = 259;
+  public static final int Playing = 260;
+  public static final int Paused = 261;
+  public static final int Stopped = 262;
+  public static final int EndReached = 265;
+  public static final int EncounteredError = 266;
+  public static final int TimeChanged = 267;
+  public static final int PositionChanged = 268;
+  public static final int SeekableChanged = 269;
+  public static final int PausableChanged = 270;
+  public static final int LengthChanged = 273;
+  public static final int Vout = 274;
+  public static final int ESAdded = 276;
+  public static final int ESDeleted = 277;
+  public static final int ESSelected = 278;
+  public static final int RecordChanged = 286;
+  public long getTimeChanged();
+  public long getLengthChanged();
+  public float getPositionChanged();
+  public int getVoutCount();
+  public int getEsChangedType();
+  public int getEsChangedID();
+  public boolean getPausable();
+  public boolean getSeekable();
+  public float getBuffering();
+  public boolean getRecording();
+  public java.lang.String getRecordPath();
+}
+=== org.videolan.libvlc.MediaPlayer$EventListener
+Compiled from "MediaPlayer.java"
+public interface org.videolan.libvlc.MediaPlayer$EventListener extends org.videolan.libvlc.interfaces.AbstractVLCEvent$Listener<org.videolan.libvlc.MediaPlayer$Event> {
+}
+=== org.videolan.libvlc.MediaPlayer$Navigate
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$Navigate {
+  public static final int Activate = 0;
+  public static final int Up = 1;
+  public static final int Down = 2;
+  public static final int Left = 3;
+  public static final int Right = 4;
+  public org.videolan.libvlc.MediaPlayer$Navigate();
+}
+=== org.videolan.libvlc.MediaPlayer$Position
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$Position {
+  public static final int Disable = -1;
+  public static final int Center = 0;
+  public static final int Left = 1;
+  public static final int Right = 2;
+  public static final int Top = 3;
+  public static final int TopLeft = 4;
+  public static final int TopRight = 5;
+  public static final int Bottom = 6;
+  public static final int BottomLeft = 7;
+  public static final int BottomRight = 8;
+  public org.videolan.libvlc.MediaPlayer$Position();
+}
+=== org.videolan.libvlc.MediaPlayer$ScaleType
+Compiled from "MediaPlayer.java"
+public final class org.videolan.libvlc.MediaPlayer$ScaleType extends java.lang.Enum<org.videolan.libvlc.MediaPlayer$ScaleType> {
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_BEST_FIT;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_FIT_SCREEN;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_FILL;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_16_9;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_4_3;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_16_10;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_2_1;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_221_1;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_235_1;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_239_1;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_5_4;
+  public static final org.videolan.libvlc.MediaPlayer$ScaleType SURFACE_ORIGINAL;
+  public static org.videolan.libvlc.MediaPlayer$ScaleType[] values();
+  public static org.videolan.libvlc.MediaPlayer$ScaleType valueOf(java.lang.String);
+  public java.lang.Float getRatio();
+  public static org.videolan.libvlc.MediaPlayer$ScaleType[] getMainScaleTypes();
+}
+=== org.videolan.libvlc.MediaPlayer$Title
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$Title {
+  public final long duration;
+  public final java.lang.String name;
+  public org.videolan.libvlc.MediaPlayer$Title(long, java.lang.String, int);
+  public boolean isMenu();
+  public boolean isInteractive();
+}
+=== org.videolan.libvlc.MediaPlayer$Title$Flags
+Compiled from "MediaPlayer.java"
+class org.videolan.libvlc.MediaPlayer$Title$Flags {
+  public static final int MENU = 1;
+  public static final int INTERACTIVE = 2;
+}
+=== org.videolan.libvlc.MediaPlayer$TrackDescription
+Compiled from "MediaPlayer.java"
+public class org.videolan.libvlc.MediaPlayer$TrackDescription {
+  public final int id;
+  public final java.lang.String name;
+}
+=== org.videolan.libvlc.VideoHelper
+Compiled from "VideoHelper.java"
+class org.videolan.libvlc.VideoHelper implements org.videolan.libvlc.interfaces.IVLCVout$OnNewVideoLayoutListener {
+  public void onNewVideoLayout(org.videolan.libvlc.interfaces.IVLCVout, int, int, int, int, int, int);
+}
+=== org.videolan.libvlc.VideoHelper$1
+Compiled from "VideoHelper.java"
+class org.videolan.libvlc.VideoHelper$1 implements android.view.View$OnLayoutChangeListener {
+  public void onLayoutChange(android.view.View, int, int, int, int, int, int, int, int);
+}
+=== org.videolan.libvlc.VideoHelper$1$1
+Compiled from "VideoHelper.java"
+class org.videolan.libvlc.VideoHelper$1$1 implements java.lang.Runnable {
+  public void run();
+}
+=== org.videolan.libvlc.VideoHelper$2
+Compiled from "VideoHelper.java"
+class org.videolan.libvlc.VideoHelper$2 {
+}
+=== org.videolan.libvlc.interfaces.AbstractVLCEvent
+Compiled from "AbstractVLCEvent.java"
+public abstract class org.videolan.libvlc.interfaces.AbstractVLCEvent {
+  public final int type;
+  public org.videolan.libvlc.interfaces.AbstractVLCEvent(int);
+  public org.videolan.libvlc.interfaces.AbstractVLCEvent(int, long);
+  public org.videolan.libvlc.interfaces.AbstractVLCEvent(int, long, long);
+  public org.videolan.libvlc.interfaces.AbstractVLCEvent(int, float);
+  public org.videolan.libvlc.interfaces.AbstractVLCEvent(int, long, java.lang.String);
+  public void release();
+}
+=== org.videolan.libvlc.interfaces.AbstractVLCEvent$Listener
+Compiled from "AbstractVLCEvent.java"
+public interface org.videolan.libvlc.interfaces.AbstractVLCEvent$Listener<T extends org.videolan.libvlc.interfaces.AbstractVLCEvent> {
+  public abstract void onEvent(T);
+}
+=== org.videolan.libvlc.interfaces.IMedia
+Compiled from "IMedia.java"
+public interface org.videolan.libvlc.interfaces.IMedia extends org.videolan.libvlc.interfaces.IVLCObject<org.videolan.libvlc.interfaces.IMedia$Event> {
+  public abstract long getDuration();
+  public abstract int getState();
+  public abstract org.videolan.libvlc.interfaces.IMediaList subItems();
+  public abstract boolean parse(int);
+  public abstract boolean parse();
+  public abstract boolean parseAsync(int, int);
+  public abstract boolean parseAsync(int);
+  public abstract boolean parseAsync();
+  public abstract int getType();
+  public abstract int getTrackCount();
+  public abstract org.videolan.libvlc.interfaces.IMedia$Track getTrack(int);
+  public abstract java.lang.String getMeta(int);
+  public abstract java.lang.String getMeta(int, boolean);
+  public abstract void setHWDecoderEnabled(boolean, boolean);
+  public abstract void setEventListener(org.videolan.libvlc.interfaces.IMedia$EventListener);
+  public abstract void addOption(java.lang.String);
+  public abstract void addSlave(org.videolan.libvlc.interfaces.IMedia$Slave);
+  public abstract void clearSlaves();
+  public abstract org.videolan.libvlc.interfaces.IMedia$Slave[] getSlaves();
+  public abstract android.net.Uri getUri();
+  public abstract boolean isParsed();
+  public abstract org.videolan.libvlc.interfaces.IMedia$Stats getStats();
+  public abstract void setDefaultMediaPlayerOptions();
+}
+=== org.videolan.libvlc.interfaces.IMedia$AudioTrack
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$AudioTrack extends org.videolan.libvlc.interfaces.IMedia$Track {
+  public final int channels;
+  public final int rate;
+  public org.videolan.libvlc.interfaces.IMedia$AudioTrack(java.lang.String, java.lang.String, int, int, int, int, int, java.lang.String, java.lang.String, int, int);
+}
+=== org.videolan.libvlc.interfaces.IMedia$Event
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Event extends org.videolan.libvlc.interfaces.AbstractVLCEvent {
+  public static final int MetaChanged = 0;
+  public static final int SubItemAdded = 1;
+  public static final int DurationChanged = 2;
+  public static final int ParsedChanged = 3;
+  public static final int StateChanged = 5;
+  public static final int SubItemTreeAdded = 6;
+  public org.videolan.libvlc.interfaces.IMedia$Event(int);
+  public org.videolan.libvlc.interfaces.IMedia$Event(int, long);
+  public int getMetaId();
+  public int getParsedStatus();
+}
+=== org.videolan.libvlc.interfaces.IMedia$EventListener
+Compiled from "IMedia.java"
+public interface org.videolan.libvlc.interfaces.IMedia$EventListener extends org.videolan.libvlc.interfaces.AbstractVLCEvent$Listener<org.videolan.libvlc.interfaces.IMedia$Event> {
+}
+=== org.videolan.libvlc.interfaces.IMedia$Meta
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Meta {
+  public static final int Title = 0;
+  public static final int Artist = 1;
+  public static final int Genre = 2;
+  public static final int Copyright = 3;
+  public static final int Album = 4;
+  public static final int TrackNumber = 5;
+  public static final int Description = 6;
+  public static final int Rating = 7;
+  public static final int Date = 8;
+  public static final int Setting = 9;
+  public static final int URL = 10;
+  public static final int Language = 11;
+  public static final int NowPlaying = 12;
+  public static final int Publisher = 13;
+  public static final int EncodedBy = 14;
+  public static final int ArtworkURL = 15;
+  public static final int TrackID = 16;
+  public static final int TrackTotal = 17;
+  public static final int Director = 18;
+  public static final int Season = 19;
+  public static final int Episode = 20;
+  public static final int ShowName = 21;
+  public static final int Actors = 22;
+  public static final int AlbumArtist = 23;
+  public static final int DiscNumber = 24;
+  public static final int MAX = 25;
+  public org.videolan.libvlc.interfaces.IMedia$Meta();
+}
+=== org.videolan.libvlc.interfaces.IMedia$Parse
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Parse {
+  public static final int ParseLocal = 0;
+  public static final int ParseNetwork = 1;
+  public static final int FetchLocal = 2;
+  public static final int FetchNetwork = 4;
+  public static final int DoInteract = 8;
+  public org.videolan.libvlc.interfaces.IMedia$Parse();
+}
+=== org.videolan.libvlc.interfaces.IMedia$ParsedStatus
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$ParsedStatus {
+  public static final int Skipped = 1;
+  public static final int Failed = 2;
+  public static final int Timeout = 3;
+  public static final int Done = 4;
+  public org.videolan.libvlc.interfaces.IMedia$ParsedStatus();
+}
+=== org.videolan.libvlc.interfaces.IMedia$Slave
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Slave {
+  public final int type;
+  public final int priority;
+  public final java.lang.String uri;
+  public org.videolan.libvlc.interfaces.IMedia$Slave(int, int, java.lang.String);
+}
+=== org.videolan.libvlc.interfaces.IMedia$Slave$Type
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Slave$Type {
+  public static final int Subtitle = 0;
+  public static final int Audio = 1;
+  public org.videolan.libvlc.interfaces.IMedia$Slave$Type();
+}
+=== org.videolan.libvlc.interfaces.IMedia$State
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$State {
+  public static final int NothingSpecial = 0;
+  public static final int Opening = 1;
+  public static final int Playing = 3;
+  public static final int Paused = 4;
+  public static final int Stopped = 5;
+  public static final int Ended = 6;
+  public static final int Error = 7;
+  public static final int MAX = 8;
+  public org.videolan.libvlc.interfaces.IMedia$State();
+}
+=== org.videolan.libvlc.interfaces.IMedia$Stats
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Stats {
+  public final int readBytes;
+  public final float inputBitrate;
+  public final int demuxReadBytes;
+  public final float demuxBitrate;
+  public final int demuxCorrupted;
+  public final int demuxDiscontinuity;
+  public final int decodedVideo;
+  public final int decodedAudio;
+  public final int displayedPictures;
+  public final int lostPictures;
+  public final int playedAbuffers;
+  public final int lostAbuffers;
+  public final int sentPackets;
+  public final int sentBytes;
+  public final float sendBitrate;
+  public org.videolan.libvlc.interfaces.IMedia$Stats(int, float, int, float, int, int, int, int, int, int, int, int, int, int, float);
+}
+=== org.videolan.libvlc.interfaces.IMedia$SubtitleTrack
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$SubtitleTrack extends org.videolan.libvlc.interfaces.IMedia$Track {
+  public final java.lang.String encoding;
+  public org.videolan.libvlc.interfaces.IMedia$SubtitleTrack(java.lang.String, java.lang.String, int, int, int, int, int, java.lang.String, java.lang.String, java.lang.String);
+}
+=== org.videolan.libvlc.interfaces.IMedia$Track
+Compiled from "IMedia.java"
+public abstract class org.videolan.libvlc.interfaces.IMedia$Track {
+  public final int type;
+  public final java.lang.String codec;
+  public final java.lang.String originalCodec;
+  public final int fourcc;
+  public final int id;
+  public final int profile;
+  public final int level;
+  public final int bitrate;
+  public final java.lang.String language;
+  public final java.lang.String description;
+}
+=== org.videolan.libvlc.interfaces.IMedia$Track$Type
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Track$Type {
+  public static final int Unknown = -1;
+  public static final int Audio = 0;
+  public static final int Video = 1;
+  public static final int Text = 2;
+  public org.videolan.libvlc.interfaces.IMedia$Track$Type();
+}
+=== org.videolan.libvlc.interfaces.IMedia$Type
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$Type {
+  public static final int Unknown = 0;
+  public static final int File = 1;
+  public static final int Directory = 2;
+  public static final int Disc = 3;
+  public static final int Stream = 4;
+  public static final int Playlist = 5;
+  public org.videolan.libvlc.interfaces.IMedia$Type();
+}
+=== org.videolan.libvlc.interfaces.IMedia$UnknownTrack
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$UnknownTrack extends org.videolan.libvlc.interfaces.IMedia$Track {
+  public org.videolan.libvlc.interfaces.IMedia$UnknownTrack(java.lang.String, java.lang.String, int, int, int, int, int, java.lang.String, java.lang.String);
+}
+=== org.videolan.libvlc.interfaces.IMedia$VideoTrack
+Compiled from "IMedia.java"
+public class org.videolan.libvlc.interfaces.IMedia$VideoTrack extends org.videolan.libvlc.interfaces.IMedia$Track {
+  public final int height;
+  public final int width;
+  public final int sarNum;
+  public final int sarDen;
+  public final int frameRateNum;
+  public final int frameRateDen;
+  public final int orientation;
+  public final int projection;
+  public org.videolan.libvlc.interfaces.IMedia$VideoTrack(java.lang.String, java.lang.String, int, int, int, int, int, java.lang.String, java.lang.String, int, int, int, int, int, int, int, int);
+}
+=== org.videolan.libvlc.interfaces.IMedia$VideoTrack$Orientation
+Compiled from "IMedia.java"
+public final class org.videolan.libvlc.interfaces.IMedia$VideoTrack$Orientation {
+  public static final int TopLeft = 0;
+  public static final int TopRight = 1;
+  public static final int BottomLeft = 2;
+  public static final int BottomRight = 3;
+  public static final int LeftTop = 4;
+  public static final int LeftBottom = 5;
+  public static final int RightTop = 6;
+  public static final int RightBottom = 7;
+  public org.videolan.libvlc.interfaces.IMedia$VideoTrack$Orientation();
+}
+=== org.videolan.libvlc.interfaces.IMedia$VideoTrack$Projection
+Compiled from "IMedia.java"
+public final class org.videolan.libvlc.interfaces.IMedia$VideoTrack$Projection {
+  public static final int Rectangular = 0;
+  public static final int EquiRectangular = 1;
+  public static final int CubemapLayoutStandard = 256;
+  public org.videolan.libvlc.interfaces.IMedia$VideoTrack$Projection();
+}
+=== org.videolan.libvlc.interfaces.IMediaFactory
+Compiled from "IMediaFactory.java"
+public interface org.videolan.libvlc.interfaces.IMediaFactory extends org.videolan.libvlc.interfaces.IComponentFactory {
+  public static final java.lang.String factoryId;
+  public abstract org.videolan.libvlc.interfaces.IMedia getFromLocalPath(org.videolan.libvlc.interfaces.ILibVLC, java.lang.String);
+  public abstract org.videolan.libvlc.interfaces.IMedia getFromUri(org.videolan.libvlc.interfaces.ILibVLC, android.net.Uri);
+  public abstract org.videolan.libvlc.interfaces.IMedia getFromFileDescriptor(org.videolan.libvlc.interfaces.ILibVLC, java.io.FileDescriptor);
+  public abstract org.videolan.libvlc.interfaces.IMedia getFromAssetFileDescriptor(org.videolan.libvlc.interfaces.ILibVLC, android.content.res.AssetFileDescriptor);
+}
+=== org.videolan.libvlc.interfaces.IMediaList
+Compiled from "IMediaList.java"
+public interface org.videolan.libvlc.interfaces.IMediaList extends org.videolan.libvlc.interfaces.IVLCObject<org.videolan.libvlc.interfaces.IMediaList$Event> {
+  public abstract void setEventListener(org.videolan.libvlc.interfaces.IMediaList$EventListener, android.os.Handler);
+  public abstract int getCount();
+  public abstract org.videolan.libvlc.interfaces.IMedia getMediaAt(int);
+  public abstract boolean isLocked();
+}
+=== org.videolan.libvlc.interfaces.IMediaList$Event
+Compiled from "IMediaList.java"
+public class org.videolan.libvlc.interfaces.IMediaList$Event extends org.videolan.libvlc.interfaces.AbstractVLCEvent {
+  public static final int ItemAdded = 512;
+  public static final int ItemDeleted = 514;
+  public static final int EndReached = 516;
+  public final org.videolan.libvlc.interfaces.IMedia media;
+  public final int index;
+  public org.videolan.libvlc.interfaces.IMediaList$Event(int, org.videolan.libvlc.interfaces.IMedia, boolean, int);
+  public void release();
+}
+=== org.videolan.libvlc.interfaces.IMediaList$EventListener
+Compiled from "IMediaList.java"
+public interface org.videolan.libvlc.interfaces.IMediaList$EventListener extends org.videolan.libvlc.interfaces.AbstractVLCEvent$Listener<org.videolan.libvlc.interfaces.IMediaList$Event> {
+}
+=== org.videolan.libvlc.interfaces.IVLCVout
+Compiled from "IVLCVout.java"
+public interface org.videolan.libvlc.interfaces.IVLCVout {
+  public abstract void setVideoView(android.view.SurfaceView);
+  public abstract void setVideoView(android.view.TextureView);
+  public abstract void setVideoSurface(android.view.Surface, android.view.SurfaceHolder);
+  public abstract void setVideoSurface(android.graphics.SurfaceTexture);
+  public abstract void setSubtitlesView(android.view.SurfaceView);
+  public abstract void setSubtitlesView(android.view.TextureView);
+  public abstract void setSubtitlesSurface(android.view.Surface, android.view.SurfaceHolder);
+  public abstract void setSubtitlesSurface(android.graphics.SurfaceTexture);
+  public abstract void attachViews(org.videolan.libvlc.interfaces.IVLCVout$OnNewVideoLayoutListener);
+  public abstract void attachViews();
+  public abstract void detachViews();
+  public abstract boolean areViewsAttached();
+  public abstract void addCallback(org.videolan.libvlc.interfaces.IVLCVout$Callback);
+  public abstract void removeCallback(org.videolan.libvlc.interfaces.IVLCVout$Callback);
+  public abstract void sendMouseEvent(int, int, int, int);
+  public abstract void setWindowSize(int, int);
+}
+=== org.videolan.libvlc.interfaces.IVLCVout$Callback
+Compiled from "IVLCVout.java"
+public interface org.videolan.libvlc.interfaces.IVLCVout$Callback {
+  public abstract void onSurfacesCreated(org.videolan.libvlc.interfaces.IVLCVout);
+  public abstract void onSurfacesDestroyed(org.videolan.libvlc.interfaces.IVLCVout);
+}
+=== org.videolan.libvlc.interfaces.IVLCVout$OnNewVideoLayoutListener
+Compiled from "IVLCVout.java"
+public interface org.videolan.libvlc.interfaces.IVLCVout$OnNewVideoLayoutListener {
+  public abstract void onNewVideoLayout(org.videolan.libvlc.interfaces.IVLCVout, int, int, int, int, int, int);
+}
+=== org.videolan.libvlc.util.VLCVideoLayout
+Compiled from "VLCVideoLayout.java"
+public class org.videolan.libvlc.util.VLCVideoLayout extends android.widget.FrameLayout {
+  public org.videolan.libvlc.util.VLCVideoLayout(android.content.Context);
+  public org.videolan.libvlc.util.VLCVideoLayout(android.content.Context, android.util.AttributeSet);
+  public org.videolan.libvlc.util.VLCVideoLayout(android.content.Context, android.util.AttributeSet, int);
+  public org.videolan.libvlc.util.VLCVideoLayout(android.content.Context, android.util.AttributeSet, int, int);
+}
