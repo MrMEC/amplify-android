@@ -4946,7 +4946,7 @@
   @media (max-width: 900px){
     .home-section-head h2{ font-size:24px; }
     .recent-col-heading{ font-size:22px; }
-    .section-heading, .section-heading-row .section-heading{ font-size:calc(26px * var(--title-fit, 1)); line-height:1.15; }
+    .section-heading, .section-heading-row .section-heading{ font-size:calc(22px * var(--title-fit, 1)); line-height:1.2; }
     /* A page title stays on one line (Mark: "My Library" wrapped beside its three buttons). */
     .section-heading-row:not(.is-search) .section-heading{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     body.home-stacked #homeTopHeading .section-heading, body.home-stacked .section-heading-row .section-heading{ font-size:24px; }
@@ -6870,7 +6870,7 @@
   }
   var stationsHeading = document.getElementById('stationsHeading');
   // Page title fits its line (builds 166-167): on a phone with large system text "My Library" didn't
-  // fit beside its buttons. The title's size is calc(26px * --title-fit); this lowers --title-fit
+  // fit beside its buttons. The title's size is calc(22px * --title-fit); this lowers --title-fit
   // (never below .5) until the whole title shows, comparing widths only. Build 166 read the px size
   // back and set a smaller px size, but Android's text zoom scales the size it reports AND the size
   // set, so the shrink cancelled out on the phone. A multiplier is immune to that.
