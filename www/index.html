@@ -16958,13 +16958,20 @@
         if(cc) ccPref(true); else { videoSubsOff = true; vsave(VIDEO_SUBS_OFF_KEY, true); }
         P.selectVideoTrack({ type: 'text', off: true })['catch'](function(){});
       });
-      text.forEach(function(t){
-        opt(cc && text.length === 1 ? 'On' : t.label, !r.textOff && t.selected, function(){
+      // A channel always offers On (build 163): while captions are off the stream may not list
+      // them at all, so On just turns them back on rather than picking from a list.
+      if(cc && text.length <= 1){
+        opt('On', !r.textOff && anyText, function(){
+          ccPref(false);
+          P.selectVideoTrack({ type: 'text', on: true })['catch'](function(){});
+        });
+      } else text.forEach(function(t){
+        opt(t.label, !r.textOff && t.selected, function(){
           if(cc) ccPref(false); else { videoSubsOff = false; vsave(VIDEO_SUBS_OFF_KEY, false); }
           P.selectVideoTrack({ type: 'text', group: t.group, track: t.track })['catch'](function(){});
         });
       });
-      if(!text.length){
+      if(!text.length && !cc){
         var none = document.createElement('div');
         none.className = 'v-menu-note';
         none.textContent = cc ? 'This channel has no captions.' : 'This video has no subtitles.';

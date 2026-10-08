@@ -37,7 +37,7 @@ MOCK = """
        return Promise.resolve({}); };
    if(k==='setVideoView') return function(a){ window.__calls.push(['view',a]); window.__view=a; return Promise.resolve(); };
    if(k==='videoState') return function(){ return Promise.resolve({id:null,hasVideo:false}); };
-   if(k==='videoTracks') return function(){ return Promise.resolve({textOff:false, audio:[], text:[{group:3,track:0,label:'CC1',selected:true}]}); };
+   if(k==='videoTracks') return function(){ return Promise.resolve(window.__noText ? {textOff:true, audio:[], text:[]} : {textOff:false, audio:[], text:[{group:3,track:0,label:'CC1',selected:true}]}); };
    return function(a){ window.__calls.push([k,a]); return Promise.resolve({}); };
  }});
  window.Capacitor={isNativePlatform:function(){return true;},getPlatform:function(){return 'android';},Plugins:{AmplifyPlayer:P},convertFileSrc:function(u){return u;}};
@@ -167,6 +167,15 @@ async def app_mode(b, w, h, tag):
     await pg.evaluate("document.querySelectorAll('.v-tracks-menu .np-menu-item')[0].click()"); await pg.wait_for_timeout(300)
     sel = await pg.evaluate("[window.__calls.filter(function(c){return c[0]==='selectVideoTrack';}).slice(-1)[0], localStorage.getItem('radioPlayerChannelCaptionsOff')]")
     check(sel[0] and sel[0][1].get('off') is True and sel[1] == 'true', f'[{tag}] Off turns them off and is remembered {sel}')
+    # Build 163: On is still offered once they're off, even when the stream lists no captions then.
+    await pg.evaluate("window.__noText = true")
+    await pg.evaluate("document.getElementById('npTracksBtn').click()"); await pg.wait_for_timeout(400)
+    opts = await pg.evaluate("Array.from(document.querySelectorAll('.v-tracks-menu .np-menu-item')).map(function(b){return b.textContent.trim()+(b.classList.contains('on')?'*':'');})")
+    check(opts == ['Off*', 'On'], f'[{tag}] with captions off the menu still offers On {opts}')
+    await pg.evaluate("document.querySelectorAll('.v-tracks-menu .np-menu-item')[1].click()"); await pg.wait_for_timeout(300)
+    sel = await pg.evaluate("[window.__calls.filter(function(c){return c[0]==='selectVideoTrack';}).slice(-1)[0], localStorage.getItem('radioPlayerChannelCaptionsOff')]")
+    check(sel[0] and sel[0][1].get('on') is True and sel[1] == 'false', f'[{tag}] On turns them back on and is remembered {sel}')
+    await pg.evaluate("window.__noText = false; localStorage.setItem('radioPlayerChannelCaptionsOff', 'true')")
 
     # Another channel: video resets, then comes on for the new one when it reports a picture.
     await paste(pg, 'http://iptv.example/live/channel2.m3u8')

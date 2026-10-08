@@ -1802,13 +1802,21 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   public void selectVideoTrack(PluginCall call) {
     String type = call.getString("type", "text");
     boolean off = Boolean.TRUE.equals(call.getBoolean("off", false));
+    // Build 163: "on" turns subtitles/captions back on without naming a track (a channel's
+    // captions may not be listed while they are off): the first one there is, or the default.
+    boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
     int group = call.getInt("group", -1);
     int track = call.getInt("track", 0);
     run(
         call,
         () -> {
           if (VlcEngine.isActive()) {
-            VlcEngine.selectTrack("audio".equals(type), off ? -1 : track);
+            int id = track;
+            if (on) {
+              java.util.List<kotlin.Triple<Integer, String, Boolean>> ts = VlcEngine.tracks("audio".equals(type));
+              id = ts.isEmpty() ? -1 : ts.get(0).getFirst();
+            }
+            VlcEngine.selectTrack("audio".equals(type), off ? -1 : id);
             call.resolve();
             return;
           }
@@ -1817,6 +1825,22 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           TrackSelectionParameters.Builder b = p.getTrackSelectionParameters().buildUpon();
           if (off) {
             b.setTrackTypeDisabled(t, true);
+          } else if (on) {
+            b.setTrackTypeDisabled(t, false).clearOverridesOfType(t);
+            for (Tracks.Group g : p.getCurrentTracks().getGroups()) {
+              if (g.getType() != t) continue;
+              int pick = -1;
+              for (int i = 0; i < g.length; i++) {
+                if (g.isTrackSupported(i)) {
+                  pick = i;
+                  break;
+                }
+              }
+              if (pick >= 0) {
+                b.setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), pick));
+                break;
+              }
+            }
           } else {
             java.util.List<Tracks.Group> groups = p.getCurrentTracks().getGroups();
             if (group < 0 || group >= groups.size()) {
