@@ -3076,6 +3076,12 @@
   @media (max-width: 900px){
     .vw-tile.vw-channel, .vw-home-grid .vw-tile.vw-channel{ width:min(132px, calc((100vw - 46px - 32px) / 2.35)); }
   }
+  /* Build 169: a movie or episode still is exactly as tall as a channel's square (and the
+     square covers in the rows around it), 16:9 wide, so a mixed row lines up. */
+  .vw-tile:not(.vw-channel), .vw-home-grid .vw-tile:not(.vw-channel){ width:calc(150px * 16 / 9); }
+  @media (max-width: 900px){
+    .vw-tile:not(.vw-channel), .vw-home-grid .vw-tile:not(.vw-channel){ width:calc(min(132px, calc((100vw - 46px - 32px) / 2.35)) * 16 / 9); }
+  }
   .vw-tile .tile-name, .vw-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
   /* Movie and show posters: tall 2:3 covers in the grid. */
   .tile.vposter .tile-art.vposter-art{ aspect-ratio:2/3; height:auto; position:relative; overflow:hidden; border-radius:10px; }
@@ -4136,6 +4142,32 @@
     -webkit-appearance:none; appearance:none;
   }
   #settingsPanel .accent-color-input::-webkit-color-swatch-wrapper{ padding:0; }
+  /* Build 169: Amplify's own colour picker, swatches and sliders on one screen (Android's
+     own dialog split them over two screens and wrapped its labels a few letters a line). */
+  .accent-swatch-btn{ background:var(--accent); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35); }
+  #accentOverlay{ z-index:503; }
+  .accent-panel{ width:min(380px, 100%); white-space:nowrap; }
+  .accent-panel .settings-header{ margin-bottom:14px; }
+  .accent-preview-row{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+  .accent-preview{ width:52px; height:52px; border-radius:50%; flex:none; box-shadow:0 4px 12px rgba(0,0,0,.2), inset 0 0 0 1px rgba(0,0,0,.08); }
+  .accent-hex{ font-size:16px; font-weight:700; color:var(--text); letter-spacing:.03em; font-variant-numeric:tabular-nums; text-transform:uppercase; }
+  .accent-swatches{ display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; margin-bottom:18px; }
+  .accent-sw{ aspect-ratio:1/1; width:100%; border-radius:50%; border:none; padding:0; cursor:pointer; position:relative;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.10); -webkit-tap-highlight-color:transparent; }
+  html:not([data-theme="light"]) .accent-sw{ box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.22); }
+  .accent-sw.on::after{ content:''; position:absolute; inset:-4px; border-radius:50%; border:2.5px solid var(--text); }
+  .accent-slider{ display:block; margin:0 0 14px; }
+  .accent-slider-label{ display:block; font-size:13px; font-weight:600; color:var(--text-dim); margin-bottom:6px; }
+  .accent-range{ -webkit-appearance:none; appearance:none; display:block; width:100%; height:26px; margin:0; border-radius:13px;
+    background:var(--track, #888); outline:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,.10); cursor:pointer; touch-action:pan-y; }
+  .accent-range-hue{ --track:linear-gradient(90deg,#f00,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00); }
+  .accent-range::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%;
+    background:var(--thumb, #fff); border:3px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.45); }
+  .accent-range::-moz-range-thumb{ width:20px; height:20px; border-radius:50%; background:var(--thumb, #fff); border:3px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.45); }
+  .accent-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+  .accent-action{ min-width:92px; padding:10px 18px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); font:inherit; font-size:14.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .accent-action-set{ background:var(--pick, var(--accent)); border-color:var(--pick, var(--accent)); color:var(--pick-text, var(--accent-text)); }
   #settingsPanel .accent-color-input::-webkit-color-swatch{ border:none; border-radius:50%; }
   #settingsPanel .accent-color-input::-moz-color-swatch{ border:none; border-radius:50%; }
   #settingsPanel .accent-reset-btn{ font-weight:600; font-family:inherit; }
@@ -5872,7 +5904,7 @@
     <div class="settings-row">
       <span class="settings-label">Accent color</span>
       <div class="accent-picker-wrap">
-        <input type="color" class="accent-color-input" id="accentColorInput" value="#1c203c" aria-label="Accent color">
+        <button type="button" class="accent-color-input accent-swatch-btn" id="accentColorInput" aria-label="Accent color" aria-haspopup="dialog"></button>
         <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
       </div>
     </div>
@@ -5949,6 +5981,26 @@
   </div>
 </div>
 
+<div class="settings-overlay" id="accentOverlay" role="dialog" aria-modal="true" aria-labelledby="accentTitle">
+  <div class="settings-panel accent-panel">
+    <div class="settings-header">
+      <h2 id="accentTitle">Accent Color</h2>
+      <button type="button" class="settings-close" id="accentCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="accent-preview-row">
+      <span class="accent-preview" id="accentPreview"></span>
+      <span class="accent-hex" id="accentHex">#000000</span>
+    </div>
+    <div class="accent-swatches" id="accentSwatches"></div>
+    <label class="accent-slider"><span class="accent-slider-label">Hue</span><input type="range" min="0" max="359" step="1" id="accentHue" class="accent-range accent-range-hue"></label>
+    <label class="accent-slider"><span class="accent-slider-label">Saturation</span><input type="range" min="0" max="100" step="1" id="accentSat" class="accent-range"></label>
+    <label class="accent-slider"><span class="accent-slider-label">Brightness</span><input type="range" min="0" max="100" step="1" id="accentVal" class="accent-range"></label>
+    <div class="accent-actions">
+      <button type="button" class="accent-action" id="accentCancelBtn">Cancel</button>
+      <button type="button" class="accent-action accent-action-set" id="accentSetBtn">Set</button>
+    </div>
+  </div>
+</div>
 <div class="settings-overlay" id="artUrlOverlay">
   <div class="settings-panel" id="artUrlPanel">
     <div class="settings-header">
@@ -7278,6 +7330,7 @@
     root.style.setProperty('--accent-dim', shadeHex(hex, relativeLuminance(hex) > 0.5 ? -60 : 90));
     root.style.setProperty('--accent-text', relativeLuminance(hex) > 0.42 ? '#1a1305' : '#ffffff');
     accentColorInput.value = hex;
+    accentColorInput.style.background = hex;
   }
   function restoreAccentForTheme(theme){
     var custom = loadCustomAccent();
@@ -7291,12 +7344,70 @@
       root.style.removeProperty('--accent-dim');
       root.style.removeProperty('--accent-text');
       accentColorInput.value = DEFAULT_ACCENTS[theme].accent;
+      accentColorInput.style.background = '';
     }
   }
-  accentColorInput.addEventListener('input', function(){
-    applyAccent(accentColorInput.value);
-    saveCustomAccent(currentTheme, accentColorInput.value);
-  });
+  // Build 169: our own picker sheet (swatches + hue/saturation/brightness on one screen).
+  var accentPick = (function(){
+    var ov = document.getElementById('accentOverlay');
+    var hue = document.getElementById('accentHue'), sat = document.getElementById('accentSat'), val = document.getElementById('accentVal');
+    var preview = document.getElementById('accentPreview'), hexEl = document.getElementById('accentHex');
+    var swWrap = document.getElementById('accentSwatches'), panel = ov.querySelector('.accent-panel');
+    var SWATCHES = ['#e8464a', '#ff2d55', '#f0a63a', '#ff9500', '#ffcc00', '#34c759',
+                    '#00b39f', '#32ade6', '#007aff', '#5856d6', '#af52de', '#1c203c'];
+    var cur = { h: 0, s: 0, v: 0 }, exact = null; // exact: the colour as given, until a slider moves
+    function toHex(n){ return Math.round(n).toString(16).padStart(2, '0'); }
+    function hsvToHex(h, s, v){
+      s /= 100; v /= 100;
+      var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c, r = 0, g = 0, b = 0;
+      if(h < 60){ r = c; g = x; } else if(h < 120){ r = x; g = c; } else if(h < 180){ g = c; b = x; }
+      else if(h < 240){ g = x; b = c; } else if(h < 300){ r = x; b = c; } else { r = c; b = x; }
+      return '#' + toHex((r + m) * 255) + toHex((g + m) * 255) + toHex((b + m) * 255);
+    }
+    function hexToHsv(hex){
+      var c = hexToRgb(hex), r = c.r / 255, g = c.g / 255, b = c.b / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
+      if(d){ if(mx === r) h = 60 * (((g - b) / d) % 6); else if(mx === g) h = 60 * ((b - r) / d + 2); else h = 60 * ((r - g) / d + 4); }
+      if(h < 0) h += 360;
+      return { h: Math.round(h) % 360, s: Math.round(mx ? d / mx * 100 : 0), v: Math.round(mx * 100) };
+    }
+    function hex(){ return exact || hsvToHex(cur.h, cur.s, cur.v); }
+    function paint(){
+      var x = hex();
+      hue.value = cur.h; sat.value = cur.s; val.value = cur.v;
+      preview.style.background = x; hexEl.textContent = x;
+      sat.style.setProperty('--track', 'linear-gradient(90deg,' + hsvToHex(cur.h, 0, cur.v) + ',' + hsvToHex(cur.h, 100, cur.v) + ')');
+      val.style.setProperty('--track', 'linear-gradient(90deg,#000,' + hsvToHex(cur.h, cur.s, 100) + ')');
+      hue.style.setProperty('--thumb', hsvToHex(cur.h, 100, 100));
+      sat.style.setProperty('--thumb', x); val.style.setProperty('--thumb', x);
+      panel.style.setProperty('--pick', x);
+      panel.style.setProperty('--pick-text', relativeLuminance(x) > 0.42 ? '#1a1305' : '#ffffff');
+      Array.prototype.forEach.call(swWrap.children, function(b){ b.classList.toggle('on', b.dataset.hex === x); });
+    }
+    SWATCHES.forEach(function(c){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'accent-sw'; b.dataset.hex = c; b.style.background = c; b.setAttribute('aria-label', c);
+      b.addEventListener('click', function(){ cur = hexToHsv(c); exact = c; paint(); });
+      swWrap.appendChild(b);
+    });
+    [hue, sat, val].forEach(function(r){
+      r.addEventListener('input', function(){ cur = { h: +hue.value, s: +sat.value, v: +val.value }; exact = null; paint(); });
+    });
+    function open(){
+      exact = (accentColorInput.value || getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e8464a').toLowerCase();
+      cur = hexToHsv(exact);
+      paint(); ov.classList.add('open');
+    }
+    function close(){ ov.classList.remove('open'); }
+    document.getElementById('accentCloseBtn').addEventListener('click', close);
+    document.getElementById('accentCancelBtn').addEventListener('click', close);
+    ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
+    document.getElementById('accentSetBtn').addEventListener('click', function(){
+      var x = hex(); applyAccent(x); saveCustomAccent(currentTheme, x); close();
+    });
+    return { open: open, close: close, isOpen: function(){ return ov.classList.contains('open'); } };
+  })();
+  accentColorInput.addEventListener('click', function(){ accentPick.open(); });
   accentResetBtn.addEventListener('click', function(){
     clearCustomAccent(currentTheme);
     restoreAccentForTheme(currentTheme);

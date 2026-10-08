@@ -73,6 +73,7 @@ async def main():
           return {cl:r('#recentSection .tile .tile-art'), ch:r('#continueWatchingHomeGrid .vw-channel .vw-thumb'), mv:r('#continueWatchingHomeGrid .vw-tile:not(.vw-channel) .vw-thumb')};})()""")
         check(sz['ch'] and sz['cl'] and abs(sz['ch'][0] - sz['cl'][0]) <= 1 and abs(sz['ch'][1] - sz['cl'][1]) <= 1, f'a channel is the size of a Continue Listening cover {sz}')
         check(sz['mv'] and sz['mv'][0] > sz['ch'][0] + 60, f'movies keep the wide frame {sz}')
+        check(sz['mv'] and abs(sz['mv'][1] - sz['ch'][1]) <= 1, f'a movie still is as tall as a channel (build 169) {sz}')
         await pg.evaluate("document.getElementById('recentSection').scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{SHOTS}/cw-home-sizes.png')
         await pg.evaluate("document.getElementById('continueWatchingHomeSection').scrollIntoView()"); await pg.wait_for_timeout(300)
