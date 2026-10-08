@@ -3949,9 +3949,12 @@
       opacity:0; visibility:hidden;
       transition: opacity .5s ease, visibility 0s linear .5s;
     }
-    body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen:not(.np-channel) .np-imm-fade{
-      opacity:1; visibility:visible; transition: opacity .5s ease, visibility 0s linear 0s;
-    }
+    /* Build 173: Mark doesn't want a bottom gradient in Immersive View at all; the fade stays off.
+       Instead the whole section under the controls (Related Stations, an album's songs, More
+       from...) fades out on entering, comes back when the page is scrolled, and fades out again
+       3s after it's back at the top (immBelowSync, body.np-imm-below). */
+    .now-playing-screen .np-below{ transition: opacity .6s ease; }
+    body.np-immersive:not(.np-imm-below) .now-playing-screen:not(.np-channel) .np-below{ opacity:0; pointer-events:none; }
     body.np-immersive .now-playing-screen .np-hero{ z-index:3; }
     /* Build 145: the fade is a window onto the moving colour wash behind it. Its inner layers
        are the full screen's height, pinned so the slice showing through lines up exactly
@@ -7890,9 +7893,28 @@
     var was = document.body.classList.contains('np-immersive');
     document.body.classList.toggle('np-immersive', on);
     if(on === was) return;
+    clearTimeout(immBelowTimer); immBelowTimer = 0;
+    document.body.classList.remove('np-imm-below');
     if(on){ try{ closeNpMenu(); }catch(e){} startImmersiveMotion(); nativeVideoUi({ awake: true }); }
     else { stopImmersiveMotion(); nativeVideoUi({}); }
   }
+  // Build 173: in Immersive View the section under the controls is hidden until the page is
+  // scrolled; back at the top it fades out again after IMM_BELOW_HIDE_MS.
+  var immBelowTimer = 0, IMM_BELOW_HIDE_MS = 3000;
+  function immBelowSync(){
+    var b = document.body;
+    if(!b.classList.contains('np-immersive')){ clearTimeout(immBelowTimer); immBelowTimer = 0; b.classList.remove('np-imm-below'); return; }
+    if(nowPlayingScreen.scrollTop > 4){
+      clearTimeout(immBelowTimer); immBelowTimer = 0;
+      b.classList.add('np-imm-below');
+    } else if(b.classList.contains('np-imm-below') && !immBelowTimer){
+      immBelowTimer = setTimeout(function(){
+        immBelowTimer = 0;
+        if(document.body.classList.contains('np-immersive') && nowPlayingScreen.scrollTop <= 4) document.body.classList.remove('np-imm-below');
+      }, IMM_BELOW_HIDE_MS);
+    }
+  }
+  nowPlayingScreen.addEventListener('scroll', immBelowSync, { passive: true });
 
   // ---------- Immersive View: movement ----------
   // The artwork drifts and slowly zooms like a camera moving over a photograph (a new
@@ -8027,9 +8049,10 @@
   }
   // Build 145: the bottom fade shows the same wash (see .np-imm-fade-wash).
   var npImmFadeWash = document.getElementById('npImmFadeWash');
+  var IMM_BOTTOM_FADE = false; // build 173: the bottom fade is no longer shown, so it isn't drawn either
   function immFadeCopy(c){
     var f = npImmFadeWash;
-    if(!f) return;
+    if(!f || !IMM_BOTTOM_FADE) return;
     if(f.width !== c.width || f.height !== c.height){ f.width = c.width; f.height = c.height; }
     var x = f._ctx || (f._ctx = f.getContext('2d'));
     x.clearRect(0, 0, f.width, f.height);

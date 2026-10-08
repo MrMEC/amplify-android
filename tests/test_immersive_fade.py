@@ -71,15 +71,31 @@ async def main():
         await tap_art(); await pg.wait_for_timeout(2500)
         n1 = await pg.evaluate(INFO)
         print(n1)
-        check(n1['op'] == 1 and n1['vis'] == 'visible' and n1['pe'] == 'none', f'Immersive View: the shade is up and lets taps through {n1}')
-        check(abs(n1['bottom'] - n1['H']) < 1 and n1['top'] < n1['hTop'], f'it runs from above the heading to the bottom of the screen {n1}')
-        check(n1['top'] > n1['ctrlBottom'] - 90, f'and starts low enough to leave the controls clear {n1}')
-        await pg.evaluate("document.querySelectorAll('#nowPlayingScreen .np-imm-fade')[0].style.transition='none'")
+        BELOW = "(function(){ var e = document.querySelector('#nowPlayingScreen .np-below'), c = getComputedStyle(e); return { op: +c.opacity, pe: c.pointerEvents, cls: document.body.classList.contains('np-imm-below'), st: document.getElementById('nowPlayingScreen').scrollTop }; })()"
+        # Build 173: no bottom gradient in Immersive View; the section under the controls fades out instead.
+        check(n1['op'] == 0 and n1['vis'] == 'hidden', f'Immersive View: no bottom gradient (build 173) {n1}')
+        b1 = await pg.evaluate(BELOW)
+        check(b1['op'] == 0 and b1['pe'] == 'none' and not b1['cls'], f'the section under the controls is faded out on entering {b1}')
         png1 = await pg.screenshot(); await pg.screenshot(path=f'{shots}/imm-fade-on.png')
         c1 = region_contrast(png1, (hbox[0], n1['hTop'], hbox[2], n1['hBottom']))
         check(c0 > 60 and c1 < 6, f"'More from' is readable in normal view (contrast {c0}) and hidden in Immersive View (contrast {c1})")
-        d = await seam('song')
-        check(d < 4, f'the bottom of the screen matches the page behind it (no visible edge): mean difference {d:.1f}')
+        await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop = 220"); await pg.wait_for_timeout(900)
+        b2 = await pg.evaluate(BELOW)
+        check(b2['op'] == 1 and b2['pe'] != 'none' and b2['cls'], f'scrolling fades it back in {b2}')
+        await pg.screenshot(path=f'{shots}/imm-below-scrolled.png')
+        await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop = 0"); await pg.wait_for_timeout(2000)
+        b3 = await pg.evaluate(BELOW)
+        check(b3['op'] == 1 and b3['cls'], f'back at the top it stays a moment {b3}')
+        await pg.wait_for_timeout(1900)
+        b4 = await pg.evaluate(BELOW)
+        check(b4['op'] == 0 and not b4['cls'], f'and fades out again about 3s later {b4}')
+        await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop = 220"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop = 0"); await pg.wait_for_timeout(1200)
+        await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop = 150"); await pg.wait_for_timeout(2600)
+        b5 = await pg.evaluate(BELOW)
+        check(b5['cls'] and b5['op'] == 1, f'scrolling away from the top again cancels the hide {b5}')
+        await pg.evaluate("document.getElementById('nowPlayingScreen').scrollTop = 0"); await pg.wait_for_timeout(3800)
+        check(not (await pg.evaluate(BELOW))['cls'], 'hidden again after 3s at the top')
 
         # the artwork: a deeper zoom, random moves, small rotations that never show a corner
         PATH = """(()=>{ var a = document.getElementById('npArt').getAnimations().filter(function(a){ return a.effect.getKeyframes().some(function(k){ return k.transform; }); });
@@ -125,8 +141,8 @@ async def main():
           return { op: +getComputedStyle(f).opacity, ft: f.dataset.t, wt: c && c.dataset.t, fw: f.width, fh: f.height, cw: c && c.width, ch: c && c.height,
             fr: f.getBoundingClientRect().top, fb: f.getBoundingClientRect().bottom, cr: c && c.getBoundingClientRect().top, cb: c && c.getBoundingClientRect().bottom }; })()"""
         w1 = await pg.evaluate(W); print(w1)
-        check(w1['wt'] is not None and w1['op'] == 1 and w1['ft'] == w1['wt'] and w1['fw'] == w1['cw'] and w1['fh'] == w1['ch'], f'the fade carries the wash, frame for frame {w1}')
-        check(abs(w1['fr'] - w1['cr']) < 2 and abs(w1['fb'] - w1['cb']) < 2, f'lined up with the wash behind it {w1}')
+        fv = await pg.evaluate("getComputedStyle(document.querySelector('#nowPlayingScreen .np-imm-fade')).visibility")
+        check(w1['wt'] is not None and w1['ft'] is None and fv == 'hidden', f'the wash moves behind; the bottom fade stays off and is not even drawn (build 173) {fv} {w1}')
         await pg.screenshot(path=f'{shots}/imm-fade-wash1.png')
         async def low():
             im = Image.open(io.BytesIO(await pg.screenshot())).convert('RGB').resize((39, 84))
@@ -136,8 +152,6 @@ async def main():
         await pg.screenshot(path=f'{shots}/imm-fade-wash2.png')
         dl = max(max(abs(l1[q] - l2[q]) for q in range(3)), max(abs(l2[q] - l3[q]) for q in range(3)))
         check(dl > 3, f'the colours at the very bottom keep shifting ({l1} -> {l2} -> {l3}, {dl:.1f})')
-        w2 = await pg.evaluate(W)
-        check(w2['ft'] != w1['ft'] and w2['ft'] == w2['wt'], f'and still in step with the wash {w2["ft"]} {w2["wt"]}')
         await pg.evaluate("__t.ui(false)"); await pg.wait_for_timeout(3600)
         d2 = await seam('wash')
         check(d2 < 4, f'with the wash, the fade matches the page behind it: mean difference {d2:.1f}')
