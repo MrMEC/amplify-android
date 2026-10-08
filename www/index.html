@@ -6434,6 +6434,9 @@
       var args = { id: id, url: url, play: !self._paused, start: self._startAt || 0, rate: self._rate, volume: self._muted ? 0 : self._vol };
       // Extra options for this one load (a video's subtitle files, subtitles on or off).
       var extra = self._loadExtra; self._loadExtra = null;
+      // A channel's captions (CC) stay off once turned off (build 162); a video of your own
+      // brings its own subtitle choice in the extras.
+      try{ args.textOff = localStorage.getItem('radioPlayerChannelCaptionsOff') === 'true'; }catch(e){}
       if(extra) for(var k in extra) if(Object.prototype.hasOwnProperty.call(extra, k)) args[k] = extra[k];
       return P.load(args)
         .then(function(r){ try{ window.dispatchEvent(new Event('amplify-native-loaded')); }catch(e){} return r; });
@@ -8440,6 +8443,7 @@
   });
   function syncNpVideoToggle(st){
     syncNpChannelLink();
+    if(typeof syncNpTracksBtn === 'function') syncNpTracksBtn(st);
     npRenameBtn.style.display = canRenameStream(st) ? '' : 'none';
     var show = videoCapable(st) && currentStation && favKey(st) === favKey(currentStation);
     npVideoToggle.hidden = !show;
@@ -16946,21 +16950,24 @@
       }
       var text = r.text || [], aud = r.audio || [];
       var anyText = text.some(function(t){ return t.selected; });
-      head('Subtitles');
+      // A live channel: its captions, and the choice is kept for every channel.
+      var cc = npStreamCaptions(currentStation);
+      function ccPref(off){ try{ localStorage.setItem('radioPlayerChannelCaptionsOff', off ? 'true' : 'false'); }catch(e){} }
+      head(cc ? 'Captions' : 'Subtitles');
       opt('Off', r.textOff || !anyText, function(){
-        videoSubsOff = true; vsave(VIDEO_SUBS_OFF_KEY, true);
+        if(cc) ccPref(true); else { videoSubsOff = true; vsave(VIDEO_SUBS_OFF_KEY, true); }
         P.selectVideoTrack({ type: 'text', off: true })['catch'](function(){});
       });
       text.forEach(function(t){
-        opt(t.label, !r.textOff && t.selected, function(){
-          videoSubsOff = false; vsave(VIDEO_SUBS_OFF_KEY, false);
+        opt(cc && text.length === 1 ? 'On' : t.label, !r.textOff && t.selected, function(){
+          if(cc) ccPref(false); else { videoSubsOff = false; vsave(VIDEO_SUBS_OFF_KEY, false); }
           P.selectVideoTrack({ type: 'text', group: t.group, track: t.track })['catch'](function(){});
         });
       });
       if(!text.length){
         var none = document.createElement('div');
         none.className = 'v-menu-note';
-        none.textContent = 'This video has no subtitles.';
+        none.textContent = cc ? 'This channel has no captions.' : 'This video has no subtitles.';
         m.appendChild(none);
       }
       if(aud.length > 1){
@@ -16983,8 +16990,17 @@
       setTimeout(openTracksMenu, 0);
     });
   }
+  // A live channel whose picture carries captions gets the same menu, as "Captions" (build 162).
+  function npStreamCaptions(st){
+    return !!(st && isLiveStream(st) && typeof streamVideoCapable === 'function' && streamVideoCapable(st));
+  }
   function syncNpTracksBtn(st){
-    if(npTracksBtn) npTracksBtn.style.display = isLocalVideo(st) && !!videoPlugin2() ? '' : 'none';
+    if(npTracksBtn){
+      var cc = npStreamCaptions(st);
+      npTracksBtn.style.display = (isLocalVideo(st) && !!videoPlugin2()) || cc ? '' : 'none';
+      var lbl = npTracksBtn.querySelector('span');
+      if(lbl) lbl.textContent = cc ? 'Captions' : 'Subtitles & Audio';
+    }
     var pb = document.getElementById('npPlexModeBtn');
     if(pb){
       // Now Playing may be holding a copy of the item; the playing one carries the decision.

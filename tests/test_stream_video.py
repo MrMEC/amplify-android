@@ -37,6 +37,7 @@ MOCK = """
        return Promise.resolve({}); };
    if(k==='setVideoView') return function(a){ window.__calls.push(['view',a]); window.__view=a; return Promise.resolve(); };
    if(k==='videoState') return function(){ return Promise.resolve({id:null,hasVideo:false}); };
+   if(k==='videoTracks') return function(){ return Promise.resolve({textOff:false, audio:[], text:[{group:3,track:0,label:'CC1',selected:true}]}); };
    return function(a){ window.__calls.push([k,a]); return Promise.resolve({}); };
  }});
  window.Capacitor={isNativePlatform:function(){return true;},getPlatform:function(){return 'android';},Plugins:{AmplifyPlayer:P},convertFileSrc:function(u){return u;}};
@@ -157,8 +158,21 @@ async def app_mode(b, w, h, tag):
     check(back['view'].get('show') and abs(back['view']['y'] - round(back['y'])) <= 1 and await pg.evaluate("document.getElementById('videoMini').hidden"),
           f'[{tag}] tapping it reopens Now Playing with the picture back in place {back}')
 
+    # Captions (build 162): the menu offers them for a channel; off is kept for the next channel.
+    cc = await pg.evaluate("[getComputedStyle(document.getElementById('npTracksBtn')).display, document.getElementById('npTracksBtn').textContent.trim()]")
+    check(cc[0] != 'none' and cc[1] == 'Captions', f'[{tag}] a channel has a Captions item in its menu {cc}')
+    await pg.evaluate("document.getElementById('npTracksBtn').click()"); await pg.wait_for_timeout(400)
+    opts = await pg.evaluate("[document.querySelector('.v-tracks-menu .v-menu-head').textContent, Array.from(document.querySelectorAll('.v-tracks-menu .np-menu-item')).map(function(b){return b.textContent.trim()+(b.classList.contains('on')?'*':'');})]")
+    check(opts[0] == 'Captions' and opts[1] == ['Off', 'On*'], f'[{tag}] Captions: Off / On (on now) {opts}')
+    await pg.evaluate("document.querySelectorAll('.v-tracks-menu .np-menu-item')[0].click()"); await pg.wait_for_timeout(300)
+    sel = await pg.evaluate("[window.__calls.filter(function(c){return c[0]==='selectVideoTrack';}).slice(-1)[0], localStorage.getItem('radioPlayerChannelCaptionsOff')]")
+    check(sel[0] and sel[0][1].get('off') is True and sel[1] == 'true', f'[{tag}] Off turns them off and is remembered {sel}')
+
     # Another channel: video resets, then comes on for the new one when it reports a picture.
     await paste(pg, 'http://iptv.example/live/channel2.m3u8')
+    await pg.wait_for_timeout(400)
+    la = await pg.evaluate("window.__calls.filter(function(c){return c[0]==='load';}).slice(-1)[0][1]")
+    check(la.get('textOff') is True, f'[{tag}] the next channel starts with captions off {la}')
     await pg.wait_for_timeout(600)
     cur2 = await pg.evaluate('window.__cur')
     await pg.evaluate("document.getElementById('playerNowTrigger').click()")
