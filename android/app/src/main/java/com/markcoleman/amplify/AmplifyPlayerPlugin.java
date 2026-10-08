@@ -8,6 +8,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
+import android.media.MediaCodecList;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -26,6 +29,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import com.markcoleman.amplify.vlc.VlcPlayerActivity;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
@@ -763,6 +767,103 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     o.put("files", files);
     o.put("truncated", truncated);
     return o;
+  }
+
+  // ---- VLC, for videos the phone's own decoders can't play (build 153) ----
+
+  /**
+   * Whether the phone's own player can show this video: the container opens and every audio and
+   * video track has a decoder on this phone. {ok, why}. AVI, WMV and FLV don't open here (the
+   * phone's extractor doesn't read them), so they come back not ok and go to VLC.
+   */
+  @PluginMethod
+  public void videoDecodable(PluginCall call) {
+    String u = call.getString("uri");
+    if (u == null || u.isEmpty()) {
+      call.reject("No uri");
+      return;
+    }
+    Context ctx = getContext();
+    new Thread(
+            () -> {
+              JSObject o = new JSObject();
+              MediaExtractor ex = new MediaExtractor();
+              try {
+                ex.setDataSource(ctx, Uri.parse(u), null);
+                MediaCodecList codecs = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+                boolean video = false;
+                StringBuilder missing = new StringBuilder();
+                for (int i = 0; i < ex.getTrackCount(); i++) {
+                  MediaFormat f = ex.getTrackFormat(i);
+                  String mime = f.getString(MediaFormat.KEY_MIME);
+                  if (mime == null || !(mime.startsWith("video/") || mime.startsWith("audio/"))) continue;
+                  if (mime.startsWith("video/")) video = true;
+                  String dec = null;
+                  try {
+                    dec = codecs.findDecoderForFormat(f);
+                  } catch (Exception ignored) {
+                    // An odd format description: treated as no decoder.
+                  }
+                  if (dec == null) missing.append(missing.length() > 0 ? ", " : "").append(mime);
+                }
+                o.put("ok", video && missing.length() == 0);
+                o.put("why", !video ? "no video track found" : missing.length() > 0 ? "no decoder for " + missing : "");
+              } catch (Exception e) {
+                o.put("ok", false);
+                o.put("why", "the phone can't open this kind of file");
+              } finally {
+                try {
+                  ex.release();
+                } catch (Exception ignored) {
+                }
+              }
+              call.resolve(o);
+            })
+        .start();
+  }
+
+  /**
+   * Opens a video in the VLC player screen. {uri, title, startMs, hw} -> when it closes:
+   * {position, duration (ms), ended, error}. The app's own player is paused first.
+   */
+  @PluginMethod
+  public void playWithVlc(PluginCall call) {
+    String u = call.getString("uri");
+    if (u == null || u.isEmpty()) {
+      call.reject("No uri");
+      return;
+    }
+    main.post(
+        () -> {
+          try {
+            ExoPlayer p = exo();
+            if (p != null) p.setPlayWhenReady(false);
+          } catch (Exception ignored) {
+          }
+        });
+    Double startD = call.getDouble("startMs", 0.0);
+    long start = startD == null ? 0L : (long) startD.doubleValue();
+    Intent i =
+        VlcPlayerActivity.intent(
+            getContext(),
+            Uri.parse(u),
+            call.getString("title", ""),
+            start,
+            !Boolean.FALSE.equals(call.getBoolean("hw", true)));
+    startActivityForResult(call, i, "onVlcDone");
+  }
+
+  @ActivityCallback
+  private void onVlcDone(PluginCall call, ActivityResult result) {
+    if (call == null) return;
+    Intent d = result.getData();
+    JSObject o = new JSObject();
+    o.put("position", d == null ? 0L : d.getLongExtra(VlcPlayerActivity.RESULT_POSITION, 0L));
+    o.put("duration", d == null ? 0L : d.getLongExtra(VlcPlayerActivity.RESULT_DURATION, 0L));
+    o.put("ended", d != null && d.getBooleanExtra(VlcPlayerActivity.RESULT_ENDED, false));
+    String err = d == null ? null : d.getStringExtra(VlcPlayerActivity.RESULT_ERROR);
+    if (err != null) o.put("error", err);
+    call.resolve(o);
   }
 
   /** Lists a music folder picked earlier again, to pick up songs added or removed since. */

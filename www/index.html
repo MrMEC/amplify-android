@@ -5565,6 +5565,9 @@
                   <!-- A channel's video on/off lives here instead of the pill above the controls. -->
                   <button type="button" class="np-menu-item" id="npVideoMenuBtn" role="menuitem" style="display:none;"></button>
                   <!-- A video of your own: subtitles and audio language. -->
+                  <button type="button" class="np-menu-item" id="npVlcBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l7.5 17h-15z"/><path d="M8.2 13.5h7.6"/></svg><span>Play in VLC</span>
+                  </button>
                   <button type="button" class="np-menu-item" id="npTracksBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h2M11 11h6"/></svg><span>Subtitles &amp; Audio</span>
                   </button>
@@ -5778,6 +5781,23 @@
         <option value="300">300</option>
         <option value="400">400</option>
         <option value="500">500</option>
+      </select>
+    </div>
+    <!-- Build 153: which player shows the phone's own videos. Automatic: the phone's player when
+         the phone has decoders for the file, VLC when it doesn't (AVI/Xvid, WMV, ...). -->
+    <div class="settings-row" id="videoPlayerRow" style="display:none;">
+      <span class="settings-label">Video player</span>
+      <select class="settings-select" id="videoPlayerSelect" aria-label="Video player">
+        <option value="auto">Automatic</option>
+        <option value="builtin">Built-in</option>
+        <option value="vlc">VLC</option>
+      </select>
+    </div>
+    <div class="settings-row" id="vlcHwRow" style="display:none;">
+      <span class="settings-label">VLC hardware decoding</span>
+      <select class="settings-select" id="vlcHwSelect" aria-label="VLC hardware decoding">
+        <option value="on">On</option>
+        <option value="off">Off</option>
       </select>
     </div>
     <div class="settings-row settings-row--stack">
@@ -7159,6 +7179,18 @@
     return DEFAULT_RESULT_LIMIT;
   }
   var resultLimit = loadResultLimit();
+  // Video player settings (build 153): only in the Android app, where VLC is.
+  (function(){
+    var row = document.getElementById('videoPlayerRow'), hwRow = document.getElementById('vlcHwRow');
+    var sel = document.getElementById('videoPlayerSelect'), hw = document.getElementById('vlcHwSelect');
+    var Cap = window.Capacitor;
+    var native = !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
+    if(!row || !native) return;
+    row.style.display = ''; hwRow.style.display = '';
+    try{ sel.value = localStorage.getItem('radioPlayerVideoPlayer') || 'auto'; hw.value = localStorage.getItem('radioPlayerVlcHw') === 'off' ? 'off' : 'on'; }catch(e){}
+    sel.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVideoPlayer', sel.value); }catch(e){} });
+    hw.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVlcHw', hw.value); }catch(e){} });
+  })();
   resultLimitSelect.value = String(resultLimit);
   resultLimitSelect.addEventListener('change', function(){
     var n = parseInt(resultLimitSelect.value, 10);
@@ -16312,7 +16344,87 @@
     playStation(t);
     openNowPlaying(t, true);
   }
+  // ---------- VLC (build 153) ----------
+  // The phone's own player plays most videos; files it has no decoders for (AVI with Xvid/DivX,
+  // WMV, MPEG-2, DTS audio, ...) go to the VLC player screen instead. "Automatic" asks the phone
+  // once per file whether it can decode it; "VLC" sends every video of your own there; a file
+  // the phone's player fails on is tried in VLC too. Plex videos are left to Plex's conversion.
+  var VIDEO_PLAYER_KEY = 'radioPlayerVideoPlayer', VLC_HW_KEY = 'radioPlayerVlcHw', VLC_NEED_KEY = 'radioPlayerVlcNeed';
+  function videoPlayerMode(){ try{ return localStorage.getItem(VIDEO_PLAYER_KEY) || 'auto'; }catch(e){ return 'auto'; } }
+  function vlcHardware(){ try{ return localStorage.getItem(VLC_HW_KEY) !== 'off'; }catch(e){ return true; } }
+  var vlcNeed = vload(VLC_NEED_KEY, {});
+  if(!vlcNeed || typeof vlcNeed !== 'object') vlcNeed = {};
+  function vlcUsable(t){
+    var P = videoPlugin2();
+    return !!(P && typeof P.playWithVlc === 'function' && t && isLocalVideo(t) && !t.plex && !t.plexTwin && !!t.uri);
+  }
+  function vlcDecodable(t){
+    var P = videoPlugin2();
+    if(Object.prototype.hasOwnProperty.call(vlcNeed, t.uri)) return Promise.resolve(vlcNeed[t.uri]);
+    if(!P || typeof P.videoDecodable !== 'function') return Promise.resolve({});
+    return P.videoDecodable({ uri: t.uri }).then(function(r){
+      if(r && typeof r.ok === 'boolean'){ vlcNeed[t.uri] = { ok: r.ok, why: r.why || '' }; vsave(VLC_NEED_KEY, vlcNeed); }
+      return r || {};
+    }, function(){ return {}; });
+  }
+  function vlcTitle(t){
+    if(t.videoKind === 'episode') return (t.show || '') + ' · ' + episodeCode(t) + (t.epTitle ? ' · ' + t.epTitle : '');
+    if(t.videoKind === 'music') return (t.name || '') + (t.artist ? ' · ' + t.artist : '');
+    return t.name || '';
+  }
+  function playInVlc(t, startSec){
+    var P = videoPlugin2();
+    if(!isQueueCurrent(t)) clearQueue();
+    currentStation = t;
+    attemptInProgress = false;
+    try{ if(!audio.paused) audio.pause(); }catch(e){}
+    setPlayingUI(false);
+    updatePlayerMeta(t, 'Playing in VLC');
+    document.querySelectorAll('.tile, .row-item, .vep-row').forEach(function(el){
+      el.classList.toggle('playing', el.dataset.key === favKey(t));
+    });
+    var p = videoProgress[t.id];
+    var from = startSec != null ? startSec : ((t.videoKind !== 'music' && p && !p.watched && p.pos > 5) ? p.pos : 0);
+    return P.playWithVlc({ uri: t.uri, title: vlcTitle(t), startMs: Math.round((from || 0) * 1000), hw: vlcHardware() }).then(function(r){
+      r = r || {};
+      if(currentStation !== t) return;
+      var dur = (r.duration || 0) / 1000, pos = (r.position || 0) / 1000;
+      if(r.error && !pos){
+        updatePlayerMeta(t, subtitleFor(t));
+        showPlaybackFailure(t, t.uri, new Error(r.error));
+        return;
+      }
+      if(dur > 0){ setVideoProgress(t.id, r.ended ? dur : pos, dur); vsave(VIDEO_PROGRESS_KEY, videoProgress); }
+      if(r.ended){
+        if(t.videoKind === 'music' && playNextInLine()) return;
+        if(typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
+      }
+      updatePlayerMeta(t, subtitleFor(t));
+      setPlayingUI(false);
+    })['catch'](function(err){
+      if(currentStation !== t) return;
+      showPlaybackFailure(t, t.uri, err);
+    });
+  }
+  window.__amplifyPlayInVlc = playInVlc;
   function playLocalVideo(t){
+    if(vlcUsable(t)){
+      var mode = videoPlayerMode();
+      if(mode === 'vlc') return playInVlc(t);
+      if(mode === 'auto'){
+        if(!isQueueCurrent(t)) clearQueue();
+        currentStation = t;
+        updatePlayerMeta(t, 'Loading…');
+        return vlcDecodable(t).then(function(r){
+          if(currentStation !== t) return;
+          if(r && r.ok === false) playInVlc(t);
+          else playLocalVideoBuiltIn(t);
+        });
+      }
+    }
+    return playLocalVideoBuiltIn(t);
+  }
+  function playLocalVideoBuiltIn(t){
     if(!isQueueCurrent(t)) clearQueue();
     currentStation = t;
     attemptInProgress = true;
@@ -16363,6 +16475,12 @@
           attemptInProgress = false;
           showPlaybackFailure(t, t.uri, err);
         });
+        return;
+      }
+      // The phone's player couldn't play it: VLC can (build 153).
+      if(vlcUsable(t) && videoPlayerMode() !== 'builtin' && !t._vlcTried){
+        t._vlcTried = true;
+        playInVlc(t);
         return;
       }
       attemptInProgress = false;
@@ -16572,7 +16690,20 @@
       setTimeout(openTracksMenu, 0);
     });
   }
+  var npVlcBtn = document.getElementById('npVlcBtn');
+  if(npVlcBtn){
+    npVlcBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      closeNpMenu();
+      var st = npTarget();
+      if(!st || !vlcUsable(st)) return;
+      // From where it is now when it is the one playing.
+      var at = (currentStation && currentStation.id === st.id && isFinite(audio.currentTime)) ? audio.currentTime : null;
+      playInVlc(currentStation && currentStation.id === st.id ? currentStation : st, at);
+    });
+  }
   function syncNpTracksBtn(st){
+    if(npVlcBtn) npVlcBtn.style.display = vlcUsable(st) ? '' : 'none';
     if(npTracksBtn) npTracksBtn.style.display = isLocalVideo(st) && !!videoPlugin2() ? '' : 'none';
     var pb = document.getElementById('npPlexModeBtn');
     if(pb){

@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 def BUILD_OFFSET = 40
 ext.amplifyBuild = { ->
@@ -9,8 +10,16 @@ ext.amplifyBuild = { ->
 android {
     namespace = "com.markcoleman.amplify"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        viewBinding true   // the VLC player screen's layout (build 153)
+    }
     defaultConfig {
         applicationId "com.markcoleman.amplify"
+        // LibVLC carries native libraries for four processor types, tens of MB each. The phone
+        // this is built for (and any 64-bit Android phone) only needs arm64-v8a (build 153).
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Build number = GitHub run number + BUILD_OFFSET. Builds 7-48 were made outside this repo (the phone had 1.0.48),
@@ -61,6 +70,8 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:1.8.0"
     implementation "androidx.media3:media3-exoplayer-hls:1.8.0"
     implementation "androidx.media3:media3-session:1.8.0"
+    // VLC, for videos the phone's own decoders can't play (build 153). 3.x is the stable line.
+    implementation "org.videolan.android:libvlc-all:3.7.6"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
@@ -68,6 +79,12 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')
