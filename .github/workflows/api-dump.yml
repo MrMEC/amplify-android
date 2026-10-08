@@ -1,0 +1,34 @@
+name: API dump
+on:
+  push:
+    branches: [tools-api-dump]
+permissions:
+  contents: write
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Dump LibVLC API
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out w && cd w
+          curl -sSfL -o libvlc.aar https://repo1.maven.org/maven2/org/videolan/android/libvlc-all/3.7.6/libvlc-all-3.7.6.aar
+          curl -sSfL -o src.jar https://repo1.maven.org/maven2/org/videolan/android/libvlc-all/3.7.6/libvlc-all-3.7.6-sources.jar && (mkdir src && cd src && unzip -q ../src.jar) || echo "no sources"
+          unzip -q -o libvlc.aar classes.jar
+          mkdir cls && cd cls && unzip -q ../classes.jar && cd ..
+          find cls -name '*.class' | sed 's#^cls/##; s#\.class$##; s#/#.#g' | sort > ../out/classes.txt
+          for c in $(grep -E '^org\.videolan\.libvlc\.(MediaPlayer|Media|LibVLC|interfaces\.IVLCVout|interfaces\.IMedia|interfaces\.AbstractVLCEvent|interfaces\.IMediaList|AWindow|util\.VLCVideoLayout|VideoHelper)' ../out/classes.txt); do
+            echo "=== $c" >> ../out/api.txt
+            javap -public -constants -cp classes.jar "$c" >> ../out/api.txt 2>&1 || true
+          done
+          if [ -d src ]; then mkdir -p ../out/src; find src -name 'MediaPlayer.java' -o -name 'IVLCVout.java' -o -name 'AWindow.java' -o -name 'Media.java' -o -name 'VideoHelper.java' | while read f; do cp "$f" ../out/src/; done; fi
+          cd ../out
+          git init -q -b api-dump-out
+          git config user.name gha; git config user.email gha@users.noreply.github.com
+          git add -A; git commit -qm dump
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" api-dump-out
