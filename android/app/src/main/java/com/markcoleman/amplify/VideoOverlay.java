@@ -2,6 +2,8 @@ package com.markcoleman.amplify;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.TextureView;
@@ -40,6 +42,18 @@ final class VideoOverlay {
   private ExoPlayer boundTo;
   private int videoW, videoH;
   private float pixelRatio = 1f;
+  // Build 156: a hide that is followed by a show soon after (Now Playing closing into the
+  // floating window, a menu passing over the box) keeps the picture connected, so the decoder is
+  // not torn down and restarted (which showed as a black box). The surface is let go only once
+  // the picture has stayed hidden for a while.
+  private final Handler main = new Handler(Looper.getMainLooper());
+  private final Runnable unbind =
+      () -> {
+        if (box != null && box.getVisibility() == View.VISIBLE) return;
+        if (boundTo != null && texture != null) boundTo.clearVideoTextureView(texture);
+        boundTo = null;
+      };
+  private static final long UNBIND_DELAY_MS = 2500;
 
   VideoOverlay(Activity activity, View webView, Listener listener) {
     this.activity = activity;
@@ -54,6 +68,7 @@ final class VideoOverlay {
       return;
     }
     if (!ensureBox()) return;
+    main.removeCallbacks(unbind);
     if (boundTo != player) {
       if (boundTo != null) boundTo.clearVideoTextureView(texture);
       player.setVideoTextureView(texture);
@@ -62,14 +77,43 @@ final class VideoOverlay {
     place(x, y, w, h);
     box.setVisibility(View.VISIBLE);
     box.bringToFront();
+    box.post(this::fit);
   }
 
   /** Nothing to show (no video, Now Playing closed, or something on the page covers the box). */
   void hide() {
+    // INVISIBLE rather than GONE keeps the box laid out, so coming back needs no new layout pass.
+    if (box != null) box.setVisibility(View.INVISIBLE);
+    // No surface while hidden for long: the sound carries on, the phone stops drawing frames
+    // nobody sees.
+    main.removeCallbacks(unbind);
+    if (boundTo != null) main.postDelayed(unbind, UNBIND_DELAY_MS);
+  }
+
+  private void unbindNow() {
+    main.removeCallbacks(unbind);
     if (box != null) box.setVisibility(View.GONE);
-    // No surface while hidden: the sound carries on, the phone stops drawing frames nobody sees.
     if (boundTo != null && texture != null) boundTo.clearVideoTextureView(texture);
     boundTo = null;
+  }
+
+  /** Where the box is and whether a picture is connected (Diagnostics). */
+  com.getcapacitor.JSObject state() {
+    com.getcapacitor.JSObject o = new com.getcapacitor.JSObject();
+    o.put("visible", box != null && box.getVisibility() == View.VISIBLE);
+    o.put("bound", boundTo != null);
+    o.put("textureReady", texture != null && texture.isAvailable());
+    if (box != null) {
+      o.put("w", box.getLayoutParams().width);
+      o.put("h", box.getLayoutParams().height);
+      o.put("x", Math.round(box.getTranslationX()));
+      o.put("y", Math.round(box.getTranslationY()));
+    }
+    if (texture != null) {
+      o.put("tw", texture.getWidth());
+      o.put("th", texture.getHeight());
+    }
+    return o;
   }
 
   void setVideoSize(int width, int height, float ratio) {
@@ -92,7 +136,7 @@ final class VideoOverlay {
   }
 
   void release() {
-    hide();
+    unbindNow();
     if (box != null && box.getParent() instanceof ViewGroup) {
       ((ViewGroup) box.getParent()).removeView(box);
     }
@@ -134,7 +178,9 @@ final class VideoOverlay {
             Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
     cp.bottomMargin = pad * 2;
     box.addView(captions, cp);
-    box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> fit());
+    // Posted: resizing the picture from inside a layout pass can be dropped until something else
+    // asks for layout, which left a shrunk box drawing nothing.
+    box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> box.post(this::fit));
     parent.addView(box, new ViewGroup.LayoutParams(1, 1));
     return true;
   }

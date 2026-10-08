@@ -1752,7 +1752,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           }
           if (show && hasVideo) video.show(exo(), x, y, w, h);
           else video.hide();
-          call.resolve();
+          // What was drawn, for Diagnostics (build 156).
+          JSObject r = video.state();
+          r.put("hasVideo", hasVideo);
+          call.resolve(r);
         });
   }
 

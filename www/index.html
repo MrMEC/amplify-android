@@ -7379,6 +7379,9 @@
               + ' s</b> ' + escapeHtml(x.doing || x.view || '') + '</div>';
           }).join('');
         })() +
+        line('Floating video', (typeof videoMiniOn !== 'undefined' && videoMiniOn ? 'showing' : 'off') +
+          (typeof videoLastSent !== 'undefined' && videoLastSent ? ' \u00b7 picture ' + videoLastSent : '') +
+          (typeof videoViewReply !== 'undefined' && videoViewReply ? ' \u00b7 app ' + videoViewReply : '')) +
         '<div id="carDiag"></div>' +
         (dbDown
           ? line('Station list cached without the database', stationsCached ? 'yes' : 'not yet')
@@ -8560,7 +8563,7 @@
   var streamVideo = { has: false, w: 0, h: 0 };
   var npVideoStream = false;       // the video now on is a live stream's (drawn natively)
   var streamVideoOffKey = null;    // the stream whose video was turned off by hand
-  var videoLastSent = '', videoRaf = 0;
+  var videoLastSent = '', videoRaf = 0, videoViewReply = '';
 
   function streamVideoCapable(st){
     return !!(videoPlugin && streamVideo.has && st && (isLiveStream(st) || isLocalVideo(st)) && currentStation &&
@@ -8614,7 +8617,9 @@
     var key = JSON.stringify(msg);
     if(key === videoLastSent) return;
     videoLastSent = key;
-    videoPlugin.setVideoView(msg)['catch'](function(){});
+    videoPlugin.setVideoView(msg).then(function(r){
+      if(r && typeof r === 'object' && 'visible' in r) videoViewReply = JSON.stringify(r);
+    })['catch'](function(){});
   }
   function videoFrame(){
     videoRaf = 0;
@@ -8622,7 +8627,10 @@
     if(!streamVideoShowing() && !mini){ sendVideoView(false); return; }
     if(streamVideo.w > 0 && streamVideo.h > 0) npVideo.style.aspectRatio = streamVideo.w + ' / ' + streamVideo.h;
     var r = (mini ? videoMiniBox : npVideo).getBoundingClientRect();
-    sendVideoView(videoBoxClear(r, mini ? videoMini : npVideoWrap), r);
+    // While Now Playing is still sliding away over it, the floating window counts as clear:
+    // hiding the picture for that moment and bringing it back is what showed as a black box.
+    var clear = mini && npClosing() ? (r.width > 2 && r.height > 2) : videoBoxClear(r, mini ? videoMini : npVideoWrap);
+    sendVideoView(clear, r);
     videoRaf = requestAnimationFrame(videoFrame);
   }
   // While a stream's video is on, a slow poll catches Now Playing opening again (the frame
