@@ -113,6 +113,18 @@ final class VideoOverlay {
       o.put("tw", texture.getWidth());
       o.put("th", texture.getHeight());
     }
+    o.put("d", activity.getResources().getDisplayMetrics().density);
+    o.put("wv", webView.getWidth() + "x" + webView.getHeight() + "/" + webView.getScaleX());
+    if (box != null) {
+      o.put("shown", box.isShown());
+      android.graphics.Rect g = new android.graphics.Rect();
+      o.put("onScreen", box.getGlobalVisibleRect(g) ? g.toShortString() : "no");
+      if (box.getParent() instanceof ViewGroup) {
+        ViewGroup p = (ViewGroup) box.getParent();
+        o.put("parent", p.getClass().getSimpleName() + " " + p.getWidth() + "x" + p.getHeight()
+            + " i" + p.indexOfChild(box) + "/" + p.getChildCount());
+      }
+    }
     return o;
   }
 

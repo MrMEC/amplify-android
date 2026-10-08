@@ -7380,8 +7380,11 @@
           }).join('');
         })() +
         line('Floating video', (typeof videoMiniOn !== 'undefined' && videoMiniOn ? 'showing' : 'off') +
-          (typeof videoLastSent !== 'undefined' && videoLastSent ? ' \u00b7 picture ' + videoLastSent : '') +
-          (typeof videoViewReply !== 'undefined' && videoViewReply ? ' \u00b7 app ' + videoViewReply : '')) +
+          (typeof videoViewReply !== 'undefined' && videoViewReply ? ' \u00b7 app ' + videoViewReply : '') +
+          ' \u00b7 page ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1) +
+          (window.visualViewport ? ' vv ' + Math.round(visualViewport.width) + 'x' + Math.round(visualViewport.height) + ' scale ' + visualViewport.scale.toFixed(2) +
+            ' +' + Math.round(visualViewport.offsetLeft) + ',' + Math.round(visualViewport.offsetTop) : '')) +
+        (typeof videoViewLog !== 'undefined' && videoViewLog.length ? '<div>' + videoViewLog.map(escapeHtml).join('<br>') + '</div>' : '') +
         '<div id="carDiag"></div>' +
         (dbDown
           ? line('Station list cached without the database', stationsCached ? 'yes' : 'not yet')
@@ -8563,7 +8566,7 @@
   var streamVideo = { has: false, w: 0, h: 0 };
   var npVideoStream = false;       // the video now on is a live stream's (drawn natively)
   var streamVideoOffKey = null;    // the stream whose video was turned off by hand
-  var videoLastSent = '', videoRaf = 0, videoViewReply = '';
+  var videoLastSent = '', videoRaf = 0, videoViewReply = '', videoBlockedBy = '', videoViewLog = [];
 
   function streamVideoCapable(st){
     return !!(videoPlugin && streamVideo.has && st && (isLiveStream(st) || isLocalVideo(st)) && currentStation &&
@@ -8603,20 +8606,49 @@
         var x = xs[i], y = ys[j];
         if(x < 0 || y < 0 || x >= vw || y >= vh) continue;
         var el = document.elementFromPoint(x, y);
-        if(!el || !wrap.contains(el)) return false;
+        if(!el || !wrap.contains(el)){
+          videoBlockedBy = el ? (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.split(' ')[0] : '')) : 'nothing';
+          return false;
+        }
         seen++;
       }
     }
     return seen > 0;
   }
+  // Build 157: the native picture is placed in screen terms. A page that is zoomed or panned
+  // (the visual viewport off the layout viewport) has page coordinates that are not where things
+  // are on the glass, so they are converted first.
+  function screenRect(r){
+    var vv = window.visualViewport, sc = (vv && vv.scale) || 1, ox = (vv && vv.offsetLeft) || 0, oy = (vv && vv.offsetTop) || 0;
+    return { left: (r.left - ox) * sc, top: (r.top - oy) * sc, width: r.width * sc, height: r.height * sc };
+  }
+  // The floating window only needs its middle checked: anything that opens over it (a menu, a
+  // sheet, a dialog) covers the middle, and its rounded corners are not hit-tested the same way
+  // on every phone.
+  function videoMiniClear(r){
+    if(r.width < 2 || r.height < 2) return false;
+    var pts = [[.5, .5], [.3, .4], [.7, .6]];
+    for(var i = 0; i < pts.length; i++){
+      var el = document.elementFromPoint(r.left + r.width * pts[i][0], r.top + r.height * pts[i][1]);
+      if(el && !videoMini.contains(el)){
+        videoBlockedBy = el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.split(' ')[0] : '');
+        return false;
+      }
+    }
+    return true;
+  }
   function sendVideoView(show, r){
     if(!videoPlugin) return;
+    if(show) r = screenRect(r);
     var msg = show
       ? { show: true, x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }
       : { show: false };
     var key = JSON.stringify(msg);
     if(key === videoLastSent) return;
     videoLastSent = key;
+    videoViewLog.push(new Date().toLocaleTimeString() + ' ' + (videoMiniOn ? 'mini ' : 'np ') + (show ? key : 'hide' + (videoBlockedBy ? ' (covered by ' + videoBlockedBy + ')' : '')));
+    if(videoViewLog.length > 8) videoViewLog.shift();
+    videoBlockedBy = '';
     videoPlugin.setVideoView(msg).then(function(r){
       if(r && typeof r === 'object' && 'visible' in r) videoViewReply = JSON.stringify(r);
     })['catch'](function(){});
@@ -8629,7 +8661,7 @@
     var r = (mini ? videoMiniBox : npVideo).getBoundingClientRect();
     // While Now Playing is still sliding away over it, the floating window counts as clear:
     // hiding the picture for that moment and bringing it back is what showed as a black box.
-    var clear = mini && npClosing() ? (r.width > 2 && r.height > 2) : videoBoxClear(r, mini ? videoMini : npVideoWrap);
+    var clear = mini && npClosing() ? (r.width > 2 && r.height > 2) : mini ? videoMiniClear(r) : videoBoxClear(r, npVideoWrap);
     sendVideoView(clear, r);
     videoRaf = requestAnimationFrame(videoFrame);
   }
