@@ -3576,9 +3576,7 @@
     background:#000; box-shadow:0 14px 36px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08);
     touch-action:none; user-select:none; -webkit-user-select:none; }
   .video-mini[hidden]{ display:none; }
-  .video-mini.left{ right:auto; left:12px; }
-  .video-mini.dragging{ transition:none; }
-  .video-mini:not(.dragging){ transition:transform .22s ease; }
+  .video-mini.dragging .video-mini-bar{ cursor:grabbing; }
   .video-mini-box{ position:relative; width:100%; aspect-ratio:16/9; background:#000; cursor:pointer; }
   .video-mini-box > video{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
   .video-mini-bar{ display:flex; align-items:center; gap:4px; height:34px; padding:0 4px; background:#17181c; cursor:grab; }
@@ -8766,7 +8764,13 @@
   var videoMiniBox = document.getElementById('videoMiniBox');
   var videoMiniPlay = document.getElementById('videoMiniPlay');
   var videoMiniTitle = document.getElementById('videoMiniTitle');
-  var videoMiniOn = false, videoMiniDismissed = null, videoMiniSide = 'right', videoMiniLift = 0;
+  var videoMiniOn = false, videoMiniDismissed = null;
+  // Where it was last left (build 158): its top-left corner in page pixels, kept between uses.
+  // Null until it is first dragged; it then starts in the corner above the mini player.
+  var VIDEO_MINI_POS_KEY = 'radioPlayerVideoMiniPos';
+  var videoMiniPos = null;
+  try{ videoMiniPos = JSON.parse(localStorage.getItem(VIDEO_MINI_POS_KEY) || 'null'); }catch(e){ videoMiniPos = null; }
+  if(!videoMiniPos || typeof videoMiniPos.x !== 'number' || typeof videoMiniPos.y !== 'number') videoMiniPos = null;
   function videoMiniWanted(){
     if(pipActive || !npVideoOn || !currentStation || !audio) return false;
     var key = favKey(currentStation);
@@ -8795,11 +8799,22 @@
     var bw = Math.min(maxW, Math.round(maxH * w / h));
     videoMini.style.width = Math.max(120, bw) + 'px';
     videoMiniBox.style.aspectRatio = w + ' / ' + h;
-    videoMini.classList.toggle('left', videoMiniSide === 'left');
-    var anchor = videoMiniAnchor();
-    var mh = videoMini.offsetHeight || 150;
-    var lift = Math.max(0, Math.min(videoMiniLift, anchor - mh - 70));
-    videoMini.style.bottom = Math.round(window.innerHeight - anchor + lift) + 'px';
+    var mw = videoMini.offsetWidth || bw, mh = videoMini.offsetHeight || 150;
+    var x, y;
+    if(videoMiniPos){ x = videoMiniPos.x; y = videoMiniPos.y; }
+    else { x = window.innerWidth - mw - 12; y = videoMiniAnchor() - mh; }
+    moveVideoMini(x, y);
+  }
+  // Anywhere on screen, kept wholly on it (a turn of the phone or a bigger picture can't push it off).
+  function moveVideoMini(x, y){
+    var mw = videoMini.offsetWidth || 200, mh = videoMini.offsetHeight || 150, m = 4;
+    x = Math.max(m, Math.min(x, window.innerWidth - mw - m));
+    y = Math.max(m, Math.min(y, window.innerHeight - mh - m));
+    videoMini.style.left = Math.round(x) + 'px';
+    videoMini.style.top = Math.round(y) + 'px';
+    videoMini.style.right = 'auto';
+    videoMini.style.bottom = 'auto';
+    return { x: x, y: y };
   }
   function syncVideoMiniPlay(){
     if(!videoMiniPlay || !audio) return;
@@ -8851,14 +8866,14 @@
       if(!audio.paused) audio.pause();
       syncVideoMini();
     });
-    // Drag it by its bar: it settles on the nearer side, at the height it was let go.
+    // Drag it by its bar to anywhere on screen; it stays exactly where it is let go.
     (function(){
       var bar = document.getElementById('videoMiniBar');
       var drag = null;
       bar.addEventListener('pointerdown', function(e){
         if(e.target.closest('.video-mini-btn')) return;
         var r = videoMini.getBoundingClientRect();
-        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, r: r, moved: false };
+        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: r.left, top: r.top, moved: false };
         try{ bar.setPointerCapture(e.pointerId); }catch(err){}
       });
       bar.addEventListener('pointermove', function(e){
@@ -8867,18 +8882,14 @@
         if(!drag.moved && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
         drag.moved = true;
         videoMini.classList.add('dragging');
-        videoMini.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        videoMiniPos = moveVideoMini(drag.left + dx, drag.top + dy);
       });
       function end(e){
         if(!drag || (e && e.pointerId !== drag.id)) return;
         var d = drag; drag = null;
         videoMini.classList.remove('dragging');
-        if(!d.moved){ videoMini.style.transform = ''; return; }
-        var r = videoMini.getBoundingClientRect();
-        videoMiniSide = (r.left + r.width / 2) < window.innerWidth / 2 ? 'left' : 'right';
-        videoMiniLift = Math.max(0, videoMiniAnchor() - r.bottom);
-        videoMini.style.transform = '';
-        placeVideoMini();
+        if(!d.moved) return;
+        try{ localStorage.setItem(VIDEO_MINI_POS_KEY, JSON.stringify(videoMiniPos)); }catch(err){}
       }
       bar.addEventListener('pointerup', end);
       bar.addEventListener('pointercancel', end);
