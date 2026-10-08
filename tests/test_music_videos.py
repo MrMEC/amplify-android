@@ -111,11 +111,11 @@ async def main():
           var tiles = Array.from(document.querySelectorAll('#stationsGrid .mv-tile')).map(function(t){ return { title: t.querySelector('.yt-title').textContent, dur: t.querySelector('.yt-date').textContent, img: !!t.querySelector('img') }; });
           return { labels: labels, tiles: tiles }; })()""")
         print(page)
-        check('Videos' in page['labels'] and page['labels'].index('Videos') < page['labels'].index('Albums'), f'a Videos section above Albums {page["labels"]}')
+        check(page['labels'] and page['labels'][0] == 'Music Videos' and 'Videos' not in page['labels'], f'one Music Videos row, at the top {page["labels"]}')
         check([t['title'] for t in page['tiles']] == ['Great Song', 'Live at Wembley'] and all(t['img'] and t['dur'] == '2:05' for t in page['tiles']),
               f'two tiles with a still and length {page["tiles"]}')
         await pg.screenshot(path=f'{shots}/mv-artist.png')
-        await pg.evaluate("document.getElementById('importPanelClose') && document.getElementById('importPanelClose').click(); document.querySelector('.artist-mvs-label').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(600)
+        await pg.evaluate("document.getElementById('importPanelClose') && document.getElementById('importPanelClose').click(); document.querySelector('.artist-videos-label').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(600)
         await pg.screenshot(path=f'{shots}/mv-artist-row.png')
         # play the first: it plays as a video, Now Playing opens, the queue is Bob's videos
         await pg.click('#stationsGrid .mv-tile'); await pg.wait_for_timeout(1200)

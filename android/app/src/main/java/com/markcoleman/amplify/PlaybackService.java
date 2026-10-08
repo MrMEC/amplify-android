@@ -704,6 +704,36 @@ public class PlaybackService extends MediaLibraryService {
         });
   }
 
+  // ---------- Latest podcasts for the car (build 155) ----------
+  // Started from the car without the app having run, the Latest list is whatever the phone
+  // last sent. When it is stale, CarLibrary looks the new episodes up itself and the car is
+  // told its lists changed. Tried at most every five minutes.
+  private volatile long latestTriedAt = 0L;
+
+  void maybeRefreshLatest() {
+    long now = System.currentTimeMillis();
+    if (now - latestTriedAt < 5L * 60L * 1000L || this.car == null) return;
+    latestTriedAt = now;
+    Thread t =
+        new Thread(
+            () -> {
+              try {
+                // The car's lists may not be read in yet: let the next browse try again.
+                if (!this.car.hasShows()) {
+                  latestTriedAt = 0L;
+                  return;
+                }
+                if (this.car.refreshLatestPodcasts(false)) {
+                  this.main.post(this::notifyListsChanged);
+                }
+              } catch (Exception ignored) {
+              }
+            },
+            "car-latest");
+    t.setDaemon(true);
+    t.start();
+  }
+
   public void notifyListsChanged() {
     if (this.session == null) {
       return;
@@ -959,6 +989,10 @@ public class PlaybackService extends MediaLibraryService {
     @Override // androidx.media3.session.MediaSession.Callback
     public MediaSession.ConnectionResult onConnect(
         MediaSession mediaSession, MediaSession.ControllerInfo controllerInfo) {
+      // The car (or any other browser) connecting: bring its podcast lists up to date.
+      if (!getPackageName().equals(controllerInfo.getPackageName())) {
+        PlaybackService.this.maybeRefreshLatest();
+      }
       return new MediaSession.ConnectionResult.AcceptedResultBuilder(mediaSession)
           .setAvailableSessionCommands(
               MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
@@ -1072,6 +1106,7 @@ public class PlaybackService extends MediaLibraryService {
       if (PlaybackService.this.browsed.size() < 300) {
         PlaybackService.this.browsed.add(str);
       }
+      PlaybackService.this.maybeRefreshLatest();
       return PlaybackService.this.io.submit(
           () -> {
             return page(PlaybackService.this.car.children(str), i, i2, libraryParams);

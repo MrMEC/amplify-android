@@ -226,7 +226,7 @@ public final class StreamTitle {
   }
 
   private static String clean(String str) {
-    String strTrim = str.replace((char) 0, ' ').replaceAll("\\s+", " ").trim();
+    String strTrim = fixText(str).replace((char) 0, ' ').replaceAll("\\s+", " ").trim();
     while (strTrim.length() >= 2
         && ((strTrim.startsWith("'") && strTrim.endsWith("'"))
             || (strTrim.startsWith("\"") && strTrim.endsWith("\"")))) {
@@ -302,6 +302,67 @@ public final class StreamTitle {
     } catch (java.io.UnsupportedEncodingException e) {
       return new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1);
     }
+  }
+
+  private static final Pattern ENTITY = Pattern.compile("&(#[0-9]{1,6}|#[xX][0-9a-fA-F]{1,5}|[a-zA-Z]{2,8});");
+
+  /**
+   * Build 155: titles some stations send in a form that reads wrong -- HTML entities
+   * ("Don&#39;t", "Rock &amp; Roll") and UTF-8 read as Windows-1252 ("Donâ€™t") -- put back the
+   * way they were meant.
+   */
+  public static String fixText(String s) {
+    if (s == null || s.isEmpty()) return s;
+    String out = s;
+    if (out.indexOf('&') >= 0) {
+      Matcher m = ENTITY.matcher(out);
+      StringBuffer sb = new StringBuffer();
+      while (m.find()) {
+        String e = m.group(1);
+        String rep = null;
+        try {
+          if (e.startsWith("#x") || e.startsWith("#X")) rep = new String(Character.toChars(Integer.parseInt(e.substring(2), 16)));
+          else if (e.startsWith("#")) rep = new String(Character.toChars(Integer.parseInt(e.substring(1))));
+          else {
+            switch (e.toLowerCase(Locale.ROOT)) {
+              case "amp": rep = "&"; break;
+              case "apos": rep = "'"; break;
+              case "quot": rep = "\""; break;
+              case "lt": rep = "<"; break;
+              case "gt": rep = ">"; break;
+              case "nbsp": rep = " "; break;
+              case "rsquo": rep = "\u2019"; break;
+              case "lsquo": rep = "\u2018"; break;
+              case "ldquo": rep = "\u201C"; break;
+              case "rdquo": rep = "\u201D"; break;
+              case "ndash": rep = "\u2013"; break;
+              case "mdash": rep = "\u2014"; break;
+              default: rep = null;
+            }
+          }
+        } catch (RuntimeException ignored) {
+          rep = null;
+        }
+        m.appendReplacement(sb, Matcher.quoteReplacement(rep != null ? rep : m.group(0)));
+      }
+      m.appendTail(sb);
+      out = sb.toString();
+    }
+    // UTF-8 bytes that were read one byte per character: "â€™" for "’", "Ã©" for "é".
+    if (out.indexOf('\u00C3') >= 0 || out.indexOf('\u00E2') >= 0 || out.indexOf('\u00C2') >= 0) {
+      try {
+        byte[] b = out.getBytes("windows-1252");
+        String re =
+            java.nio.charset.StandardCharsets.UTF_8
+                .newDecoder()
+                .decode(java.nio.ByteBuffer.wrap(b))
+                .toString();
+        if (!re.equals(out)) out = re;
+      } catch (Exception ignored) {
+        // Not mangled UTF-8 after all: left as it was.
+      }
+    }
+    return out;
   }
 
   private static String norm(String str) {

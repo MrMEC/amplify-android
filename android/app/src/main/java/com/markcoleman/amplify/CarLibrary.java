@@ -32,6 +32,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -628,8 +635,211 @@ final class CarLibrary {
       if (str2 == null) {
         return Collections.emptyList();
       }
+      // Latest episodes fetched here since the phone last sent its lists (build 155).
+      List<JSONObject> fresh = freshLatestFor(str2);
+      if (fresh != null) return fresh;
       return arrayOf(this.catalog.optJSONObject("lists"), str2);
     }
+  }
+
+  // ---------- Latest podcasts without opening the app (build 155) ----------
+  // The phone sends the car its podcast lists when the app runs. Started straight from the
+  // car, those can be days old, so when they are more than half an hour old the newest
+  // episode of every followed show is looked up here (Apple's podcast directory, the same
+  // place the app gets them) and Latest, and each category, are rebuilt from that.
+  static final long LATEST_STALE_MS = 30L * 60L * 1000L;
+  private volatile List<JSONObject> freshLatest = null;
+  private volatile long freshLatestAt = 0L;
+  private final Object latestLock = new Object();
+  private boolean latestBusy = false;
+
+  private synchronized long catalogAt() {
+    return this.catalog.optLong("at", 0L);
+  }
+
+  boolean hasShows() {
+    return !arrayOf(catalogLists(), "shows").isEmpty();
+  }
+
+  boolean latestStale() {
+    if (arrayOf(catalogLists(), "shows").isEmpty()) return false;
+    long newest = Math.max(catalogAt(), freshLatestAt);
+    return System.currentTimeMillis() - newest > LATEST_STALE_MS;
+  }
+
+  private synchronized JSONObject catalogLists() {
+    return this.catalog.optJSONObject("lists");
+  }
+
+  /** Called with the lock held (from listItems). Null means use the phone's own list. */
+  private List<JSONObject> freshLatestFor(String list) {
+    List<JSONObject> fresh = this.freshLatest;
+    if (fresh == null || this.freshLatestAt <= this.catalog.optLong("at", 0L)) return null;
+    if ("podLatest".equals(list)) return fresh;
+    if (!list.startsWith("cat:")) return null;
+    // A category keeps the shows it had; their episodes come from the fresh list.
+    Set<String> cids = new HashSet<>();
+    for (JSONObject e : arrayOf(this.catalog.optJSONObject("lists"), list)) {
+      JSONObject rec = e.optJSONObject("rec");
+      if (rec != null && rec.has("collectionId")) cids.add(String.valueOf(rec.opt("collectionId")));
+    }
+    List<JSONObject> out = new ArrayList<>();
+    for (JSONObject e : fresh) {
+      JSONObject rec = e.optJSONObject("rec");
+      if (rec != null && cids.contains(String.valueOf(rec.opt("collectionId")))) out.add(e);
+    }
+    return out;
+  }
+
+  /** Looks up every followed show's newest episode. Returns true when the lists changed. */
+  boolean refreshLatestPodcasts(boolean force) {
+    if (!force && !latestStale()) return false;
+    synchronized (latestLock) {
+      if (latestBusy) return false;
+      latestBusy = true;
+    }
+    ExecutorService pool = Executors.newFixedThreadPool(4);
+    try {
+      List<JSONObject> shows = arrayOf(catalogLists(), "shows");
+      List<JSONObject> old = arrayOf(catalogLists(), "podLatest");
+      if (shows.isEmpty()) return false;
+      final JSONObject progress = CarProgress.readAll(ctx);
+      List<Future<JSONObject>> jobs = new ArrayList<>();
+      for (JSONObject sh : shows) {
+        final String cid = sh.optString("cid");
+        final JSONObject show = sh;
+        if (cid.isEmpty()) continue;
+        jobs.add(pool.submit(() -> latestEpisodeOf(cid, show, progress)));
+      }
+      long deadline = System.currentTimeMillis() + 20000L;
+      Map<String, JSONObject> byShow = new LinkedHashMap<>();
+      int got = 0;
+      for (Future<JSONObject> f : jobs) {
+        try {
+          JSONObject e = f.get(Math.max(1L, deadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+          if (e != null) {
+            byShow.put(String.valueOf(e.optJSONObject("rec").opt("collectionId")), e);
+            got++;
+          }
+        } catch (Exception ignored) {
+        }
+      }
+      if (got == 0) return false; // offline: keep what the phone sent
+      // A show that couldn't be reached keeps the episode the phone last knew of.
+      for (JSONObject e : old) {
+        JSONObject rec = e.optJSONObject("rec");
+        if (rec == null) continue;
+        String cid = String.valueOf(rec.opt("collectionId"));
+        if (byShow.containsKey(cid)) continue;
+        JSONObject copy = new JSONObject(e.toString());
+        copy.put("_ms", parseIsoMs(rec.optString("releaseDate")));
+        byShow.put(cid, copy);
+      }
+      List<JSONObject> eps = new ArrayList<>(byShow.values());
+      Collections.sort(eps, (a, b) -> Long.compare(b.optLong("_ms"), a.optLong("_ms")));
+      List<JSONObject> out = new ArrayList<>();
+      for (JSONObject e : eps) {
+        long ms = e.optLong("_ms");
+        e.remove("_ms");
+        out.add(ms > 0 ? withGroup(e, dayLabel(ms)) : e);
+      }
+      String before = String.valueOf(this.freshLatest != null ? this.freshLatest : old);
+      this.freshLatest = out;
+      this.freshLatestAt = System.currentTimeMillis();
+      return !before.equals(String.valueOf(out));
+    } catch (Exception ignored) {
+      return false;
+    } finally {
+      pool.shutdownNow();
+      synchronized (latestLock) {
+        latestBusy = false;
+      }
+    }
+  }
+
+  private JSONObject latestEpisodeOf(String cid, JSONObject show, JSONObject progress) {
+    try {
+      String url =
+          "https://itunes.apple.com/lookup?id="
+              + URLEncoder.encode(cid, "UTF-8")
+              + "&entity=podcastEpisode&limit=5";
+      JSONObject data = new JSONObject(httpGet(url, 2 * 1024 * 1024));
+      JSONArray res = data.optJSONArray("results");
+      JSONObject best = null;
+      long bestMs = -1L;
+      if (res != null) {
+        for (int i = 0; i < res.length(); i++) {
+          JSONObject r = res.optJSONObject(i);
+          if (r == null || !"podcastEpisode".equals(r.optString("wrapperType"))) continue;
+          String epUrl = r.optString("episodeUrl", r.optString("previewUrl", ""));
+          if (epUrl.isEmpty()) continue;
+          long ms = parseIsoMs(r.optString("releaseDate"));
+          if (ms > bestMs) {
+            bestMs = ms;
+            best = r;
+          }
+        }
+      }
+      if (best == null) return null;
+      JSONObject r = best;
+      String epUrl = r.optString("episodeUrl", r.optString("previewUrl", ""));
+      String guid = r.optString("episodeGuid", epUrl);
+      String art = firstNonEmpty(r, "artworkUrl600", "artworkUrl160", "artworkUrl100", "artworkUrl60");
+      if (art == null || art.isEmpty()) art = show.optString("art");
+      double dur = r.optLong("trackTimeMillis", 0) / 1000.0;
+      String showName = r.optString("collectionName", show.optString("title"));
+      JSONObject rec = new JSONObject();
+      rec.put("guid", guid);
+      rec.put("collectionId", r.has("collectionId") ? r.opt("collectionId") : cid);
+      rec.put("collectionName", showName);
+      rec.put("artistName", r.optString("artistName", show.optString("sub")));
+      rec.put("trackName", r.optString("trackName", "Untitled episode"));
+      rec.put("artworkUrl", art);
+      rec.put("releaseDate", r.optString("releaseDate"));
+      rec.put("durationSec", dur);
+      rec.put("episodeUrl", epUrl);
+      rec.put("description", "");
+      rec.put("isVideo", "Video".equals(r.optString("episodeContentType")));
+      JSONObject e = new JSONObject();
+      e.put("t", "episode");
+      e.put("k", "podcast:" + guid);
+      e.put("guid", guid);
+      e.put("title", r.optString("trackName", "Untitled episode"));
+      e.put("sub", showName);
+      e.put("art", art);
+      e.put("url", epUrl);
+      e.put("dur", dur);
+      JSONObject pr = progress == null ? null : progress.optJSONObject(guid);
+      if (pr != null) {
+        e.put("pos", pr.optDouble("positionSec", 0));
+        e.put("done", pr.optBoolean("completed", false));
+      }
+      e.put("rec", rec);
+      e.put("_ms", bestMs);
+      return e;
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
+  static long parseIsoMs(String iso) {
+    if (iso == null || iso.isEmpty()) return 0L;
+    String[] fmts = {"yyyy-MM-dd'T'HH:mm:ssX", "yyyy-MM-dd'T'HH:mm:ss.SSSX", "yyyy-MM-dd"};
+    for (String f : fmts) {
+      try {
+        SimpleDateFormat df = new SimpleDateFormat(f, Locale.US);
+        df.setTimeZone(TimeZone.getTimeZone("UTC"));
+        Date d = df.parse(iso);
+        if (d != null) return d.getTime();
+      } catch (Exception ignored) {
+      }
+    }
+    return 0L;
+  }
+
+  /** The same date heading the app's Latest tab uses ("Wednesday, October 7"). */
+  static String dayLabel(long ms) {
+    return new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(new Date(ms));
   }
 
   private static JSONObject songRef(String str, String str2) {

@@ -135,10 +135,18 @@ async def app_mode(b, w, h, tag):
     # Closing Now Playing hides the picture; reopening shows it again.
     await pg.evaluate("document.getElementById('npBackBtn').click()")
     await pg.wait_for_timeout(900)
-    check(not (await pg.evaluate('window.__view')).get('show'), f'[{tag}] closing Now Playing hides the picture')
-    await pg.evaluate("document.getElementById('playerNowTrigger').click()")
+    # Build 155: the picture carries on in the floating window instead.
+    mini = await pg.evaluate("""(()=>{var m=document.getElementById('videoMini'),b=document.getElementById('videoMiniBox').getBoundingClientRect();
+      return {hidden:m.hidden, x:Math.round(b.left), y:Math.round(b.top), w:Math.round(b.width), h:Math.round(b.height), view:window.__view, calls:window.__calls.filter(function(c){return c[0]==='pause'||c[0]==='stop';}).length};})()""")
+    v = mini['view'] or {}
+    check(not mini['hidden'] and v.get('show') and v.get('x') == mini['x'] and v.get('y') == mini['y'] and v.get('width') == mini['w'],
+          f'[{tag}] closing Now Playing moves the picture into the floating window {mini}')
+    await pg.evaluate(STANDIN); await pg.screenshot(path=f'{SHOTS}/stream-video-mini-{tag}.png')
+    await pg.evaluate("document.getElementById('videoMiniBox').click()")
     await pg.wait_for_timeout(900)
-    check((await pg.evaluate('window.__view')).get('show'), f'[{tag}] reopening shows it again')
+    back = await state(pg)
+    check(back['view'].get('show') and abs(back['view']['y'] - round(back['y'])) <= 1 and await pg.evaluate("document.getElementById('videoMini').hidden"),
+          f'[{tag}] tapping it reopens Now Playing with the picture back in place {back}')
 
     # Another channel: video resets, then comes on for the new one when it reports a picture.
     await paste(pg, 'http://iptv.example/live/channel2.m3u8')

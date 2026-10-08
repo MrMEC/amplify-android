@@ -3038,6 +3038,11 @@
   .fav-artists-block .ch-sort-opts{ display:flex; flex-direction:column; gap:10px; margin:2px 0 12px; }
   .tile-grid > .video-tabs + .grid-section-label, .tile-grid > .video-tabs + .grid-section-label.ch-row-label{ margin-top:4px; }
   .tile-grid > .video-tabs.vd-seasons{ margin:4px 0 -18px; }
+  /* A long run of seasons scrolls sideways instead of running off the edge. */
+  .video-tabs.vd-seasons{ flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y;
+    overscroll-behavior-x:contain; scrollbar-width:none; min-width:0; max-width:100%; padding-bottom:2px; scroll-padding-inline:16px; }
+  .video-tabs.vd-seasons::-webkit-scrollbar{ display:none; }
+  .video-tabs.vd-seasons .home-tab{ flex:0 0 auto; }
   .v-progress{ position:absolute; left:8px; right:8px; bottom:8px; height:4px; border-radius:2px; background:rgba(255,255,255,.35); overflow:hidden; z-index:2; }
   .v-progress > span{ display:block; height:100%; background:var(--accent); border-radius:2px; }
   .v-watched{
@@ -3052,14 +3057,17 @@
   .vw-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .vw-tile .tile-name{ margin-top:8px; }
   .vw-thumb .vw-more{ top:4px; right:2px; z-index:3; }
-  .vw-thumb.vw-logo{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); }
+  .vw-thumb.vw-logo{ display:flex; align-items:center; justify-content:center; background:#2b2c31; }
   /* A channel's logo uses the whole thumbnail: scaled to fit its width (or height, if it's a
      tall one) so a wide logo is never cropped to a square. */
   .vw-thumb.vw-logo .tile-art{ width:100%; height:100%; aspect-ratio:auto; max-width:none; border-radius:0; overflow:hidden; box-shadow:none; background:transparent; }
   .vw-thumb.vw-logo .tile-art img{ width:100%; height:100%; object-fit:contain; border-radius:0; }
   /* Once the logo is in, nothing is drawn around it: a square logo is the whole cover, the
      same size as a Continue Listening cover. */
-  .vw-thumb.vw-logo:has(img), .vw-thumb.vw-logo .tile-art:has(img){ background:transparent !important; }
+  .vw-thumb.vw-logo:has(img), .vw-thumb.vw-logo .tile-art:has(img){ background:#2b2c31 !important; }
+  /* Channel logos anywhere sit on a plain dark gray, never a generated colour wash. */
+  .channel-art{ background:#2b2c31 !important; }
+  .channel-art img{ object-fit:contain; }
   .vw-home-grid .vw-tile{ width:min(62vw, 260px); }
   /* A channel is a station logo, so it takes a Continue Listening cover's size and shape;
      movies and episodes keep the wide video frame. */
@@ -3077,7 +3085,8 @@
     padding:10px; font-size:14px; font-weight:800; line-height:1.2; color:var(--text-dim);
     background:linear-gradient(160deg, var(--panel-2), var(--panel));
   }
-  .tile.vposter .tile-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  /* Show and movie names get two lines before they are cut, so a long title stays readable. */
+  .tile.vposter .tile-name{ white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; line-height:1.25; overflow-wrap:anywhere; }
   .tile-grid > .v-empty{ grid-column:1/-1; }
   .tile-grid > .v-add-folder{ grid-column:1/-1; justify-self:start; margin-top:-18px; display:inline-flex; gap:8px; align-items:center; }
   .tile-grid > .grid-section-label.v-folders-label{ margin-top:18px; }
@@ -3105,7 +3114,7 @@
   .vd-poster{ position:relative; flex:0 0 auto; width:112px; aspect-ratio:2/3; border-radius:10px; overflow:hidden; background:var(--panel); box-shadow:0 10px 30px rgba(0,0,0,.4); }
   .vd-poster img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .vd-text{ flex:1; min-width:0; padding-bottom:4px; }
-  .vd-title{ font-size:22px; font-weight:800; line-height:1.2; color:var(--text); }
+  .vd-title{ font-size:22px; font-weight:800; line-height:1.2; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow-wrap:anywhere; }
   .vd-meta{ margin-top:4px; font-size:13px; color:var(--text-dim); }
   .vd-actions{ display:flex; align-items:center; gap:10px; margin:18px 0 0; flex-wrap:wrap; }
   .vd-play{
@@ -3140,7 +3149,7 @@
   .vep-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .vep-thumb .v-progress{ left:5px; right:5px; bottom:5px; height:3px; }
   .vep-text{ flex:1; min-width:0; }
-  .vep-title{ font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vep-title{ font-size:14px; font-weight:700; line-height:1.3; color:var(--text); white-space:normal; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow-wrap:anywhere; }
   .vep-sub{ margin-top:3px; font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .vep-row.playing .vep-title{ color:var(--accent); }
   .vep-row.playing .vep-thumb{ box-shadow:0 0 0 3px var(--accent); }
@@ -3167,7 +3176,7 @@
   .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
   .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
   .ch-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; min-width:0; }
-  .ch-logo{ width:52px; height:52px; flex:none; border-radius:10px; overflow:hidden; background:var(--panel-2);
+  .ch-logo{ width:52px; height:52px; flex:none; border-radius:10px; overflow:hidden; background:#2b2c31;
     display:flex; align-items:center; justify-content:center; color:var(--text-faint); }
   .ch-logo img{ width:100%; height:100%; object-fit:contain; padding:5px; box-sizing:border-box; }
   .ch-logo svg{ width:24px; height:24px; fill:currentColor; }
@@ -3562,6 +3571,23 @@
      translucent and blurs whatever passes underneath, so the page keeps scrolling visibly
      behind it instead of stopping at a line. Centred in the content column rather than in the
      window: the bar belongs to what is playing, and that is what the column holds. */
+  /* ---------- floating video while browsing (build 155) ---------- */
+  .video-mini{ position:fixed; right:12px; bottom:120px; z-index:52; width:208px; border-radius:14px; overflow:hidden;
+    background:#000; box-shadow:0 14px 36px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08);
+    touch-action:none; user-select:none; -webkit-user-select:none; }
+  .video-mini[hidden]{ display:none; }
+  .video-mini.left{ right:auto; left:12px; }
+  .video-mini.dragging{ transition:none; }
+  .video-mini:not(.dragging){ transition:transform .22s ease; }
+  .video-mini-box{ position:relative; width:100%; aspect-ratio:16/9; background:#000; cursor:pointer; }
+  .video-mini-box > video{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
+  .video-mini-bar{ display:flex; align-items:center; gap:4px; height:34px; padding:0 4px; background:#17181c; cursor:grab; }
+  .video-mini-title{ flex:1 1 auto; min-width:0; font-size:12px; font-weight:600; color:#f1f1f4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .video-mini-btn{ flex:none; width:30px; height:30px; border:0; border-radius:50%; background:transparent; color:#f1f1f4;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; }
+  .video-mini-btn:active{ background:rgba(255,255,255,.12); }
+  body.np-open .video-mini, body.in-pip .video-mini{ display:none; }
+
   .player-bar{
     position:fixed; z-index:50;
     /* --player-bar-bottom exists so the search sheet (below) can sit flush against this bar's
@@ -5725,6 +5751,16 @@
 <!-- Phone-only tab bar (hidden on desktop by CSS). The fade sits behind it and the player
      bar to show the page carries on below. -->
 <div class="mobile-scroll-fade" aria-hidden="true"></div>
+<!-- A video playing while you browse: a small floating picture that stays until Now Playing
+     opens again (build 155). The native player draws into #videoMiniBox. -->
+<div class="video-mini" id="videoMini" hidden>
+  <div class="video-mini-box" id="videoMiniBox" role="button" tabindex="0" aria-label="Open Now Playing"></div>
+  <div class="video-mini-bar" id="videoMiniBar">
+    <button type="button" class="video-mini-btn" id="videoMiniPlay" aria-label="Pause"><i class="fa-solid fa-pause"></i></button>
+    <div class="video-mini-title" id="videoMiniTitle"></div>
+    <button type="button" class="video-mini-btn" id="videoMiniClose" aria-label="Close video"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+</div>
 <nav class="mobile-nav" id="mobileNav" aria-label="Main">
   <button type="button" class="mobile-nav-btn" data-nav="home" aria-label="Home">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9"/></svg>
@@ -7550,6 +7586,7 @@
     if(!closing) savedBrowseScrollY = window.scrollY;
     renderNowPlayingScreen();
     nowPlayingScreen.style.display = 'flex';
+    syncVideoMini();
     closeDrawer();
     var slide = (animate || closing) && !already && npSheetMotionOk();
     if(slide && npSheetMobile()){
@@ -7972,8 +8009,8 @@
     setNpImmersive(false);
     // A channel's screen closes at once rather than sliding down.
     if(nowPlayingScreen.classList.contains('np-channel')) animate = false;
-    if(npVideoOn && !npVideoStream) setNpVideo(false);
-    else if(npVideoFull) exitVideoFull();
+    // The video carries on in the floating window instead of stopping (build 155).
+    if(npVideoFull) exitVideoFull();
     if(npClosing()){
       if(animate) return; // already on its way down
       stopNpSheet(false);
@@ -8004,6 +8041,7 @@
     if(closingVideo) refreshVideoPages();
     updateNowPlayingFavState();
     updateNpPlayBtn();
+    syncVideoMini();
     if(restoreScroll && wasOpen){
       // rAF ensures the browse grid has reflowed before we scroll to it.
       requestAnimationFrame(function(){ window.scrollTo(0, savedBrowseScrollY); });
@@ -8423,6 +8461,7 @@
     npVideoWrap.hidden = true;
     nativeVideoUi({ fullscreen: false, landscape: false, awake: false });
     if(currentStation) syncNpVideoToggle(currentStation);
+    syncVideoMini();
   }
   function setNpVideo(on){
     if(on) setNpImmersive(false); // video has its own full-screen view
@@ -8549,7 +8588,8 @@
   // the outer rows and columns just inside its edges, so a menu that only tucks under an edge
   // still counts. Points past the edge of the screen don't count (the picture is clipped there
   // the same way the page is).
-  function videoBoxClear(r){
+  function videoBoxClear(r, wrap){
+    wrap = wrap || npVideoWrap;
     var vw = window.innerWidth, vh = window.innerHeight;
     if(r.width < 2 || r.height < 2 || r.bottom <= 0 || r.top >= vh || r.right <= 0 || r.left >= vw) return false;
     var xs = [r.left + 2, r.left + r.width * .25, r.left + r.width / 2, r.left + r.width * .75, r.right - 2];
@@ -8560,7 +8600,7 @@
         var x = xs[i], y = ys[j];
         if(x < 0 || y < 0 || x >= vw || y >= vh) continue;
         var el = document.elementFromPoint(x, y);
-        if(!el || !npVideoWrap.contains(el)) return false;
+        if(!el || !wrap.contains(el)) return false;
         seen++;
       }
     }
@@ -8578,10 +8618,11 @@
   }
   function videoFrame(){
     videoRaf = 0;
-    if(!streamVideoShowing()){ sendVideoView(false); return; }
+    var mini = !streamVideoShowing() && npVideoStream && videoMiniOn && (!document.hidden || pipActive);
+    if(!streamVideoShowing() && !mini){ sendVideoView(false); return; }
     if(streamVideo.w > 0 && streamVideo.h > 0) npVideo.style.aspectRatio = streamVideo.w + ' / ' + streamVideo.h;
-    var r = npVideo.getBoundingClientRect();
-    sendVideoView(videoBoxClear(r), r);
+    var r = (mini ? videoMiniBox : npVideo).getBoundingClientRect();
+    sendVideoView(videoBoxClear(r, mini ? videoMini : npVideoWrap), r);
     videoRaf = requestAnimationFrame(videoFrame);
   }
   // While a stream's video is on, a slow poll catches Now Playing opening again (the frame
@@ -8612,6 +8653,7 @@
     videoPlugin.addListener('video', onStreamVideo);
     videoPlugin.addListener('videotap', function(){
       if(!npVideoStream) return;
+      if(videoMiniOn){ openVideoMiniNp(); return; }
       if(npVideoFull) exitVideoFull(); else enterVideoFull(true);
     });
     videoPlugin.videoState().then(onStreamVideo)['catch'](function(){});
@@ -8672,6 +8714,135 @@
         syncPip();
       }
     });
+  }
+
+  // ---------- Floating video while browsing (build 155) ----------
+  // Leaving Now Playing while a video is on (a video podcast, a channel, a stream with a
+  // picture, a music video, a movie or an episode) no longer drops the picture: it carries on
+  // in a small floating window above the mini player. Opening Now Playing again puts it back
+  // in place. Nothing reloads either way: a podcast's <video> element is moved, not rebuilt,
+  // and the native player's picture just follows whichever box is showing.
+  var videoMini = document.getElementById('videoMini');
+  var videoMiniBox = document.getElementById('videoMiniBox');
+  var videoMiniPlay = document.getElementById('videoMiniPlay');
+  var videoMiniTitle = document.getElementById('videoMiniTitle');
+  var videoMiniOn = false, videoMiniDismissed = null, videoMiniSide = 'right', videoMiniLift = 0;
+  function videoMiniWanted(){
+    if(pipActive || !npVideoOn || !currentStation || !audio) return false;
+    var key = favKey(currentStation);
+    if(videoMiniDismissed && videoMiniDismissed === key) return false;
+    var npShowing = nowPlayingScreen.style.display === 'flex' && !npClosing();
+    if(npShowing && npTarget() && favKey(npTarget()) === key) return false;
+    if(npVideoStream) return !!(streamVideo.has && streamVideoCapable(currentStation));
+    return !!audio.videoActive;
+  }
+  function videoMiniAnchor(){
+    // Sits just above the mini player (or the tab bar, or the bottom of the screen).
+    var vh = window.innerHeight, top = vh - 12;
+    [document.getElementById('playerBar'), document.getElementById('mobileNav')].some(function(el){
+      if(!el || getComputedStyle(el).display === 'none') return false;
+      var r = el.getBoundingClientRect();
+      if(r.height < 2 || r.top >= vh) return false;
+      top = r.top - 10; return true;
+    });
+    return top;
+  }
+  function placeVideoMini(){
+    var w = 16, h = 9;
+    if(npVideoStream){ if(streamVideo.w > 0 && streamVideo.h > 0){ w = streamVideo.w; h = streamVideo.h; } }
+    else if(npVideo.videoWidth > 0 && npVideo.videoHeight > 0){ w = npVideo.videoWidth; h = npVideo.videoHeight; }
+    var maxW = Math.min(240, Math.round(window.innerWidth * 0.56)), maxH = 190;
+    var bw = Math.min(maxW, Math.round(maxH * w / h));
+    videoMini.style.width = Math.max(120, bw) + 'px';
+    videoMiniBox.style.aspectRatio = w + ' / ' + h;
+    videoMini.classList.toggle('left', videoMiniSide === 'left');
+    var anchor = videoMiniAnchor();
+    var mh = videoMini.offsetHeight || 150;
+    var lift = Math.max(0, Math.min(videoMiniLift, anchor - mh - 70));
+    videoMini.style.bottom = Math.round(window.innerHeight - anchor + lift) + 'px';
+  }
+  function syncVideoMiniPlay(){
+    if(!videoMiniPlay || !audio) return;
+    var paused = !!audio.paused;
+    videoMiniPlay.innerHTML = paused ? '<i class="fa-solid fa-play"></i>' : '<i class="fa-solid fa-pause"></i>';
+    videoMiniPlay.setAttribute('aria-label', paused ? 'Play' : 'Pause');
+  }
+  function syncVideoMini(){
+    if(!videoMini) return;
+    var want = videoMiniWanted();
+    if(want !== videoMiniOn){
+      videoMiniOn = want;
+      videoMini.hidden = !want;
+      document.body.classList.toggle('video-mini-on', want);
+    }
+    // A podcast's picture lives wherever it is showing; moving the element keeps it playing.
+    var home = want && !npVideoStream && audio && audio.videoActive ? videoMiniBox : npVideoWrap;
+    if(npVideo.parentNode !== home){
+      var wasPlaying = !npVideo.paused;
+      if(home === npVideoWrap) npVideoWrap.insertBefore(npVideo, npVideoWrap.firstChild); else home.appendChild(npVideo);
+      if(wasPlaying && npVideo.paused) npVideo.play()['catch'](function(){});
+    }
+    if(want){
+      videoMiniTitle.textContent = stripExclusively((currentStation && currentStation.name) || '');
+      syncVideoMiniPlay();
+      placeVideoMini();
+    }
+    if(npVideoStream && !videoRaf) videoFrame();
+  }
+  function openVideoMiniNp(){
+    if(currentStation) openNowPlaying(currentStation, true);
+  }
+  if(videoMini){
+    setInterval(function(){ if(videoMiniOn || npVideoOn) syncVideoMini(); }, 400);
+    window.addEventListener('resize', function(){ if(videoMiniOn) placeVideoMini(); });
+    ['play', 'pause', 'playing'].forEach(function(t){ audio.addEventListener(t, syncVideoMiniPlay); });
+    audio.addEventListener('play', function(){ videoMiniDismissed = null; });
+    audio.addEventListener('loadstart', function(){ videoMiniDismissed = null; });
+    videoMiniBox.addEventListener('click', openVideoMiniNp);
+    videoMiniTitle.addEventListener('click', openVideoMiniNp);
+    videoMiniPlay.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(audio.paused) audio.play()['catch'](function(){}); else audio.pause();
+    });
+    // Closing the floating picture stops the video there; the mini player can start it again.
+    document.getElementById('videoMiniClose').addEventListener('click', function(e){
+      e.stopPropagation();
+      if(currentStation) videoMiniDismissed = favKey(currentStation);
+      if(!audio.paused) audio.pause();
+      syncVideoMini();
+    });
+    // Drag it by its bar: it settles on the nearer side, at the height it was let go.
+    (function(){
+      var bar = document.getElementById('videoMiniBar');
+      var drag = null;
+      bar.addEventListener('pointerdown', function(e){
+        if(e.target.closest('.video-mini-btn')) return;
+        var r = videoMini.getBoundingClientRect();
+        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, r: r, moved: false };
+        try{ bar.setPointerCapture(e.pointerId); }catch(err){}
+      });
+      bar.addEventListener('pointermove', function(e){
+        if(!drag || e.pointerId !== drag.id) return;
+        var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if(!drag.moved && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        drag.moved = true;
+        videoMini.classList.add('dragging');
+        videoMini.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      });
+      function end(e){
+        if(!drag || (e && e.pointerId !== drag.id)) return;
+        var d = drag; drag = null;
+        videoMini.classList.remove('dragging');
+        if(!d.moved){ videoMini.style.transform = ''; return; }
+        var r = videoMini.getBoundingClientRect();
+        videoMiniSide = (r.left + r.width / 2) < window.innerWidth / 2 ? 'left' : 'right';
+        videoMiniLift = Math.max(0, videoMiniAnchor() - r.bottom);
+        videoMini.style.transform = '';
+        placeVideoMini();
+      }
+      bar.addEventListener('pointerup', end);
+      bar.addEventListener('pointercancel', end);
+    })();
   }
 
   function renderNpRelated(station){
@@ -10041,6 +10212,11 @@
        + accentTint('hsl(' + hueC + ',' + sat + '%,' + Math.max(baseLight - 14, 12) + '%)', 42) + ')';
     return bg;
   }
+  var CHANNEL_LOGO_BG = '#2b2c31';
+  function channelLogoBg(el){
+    el.style.background = CHANNEL_LOGO_BG;
+    if(el.dataset) delete el.dataset.artSeed;
+  }
   function applyPlaceholderArt(el, seedKey){
     el.style.background = placeholderArtBackground(seedKey);
     el.classList.add('generated-art');
@@ -10119,29 +10295,113 @@
   }
 
   // ---------- user-supplied custom cover art (takes priority over everything else) ----------
+  // Build 155: pictures uploaded from the phone (data: URLs, tens of KB each) filled the page's
+  // small local storage ("browser storage is full"). Every cover now lives in IndexedDB, which
+  // has room for thousands; local storage keeps only the small ones (web addresses), so most
+  // covers still show the moment the app opens and the uploaded ones follow a moment later.
   var customArtMem = null;
+  var CUSTOM_ART_DB = 'amplifyCustomArt', CUSTOM_ART_STORE = 'art';
+  var customArtDbP = null;
+  function isBigArt(url){ return typeof url === 'string' && (/^data:/i.test(url) || url.length > 2048); }
   function loadCustomArtMap(){
     if(customArtMem) return customArtMem;
-    try{ customArtMem = JSON.parse(localStorage.getItem(CUSTOM_ART_KEY) || '{}'); }
+    try{ customArtMem = JSON.parse(localStorage.getItem(CUSTOM_ART_KEY) || '{}') || {}; }
     catch(e){ customArtMem = {}; }
     return customArtMem;
   }
   function getCustomArtUrl(key){
     return loadCustomArtMap()[key] || null;
   }
+  function customArtDb(){
+    if(customArtDbP) return customArtDbP;
+    customArtDbP = new Promise(function(resolve, reject){
+      try{
+        var r = indexedDB.open(CUSTOM_ART_DB, 1);
+        r.onupgradeneeded = function(){ r.result.createObjectStore(CUSTOM_ART_STORE); };
+        r.onsuccess = function(){ resolve(r.result); };
+        r.onerror = function(){ reject(r.error); };
+      }catch(e){ reject(e); }
+    });
+    return customArtDbP;
+  }
+  function customArtTx(fn){
+    return customArtDb().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(CUSTOM_ART_STORE, 'readwrite');
+        var out = fn(tx.objectStore(CUSTOM_ART_STORE));
+        tx.oncomplete = function(){ resolve(out); };
+        tx.onerror = function(){ reject(tx.error); };
+        tx.onabort = function(){ reject(tx.error); };
+      });
+    });
+  }
+  // Local storage: the small covers only.
+  function persistSmallCustomArt(){
+    var m = loadCustomArtMap(), small = {};
+    Object.keys(m).forEach(function(k){ if(!isBigArt(m[k])) small[k] = m[k]; });
+    try{ localStorage.setItem(CUSTOM_ART_KEY, JSON.stringify(small)); return true; }
+    catch(e){ return false; }
+  }
   // Saved art is written through immediately, never deferred: it is something the user
   // typed in and expects to survive whatever they do next, including closing the tab.
   function persistCustomArtMap(){
-    try{ localStorage.setItem(CUSTOM_ART_KEY, JSON.stringify(loadCustomArtMap())); return true; }
-    catch(e){ return false; }
+    var m = loadCustomArtMap();
+    customArtTx(function(st){ Object.keys(m).forEach(function(k){ st.put(m[k], k); }); })['catch'](function(err){ console.warn('Cover art not saved', err); });
+    persistSmallCustomArt();
+    return true;
   }
   function setCustomArtUrl(key, url){
     loadCustomArtMap()[key] = url;
-    return persistCustomArtMap();
+    customArtTx(function(st){ st.put(url, key); })['catch'](function(err){ console.warn('Cover art not saved', err); });
+    // A small cover that doesn't fit local storage is still in IndexedDB.
+    persistSmallCustomArt();
+    return true;
   }
   function clearCustomArtUrl(key){
     delete loadCustomArtMap()[key];
-    return persistCustomArtMap();
+    customArtTx(function(st){ st['delete'](key); })['catch'](function(){});
+    persistSmallCustomArt();
+    return true;
+  }
+  // At start: everything in IndexedDB joins the map (covers uploaded since build 155), and any
+  // big cover still in local storage from before moves across, freeing that space.
+  var customArtReady = customArtDb().then(function(){
+    return customArtTx(function(st){
+      var all = {};
+      var req = st.openCursor();
+      req.onsuccess = function(){
+        var c = req.result;
+        if(c){ all[c.key] = c.value; c['continue'](); }
+      };
+      return all;
+    });
+  }).then(function(all){
+    var m = loadCustomArtMap(), arrived = [], legacy = [];
+    Object.keys(all).forEach(function(k){
+      if(m[k] !== all[k] && typeof all[k] === 'string'){ if(!Object.prototype.hasOwnProperty.call(m, k)) arrived.push(k); m[k] = all[k]; }
+    });
+    Object.keys(m).forEach(function(k){ if(!Object.prototype.hasOwnProperty.call(all, k)) legacy.push(k); });
+    var moved = legacy.length ? customArtTx(function(st){ legacy.forEach(function(k){ st.put(m[k], k); }); }) : Promise.resolve();
+    return moved.then(function(){
+      if(legacy.some(function(k){ return isBigArt(m[k]); })) persistSmallCustomArt();
+      if(arrived.length) repaintCustomArt(arrived);
+      return arrived.length;
+    });
+  })['catch'](function(err){ console.warn('Cover art store unavailable', err); return 0; });
+  // Covers that arrived from IndexedDB after the page drew: shown wherever they belong.
+  function repaintCustomArt(keys){
+    keys.forEach(function(k){
+      try{
+        if(k.indexOf('artist:') === 0){ var e = findArtistEntry(k.slice(7)); if(e) refreshArtistArt(e); return; }
+        if(k.indexOf('album:') === 0){ refreshAlbumArt(k.slice(6)); return; }
+        document.querySelectorAll('[data-key]').forEach(function(el){
+          if(el.dataset.key !== k || !el._ctxItem) return;
+          var art = el.querySelector('.tile-art, .row-thumb');
+          if(art) renderStationArt(art, el._ctxItem);
+        });
+        if(currentStation && favKey(currentStation) === k) refreshStationArt(currentStation);
+      }catch(e){}
+    });
   }
   // A deferred write that never happened is a lost setting, so both maps are forced out
   // when the page is being put away. pagehide is the one event a mobile browser reliably
@@ -10284,6 +10544,10 @@
     var token = beginArtRender(container);
     var key = favKey(station);
     applyPlaceholderArt(container, key);
+    // A channel's logo sits on a plain dark gray rather than a generated colour wash.
+    var isCh = isChannelEntry(station);
+    if(container.classList) container.classList.toggle('channel-art', isCh);
+    if(isCh) channelLogoBg(container);
 
     // `deferred` marks a paint that resolved asynchronously and so has to prove it is still
     // the current render. A synchronous paint must not: the box is often built detached and
@@ -10359,6 +10623,7 @@
         if(url && url !== station.favicon && artRenderCurrent(container, token)){
           container.innerHTML = '';
           applyPlaceholderArt(container, key);
+          if(isCh) channelLogoBg(container);
           paint(url, true);
         }
       });
@@ -16183,6 +16448,11 @@
         tabs.appendChild(b);
       });
       stationsGrid.appendChild(tabs);
+      // The page is rebuilt on a pick, so the row is brought back to the chosen season.
+      var act = tabs.querySelector('.home-tab.active');
+      if(act && tabs.scrollWidth > tabs.clientWidth){
+        tabs.scrollLeft = Math.max(0, act.offsetLeft - tabs.offsetLeft - (tabs.clientWidth - act.offsetWidth) / 2);
+      }
     } else {
       appendGridSection(season ? 'Season ' + season : 'Episodes').classList.add('ch-row-label');
     }
@@ -23160,8 +23430,9 @@
       });
     });
 
-    // Their videos from the music folders (build 152).
-    total += appendArtistMusicVideos(entry);
+    // Their videos from the music folders (build 152) join the Music Videos row at the top
+    // (build 155, see paintArtistVideos).
+    total += musicVideosFor(entry.key).length;
 
     if(albums.length){
       appendGridSection('Albums', albums.length);
@@ -23503,18 +23774,23 @@
     return b;
   }
   function clearArtistVideos(){
-    stationsGrid.querySelectorAll('.artist-videos-label, .artist-videos:not(.artist-mvs)').forEach(function(el){ el.remove(); });
+    stationsGrid.querySelectorAll('.artist-videos-label, .artist-videos, .artist-mvs-label').forEach(function(el){ el.remove(); });
   }
   function paintArtistVideos(entry, rec, loading){
     clearArtistVideos();
-    if(!loading && !(rec && rec.videos && rec.videos.length)){
+    // The artist's own video files (build 152) go at the end of the same row (build 155).
+    var locals = musicVideosFor(entry.key);
+    if(!loading && !(rec && rec.videos && rec.videos.length) && locals.length){
+      rec = { videos: [], mv: true };
+    }
+    if(!loading && !(rec && rec.videos && rec.videos.length) && !locals.length){
       if(!stationsGrid.children.length) stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
       return;
     }
     var empty = stationsGrid.querySelector('.empty-state');
     if(empty) empty.remove();
     // Directly under the bio: the first thing in the page's grid, above Stations and Albums.
-    var label = appendGridSection(loading ? 'Music Videos' : (rec.mv ? 'Music Videos' : 'Videos'));
+    var label = appendGridSection(loading ? 'Music Videos' : ((rec.mv || locals.length) ? 'Music Videos' : 'Videos'));
     label.classList.add('artist-videos-label');
     stationsGrid.insertBefore(label, stationsGrid.firstChild);
     var row = document.createElement('div');
@@ -23529,10 +23805,29 @@
     } else {
       rec.videos.forEach(function(v){ var t = buildYtTile(v, entry.name); t._ytList = rec.videos; row.appendChild(t); });
     }
+    if(locals.length){
+      var tiles = {};
+      locals.forEach(function(v){ var tile = buildMusicVideoTile(v, locals); tiles[v.uri] = tile; row.appendChild(tile); });
+      ensureMusicVideoStills(locals, function(v){
+        var tile = tiles[v.uri];
+        if(tile && tile.isConnected){ tile._paintStill(); tile._paintDur(); }
+      });
+      if(!loading){
+        var c = document.createElement('span');
+        c.className = 'grid-section-count';
+        c.textContent = String((rec.videos || []).length + locals.length);
+        label.appendChild(c);
+      }
+    }
     stationsGrid.insertBefore(row, label.nextSibling);
   }
   // Called whenever the artist page is drawn and when the artist is favourited or not.
   function syncArtistVideos(entry){
+    if(entry && !isFavorite(artistFavRecord(entry)) && musicVideosFor(entry.key).length){
+      // Not a favourite (no YouTube videos looked up), but videos of theirs on the phone.
+      paintArtistVideos(entry, null, false);
+      return;
+    }
     if(!entry || !isFavorite(artistFavRecord(entry))){
       clearArtistVideos();
       if(entry && !stationsGrid.children.length) stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
