@@ -27,9 +27,51 @@ import androidx.media3.exoplayer.ExoPlayer;
  * top of a native view.
  */
 @OptIn(markerClass = UnstableApi.class)
-final class VideoOverlay {
+public final class VideoOverlay {
   interface Listener {
     void onTap();
+  }
+
+  /**
+   * Whatever draws the picture into the box's TextureView: the phone's own player, or VLC (build
+   * 159). Only one is connected at a time.
+   */
+  public interface Target {
+    void bind(TextureView view);
+
+    void unbind(TextureView view);
+
+    /** The size the picture is drawn at, in screen pixels. */
+    default void onWindowSize(int width, int height) {}
+  }
+
+  /** The phone's own player as a target. Equal when it is the same player. */
+  static final class ExoTarget implements Target {
+    final ExoPlayer player;
+
+    ExoTarget(ExoPlayer player) {
+      this.player = player;
+    }
+
+    @Override
+    public void bind(TextureView view) {
+      player.setVideoTextureView(view);
+    }
+
+    @Override
+    public void unbind(TextureView view) {
+      player.clearVideoTextureView(view);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof ExoTarget && ((ExoTarget) o).player == player;
+    }
+
+    @Override
+    public int hashCode() {
+      return System.identityHashCode(player);
+    }
   }
 
   private final Activity activity;
@@ -39,7 +81,7 @@ final class VideoOverlay {
   private TextureView texture;
   private TextView captions;
   @Nullable private CharSequence cueText;
-  private ExoPlayer boundTo;
+  private Target boundTo;
   private int videoW, videoH;
   private float pixelRatio = 1f;
   // Build 156: a hide that is followed by a show soon after (Now Playing closing into the
@@ -50,7 +92,7 @@ final class VideoOverlay {
   private final Runnable unbind =
       () -> {
         if (box != null && box.getVisibility() == View.VISIBLE) return;
-        if (boundTo != null && texture != null) boundTo.clearVideoTextureView(texture);
+        if (boundTo != null && texture != null) boundTo.unbind(texture);
         boundTo = null;
       };
   private static final long UNBIND_DELAY_MS = 2500;
@@ -63,16 +105,22 @@ final class VideoOverlay {
 
   /** Show the picture over the page's box (CSS px, relative to the WebView). */
   void show(ExoPlayer player, float x, float y, float w, float h) {
-    if (player == null || w < 2 || h < 2) {
+    show(player == null ? null : new ExoTarget(player), x, y, w, h);
+  }
+
+  void show(Target target, float x, float y, float w, float h) {
+    if (target == null || w < 2 || h < 2) {
       hide();
       return;
     }
     if (!ensureBox()) return;
     main.removeCallbacks(unbind);
-    if (boundTo != player) {
-      if (boundTo != null) boundTo.clearVideoTextureView(texture);
-      player.setVideoTextureView(texture);
-      boundTo = player;
+    if (!target.equals(boundTo)) {
+      if (boundTo != null) boundTo.unbind(texture);
+      target.bind(texture);
+      boundTo = target;
+      int tw = texture.getLayoutParams().width, th = texture.getLayoutParams().height;
+      if (tw > 0 && th > 0) target.onWindowSize(tw, th);
     }
     place(x, y, w, h);
     box.setVisibility(View.VISIBLE);
@@ -93,7 +141,7 @@ final class VideoOverlay {
   private void unbindNow() {
     main.removeCallbacks(unbind);
     if (box != null) box.setVisibility(View.GONE);
-    if (boundTo != null && texture != null) boundTo.clearVideoTextureView(texture);
+    if (boundTo != null && texture != null) boundTo.unbind(texture);
     boundTo = null;
   }
 
@@ -242,5 +290,6 @@ final class VideoOverlay {
       lp.gravity = Gravity.CENTER;
       texture.setLayoutParams(lp);
     }
+    if (boundTo != null) boundTo.onWindowSize(tw, th);
   }
 }

@@ -35,8 +35,6 @@ data class VlcPlayerConfig(
         add("--avcodec-threads=$decoderThreads")
         add("--avcodec-skiploopfilter=$skipLoopFilter")
         add("--audio-time-stretch")          // keeps pitch right if playback rate changes
-        add("--no-drop-late-frames")         // smoother on slow devices: show late frames
-        add("--no-skip-frames")
         if (!hardwareAcceleration) add("--avcodec-hw=none")
         add(if (verboseLogging) "-vvv" else "--quiet")
         addAll(extraLibVlcArgs)

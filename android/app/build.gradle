@@ -10,9 +10,6 @@ ext.amplifyBuild = { ->
 android {
     namespace = "com.markcoleman.amplify"
     compileSdk = rootProject.ext.compileSdkVersion
-    buildFeatures {
-        viewBinding true   // the VLC player screen's layout (build 153)
-    }
     // VLC's native library is ~50 MB uncompressed. Stored compressed in the APK it is a fraction
     // of that to download with each build; Android unpacks it once on install.
     packaging {

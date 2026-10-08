@@ -27,15 +27,6 @@
 
         </activity>
 
-        <!-- The VLC player screen (build 153), for videos the phone's own decoders can't play. -->
-        <activity
-            android:name=".vlc.VlcPlayerActivity"
-            android:exported="false"
-            android:theme="@style/AppTheme.VlcPlayer"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
-            android:screenOrientation="sensor"
-            android:resizeableActivity="true" />
-
         <service
             android:name=".PlaybackService"
             android:foregroundServiceType="mediaPlayback"

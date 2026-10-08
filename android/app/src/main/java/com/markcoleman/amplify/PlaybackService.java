@@ -166,6 +166,8 @@ public class PlaybackService extends MediaLibraryService {
           this.updateButtons();
         });
     this.car = new CarLibrary(this);
+    // VLC, for videos of your own (build 159): loaded now, so a video starts without a wait.
+    com.markcoleman.amplify.vlc.VlcEngine.warm(this);
     this.io.execute(
         () -> {
           this.car.reload();
@@ -409,6 +411,11 @@ public class PlaybackService extends MediaLibraryService {
   }
 
   void skip(boolean z) {
+    if (com.markcoleman.amplify.vlc.VlcEngine.isActive() && this.exo != null) {
+      com.markcoleman.amplify.vlc.VlcEngine.seekBy(
+          z ? -this.exo.getSeekBackIncrement() : this.exo.getSeekForwardIncrement());
+      return;
+    }
     ExoPlayer exoPlayer = this.exo;
     if (exoPlayer == null || exoPlayer.getMediaItemCount() == 0) {
       return;
@@ -424,6 +431,24 @@ public class PlaybackService extends MediaLibraryService {
       jMax2 = Math.min(jMax2, Math.max(0L, duration - 1000));
     }
     this.exo.seekTo(jMax2);
+  }
+
+  /**
+   * While VLC plays a video of your own, the session (notification, lock screen, headset) is
+   * given VLC in place of the phone's player; it gets the phone's player back afterwards.
+   */
+  void useVlcSession(boolean on) {
+    if (this.session == null) return;
+    androidx.media3.common.Player target;
+    if (on) {
+      com.markcoleman.amplify.vlc.VlcSessionPlayer v =
+          com.markcoleman.amplify.vlc.VlcSessionPlayer.get(android.os.Looper.getMainLooper());
+      if (this.exo != null) v.setSeekIncrements(this.exo.getSeekBackIncrement(), this.exo.getSeekForwardIncrement());
+      target = v;
+    } else {
+      target = this.player;
+    }
+    if (target != null && this.session.getPlayer() != target) this.session.setPlayer(target);
   }
 
   void logCar(String str) {

@@ -8,9 +8,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
-import android.media.MediaCodecList;
-import android.media.MediaExtractor;
-import android.media.MediaFormat;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -29,7 +26,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
-import com.markcoleman.amplify.vlc.VlcPlayerActivity;
+import com.markcoleman.amplify.vlc.VlcEngine;
+import com.markcoleman.amplify.vlc.VlcSessionPlayer;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
@@ -139,6 +137,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           this.emitOnAir(streamTitle);
         });
     playbackService.exo.addListener(this.exoListener);
+    VlcEngine.setListener(this.vlcListener);
     this.attached = true;
     ArrayList arrayList = new ArrayList(this.pending);
     this.pending.clear();
@@ -159,6 +158,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             playbackService.player.setOnAirListener(null);
             playbackService.exo.removeListener(this.exoListener);
           }
+          if (VlcEngine.getListener() == this.vlcListener) VlcEngine.setListener(null);
           this.attached = false;
           this.main.removeCallbacks(this.progressTick);
           if (this.video != null) {
@@ -229,12 +229,23 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     // should show.
     final JSArray subs = pluginCall.getArray("subs");
     final Boolean textOff = pluginCall.getBoolean("textOff", null);
+    // Build 159: a video of your own plays in VLC, in the same place and with the same controls.
+    final boolean useVlc = "vlc".equals(pluginCall.getString("engine", ""));
+    final boolean vlcHw = !Boolean.FALSE.equals(pluginCall.getBoolean("hw", true));
     if (string == null || string.isEmpty()) {
       pluginCall.reject("No url");
+    } else if (useVlc) {
+      run(
+          pluginCall,
+          () -> {
+            loadInVlc(string, string2, zEquals, dDoubleValue, d, d2, subs, textOff, vlcHw);
+            pluginCall.resolve();
+          });
     } else {
       run(
           pluginCall,
           () -> {
+            leaveVlc();
             ExoPlayer exoPlayerExo = exo();
             SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
             if (skipAwarePlayerSessionPlayer != null) {
@@ -278,6 +289,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
+          if (VlcEngine.isActive()) {
+            VlcEngine.play();
+            call.resolve();
+            return;
+          }
           ExoPlayer p = exo();
           if (p.getMediaItemCount() == 0) {
             call.reject("Nothing loaded");
@@ -295,7 +311,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          exo().setPlayWhenReady(false);
+          if (VlcEngine.isActive()) VlcEngine.pause();
+          else exo().setPlayWhenReady(false);
           call.resolve();
         });
   }
@@ -307,6 +324,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         () -> {
           ExoPlayer exoPlayerExo = exo();
           this.currentId = null;
+          leaveVlc();
           exoPlayerExo.stop();
           exoPlayerExo.clearMediaItems();
           SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
@@ -326,7 +344,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          exo().seekTo((long) (pos * 1000));
+          if (VlcEngine.isActive()) VlcEngine.seekTo((long) (pos * 1000));
+          else exo().seekTo((long) (pos * 1000));
           call.resolve();
         });
   }
@@ -337,7 +356,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          exo().setVolume(v.floatValue());
+          if (VlcEngine.isActive()) VlcEngine.setVolume(v.floatValue());
+          else exo().setVolume(v.floatValue());
           call.resolve();
         });
   }
@@ -348,7 +368,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          exo().setPlaybackSpeed(Math.max(0.25f, r.floatValue()));
+          if (VlcEngine.isActive()) VlcEngine.changeRate(Math.max(0.25f, r.floatValue()));
+          else exo().setPlaybackSpeed(Math.max(0.25f, r.floatValue()));
           call.resolve();
         });
   }
@@ -432,6 +453,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           String str;
           this.lastMeta = mediaMetadataBuild;
           this.lastLive = zEquals;
+          VlcSessionPlayer vsp = VlcSessionPlayer.getCurrent();
+          if (vsp != null) vsp.setMetadata(mediaMetadataBuild);
           sessionPlayer().setOverrideMetadata(mediaMetadataBuild, zEquals);
           ExoPlayer exoPlayerExo = exo();
           SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
@@ -767,103 +790,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     o.put("files", files);
     o.put("truncated", truncated);
     return o;
-  }
-
-  // ---- VLC, for videos the phone's own decoders can't play (build 153) ----
-
-  /**
-   * Whether the phone's own player can show this video: the container opens and every audio and
-   * video track has a decoder on this phone. {ok, why}. AVI, WMV and FLV don't open here (the
-   * phone's extractor doesn't read them), so they come back not ok and go to VLC.
-   */
-  @PluginMethod
-  public void videoDecodable(PluginCall call) {
-    String u = call.getString("uri");
-    if (u == null || u.isEmpty()) {
-      call.reject("No uri");
-      return;
-    }
-    Context ctx = getContext();
-    new Thread(
-            () -> {
-              JSObject o = new JSObject();
-              MediaExtractor ex = new MediaExtractor();
-              try {
-                ex.setDataSource(ctx, Uri.parse(u), null);
-                MediaCodecList codecs = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
-                boolean video = false;
-                StringBuilder missing = new StringBuilder();
-                for (int i = 0; i < ex.getTrackCount(); i++) {
-                  MediaFormat f = ex.getTrackFormat(i);
-                  String mime = f.getString(MediaFormat.KEY_MIME);
-                  if (mime == null || !(mime.startsWith("video/") || mime.startsWith("audio/"))) continue;
-                  if (mime.startsWith("video/")) video = true;
-                  String dec = null;
-                  try {
-                    dec = codecs.findDecoderForFormat(f);
-                  } catch (Exception ignored) {
-                    // An odd format description: treated as no decoder.
-                  }
-                  if (dec == null) missing.append(missing.length() > 0 ? ", " : "").append(mime);
-                }
-                o.put("ok", video && missing.length() == 0);
-                o.put("why", !video ? "no video track found" : missing.length() > 0 ? "no decoder for " + missing : "");
-              } catch (Exception e) {
-                o.put("ok", false);
-                o.put("why", "the phone can't open this kind of file");
-              } finally {
-                try {
-                  ex.release();
-                } catch (Exception ignored) {
-                }
-              }
-              call.resolve(o);
-            })
-        .start();
-  }
-
-  /**
-   * Opens a video in the VLC player screen. {uri, title, startMs, hw} -> when it closes:
-   * {position, duration (ms), ended, error}. The app's own player is paused first.
-   */
-  @PluginMethod
-  public void playWithVlc(PluginCall call) {
-    String u = call.getString("uri");
-    if (u == null || u.isEmpty()) {
-      call.reject("No uri");
-      return;
-    }
-    main.post(
-        () -> {
-          try {
-            ExoPlayer p = exo();
-            if (p != null) p.setPlayWhenReady(false);
-          } catch (Exception ignored) {
-          }
-        });
-    Double startD = call.getDouble("startMs", 0.0);
-    long start = startD == null ? 0L : (long) startD.doubleValue();
-    Intent i =
-        VlcPlayerActivity.intent(
-            getContext(),
-            Uri.parse(u),
-            call.getString("title", ""),
-            start,
-            !Boolean.FALSE.equals(call.getBoolean("hw", true)));
-    startActivityForResult(call, i, "onVlcDone");
-  }
-
-  @ActivityCallback
-  private void onVlcDone(PluginCall call, ActivityResult result) {
-    if (call == null) return;
-    Intent d = result.getData();
-    JSObject o = new JSObject();
-    o.put("position", d == null ? 0L : d.getLongExtra(VlcPlayerActivity.RESULT_POSITION, 0L));
-    o.put("duration", d == null ? 0L : d.getLongExtra(VlcPlayerActivity.RESULT_DURATION, 0L));
-    o.put("ended", d != null && d.getBooleanExtra(VlcPlayerActivity.RESULT_ENDED, false));
-    String err = d == null ? null : d.getStringExtra(VlcPlayerActivity.RESULT_ERROR);
-    if (err != null) o.put("error", err);
-    call.resolve(o);
   }
 
   /** Lists a music folder picked earlier again, to pick up songs added or removed since. */
@@ -1401,6 +1327,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   public JSObject snapshot() {
     String str;
+    if (VlcEngine.isActive()) return vlcSnapshot();
     ExoPlayer exoPlayerExo = exo();
     JSObject jSObject = new JSObject();
     jSObject.put("id", this.currentId);
@@ -1499,7 +1426,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   public void progressTick() {
     ExoPlayer exoPlayerExo = exo();
-    if (exoPlayerExo == null || !exoPlayerExo.isPlaying() || this.currentId == null) {
+    boolean playing = VlcEngine.isActive() ? VlcEngine.isPlaying() : exoPlayerExo != null && exoPlayerExo.isPlaying();
+    if (!playing || this.currentId == null) {
       return;
     }
     notifyListeners("progress", snapshot());
@@ -1750,8 +1678,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                     });
             video.setVideoSize(videoW, videoH, videoRatio);
           }
-          if (show && hasVideo) video.show(exo(), x, y, w, h);
-          else video.hide();
+          if (show && hasVideo) {
+            if (VlcEngine.isActive()) video.show(VlcEngine.getTarget(), x, y, w, h);
+            else video.show(exo(), x, y, w, h);
+          } else video.hide();
           // What was drawn, for Diagnostics (build 156).
           JSObject r = video.state();
           r.put("hasVideo", hasVideo);
@@ -1820,6 +1750,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
+          if (VlcEngine.isActive()) {
+            call.resolve(vlcTracks());
+            return;
+          }
           ExoPlayer p = exo();
           JSArray audio = new JSArray(), text = new JSArray();
           int na = 0, nt = 0;
@@ -1859,6 +1793,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
+          if (VlcEngine.isActive()) {
+            VlcEngine.selectTrack("audio".equals(type), off ? -1 : track);
+            call.resolve();
+            return;
+          }
           ExoPlayer p = exo();
           int t = "audio".equals(type) ? C.TRACK_TYPE_AUDIO : C.TRACK_TYPE_TEXT;
           TrackSelectionParameters.Builder b = p.getTrackSelectionParameters().buildUpon();
@@ -1942,19 +1881,173 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     if (hasVideo) emitVideo();
   }
 
+  // ---------------- VLC (build 159) ----------------
+  // Videos of your own play in VLC (VlcEngine) instead of the phone's player, with nothing
+  // else changing: the same calls, the same events back to the page, the same picture box,
+  // and VLC standing in for the phone's player in the media session while it plays.
+
+  private void loadInVlc(
+      String url,
+      String id,
+      boolean play,
+      double startSec,
+      Double rate,
+      Double volume,
+      @Nullable JSArray subs,
+      @Nullable Boolean textOff,
+      boolean hw) {
+    ExoPlayer exoPlayerExo = exo();
+    SkipAwarePlayer sp = sessionPlayer();
+    if (sp != null) {
+      sp.exitNativeMode();
+      sp.clearOnAir();
+    }
+    main.removeCallbacks(pageTakeover);
+    // The phone's player lets go (its own events are ignored from here on).
+    this.currentId = id;
+    if (exoPlayerExo != null) {
+      exoPlayerExo.stop();
+      exoPlayerExo.clearMediaItems();
+    }
+    if (this.video != null) this.video.setCues(null);
+    List<Uri> side = new ArrayList<>();
+    if (subs != null) {
+      for (int i = 0; i < subs.length(); i++) {
+        try {
+          String u = subs.getJSONObject(i).optString("uri", "");
+          if (!u.isEmpty()) side.add(Uri.parse(u));
+        } catch (Exception ignored) {
+        }
+      }
+    }
+    PlaybackService ps = PlaybackService.instance;
+    if (ps != null) ps.useVlcSession(true);
+    VlcSessionPlayer vsp = VlcSessionPlayer.getCurrent();
+    if (vsp != null) vsp.setMetadata(lastMeta);
+    VlcEngine.load(
+        getContext(),
+        id,
+        Uri.parse(url),
+        (long) (startSec * 1000.0d),
+        play,
+        rate == null ? 1f : rate.floatValue(),
+        volume == null ? 1f : volume.floatValue(),
+        hw,
+        side,
+        textOff);
+    // A video: the page puts up the picture box straight away; VLC starts drawing into it.
+    this.hasVideo = true;
+    this.videoW = this.videoH = 0;
+    this.videoRatio = 1f;
+    emitVideo();
+  }
+
+  /** Back to the phone's player for whatever plays next. */
+  private void leaveVlc() {
+    if (!VlcEngine.isActive()) return;
+    VlcEngine.deactivate();
+    if (this.video != null) this.video.hide();
+    PlaybackService ps = PlaybackService.instance;
+    if (ps != null) ps.useVlcSession(false);
+  }
+
+  private JSObject vlcSnapshot() {
+    JSObject o = new JSObject();
+    o.put("id", this.currentId);
+    o.put("onAirTitle", "");
+    o.put("onAirArtist", "");
+    long dur = VlcEngine.durationMs();
+    o.put("position", Math.max(0L, VlcEngine.positionMs()) / 1000.0d);
+    o.put("duration", dur > 0 ? dur / 1000.0d : -1.0d);
+    o.put("live", false);
+    o.put("isPlaying", VlcEngine.isPlaying());
+    o.put("playWhenReady", VlcEngine.getPlayWhenReady());
+    int st = VlcEngine.getPlaybackState();
+    o.put(
+        "state",
+        st == Player.STATE_BUFFERING
+            ? "buffering"
+            : st == Player.STATE_READY ? "ready" : st == Player.STATE_ENDED ? "ended" : "idle");
+    o.put("at", System.currentTimeMillis());
+    if (st == Player.STATE_ENDED) o.put("takeover", false);
+    return o;
+  }
+
+  private JSObject vlcTracks() {
+    JSArray audio = new JSArray(), text = new JSArray();
+    int n = 0;
+    for (kotlin.Triple<Integer, String, Boolean> t : VlcEngine.tracks(true)) {
+      JSObject o = new JSObject();
+      o.put("group", 0);
+      o.put("track", t.getFirst());
+      o.put("label", t.getSecond().isEmpty() ? "Audio " + (++n) : t.getSecond());
+      o.put("selected", t.getThird());
+      audio.put(o);
+    }
+    n = 0;
+    for (kotlin.Triple<Integer, String, Boolean> t : VlcEngine.tracks(false)) {
+      JSObject o = new JSObject();
+      o.put("group", 0);
+      o.put("track", t.getFirst());
+      o.put("label", t.getSecond().isEmpty() ? "Subtitles " + (++n) : t.getSecond());
+      o.put("selected", t.getThird());
+      text.put(o);
+    }
+    JSObject o = new JSObject();
+    o.put("audio", audio);
+    o.put("text", text);
+    o.put("textOff", VlcEngine.subtitlesOff());
+    return o;
+  }
+
+  private final VlcEngine.Listener vlcListener =
+      new VlcEngine.Listener() {
+        @Override
+        public void onVlcState(boolean external) {
+          if (!VlcEngine.isActive() || currentId == null || !currentId.equals(VlcEngine.getCurrentId())) return;
+          emitState(external);
+          main.removeCallbacks(progressTick);
+          if (VlcEngine.isPlaying() || VlcEngine.getPlayWhenReady()) main.postDelayed(progressTick, 500);
+        }
+
+        @Override
+        public void onVlcVideo() {
+          if (!VlcEngine.isActive()) return;
+          videoW = VlcEngine.getVideoWidth();
+          videoH = VlcEngine.getVideoHeight();
+          videoRatio = VlcEngine.getPixelRatio();
+          if (video != null) video.setVideoSize(videoW, videoH, videoRatio);
+          emitVideo();
+        }
+
+        @Override
+        public void onVlcError(String message) {
+          if (currentId == null) return;
+          JSObject o = new JSObject();
+          o.put("id", currentId);
+          o.put("code", 4001);
+          o.put("name", "VLC");
+          o.put("message", message);
+          notifyListeners("error", o);
+        }
+      };
+
   private final class ExoListener implements Player.Listener {
     @Override
     public void onTracksChanged(Tracks tracks) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       onTracks(tracks);
     }
 
     @Override
     public void onVideoSizeChanged(VideoSize videoSize) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       onVideoSize(videoSize);
     }
 
     @Override
     public void onCues(CueGroup cueGroup) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       AmplifyPlayerPlugin.this.onCues(cueGroup);
     }
 
@@ -1962,6 +2055,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onPlaybackStateChanged(int state) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       if (state == Player.STATE_ENDED) schedulePageTakeover();
       else main.removeCallbacks(pageTakeover);
       emitState(false);
@@ -1969,6 +2063,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onIsPlayingChanged(boolean isPlaying) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       emitState(false);
       main.removeCallbacks(progressTick);
       if (isPlaying) main.postDelayed(progressTick, 500);
@@ -1976,6 +2071,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override // androidx.media3.common.Player.Listener
     public void onPlayWhenReadyChanged(boolean z, int i) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       SkipAwarePlayer skipAwarePlayerSessionPlayer = AmplifyPlayerPlugin.this.sessionPlayer();
       if (z
           && skipAwarePlayerSessionPlayer != null
@@ -1989,17 +2085,20 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override // androidx.media3.common.Player.Listener
     public void onMediaItemTransition(MediaItem mediaItem, int i) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       AmplifyPlayerPlugin.this.announceCar();
     }
 
     @Override
     public void onPositionDiscontinuity(
         Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       if (currentId != null) notifyListeners("progress", snapshot());
     }
 
     @Override
     public void onPlayerError(PlaybackException error) {
+      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
       if (currentId == null) return;
       JSObject o = new JSObject();
       o.put("id", currentId);
