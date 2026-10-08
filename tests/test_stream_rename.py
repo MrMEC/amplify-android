@@ -1,6 +1,6 @@
 """A stream added by its link: titled from the link at first, then by the stream's own name
 (icy-name) once it plays, and renameable from Now Playing's More menu. Also: the Podcasts
-date headings match the small section labels.
+date headings are small grey capitals under bold section labels (build 164).
 Run: python3 tests/test_stream_rename.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -82,14 +82,15 @@ async def main():
         check(await np_name(pg) == 'KEXP', 'a directory station keeps its name')
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
 
-        # Podcasts date headings look like the small section labels
+        # Podcasts date headings: small grey capitals; section labels larger and bolder (build 164)
         st = await pg.evaluate("""(()=>{var g=document.getElementById('stationsGrid');
           var a=document.createElement('div'); a.className='podcast-date-heading'; a.textContent='Today';
           var b=document.createElement('div'); b.className='grid-section-label'; b.textContent='Continue Watching';
           g.appendChild(a); g.appendChild(b);
-          var f=function(e){var c=getComputedStyle(e);return [c.fontSize,c.fontWeight,c.color];};
+          var f=function(e){var c=getComputedStyle(e);return [parseFloat(c.fontSize),c.fontWeight,c.color,c.textTransform];};
           var r=[f(a),f(b)]; a.remove(); b.remove(); return r;})()""")
-        check(st[0] == st[1], f'date headings match the small labels {st}')
+        check(st[0][3] == 'uppercase' and st[0][0] < 15 and st[1][0] >= 18 and st[1][1] == '800' and st[0][2] != st[1][2],
+              f'date headings are small grey capitals, section labels big and bold {st}')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('ALL PASSED' if not fails else f'FAILED {fails}')
