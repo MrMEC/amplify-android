@@ -6869,6 +6869,34 @@
     hideAzRail();
   }
   var stationsHeading = document.getElementById('stationsHeading');
+  // Page title fits its line (build 166): on a phone with large system text "My Library" didn't fit
+  // beside its buttons. Shrink the title (never below 60% of its size) until the whole thing shows;
+  // the ellipsis is only a last resort. Works in ratios, so it holds whatever the text zoom is.
+  (function(){
+    var busy = false, raf = 0;
+    function fit(){
+      raf = 0;
+      var h = stationsHeading;
+      if(!h || busy) return;
+      busy = true;
+      h.style.fontSize = '';
+      if(window.innerWidth <= 900 && h.offsetParent && !h.closest('.is-search')){
+        var base = parseFloat(getComputedStyle(h).fontSize) || 0, size = base;
+        for(var i = 0; i < 12 && base && h.scrollWidth > h.clientWidth + 1 && size > base * 0.6; i++){
+          size = Math.max(base * 0.6, size * Math.min(0.96, h.clientWidth / h.scrollWidth));
+          h.style.fontSize = size.toFixed(1) + 'px';
+        }
+      }
+      busy = false;
+    }
+    function later(){ if(!raf) raf = requestAnimationFrame(fit); }
+    if(stationsHeading){
+      new MutationObserver(later).observe(stationsHeading, { childList: true, characterData: true, subtree: true });
+      if(window.ResizeObserver) new ResizeObserver(later).observe(stationsHeading.parentElement || stationsHeading);
+      window.addEventListener('resize', later);
+      later();
+    }
+  })();
   var stationsHeadingInput = document.getElementById('stationsHeadingInput');
   var recentSection = document.getElementById('recentSection');
   var favoritesSection = document.getElementById('favoritesSection');
