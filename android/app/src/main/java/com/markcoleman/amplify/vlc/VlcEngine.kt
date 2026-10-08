@@ -186,8 +186,10 @@ object VlcEngine {
         try {
             val media = openMedia(uri)
             try {
-                media.setHWDecoderEnabled(hardware, false)
+                // Our own read-ahead first: with hardware decoding on, VLC otherwise adds 1.5 s
+                // of caching to every local file, which is most of the wait before it starts.
                 VlcPlayerConfig().mediaOptions().forEach { media.addOption(it) }
+                media.setHWDecoderEnabled(hardware, false)
                 if (startMs > 0) media.addOption(":start-time=${startMs / 1000.0}")
                 p.media = media
             } finally {

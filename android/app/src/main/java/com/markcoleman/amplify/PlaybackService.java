@@ -451,6 +451,12 @@ public class PlaybackService extends MediaLibraryService {
     if (target != null && this.session.getPlayer() != target) this.session.setPlayer(target);
   }
 
+  void leaveVlcForSession() {
+    if (!com.markcoleman.amplify.vlc.VlcEngine.isActive()) return;
+    com.markcoleman.amplify.vlc.VlcEngine.deactivate();
+    useVlcSession(false);
+  }
+
   void logCar(String str) {
     String str2 = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
     synchronized (this.carLog) {
@@ -1145,6 +1151,8 @@ public class PlaybackService extends MediaLibraryService {
         final List<MediaItem> list,
         final int i,
         final long j) {
+      // The car (or anything else) starting something takes over from a video playing in VLC.
+      PlaybackService.this.leaveVlcForSession();
       return PlaybackService.this.io.submit(
           () -> {
             if (list.size() == 1) {

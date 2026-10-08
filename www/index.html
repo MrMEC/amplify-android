@@ -16704,12 +16704,17 @@
         subs: (t.plex || (t.plexTwin && t._plexMode === 'transcode')) ? (t._plexSubs || []).slice() : ((v0 && v0.subs) || []).map(function(sb){ var l = subtitleLang(sb.name, v0.fileName); return { uri: sb.uri, name: sb.name, label: l.label, language: l.code }; }),
         textOff: videoSubsOff
       };
-      if(t._useVlc){ audio._loadExtra.engine = 'vlc'; audio._loadExtra.hw = vlcHardware(); }
+      if(t._useVlc){
+        audio._loadExtra.engine = 'vlc'; audio._loadExtra.hw = vlcHardware();
+        // VLC opens straight at the resume point, rather than starting at 0 and jumping.
+        var rp = videoProgress[t.id];
+        if(rp && !rp.watched && rp.pos > 5 && t.videoKind !== 'music') audio._loadExtra.start = rp.pos;
+      }
     }catch(e){}
     tryPlayUrl(t.uri).then(function(){
       if(!stillWanted()) return;
       var p = videoProgress[t.id];
-      if(p && !p.watched && p.pos > 5 && t.videoKind !== 'music'){
+      if(p && !p.watched && p.pos > 5 && t.videoKind !== 'music' && !t._useVlc){
         var at = p.pos;
         var seek = function(){ try{ audio.currentTime = at; }catch(e){} audio.removeEventListener('loadedmetadata', seek); };
         if(audio.readyState >= 1) seek(); else audio.addEventListener('loadedmetadata', seek);
