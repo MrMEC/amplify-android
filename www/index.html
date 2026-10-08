@@ -4946,7 +4946,7 @@
   @media (max-width: 900px){
     .home-section-head h2{ font-size:24px; }
     .recent-col-heading{ font-size:22px; }
-    .section-heading, .section-heading-row .section-heading{ font-size:26px; line-height:1.15; }
+    .section-heading, .section-heading-row .section-heading{ font-size:calc(26px * var(--title-fit, 1)); line-height:1.15; }
     /* A page title stays on one line (Mark: "My Library" wrapped beside its three buttons). */
     .section-heading-row:not(.is-search) .section-heading{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     body.home-stacked #homeTopHeading .section-heading, body.home-stacked .section-heading-row .section-heading{ font-size:24px; }
@@ -6869,9 +6869,11 @@
     hideAzRail();
   }
   var stationsHeading = document.getElementById('stationsHeading');
-  // Page title fits its line (build 166): on a phone with large system text "My Library" didn't fit
-  // beside its buttons. Shrink the title (never below 60% of its size) until the whole thing shows;
-  // the ellipsis is only a last resort. Works in ratios, so it holds whatever the text zoom is.
+  // Page title fits its line (builds 166-167): on a phone with large system text "My Library" didn't
+  // fit beside its buttons. The title's size is calc(26px * --title-fit); this lowers --title-fit
+  // (never below .5) until the whole title shows, comparing widths only. Build 166 read the px size
+  // back and set a smaller px size, but Android's text zoom scales the size it reports AND the size
+  // set, so the shrink cancelled out on the phone. A multiplier is immune to that.
   (function(){
     var busy = false, raf = 0;
     function fit(){
@@ -6879,12 +6881,12 @@
       var h = stationsHeading;
       if(!h || busy) return;
       busy = true;
-      h.style.fontSize = '';
+      h.style.removeProperty('--title-fit');
       if(window.innerWidth <= 900 && h.offsetParent && !h.closest('.is-search')){
-        var base = parseFloat(getComputedStyle(h).fontSize) || 0, size = base;
-        for(var i = 0; i < 12 && base && h.scrollWidth > h.clientWidth + 1 && size > base * 0.6; i++){
-          size = Math.max(base * 0.6, size * Math.min(0.96, h.clientWidth / h.scrollWidth));
-          h.style.fontSize = size.toFixed(1) + 'px';
+        var f = 1;
+        for(var i = 0; i < 14 && h.scrollWidth > h.clientWidth + 1 && f > 0.5; i++){
+          f = Math.max(0.5, f * Math.min(0.96, h.clientWidth / h.scrollWidth));
+          h.style.setProperty('--title-fit', f.toFixed(3));
         }
       }
       busy = false;
@@ -6894,6 +6896,7 @@
       new MutationObserver(later).observe(stationsHeading, { childList: true, characterData: true, subtree: true });
       if(window.ResizeObserver) new ResizeObserver(later).observe(stationsHeading.parentElement || stationsHeading);
       window.addEventListener('resize', later);
+      if(document.fonts && document.fonts.ready) document.fonts.ready.then(later);
       later();
     }
   })();
