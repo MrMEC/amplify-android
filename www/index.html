@@ -23376,16 +23376,27 @@
     setResultCount(list.length, 'artist');
   }
 
+  // Build 176: the Favorites page is on screen only while its own title is showing. Switching
+  // tabs (Library, Watch, Podcasts) doesn't clear activeHomeSection, which left this Edit
+  // button on those pages. The heading's text is the one thing every page sets.
+  function favPageOnScreen(){
+    return activeHomeSection === 'favorites' && !!stationsHeading &&
+      stationsHeading.textContent.trim() === (HOME_SECTION_TITLES.favorites || 'Favorites');
+  }
   function syncFavPageEditBtn(){
-    var show = activeHomeSection === 'favorites' && (favorites.length > 0 || favPageEditing);
+    var onPage = favPageOnScreen();
+    if(!onPage) favPageEditing = false;
+    var show = onPage && (favorites.length > 0 || favPageEditing);
     favPageEditBtn.style.display = show ? '' : 'none';
     favPageEditBtn.innerHTML = favPageEditing
       ? '<i class="fa-solid fa-check"></i><span class="btn-text">Done</span>'
       : '<i class="fa-solid fa-pen"></i><span class="btn-text">Edit</span>';
     favPageEditBtn.title = favPageEditing ? 'Done editing' : 'Edit favorites';
     // Shuffle and Edit don't mix: while editing, a tap on the list is for arranging it.
-    if(activeHomeSection === 'favorites') libraryShuffleBtn.style.display = favPageEditing ? 'none' : '';
+    if(onPage) libraryShuffleBtn.style.display = favPageEditing ? 'none' : '';
   }
+  // Every page change rewrites the heading, so that's when to check again.
+  if(stationsHeading) new MutationObserver(function(){ syncFavPageEditBtn(); }).observe(stationsHeading, { childList: true, characterData: true, subtree: true });
   favPageEditBtn.addEventListener('click', function(){
     if(favPageEditing) commitFavPageOrder();
     favPageEditing = !favPageEditing;
