@@ -3973,10 +3973,12 @@
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen:not(.np-channel) :is(.np-imm-reflect, .np-imm-orbs){
       display:block; position:fixed; left:0; right:0; bottom:0; z-index:2; pointer-events:none; overflow:hidden;
     }
-    /* Build 170: eased in and out over many stops (it showed as a band with an edge). */
+    /* Build 170: eased in and out over many stops (it showed as a band with an edge).
+       Build 174: back up to a clearly visible mirror (Mark: it had disappeared), easing in to .55
+       just under the controls, then a long smooth fade to nothing at the bottom. */
     .np-imm-reflect{ top:60vh;
-      -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.03) 8%, rgba(0,0,0,.09) 17%, rgba(0,0,0,.15) 28%, rgba(0,0,0,.17) 38%, rgba(0,0,0,.14) 50%, rgba(0,0,0,.08) 64%, rgba(0,0,0,.03) 78%, transparent 92%);
-      mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.03) 8%, rgba(0,0,0,.09) 17%, rgba(0,0,0,.15) 28%, rgba(0,0,0,.17) 38%, rgba(0,0,0,.14) 50%, rgba(0,0,0,.08) 64%, rgba(0,0,0,.03) 78%, transparent 92%);
+      -webkit-mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.05) 4%, rgba(0,0,0,.15) 8%, rgba(0,0,0,.29) 12%, rgba(0,0,0,.43) 16%, rgba(0,0,0,.52) 21%, rgba(0,0,0,.55) 27%, rgba(0,0,0,.50) 35%, rgba(0,0,0,.39) 46%, rgba(0,0,0,.26) 58%, rgba(0,0,0,.14) 70%, rgba(0,0,0,.06) 81%, transparent 94%);
+      mask-image:linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.05) 4%, rgba(0,0,0,.15) 8%, rgba(0,0,0,.29) 12%, rgba(0,0,0,.43) 16%, rgba(0,0,0,.52) 21%, rgba(0,0,0,.55) 27%, rgba(0,0,0,.50) 35%, rgba(0,0,0,.39) 46%, rgba(0,0,0,.26) 58%, rgba(0,0,0,.14) 70%, rgba(0,0,0,.06) 81%, transparent 94%);
     }
     .np-imm-reflect canvas{ position:absolute; left:0; top:0; width:100vw; height:100vw; opacity:0; transform-origin:50% 0; }
     .np-imm-orbs{ height:55vh;
@@ -8162,7 +8164,7 @@
       var c = npImmReflectCv, x = c.getContext('2d');
       x.clearRect(0, 0, 128, 128);
       x.save();
-      x.filter = 'blur(11px) saturate(1.2)';
+      x.filter = 'blur(5px) saturate(1.15)';
       x.translate(0, 128); x.scale(1, -1);
       x.drawImage(img, -8, -8, 144, 144);
       x.restore();
