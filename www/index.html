@@ -3030,6 +3030,11 @@
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
   .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
+  /* Build 178: a genre's tabs carry their own count under the name. */
+  .genre-tabs .genre-tab{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1.15; padding-top:7px; padding-bottom:7px; }
+  .genre-tabs .genre-tab-count{ font-size:10.5px; font-weight:600; letter-spacing:.01em; text-transform:none; opacity:.78; white-space:nowrap; }
+  .tile-grid > .genre-tabs{ margin-bottom:10px; }
+  .tile-grid:not(.grid-songs) > .genre-tabs{ margin-bottom:-6px; }
   /* My Channels' sort options, shown only while editing. */
   .tile-grid > .ch-sort-opts{ grid-column:1/-1; display:flex; flex-direction:column; gap:10px; margin:2px 0 8px; }
   .ch-sort-line{ display:flex; align-items:center; gap:12px; }
@@ -26128,30 +26133,7 @@
     stationsGrid.classList.add('grid-songs');
     tracks.sort(byNameAsc);
     // A Shuffle All row heads the list (the car's Songs list starts with the same one).
-    if(tracks.length > 1){
-      var sh = document.createElement('div');
-      sh.className = 'tile song-row shuffle-all-row';
-      sh.setAttribute('role', 'button');
-      sh.tabIndex = 0;
-      var shArt = document.createElement('div');
-      shArt.className = 'tile-art song-row-art shuffle-all-art';
-      shArt.innerHTML = '<svg class="shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-        + '<path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/>'
-        + '<path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>';
-      sh.appendChild(shArt);
-      var shBody = document.createElement('div');
-      shBody.className = 'song-row-body';
-      shBody.innerHTML = '<div class="tile-name song-row-title">Shuffle All</div>';
-      var shSub = document.createElement('div');
-      shSub.className = 'song-row-sub';
-      shSub.textContent = plural(tracks.length, 'song', 'songs');
-      shBody.appendChild(shSub);
-      sh.appendChild(shBody);
-      var shuffleAll = function(){ playShuffled(tracks, 'Songs'); };
-      sh.addEventListener('click', shuffleAll);
-      sh.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); shuffleAll(); } });
-      stationsGrid.appendChild(sh);
-    }
+    if(tracks.length > 1) stationsGrid.appendChild(buildShuffleAllRow(tracks, 'Songs'));
     // Broken into letters, with the letter over each run. A few hundred titles in one
     // unbroken column gives you no way to tell how far through the alphabet you are without
     // reading; the headings are what the rail on the right is pointing at, made visible.
@@ -26185,6 +26167,31 @@
       if(isBlacklisted(t)) return false;
       return matchesQuery([t.name, t.artist, t.album, t.genre, t.fileName], pq);
     }), function(t){ return t.name; }, pq);
+  }
+  // A Shuffle All row (the Songs list, a genre's Songs tab): plays every song given in random order.
+  function buildShuffleAllRow(tracks, label){
+    var sh = document.createElement('div');
+    sh.className = 'tile song-row shuffle-all-row';
+    sh.setAttribute('role', 'button');
+    sh.tabIndex = 0;
+    var shArt = document.createElement('div');
+    shArt.className = 'tile-art song-row-art shuffle-all-art';
+    shArt.innerHTML = '<svg class="shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+      + '<path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/>'
+      + '<path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>';
+    sh.appendChild(shArt);
+    var shBody = document.createElement('div');
+    shBody.className = 'song-row-body';
+    shBody.innerHTML = '<div class="tile-name song-row-title">Shuffle All</div>';
+    var shSub = document.createElement('div');
+    shSub.className = 'song-row-sub';
+    shSub.textContent = plural(tracks.length, 'song', 'songs');
+    shBody.appendChild(shSub);
+    sh.appendChild(shBody);
+    var shuffleAll = function(){ playShuffled(tracks, label); };
+    sh.addEventListener('click', shuffleAll);
+    sh.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); shuffleAll(); } });
+    return sh;
   }
   function localTracksWithTag(tag){
     var want = String(tag || '').trim().toLowerCase();
@@ -28790,18 +28797,93 @@
     setClearSearchVisible(false);
     clearHistoryBtn.style.display = 'none';
     renderRecentSection();
-    stationsHeading.textContent = tag + ' Stations';
+    // Build 178: the genre's name alone, and its songs and stations on tabs of their own.
+    stationsHeading.textContent = tag;
     setResultCount(null);
-    // Genre chips filter across both sources: tracks whose own genre tag matches lead the
-    // grid, stations carrying that tag follow.
-    var localTagHits = localTracksWithTag(tag);
-    renderStations([], null, localTagHits, true);
+    var g = genrePage = { tag: tag, songs: localTracksWithTag(tag), stations: [], pending: true, tab: null };
+    renderGenrePage();
     apiFetch('/json/stations/search?tag=' + encodeURIComponent(tag.toLowerCase()) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
-      .then(function(data){ renderStations(data, null, localTagHits); })
+      .then(function(data){
+        if(genrePage !== g || activeGenre !== tag) return;
+        g.stations = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        g.pending = false;
+        renderGenrePage();
+      })
       .catch(function(err){
+        if(genrePage !== g || activeGenre !== tag) return;
         setStatus(err.message, true);
-        renderStations([], null, localTagHits);
+        g.pending = false;
+        renderGenrePage();
       });
+  }
+  // A genre's page (build 178): Songs (your library songs tagged with it, A-Z, with Shuffle All)
+  // and Stations (the directory's stations for the tag), as tabs, Songs first. Tabs only when it
+  // has both; otherwise just the one list. Each tab names its own count.
+  var genrePage = null;
+  var GENRE_TABS = [['songs', 'Songs', 'song', 'songs'], ['stations', 'Stations', 'station', 'stations']];
+  function renderGenrePage(){
+    var g = genrePage;
+    if(!g) return;
+    resetStationsGrid();
+    var songs = g.songs.filter(function(t){ return !isBlacklisted(t); }).sort(byNameAsc);
+    var have = { songs: songs.length > 0, stations: g.stations.length > 0 };
+    var both = have.songs && have.stations;
+    if(!g.tab || !have[g.tab]) g.tab = have.songs ? 'songs' : 'stations';
+    if(both){
+      var tabs = document.createElement('div');
+      tabs.className = 'home-tabs video-tabs genre-tabs';
+      tabs.setAttribute('role', 'tablist');
+      GENRE_TABS.forEach(function(t){
+        var n = t[0] === 'songs' ? songs.length : g.stations.length;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'home-tab genre-tab' + (g.tab === t[0] ? ' active' : '');
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-selected', g.tab === t[0] ? 'true' : 'false');
+        b.dataset.gtab = t[0];
+        b.innerHTML = '<span class="genre-tab-name"></span><span class="genre-tab-count"></span>';
+        b.querySelector('.genre-tab-name').textContent = t[1];
+        b.querySelector('.genre-tab-count').textContent = plural(n, t[2], t[3]);
+        b.addEventListener('click', function(){
+          if(g.tab === t[0]) return;
+          g.tab = t[0];
+          renderGenrePage();
+          window.scrollTo(0, 0);
+        });
+        tabs.appendChild(b);
+      });
+      stationsGrid.appendChild(tabs);
+    }
+    if(g.tab === 'songs' && have.songs){
+      stationsGrid.classList.add('grid-songs');
+      if(songs.length > 1) stationsGrid.appendChild(buildShuffleAllRow(songs, g.tag));
+      songs.forEach(function(t){ stationsGrid.appendChild(buildSongRow(t, { queueList: songs, queueLabel: g.tag })); });
+      setResultCount(songs.length, 'song');
+      // While the stations are still on their way, say so under the songs.
+      if(g.pending){
+        var spin = document.createElement('div');
+        spin.className = 'loading-state genre-loading';
+        spin.innerHTML = '<div class="spinner"></div>';
+        stationsGrid.appendChild(spin);
+      }
+      return;
+    }
+    if(have.stations){
+      g.stations.forEach(function(st){
+        var tile = buildTile(st);
+        markStationVideo(tile, st);
+        stationsGrid.appendChild(tile);
+      });
+      setResultCount(g.stations.length, 'station');
+      return;
+    }
+    if(g.pending){
+      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      setResultCount(null);
+      return;
+    }
+    stationsGrid.innerHTML = '<div class="empty-state">No songs or stations found for ' + escapeHtml(g.tag) + '.</div>';
+    setResultCount(0, 'station');
   }
 
   function isUrlLike(v){ return /^https?:\/\//i.test(v.trim()); }
