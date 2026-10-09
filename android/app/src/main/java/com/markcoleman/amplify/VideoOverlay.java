@@ -33,6 +33,10 @@ public final class VideoOverlay {
 
     /** A finger dragging the picture (build 161): phase start / move / end, distance in px. */
     void onDrag(String phase, float dxPx, float dyPx);
+
+    /** Two fingers pinching the picture (build 175): phase start / move / end, and the
+     *  distance between the fingers now divided by the distance when the pinch began. */
+    void onPinch(String phase, float scale);
   }
 
   /**
@@ -223,8 +227,13 @@ public final class VideoOverlay {
     final int slop = android.view.ViewConfiguration.get(activity).getScaledTouchSlop();
     box.setOnTouchListener(
         new View.OnTouchListener() {
-          float x0, y0;
-          boolean dragging;
+          float x0, y0, span0;
+          boolean dragging, pinching, spent;
+
+          float span(android.view.MotionEvent e) {
+            if (e.getPointerCount() < 2) return 0f;
+            return (float) Math.hypot(e.getX(1) - e.getX(0), e.getY(1) - e.getY(0));
+          }
 
           @Override
           public boolean onTouch(View v, android.view.MotionEvent e) {
@@ -233,8 +242,36 @@ public final class VideoOverlay {
                 x0 = e.getRawX();
                 y0 = e.getRawY();
                 dragging = false;
+                pinching = false;
+                spent = false;
                 return false; // the click still sees it
+              case android.view.MotionEvent.ACTION_POINTER_DOWN:
+                // A second finger: a pinch resizes the floating window (the page decides how).
+                if (!pinching && e.getPointerCount() == 2) {
+                  if (dragging) {
+                    dragging = false;
+                    listener.onDrag("end", e.getRawX() - x0, e.getRawY() - y0);
+                  }
+                  span0 = Math.max(1f, span(e));
+                  pinching = true;
+                  v.setPressed(false);
+                  v.cancelLongPress();
+                  listener.onPinch("start", 1f);
+                }
+                return true;
+              case android.view.MotionEvent.ACTION_POINTER_UP:
+                if (pinching) {
+                  pinching = false;
+                  spent = true; // the finger left behind doesn't drag or tap
+                  listener.onPinch("end", 1f);
+                }
+                return true;
               case android.view.MotionEvent.ACTION_MOVE:
+                if (pinching) {
+                  if (e.getPointerCount() >= 2) listener.onPinch("move", span(e) / span0);
+                  return true;
+                }
+                if (spent) return true;
                 float dx = e.getRawX() - x0, dy = e.getRawY() - y0;
                 if (!dragging && Math.hypot(dx, dy) > slop) {
                   dragging = true;
@@ -249,6 +286,13 @@ public final class VideoOverlay {
                 return false;
               case android.view.MotionEvent.ACTION_UP:
               case android.view.MotionEvent.ACTION_CANCEL:
+                if (pinching || spent) {
+                  if (pinching) listener.onPinch("end", 1f);
+                  pinching = false;
+                  spent = false;
+                  v.setPressed(false);
+                  return true; // not a click
+                }
                 if (dragging) {
                   dragging = false;
                   listener.onDrag("end", e.getRawX() - x0, e.getRawY() - y0);

@@ -82,6 +82,53 @@ async def main():
         await pg.mouse.up(); await pg.wait_for_timeout(500)
         r2 = await pg.evaluate("(()=>{var r=document.getElementById('videoMini').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)];})()")
         check(r2[0] == 4 and abs(r2[1] - r1[1]) <= 2, f'pushed past the edge it stays on screen {r2}')
+        # pinch to resize (build 175): two fingers on the picture, spread apart then together
+        cdp = await ctx.new_cdp_session(pg)
+        GEO = "(()=>{var r=document.getElementById('videoMini').getBoundingClientRect(), p=document.getElementById('videoMiniBox').getBoundingClientRect(); return {pr:p.width/p.height, w:r.width, h:r.height, cx:r.left+r.width/2, cy:r.top+r.height/2, l:r.left, t:r.top, r:r.right, b:r.bottom, W:innerWidth, H:innerHeight, np:document.getElementById('nowPlayingScreen').style.display};})()"
+        async def pinch(d0, d1, steps=8):
+            g = await pg.evaluate("(()=>{var r=document.getElementById('videoMiniBox').getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2];})()")
+            cx, cy = g
+            def pts(d): return [{'x': cx - d / 2, 'y': cy, 'id': 1}, {'x': cx + d / 2, 'y': cy, 'id': 2}]
+            await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': pts(d0)[:1]})
+            await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': pts(d0)})
+            for i in range(1, steps + 1):
+                await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': pts(d0 + (d1 - d0) * i / steps)})
+                await pg.wait_for_timeout(16)
+            await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': pts(d1)[1:]})
+            await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
+            await pg.wait_for_timeout(600)
+        g0 = await pg.evaluate(GEO)
+        await pinch(40, 80)
+        g1 = await pg.evaluate(GEO)
+        print('pinch out', g0, g1)
+        check(g1['w'] > g0['w'] * 1.5 and g1['np'] != 'flex', f'pinching out makes it bigger, and doesn\'t open Now Playing {g0["w"]} -> {g1["w"]}')
+        check(abs(g1['pr'] - g0['pr']) < 0.02, f'the picture keeps its shape {g0["pr"]} -> {g1["pr"]}')
+        check(g1['l'] >= 3.5 and g1['t'] >= 3.5 and g1['r'] <= g1['W'] - 3.5 and g1['b'] <= g1['H'] - 3.5, f'and stays on screen {g1}')
+        saved_w = await pg.evaluate("localStorage.getItem('radioPlayerVideoMiniWidth')")
+        check(saved_w and abs(float(saved_w) - g1['w']) <= 1, f'the new size is remembered ({saved_w})')
+        await pg.wait_for_timeout(900)
+        g1b = await pg.evaluate(GEO)
+        check(abs(g1b['w'] - g1['w']) <= 1, f'and kept while it keeps placing itself {g1["w"]} -> {g1b["w"]}')
+        await pg.screenshot(path=f'{SHOTS}/vmini-pinched-big.png')
+        await pinch(60, 600, 12)
+        g2 = await pg.evaluate(GEO)
+        check(g2['w'] <= g2['W'] - 8 + 1 and g2['h'] <= g2['H'] * 0.72 + 2, f'it never grows past the screen {g2}')
+        await pinch(120, 20, 10)
+        g3 = await pg.evaluate(GEO)
+        check(139 <= g3['w'] <= 141, f'pinching in makes it smaller, down to a minimum {g3["w"]}')
+        await pinch(40, 70)
+        g4 = await pg.evaluate(GEO)
+        await pg.screenshot(path=f'{SHOTS}/vmini-pinched.png')
+        # the same from the app's own picture (channels, own videos): the app reports the pinch
+        await pg.evaluate("window.__emit('videopinch', {phase:'start', scale:1})")
+        for sc in (1.1, 1.25, 1.4): await pg.evaluate("(s)=>window.__emit('videopinch', {phase:'move', scale:s})", sc)
+        await pg.evaluate("window.__emit('videopinch', {phase:'end', scale:1})"); await pg.wait_for_timeout(300)
+        g5 = await pg.evaluate(GEO)
+        check(abs(g5['w'] - min(g5['W'] - 8, g4['w'] * 1.4)) <= 2 and abs(g5['cx'] - g4['cx']) <= 2, f'a pinch reported by the app resizes it too, around its centre {g4["w"]} -> {g5["w"]}')
+        saved_w = await pg.evaluate("localStorage.getItem('radioPlayerVideoMiniWidth')")
+        check(abs(float(saved_w) - g5['w']) <= 1, f'and is remembered ({saved_w})')
+        r1 = [g5['l'], g5['t']]
+        await pg.wait_for_timeout(500)  # a tap right as the fingers lift is ignored on purpose
         # back to Now Playing: same element, still playing
         t_before = (await mini_state(pg))['t']
         await pg.evaluate("document.getElementById('videoMiniBox').click()"); await pg.wait_for_timeout(1000)
@@ -97,6 +144,13 @@ async def main():
         await pg.evaluate("document.getElementById('playPauseBtn').click()"); await pg.wait_for_timeout(800)
         s5 = await mini_state(pg)
         check(s5['shown'] and not s5['paused'], f'playing again from the mini player brings it back {s5}')
+        await pg.wait_for_timeout(600)
+        g6 = await pg.evaluate(GEO)
+        check(abs(g6['w'] - g5['w']) <= 1, f'it comes back at the size it was given {g5["w"]} -> {g6["w"]}')
+        # after a restart too
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        kept = await pg.evaluate("localStorage.getItem('radioPlayerVideoMiniWidth')")
+        check(kept and abs(float(kept) - g5['w']) <= 1, f'the size survives a restart ({kept})')
         check(not errs, f'no page errors {errs}')
         await b.close()
     print('ALL PASSED' if not check.failed else f'FAILED {check.failed}')

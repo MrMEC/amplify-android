@@ -9047,13 +9047,29 @@
   var videoMiniBox = document.getElementById('videoMiniBox');
   var videoMiniPlay = document.getElementById('videoMiniPlay');
   var videoMiniTitle = document.getElementById('videoMiniTitle');
-  var videoMiniOn = false, videoMiniDismissed = null;
+  var videoMiniOn = false, videoMiniDismissed = null, miniPinch = null;
   // Where it was last left (build 158): its top-left corner in page pixels, kept between uses.
   // Null until it is first dragged; it then starts in the corner above the mini player.
   var VIDEO_MINI_POS_KEY = 'radioPlayerVideoMiniPos';
   var videoMiniPos = null;
   try{ videoMiniPos = JSON.parse(localStorage.getItem(VIDEO_MINI_POS_KEY) || 'null'); }catch(e){ videoMiniPos = null; }
   if(!videoMiniPos || typeof videoMiniPos.x !== 'number' || typeof videoMiniPos.y !== 'number') videoMiniPos = null;
+  // Its width once resized with two fingers (build 175), kept until it is resized again.
+  var VIDEO_MINI_W_KEY = 'radioPlayerVideoMiniWidth';
+  var videoMiniW = null;
+  try{ videoMiniW = parseFloat(localStorage.getItem(VIDEO_MINI_W_KEY)) || null; }catch(e){ videoMiniW = null; }
+  var VIDEO_MINI_BAR_H = 34;
+  // Smallest and largest the window may be at this screen size, for a picture of shape w:h.
+  function videoMiniLimits(w, h){
+    var maxW = Math.min(window.innerWidth - 8, Math.round(((window.innerHeight * 0.72) - VIDEO_MINI_BAR_H) * w / h));
+    return { min: Math.min(140, maxW), max: Math.max(140, maxW) };
+  }
+  function videoMiniShape(){
+    var w = 16, h = 9;
+    if(npVideoStream){ if(streamVideo.w > 0 && streamVideo.h > 0){ w = streamVideo.w; h = streamVideo.h; } }
+    else if(npVideo.videoWidth > 0 && npVideo.videoHeight > 0){ w = npVideo.videoWidth; h = npVideo.videoHeight; }
+    return { w: w, h: h };
+  }
   function videoMiniWanted(){
     if(pipActive || !npVideoOn || !currentStation || !audio) return false;
     var key = favKey(currentStation);
@@ -9075,12 +9091,13 @@
     return top;
   }
   function placeVideoMini(){
-    var w = 16, h = 9;
-    if(npVideoStream){ if(streamVideo.w > 0 && streamVideo.h > 0){ w = streamVideo.w; h = streamVideo.h; } }
-    else if(npVideo.videoWidth > 0 && npVideo.videoHeight > 0){ w = npVideo.videoWidth; h = npVideo.videoHeight; }
+    if(miniPinch) return; // the pinch is sizing it
+    var sh = videoMiniShape(), w = sh.w, h = sh.h;
     var maxW = Math.min(240, Math.round(window.innerWidth * 0.56)), maxH = 190;
     var bw = Math.min(maxW, Math.round(maxH * w / h));
-    videoMini.style.width = Math.max(120, bw) + 'px';
+    if(videoMiniW){ var lim = videoMiniLimits(w, h); bw = Math.max(lim.min, Math.min(lim.max, videoMiniW)); }
+    else bw = Math.max(120, bw);
+    videoMini.style.width = Math.round(bw) + 'px';
     videoMiniBox.style.aspectRatio = w + ' / ' + h;
     var mw = videoMini.offsetWidth || bw, mh = videoMini.offsetHeight || 150;
     var x, y;
@@ -9195,6 +9212,65 @@
       el.addEventListener('pointerup', end);
       el.addEventListener('pointercancel', end);
     });
+    // Two fingers pinch it bigger or smaller (build 175), around the point between the fingers'
+    // starting place (its centre stays put); the width is kept for next time.
+    function miniPinchStart(){
+      var r = videoMini.getBoundingClientRect();
+      if(miniDrag){ miniDrag = null; videoMini.classList.remove('dragging'); }
+      miniPinch = { w: r.width, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+      videoMini.classList.add('pinching');
+    }
+    function miniPinchMove(scale){
+      if(!miniPinch || !(scale > 0)) return;
+      var sh = videoMiniShape(), lim = videoMiniLimits(sh.w, sh.h);
+      var w = Math.round(Math.max(lim.min, Math.min(lim.max, miniPinch.w * scale)));
+      videoMini.style.width = w + 'px';
+      var mh = videoMini.offsetHeight || (w * sh.h / sh.w + VIDEO_MINI_BAR_H);
+      videoMiniPos = moveVideoMini(miniPinch.cx - w / 2, miniPinch.cy - mh / 2);
+      if(npVideoStream && !videoRaf) videoFrame();
+    }
+    function miniPinchEnd(){
+      if(!miniPinch) return;
+      miniPinch = null;
+      miniDragJustEnded = Date.now();
+      videoMini.classList.remove('pinching');
+      videoMiniW = videoMini.getBoundingClientRect().width;
+      try{
+        localStorage.setItem(VIDEO_MINI_W_KEY, String(Math.round(videoMiniW)));
+        localStorage.setItem(VIDEO_MINI_POS_KEY, JSON.stringify(videoMiniPos));
+      }catch(err){}
+    }
+    // In the page (a podcast's video, and the bar): the fingers on the window itself.
+    var miniTouches = {}, miniSpan0 = 0;
+    function miniSpan(){
+      var ps = Object.keys(miniTouches).map(function(k){ return miniTouches[k]; });
+      return ps.length < 2 ? 0 : Math.hypot(ps[1].x - ps[0].x, ps[1].y - ps[0].y);
+    }
+    videoMini.addEventListener('pointerdown', function(e){
+      miniTouches[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if(Object.keys(miniTouches).length === 2){
+        miniSpan0 = Math.max(1, miniSpan());
+        miniPinchStart();
+      }
+    }, true);
+    videoMini.addEventListener('pointermove', function(e){
+      if(!miniTouches[e.pointerId]) return;
+      miniTouches[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if(miniPinch && Object.keys(miniTouches).length >= 2){
+        e.stopImmediatePropagation(); // not a drag
+        miniPinchMove(miniSpan() / miniSpan0);
+      }
+    }, true);
+    function miniTouchUp(e){
+      if(!miniTouches[e.pointerId]) return;
+      delete miniTouches[e.pointerId];
+      if(miniPinch && Object.keys(miniTouches).length < 2) miniPinchEnd();
+    }
+    // On the window (captured pointers are delivered here too) and anywhere, in case a finger left it.
+    ['pointerup', 'pointercancel'].forEach(function(t){
+      videoMini.addEventListener(t, miniTouchUp, true);
+      window.addEventListener(t, miniTouchUp, true);
+    });
     // A drag is not a tap: the click that follows letting go doesn't open Now Playing.
     videoMiniBox.addEventListener('click', function(e){
       if(Date.now() - miniDragJustEnded < 400){ e.stopImmediatePropagation(); e.preventDefault(); }
@@ -9207,6 +9283,12 @@
         if(ev.phase === 'start') miniDragStart();
         else if(ev.phase === 'move') miniDragMove(ev.dx || 0, ev.dy || 0);
         else miniDragEnd();
+      });
+      videoPlugin.addListener('videopinch', function(ev){
+        if(!ev || !videoMiniOn) return;
+        if(ev.phase === 'start') miniPinchStart();
+        else if(ev.phase === 'move') miniPinchMove(+ev.scale || 1);
+        else miniPinchEnd();
       });
     }
   }

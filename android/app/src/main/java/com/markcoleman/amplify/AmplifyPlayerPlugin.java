@@ -1689,6 +1689,14 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                         o.put("dy", dyPx / d);
                         notifyListeners("videodrag", o);
                       }
+
+                      @Override
+                      public void onPinch(String phase, float scale) {
+                        JSObject o = new JSObject();
+                        o.put("phase", phase);
+                        o.put("scale", scale);
+                        notifyListeners("videopinch", o);
+                      }
                     });
             video.setVideoSize(videoW, videoH, videoRatio);
           }
