@@ -27820,7 +27820,9 @@
       searchState.channels = searchChannels(q);
       searchState.playlists = searchPlaylists(q);
       searchState.videos = searchVideos(q);
+      searchState.musicVideos = searchMusicVideos(q);
       applySearchResults();
+      fetchSearchArtistVideos(q, searchState);
       return;
     }
     if(live && isUrlLike(q)){ searchLiveNow(q); return; }
@@ -27842,6 +27844,7 @@
     { id: 'artists', label: 'Artists', noun: 'artist' },
     { id: 'albums', label: 'Albums', noun: 'album' },
     { id: 'songs', label: 'Songs', noun: 'song' },
+    { id: 'musicVideos', label: 'Music Videos', noun: 'music video' },
     { id: 'podcasts', label: 'Podcasts', noun: 'show' },
     { id: 'videos', label: 'Movies & TV', noun: 'video' },
     { id: 'channels', label: 'Channels', noun: 'channel' },
@@ -28038,6 +28041,7 @@
       channels: searchChannels(q),
       playlists: searchPlaylists(q),
       videos: searchVideos(q),
+      musicVideos: searchMusicVideos(q),
       tab: prevTab,
       pending: true,
       podcastsPending: true
@@ -28073,6 +28077,7 @@
       if(searchState === st) applySearchResults();
     });
 
+    fetchSearchArtistVideos(q, st);
     // The channel list may not have loaded yet; artists are recomputed when it arrives.
     loadArtistStations().then(function(){
       if(stale()) return;
@@ -28188,7 +28193,7 @@
       return;
     }
 
-    if(group.id === 'videos') stationsGrid.classList.add('grid-songs');
+    if(group.id === 'videos' || group.id === 'musicVideos') stationsGrid.classList.add('grid-songs');
     // Save as Custom Station sits on the Stations tab, centred above the results (build 119).
     if(group.id === 'stations'){
       var bar = document.createElement('div');
@@ -28231,6 +28236,8 @@
         chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url) }));
       } else if(group.id === 'videos'){
         stationsGrid.appendChild(buildVideoResultRow(item, false));
+      } else if(group.id === 'musicVideos'){
+        stationsGrid.appendChild(buildMusicVideoResultRow(item, false));
       } else if(group.id === 'playlists'){
         stationsGrid.appendChild(buildEntityTile({
           key: 'playlist-' + item.id, entity: 'playlist', name: item.label, row: true,
@@ -28254,6 +28261,7 @@
       }
     });
 
+    if(group.id === 'musicVideos') searchMusicVideoStills(items);
     if(group.id === 'channels' && !iptvIndex) stationsGrid.appendChild(buildSearchAllChannelsRow());
     // Still counting up while the directory answers, so no total is claimed yet.
     if(group.id === 'stations' && searchState.pending) setResultCount(null);
@@ -28390,6 +28398,108 @@
     return row;
   }
 
+  // ---------- search: Music Videos (build 177) ----------
+  // Your own music videos (from the music folders, matched to artists: musicVideoIndex) and the
+  // YouTube music videos Amplify knows for your artists (ytStore, filled by artist pages and by
+  // the lookup below), matched on the title or the artist. Yours come first at the same closeness.
+  function searchMusicVideos(q){
+    var pq = parseSearchQuery(q);
+    if(pq.empty) return [];
+    var out = [], idx;
+    try{ idx = musicVideoIndex(); }catch(e){ idx = {}; }
+    Object.keys(idx).forEach(function(k){
+      var list = idx[k];
+      list.forEach(function(v){
+        if(matchesQuery([v.name, v.artist], pq)) out.push({ src: 'local', name: v.name, artist: v.artist, v: v, list: list });
+      });
+    });
+    Object.keys(ytStore || {}).forEach(function(k){
+      var rec = ytStore[k];
+      if(!rec || !rec.videos || !rec.videos.length) return;
+      var entry = findArtistEntry(k);
+      if(!entry) return;
+      rec.videos.forEach(function(v){
+        var name = ytDisplayTitle(v.title, entry.name);
+        if(matchesQuery([name, entry.name], pq)) out.push({ src: 'yt', name: name, artist: entry.name, v: v, list: rec.videos });
+      });
+    });
+    var ranked = rankByMatch(out, function(r){ return r.name; }, pq, function(a, b){ return (a.src === 'local' ? 0 : 1) - (b.src === 'local' ? 0 : 1); });
+    // A search for an artist matches all of their videos on the artist; titles that match come first.
+    return ranked.slice(0, 80);
+  }
+  // The search names one of your artists: look up their YouTube music videos once (cached by
+  // loadArtistVideos as for the artist page), then fill the tab in.
+  function fetchSearchArtistVideos(q, st){
+    var pq = parseSearchQuery(q);
+    if(pq.empty) return;
+    var hits = searchArtists(q).filter(function(e){ return nameMatchRank(e.name, pq) <= 1; }).slice(0, 2);
+    hits.forEach(function(entry){
+      if(ytFresh(ytStore[entry.key])) return;
+      loadArtistVideos(entry).then(function(){
+        if(lastSearch !== st) return;
+        st.musicVideos = searchMusicVideos(st.q);
+        st._topKey = null;
+        if(searchState === st) applySearchResults();
+      })['catch'](function(){});
+    });
+  }
+  function searchMusicVideoStills(items){
+    var local = items.filter(function(r){ return r && r.src === 'local' && !r.v.still; }).map(function(r){ return r.v; });
+    if(!local.length) return;
+    ensureMusicVideoStills(local, function(v){
+      document.querySelectorAll('.mv-result-row').forEach(function(row){
+        if(row._mv !== v || !row.isConnected) return;
+        row._paint();
+      });
+    });
+  }
+  function buildMusicVideoResultRow(r, inTop){
+    var v = r.v;
+    var row = document.createElement('div');
+    row.className = 'tile song-row video-result-row mv-result-row' + (inTop ? ' top-result-row' : '');
+    row.dataset.kind = 'musicVideos';
+    row.dataset.src = r.src;
+    row._mv = v;
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art video-result-art wide';
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div');
+    t.className = 'tile-name song-row-title';
+    t.textContent = r.name;
+    body.appendChild(t);
+    var sub = document.createElement('div');
+    sub.className = 'song-row-sub';
+    body.appendChild(sub);
+    row.appendChild(body);
+    row._paint = function(){
+      var url = r.src === 'yt' ? 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg' : (v.still ? capUrl(v.still) : '');
+      art.innerHTML = '';
+      if(url){
+        var img = document.createElement('img');
+        img.alt = ''; img.decoding = 'async'; img.loading = 'lazy'; img.src = url;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+        img.onerror = function(){ img.remove(); };
+        art.appendChild(img);
+      }
+      var bits = ['Music Video', r.artist];
+      if(r.src === 'yt') bits.push('YouTube');
+      else if(v.duration) bits.push(formatTime(v.duration));
+      sub.textContent = bits.filter(Boolean).join(' \u00b7 ');
+    };
+    row._paint();
+    if(r.src === 'local'){
+      row.dataset.key = favKey(v);
+      if(currentStation && favKey(currentStation) === favKey(v)) row.classList.add('playing');
+      row.addEventListener('click', function(){ playMusicVideo(v, r.list); });
+    } else {
+      row.dataset.vid = v.id;
+      row.addEventListener('click', function(){ openYtPlayer(v, r.list, r.artist); });
+    }
+    return row;
+  }
+
   // ---------- search: Top Results ----------
   // The closest few of every kind in one list, like a music app's top hits: each kind
   // offers its best few, every one is scored by how well its name answers the search (the
@@ -28403,6 +28513,7 @@
     { id: 'playlists', take: 2, bias: 1.5, name: function(p){ return p.label; } },
     { id: 'stations', take: 5, bias: 2, name: function(s){ return s.name; } },
     { id: 'videos', take: 4, bias: 1.5, name: function(r){ return r.name; } },
+    { id: 'musicVideos', take: 3, bias: 1.8, name: function(r){ return r.name; } },
     { id: 'channels', take: 3, bias: 2.5, name: function(c){ return c.name; } },
     { id: 'podcasts', take: 3, bias: 2.5, name: function(sh){ return sh.collectionName; } }
   ];
@@ -28430,6 +28541,7 @@
   function buildTopResultRow(r){
     var item = r.item, kind = r.kind;
     if(kind === 'videos') return buildVideoResultRow(item, true);
+    if(kind === 'musicVideos'){ var mvr = buildMusicVideoResultRow(item, true); searchMusicVideoStills([item]); return mvr; }
     var row = document.createElement('div');
     row.className = 'tile song-row top-result-row';
     row.dataset.kind = kind;
