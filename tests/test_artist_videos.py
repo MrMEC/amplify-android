@@ -285,7 +285,8 @@ async def main():
           var rows = Array.from(list.querySelectorAll('.yt-row'));
           return { open: o.classList.contains('open'), src: f.src, ref: f.getAttribute('referrerpolicy'),
             title: document.getElementById('ytOvTitle').textContent, sub: document.getElementById('ytOvSub').textContent,
-            link: document.getElementById('ytOpenLink').href, full: r.width === innerWidth && r.height === innerHeight,
+            link: !!document.getElementById('ytOpenLink'), menu: (document.getElementById('ytMenuBtn') || {}).textContent || null,
+            menuR: (function(){ var m = document.getElementById('ytMenuBtn'); if(!m) return null; var a = m.getBoundingClientRect(); return [Math.round(a.right), Math.round(a.height), getComputedStyle(m).display]; })(), full: r.width === innerWidth && r.height === innerHeight,
             fw: Math.round(fr.width), fh: Math.round(fr.height), ft: Math.round(fr.top), barBottom: Math.round(bar.bottom),
             bg: getComputedStyle(o).backgroundColor, tint: getComputedStyle(document.body).backgroundColor,
             back: back.getAttribute('aria-label'), backIcon: !!back.querySelector('.fa-arrow-left'),
@@ -297,10 +298,11 @@ async def main():
         check(ov['open'] and ov['full'], 'the video page covers the screen')
         check(ov['bg'] == ov['tint'] and ov['bg'] not in ('rgb(0, 0, 0)', 'rgba(0, 0, 0, 0)'), f"painted in the artist page's colour, not black ({ov['bg']} vs page {ov['tint']})")
         check(ov['back'] == 'Back' and ov['backIcon'], 'a Back arrow instead of a close X')
-        check(abs(ov['ft'] - ov['barBottom']) <= 1, 'the video sits right under Back and Open in YouTube')
+        check(abs(ov['ft'] - ov['barBottom']) <= 1, 'the video sits right under Back and Menu')
         check('/embed/alphaVevo01?' in ov['src'] and 'autoplay=1' in ov['src'] and 'playsinline=1' in ov['src'] and 'fs=0' in ov['src'], 'embeds that video, autoplaying inline')
         check(ov['ref'] == 'strict-origin-when-cross-origin', 'the embed sends a referrer (no error 153)')
-        check(ov['link'] == 'https://www.youtube.com/watch?v=alphaVevo01', 'Open in YouTube points at the video')
+        check(not ov['link'] and ov['menu'] == 'Menu' and ov['menuR'] and ov['menuR'][2] == 'flex' and ov['menuR'][0] >= 370,
+              f'no Open in YouTube; the main Menu button sits top right {ov["menu"]} {ov["menuR"]}')
         check(ov['fw'] == 390 and abs(ov['fh'] - 390 * 9 / 16) < 2, f'video frame is full width, 16:9 ({ov["fw"]}x{ov["fh"]})')
         check(ov['title'].startswith('A Very Long Song') and ov['sub'] == 'Alpha \u00b7 2024', f'title and "artist · year" under the video ({ov["sub"]})')
         check(ov['head'] == 'More videos by Alpha', f'list headed "More videos by Alpha" ({ov["head"]})')
@@ -317,11 +319,19 @@ async def main():
         # play one from the list
         await pg.evaluate("document.querySelector('#ytOvList .yt-row[data-vid=alphaLive01]').click()"); await pg.wait_for_timeout(800)
         sw = await pg.evaluate(OV)
-        check('/embed/alphaLive01?' in sw['src'] and sw['title'] == 'Deep Cut (Live at Club 3121, Las Vegas)' and sw['link'].endswith('alphaLive01'),
+        check('/embed/alphaLive01?' in sw['src'] and sw['title'] == 'Deep Cut (Live at Club 3121, Las Vegas)',
               'tapping a listed video plays it at the top')
         check('alphaLive01' not in sw['rows'] and 'alphaVevo01' in sw['rows'] and len(sw['rows']) == 6, 'and the list now holds the others, the previous one included')
         check(await pg.evaluate("document.getElementById('ytOvList').scrollTop") == 0, 'the list goes back to its top')
         check(len(counts['yt_embed']) == 2 and await pg.evaluate("document.querySelectorAll('#ytOverlay iframe').length") == 1, 'one player at a time')
+        # the Menu button opens the drawer over the video; closing it keeps the video
+        await pg.evaluate("document.getElementById('ytMenuBtn').click()"); await pg.wait_for_timeout(500)
+        dr = await pg.evaluate("""(()=>{ var d = document.querySelector('.sidebar-scroll'), r = d.getBoundingClientRect();
+          var hit = document.elementFromPoint(r.left + r.width / 2, r.top + 120); return [d.classList.contains('open'), !!hit && d.contains(hit)]; })()""")
+        check(dr == [True, True], f'Menu opens the main menu over the video {dr}')
+        await pg.screenshot(path=f'{shots}/artvid-player-menu.png')
+        await pg.evaluate("document.getElementById('drawerCloseBtn').click()"); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("document.getElementById('ytOverlay').classList.contains('open') && !!document.querySelector('#ytOverlay iframe')"), 'closing the menu keeps the video')
         await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(500)
         check(await pg.evaluate("!document.getElementById('ytOverlay').classList.contains('open') && !document.querySelector('#ytOverlay iframe')"), 'Back stops the video and returns to the artist page')
         check(await pg.evaluate("document.body.classList.contains('artist-open')"), 'the artist page is still there')
@@ -334,9 +344,19 @@ async def main():
           var top = document.elementFromPoint(422, 200); return { onTop: o.contains(top), fw: Math.round(fr.width), fh: Math.round(fr.height), ft: Math.round(fr.top), fb: Math.round(fr.bottom) }; })()""")
         print('landscape', land)
         check(land['onTop'] and land['ft'] == 0 and land['fh'] == 390 and abs(land['fw'] - 693) <= 1, f'landscape: the video stays on top and fills the height {land}')
+        hid = await pg.evaluate("[getComputedStyle(document.getElementById('ytBackBtn')).display === 'none' || !document.getElementById('ytBackBtn').getClientRects().length, !document.getElementById('ytMenuBtn').getClientRects().length]")
+        check(hid == [True, True], f'full screen: no Back and no Menu {hid}')
         await pg.screenshot(path=f'{shots}/artvid-player-land.png')
-        await pg.evaluate("document.getElementById('ytBackBtn').click()")
         await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(1200)
+        check(await pg.evaluate("document.getElementById('ytBackBtn').getClientRects().length > 0 && document.getElementById('ytMenuBtn').getClientRects().length > 0"), 'upright again: Back and Menu are back')
+        await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(500)
+        # picking something in the menu over a video leaves the video page
+        await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[0].click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.getElementById('ytMenuBtn').click()"); await pg.wait_for_timeout(400)
+        await pg.evaluate("document.getElementById('drawerSettingsBtn').click()"); await pg.wait_for_timeout(600)
+        check(await pg.evaluate("!document.getElementById('ytOverlay').classList.contains('open') && !document.body.classList.contains('drawer-open')"), 'choosing Settings from the menu closes the video page')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        await pg.evaluate("(()=>{ var b = document.querySelector('.settings-overlay.open .settings-close, #settingsCloseBtn'); if(b) b.click(); })()"); await pg.wait_for_timeout(400)
 
         # ---- unfavourite: the row goes ----
         await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(500)
