@@ -57,7 +57,7 @@ async def route(r):
     return await r.abort()
 PAGE = """(()=>{ var g = document.getElementById('stationsGrid');
   return { title: document.getElementById('stationsHeading').textContent,
-    tabs: Array.from(g.querySelectorAll('.genre-tab')).map(function(b){ return { tab: b.dataset.gtab, name: b.querySelector('.genre-tab-name').textContent, count: b.querySelector('.genre-tab-count').textContent, active: b.classList.contains('active') }; }),
+    tabs: Array.from(g.querySelectorAll('.genre-tab')).map(function(b){ return { tab: b.dataset.gtab, name: b.textContent, active: b.classList.contains('active') }; }),
     shuffle: !!g.querySelector('.shuffle-all-row'), shuffleSub: (g.querySelector('.shuffle-all-row .song-row-sub') || {}).textContent || '',
     songs: Array.from(g.querySelectorAll('.song-row:not(.shuffle-all-row) .song-row-title')).map(function(e){ return e.textContent; }),
     stations: Array.from(g.querySelectorAll('.tile:not(.song-row) .tile-name')).map(function(e){ return e.textContent; }),
@@ -82,9 +82,12 @@ async def main():
         r = await pg.evaluate(PAGE); print(r)
         check(r['title'] == 'Rock', f'titled with the genre alone {r["title"]!r}')
         check([t['tab'] for t in r['tabs']] == ['songs', 'stations'] and r['tabs'][0]['active'], f'Songs and Stations tabs, Songs first and open {r["tabs"]}')
-        check(r['tabs'][0]['count'] == '3 songs' and r['tabs'][1]['count'] == '5 stations', f'each tab names its own count {r["tabs"]}')
+        check([t['name'] for t in r['tabs']] == ['Songs', 'Stations'], f'the tabs carry their names only, no counts (build 179) {r["tabs"]}')
+        check(r['count'] == '3 songs', f'the count is shown once, at the top {r["count"]!r}')
         check(r['songs'] == ['Rock One', 'Rock Three', 'Rock Two'] and not r['stations'], f'the Songs tab lists the songs, A to Z, and no stations {r["songs"]} {r["stations"]}')
-        check(r['shuffle'] and r['shuffleSub'] == '3 songs', f'Shuffle All heads the songs {r["shuffleSub"]}')
+        check(r['shuffle'] and r['shuffleSub'] == '', f'Shuffle All heads the songs, with no count under it {r["shuffleSub"]!r}')
+        page_text = await pg.evaluate("document.getElementById('browseView').innerText")
+        check(page_text.count('3 songs') == 1, f'"3 songs" appears once on the page ({page_text.count("3 songs")})')
         await pg.screenshot(path=f'{shots}/genre-songs.png')
         await pg.evaluate("document.querySelector('.genre-tab[data-gtab=stations]').click()"); await pg.wait_for_timeout(500)
         r2 = await pg.evaluate(PAGE)

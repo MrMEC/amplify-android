@@ -3030,9 +3030,6 @@
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
   .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
-  /* Build 178: a genre's tabs carry their own count under the name. */
-  .genre-tabs .genre-tab{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1.15; padding-top:7px; padding-bottom:7px; }
-  .genre-tabs .genre-tab-count{ font-size:10.5px; font-weight:600; letter-spacing:.01em; text-transform:none; opacity:.78; white-space:nowrap; }
   .tile-grid > .genre-tabs{ margin-bottom:10px; }
   .tile-grid:not(.grid-songs) > .genre-tabs{ margin-bottom:-6px; }
   /* My Channels' sort options, shown only while editing. */
@@ -26182,11 +26179,8 @@
     sh.appendChild(shArt);
     var shBody = document.createElement('div');
     shBody.className = 'song-row-body';
+    // No count here (build 179): the page already shows it once, at the top.
     shBody.innerHTML = '<div class="tile-name song-row-title">Shuffle All</div>';
-    var shSub = document.createElement('div');
-    shSub.className = 'song-row-sub';
-    shSub.textContent = plural(tracks.length, 'song', 'songs');
-    shBody.appendChild(shSub);
     sh.appendChild(shBody);
     var shuffleAll = function(){ playShuffled(tracks, label); };
     sh.addEventListener('click', shuffleAll);
@@ -28834,16 +28828,13 @@
       tabs.className = 'home-tabs video-tabs genre-tabs';
       tabs.setAttribute('role', 'tablist');
       GENRE_TABS.forEach(function(t){
-        var n = t[0] === 'songs' ? songs.length : g.stations.length;
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'home-tab genre-tab' + (g.tab === t[0] ? ' active' : '');
         b.setAttribute('role', 'tab');
         b.setAttribute('aria-selected', g.tab === t[0] ? 'true' : 'false');
         b.dataset.gtab = t[0];
-        b.innerHTML = '<span class="genre-tab-name"></span><span class="genre-tab-count"></span>';
-        b.querySelector('.genre-tab-name').textContent = t[1];
-        b.querySelector('.genre-tab-count').textContent = plural(n, t[2], t[3]);
+        b.textContent = t[1];
         b.addEventListener('click', function(){
           if(g.tab === t[0]) return;
           g.tab = t[0];

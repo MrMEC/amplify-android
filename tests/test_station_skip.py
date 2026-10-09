@@ -193,7 +193,7 @@ async def main():
         # ---- Songs: a Shuffle All row heads the list ----
         await pg.evaluate('__t.songs()'); await pg.wait_for_timeout(700)
         first = await pg.evaluate("(function(){ var r = document.querySelector('#stationsGrid .song-row'); return r ? r.className + '|' + r.textContent.trim() : ''; })()")
-        check('shuffle-all-row' in first and 'Shuffle All' in first and '3 songs' in first, f'the Songs list starts with Shuffle All ({first})')
+        check('shuffle-all-row' in first and first.endswith('|Shuffle All'), f'the Songs list starts with Shuffle All, no count under it (build 179) ({first})')
         await pg.screenshot(path=f'{shots}/shuffle-songs.png')
         await pg.evaluate("document.querySelector('#stationsGrid .shuffle-all-row').click()"); await pg.wait_for_timeout(600)
         st = await q()
