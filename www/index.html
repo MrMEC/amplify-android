@@ -3030,6 +3030,14 @@
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
   .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
+  /* Build 180: tab rows scroll sideways rather than squeeze (Watch now has four tabs). */
+  .scroll-tabs{ flex-wrap:nowrap !important; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -ms-overflow-style:none;
+    -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; }
+  .scroll-tabs::-webkit-scrollbar{ display:none; }
+  .scroll-tabs > .home-tab{ flex:0 0 auto; }
+  .cw-row .cw-art{ position:relative; overflow:hidden; }
+  .cw-row .cw-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .cw-row .cw-art .v-progress{ left:4px; right:4px; bottom:4px; }
   .tile-grid > .genre-tabs{ margin-bottom:10px; }
   .tile-grid:not(.grid-songs) > .genre-tabs{ margin-bottom:-6px; }
   /* My Channels' sort options, shown only while editing. */
@@ -6352,7 +6360,6 @@
       <div class="add-music-note" id="addMusicFolderNote" style="display:none;">
         This browser can’t open a folder picker. You can still drag a folder onto the page.
       </div>
-      <div class="add-music-note">Music is read on this device and never uploaded.</div>
     </div>
   </div>
 </div>
@@ -13535,6 +13542,7 @@
     });
     tabs.push({ id: 'following', label: 'A-Z' });
     tabs.push({ id: 'popular', label: 'Popular' });
+    tabs.push({ id: 'continue', label: 'Continue' });   // build 180: in-progress episodes, far right
     return tabs;
   }
   function renderPodcastTabsRow(){
@@ -13557,6 +13565,7 @@
       });
       podcastTabs.appendChild(btn);
     });
+    revealActiveTab(podcastTabs);
   }
 
   // Builds whichever tab is active, shared by openPodcastsHome() and the tab row's own click
@@ -13571,6 +13580,10 @@
 
     if(podcastTab === 'popular'){
       renderPodcastsPopular();
+      return;
+    }
+    if(podcastTab === 'continue'){
+      renderPodcastsContinue();
       return;
     }
 
@@ -13620,22 +13633,41 @@
     // of in-progress episodes to skim sideways through, not a grid to scan top to bottom) plus
     // every followed show's newest episode, grouped by release date.
     stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-    loadContinueListening(12).then(function(inProgress){
-      if(onPodcastsView !== true || podcastTab !== 'latest') return;
+    // Build 180: in-progress episodes moved to their own Continue tab.
+    resetStationsGrid();
+    renderPodcastsFollowingByDate(podcastSubs);
+  }
+  // The Continue tab (build 180): episodes part-way through, most recent first, as stacked rows.
+  // Each row's More menu has Remove, which drops the saved progress that puts it here.
+  function renderPodcastsContinue(){
+    stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    loadContinueListening(40).then(function(inProgress){
+      if(onPodcastsView !== true || podcastTab !== 'continue') return;
       resetStationsGrid();
-      if(inProgress.length){
-        var clLabel = appendGridSection('Continue Listening');
-        var row = document.createElement('div');
-        row.className = 'cl-row';
-        inProgress.forEach(function(rec){
-          row.appendChild(buildContinueListeningTile(rec));
-        });
-        stationsGrid.appendChild(row);
-        makeSectionAccordion(clLabel, row, 'podcastContinue');
+      if(!inProgress.length){
+        stationsGrid.innerHTML = '<div class="empty-state">Nothing to continue. Episodes you start listening to show up here.</div>';
+        return;
       }
-      // No "Latest Episodes" label: the tab above already says Latest, and the first date
-      // heading starts the list.
-      renderPodcastsFollowingByDate(podcastSubs);
+      stationsGrid.classList.add('grid-songs');
+      inProgress.forEach(function(rec){
+        var ep = podcastTrackFromProgress(rec);
+        var row = buildPodcastEpisodeRow(ep, { menu: false });
+        row.classList.add('pc-continue-row');
+        var left = rec.durationSec ? Math.max(0, rec.durationSec - rec.positionSec) : 0;
+        if(left > 0){
+          var sub = row.querySelector('.song-row-sub');
+          var txt = formatRuntime(left) + ' left';
+          if(sub) sub.textContent = (ep.collectionName ? ep.collectionName + ' \u00b7 ' : '') + txt;
+          else {
+            sub = document.createElement('div'); sub.className = 'song-row-sub'; sub.textContent = txt;
+            row.querySelector('.song-row-body').appendChild(sub);
+          }
+        }
+        row.appendChild(buildRowMoreBtn(ep, {
+          onRemove: function(){ removePodcastProgress(rec.guid).then(function(){ if(onPodcastsView) renderPodcastsGrid(); }); }
+        }));
+        stationsGrid.appendChild(row);
+      });
     });
   }
 
@@ -14012,7 +14044,7 @@
         key: 'library-' + r.id,
         entity: 'library-section',
         name: r.label,
-        sub: r.count + (r.count === 1 ? ' item' : ' items'),
+        sub: String(r.count),
         row: true,
         renderArt: function(art){ libraryIconArt(art, r.id); },
         onClick: function(){ searchInput.value = ''; runLibrarySection(r.id); }
@@ -14022,7 +14054,7 @@
       key: 'library-playlists',
       entity: 'library-section',
       name: 'Playlists',
-      sub: stationPlaylists.length + (stationPlaylists.length === 1 ? ' item' : ' items'),
+      sub: String(stationPlaylists.length),
       row: true,
       renderArt: function(art){ libraryIconArt(art, 'playlists'); },
       onClick: function(){ pushView(); openPlaylistsHome(); }
@@ -14031,7 +14063,7 @@
       key: 'library-genres',
       entity: 'library-section',
       name: 'Genres',
-      sub: genreOrder.length + (genreOrder.length === 1 ? ' genre' : ' genres'),
+      sub: String(genreOrder.length),
       row: true,
       renderArt: function(art){ libraryIconArt(art, 'genres'); },
       onClick: function(){ pushView(); openGenresHome(); }
@@ -14234,11 +14266,11 @@
     resetStationsGrid();
     closeChannelSortMenu();
     if(videoTab !== 'channels') videoChannelsEditing = false;
-    if(!videoChannelsEditing) appendContinueWatching();
     appendVideoTabs();
     videoAddHeaderBtnEl.title = videoTab === 'channels' ? 'Add channels' : 'Add a folder of videos';
     videoAddHeaderBtnEl.setAttribute('aria-label', videoAddHeaderBtnEl.title);
     if(videoTab === 'channels') renderChannelsTab();
+    else if(videoTab === 'continue') renderVideoContinueTab();
     else renderVideoLibraryTab(videoTab);
   }
   function renderChannelsTab(){
@@ -14250,7 +14282,6 @@
     updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing, 'Edit');
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
     if(!mine.length){
-      appendGridSection('My Channels');
       var empty = document.createElement('div');
       empty.className = 'empty-state';
       empty.textContent = 'No channels yet. Tap \u201cAdd Channels\u201d to find free TV channels.';
@@ -14261,7 +14292,6 @@
     // the rows drag into order; in A to Z there's nothing to drag.
     if(videoChannelsEditing){
       appendChannelSortOptions();
-      appendGridSection('My Channels').classList.add('ch-row-label');
       var manual = channelOrder === 'manual';
       mine.forEach(function(ch){
         var row = buildEntityTile({
@@ -14281,7 +14311,6 @@
       return;
     }
     if(channelSort === 'list'){
-      appendGridSection('My Channels').classList.add('ch-row-label');
       mine.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
       return;
     }
@@ -14300,7 +14329,9 @@
     var other = byName[''];
     if(other){ groups.splice(groups.indexOf(other), 1); groups.push(other); }
     groups.forEach(function(g){
-      appendGridSection(g.name || (groups.length > 1 ? 'Other' : 'My Channels')).classList.add('ch-row-label');
+      // Build 180: no "My Channels" label (the Live TV tab says what this is); a list of
+      // channels with no category gets no heading of its own unless other categories are shown.
+      if(g.name || groups.length > 1) appendGridSection(g.name || 'Other').classList.add('ch-row-label');
       g.list.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
     });
   }
@@ -14988,7 +15019,7 @@
   var videoEdits = vload(VIDEO_EDITS_KEY, {});         // id / 'show:'+key -> { title, kind, ... }
   var videoProgress = vload(VIDEO_PROGRESS_KEY, {});   // id -> { pos, dur, at, watched }
   var videoTab = vload(VIDEO_TAB_KEY, 'channels');
-  if(['channels', 'movies', 'shows'].indexOf(videoTab) === -1) videoTab = 'channels';
+  if(['channels', 'movies', 'shows', 'continue'].indexOf(videoTab) === -1) videoTab = 'channels';
   var videoSortBy = vload(VIDEO_SORT_KEY, { movies: 'recent', shows: 'recent' });
   var videoLib = null;                                 // built from the above (buildVideoLibrary)
   var onVideoDetailView = false;
@@ -16472,7 +16503,8 @@
   function appendVideoTabs(){
     var tabs = document.createElement('div');
     tabs.className = 'home-tabs video-tabs';
-    [['channels', 'Live TV'], ['movies', 'Movies'], ['shows', 'TV Shows']].forEach(function(t){
+    tabs.classList.add('scroll-tabs');
+    [['channels', 'Live TV'], ['movies', 'Movies'], ['shows', 'TV Shows'], ['continue', 'Continue']].forEach(function(t){
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'home-tab' + (videoTab === t[0] ? ' active' : '');
@@ -16487,6 +16519,87 @@
       tabs.appendChild(b);
     });
     stationsGrid.appendChild(tabs);
+    revealActiveTab(tabs);
+  }
+  // A tab row that scrolls sideways shows its open tab whole (build 180).
+  function revealActiveTab(row){
+    var a = row && row.querySelector('.home-tab.active');
+    if(!a) return;
+    var pad = 12, l = a.offsetLeft - row.offsetLeft, r = l + a.offsetWidth;
+    if(r > row.scrollLeft + row.clientWidth - pad) row.scrollLeft = r - row.clientWidth + pad;
+    else if(l < row.scrollLeft + pad) row.scrollLeft = Math.max(0, l - pad);
+  }
+  // Build 180: Continue Watching is a tab of its own (far right), as stacked rows.
+  function renderVideoContinueTab(){
+    videoReorderHeaderBtnEl.style.display = 'none';
+    videoSortHeaderBtnEl.style.display = 'none';
+    videoRefreshHeaderBtnEl.style.display = 'none';
+    var list = continueWatchingEntries();
+    if(!list.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'Nothing to continue. Movies, episodes and channels you start watching show up here.';
+      stationsGrid.appendChild(empty);
+      return;
+    }
+    stationsGrid.classList.add('grid-songs');
+    list.forEach(function(e){ stationsGrid.appendChild(buildContinueEntryRow(e)); });
+  }
+  function buildContinueEntryRow(e){
+    var row = document.createElement('div');
+    row.className = 'tile song-row video-result-row cw-row';
+    var art = document.createElement('div');
+    var title = '', sub = '';
+    if(e.kind === 'channel'){
+      var cst = channelToStation(e.ch);
+      row.dataset.key = favKey(cst);
+      art.className = 'tile-art song-row-art channel-art';
+      renderStationArt(art, cst);
+      title = e.ch.name;
+      sub = channelRowName(e.ch) || 'Channel';
+      if(currentStation && favKey(currentStation) === favKey(cst)) row.classList.add('playing');
+      row.addEventListener('click', function(){ playChannel(e.ch); });
+    } else {
+      var v = e.v;
+      row.dataset.key = 'video:' + v.id;
+      art.className = 'tile-art song-row-art video-result-art wide cw-art';
+      var url = v.kind === 'episode' ? episodeImageUrl(v) || videoPosterUrl(v) : (movieBackdropUrl(v) || videoPosterUrl(v));
+      if(url) art.appendChild(vImg(url));
+      var bar = progressBar(v);
+      if(bar) art.appendChild(bar);
+      title = v.kind === 'episode' ? v.show : v.title;
+      sub = v.kind === 'episode' ? (episodeCode(v) + (v.epTitle ? ' \u00b7 ' + v.epTitle : '')) : remainingText(v);
+      if(currentStation && isLocalVideo(currentStation) && currentStation.id === v.id) row.classList.add('playing');
+      row.addEventListener('click', function(){ playVideo(v); });
+    }
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div');
+    t.className = 'tile-name song-row-title';
+    t.textContent = title;
+    body.appendChild(t);
+    if(sub){
+      var s2 = document.createElement('div');
+      s2.className = 'song-row-sub';
+      s2.textContent = sub;
+      body.appendChild(s2);
+    }
+    row.appendChild(body);
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'row-more-btn';
+    more.title = 'More';
+    more.setAttribute('aria-label', 'More');
+    more.setAttribute('aria-haspopup', 'true');
+    more.innerHTML = '<span class="icon-ellipsis-v" aria-hidden="true"></span>';
+    more.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if(videoMenu){ closeVideoMenu(); return; }
+      openContinueMenu(more, e);
+    });
+    row.appendChild(more);
+    return row;
   }
   function appendContinueWatching(){
     var list = continueWatchingEntries();

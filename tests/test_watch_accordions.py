@@ -1,5 +1,8 @@
 """Build 138: the Video section is called Watch (circle play icon) in the tab bar and the drawer;
-Continue Listening on Podcasts and Continue Watching on Watch are accordions, open by default (build 141); after visiting a Library page, opening Watch highlights Watch in the tab bar.
+after visiting a Library page, opening Watch highlights Watch in the tab bar.
+Build 180: Continue Listening (Podcasts) and Continue Watching (Watch) are no longer accordions
+on the page: each is a Continue tab, the last tab, listing stacked rows; the tab rows scroll
+sideways; Live TV has no "My Channels" label; My Library's counts are bare numbers.
 Run: python3 tests/test_watch_accordions.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools, sys
 from playwright.async_api import async_playwright
@@ -77,56 +80,60 @@ async def main():
             check(lit == 'video', f'[{theme}] Watch opened from a Library page lights Watch, not Library ({lit})')
             head = await pg.evaluate("document.getElementById('stationsHeading').textContent")
             check(head == 'Watch', f'[{theme}] page heading reads Watch ({head})')
-            a0 = await pg.evaluate(ACC, 'watchContinue')
-            check(a0 and a0['expanded'] == 'true' and a0['rowShown'] and a0['tiles'] == 2 and a0['chev'], f'[{theme}] Continue Watching open by default {a0}')
-            await pg.screenshot(path=f'{SHOTS}/acc-watch-default-{theme}.png')
-            await pg.evaluate("document.querySelector('.acc-head[data-acc=watchContinue]').click()"); await pg.wait_for_timeout(500)
-            a = await pg.evaluate(ACC, 'watchContinue')
-            print(a)
-            check(a and a['expanded'] == 'false' and not a['rowShown'], f'[{theme}] tapping closes it {a}')
-            check(a and a['text'] == 'Continue Watching', f'[{theme}] heading has no count ({a and a["text"]})')
-            check(a and a['headH'] >= 40, f'[{theme}] heading is a comfortable tap target ({a and a["headH"]}px)')
-            gap_closed = a['nextTop'] - a['headBottom'] if a else None
-            await pg.screenshot(path=f'{SHOTS}/acc-watch-closed-{theme}.png')
-            fr = await pg.evaluate(SAMPLE, 'watchContinue')
-            a2 = await pg.evaluate(ACC, 'watchContinue')
-            print('open frames', fr[:4], '...', fr[-2:])
-            check(smooth(fr, a['nextTop'], a2['nextTop']), f'[{theme}] opening slides: the tabs glide down in steps, never back, no jump at the start ({len(fr)} frames, {fr[0]} -> {fr[-1]})')
-            check(fr[-1][2] > 100 and any(0 < f[2] < fr[-1][2] - 10 for f in fr), f'[{theme}] the row grows from nothing to full height')
-            print(a2)
-            check(a2['expanded'] == 'true' and a2['rowShown'] and a2['tiles'] == 2, f'[{theme}] tapping opens it: both channels {a2}')
-            check(a2['rowTop'] - a2['headBottom'] >= 8, f'[{theme}] row starts clear of the heading ({a2["rowTop"] - a2["headBottom"]}px)')
-            check(a2['nextTop'] - a2['rowBottom'] >= 8, f'[{theme}] room under the open row ({a2["nextTop"] - a2["rowBottom"]}px)')
-            check(gap_closed is not None and 8 <= gap_closed <= 40, f'[{theme}] closed: tidy gap to the tabs ({gap_closed}px)')
-            await pg.screenshot(path=f'{SHOTS}/acc-watch-open-{theme}.png')
-            # a redraw keeps it open
-            await pg.evaluate("document.querySelector('.video-tabs [data-vtab=movies]').click()"); await pg.wait_for_timeout(300)
+            TABS = """(sel)=>{ var t = document.querySelector(sel); if(!t) return null; var cs = getComputedStyle(t);
+              return { names: Array.from(t.querySelectorAll('.home-tab')).map(function(b){ return b.textContent.trim(); }),
+                active: (t.querySelector('.home-tab.active') || {}).textContent, scroll: cs.overflowX, wrap: cs.flexWrap,
+                sw: t.scrollWidth, cw: t.clientWidth }; }"""
+            GRID = """(()=>{ var g = document.getElementById('stationsGrid');
+              return { acc: g.querySelectorAll('.acc-head').length, labels: Array.from(g.querySelectorAll('.grid-section-label')).map(function(e){ return e.textContent.trim(); }),
+                rows: Array.from(g.querySelectorAll('.song-row')).map(function(r){ return { t: (r.querySelector('.song-row-title') || {}).textContent, s: (r.querySelector('.song-row-sub') || {}).textContent || '',
+                  more: !!r.querySelector('.row-more-btn'), h: Math.round(r.getBoundingClientRect().height), l: Math.round(r.getBoundingClientRect().left) }; }),
+                cl: g.querySelectorAll('.cl-row').length, text: g.innerText.slice(0, 300) }; })()"""
+            # ---- Watch: no accordion; Continue is the last tab ----
+            gw = await pg.evaluate(GRID)
+            check(gw['acc'] == 0 and gw['cl'] == 0 and 'Continue Watching' not in gw['text'], f'[{theme}] Watch has no Continue Watching section on the page {gw["labels"]}')
+            check('My Channels' not in gw['labels'], f'[{theme}] Live TV: no "My Channels" label {gw["labels"]}')
+            tw = await pg.evaluate(TABS, '.video-tabs')
+            check(tw['names'] == ['Live TV', 'Movies', 'TV Shows', 'Continue'], f'[{theme}] Continue is the last Watch tab {tw["names"]}')
+            check(tw['scroll'] in ('auto', 'scroll') and tw['wrap'] == 'nowrap', f'[{theme}] Watch tabs scroll sideways, on one line {tw}')
+            await pg.screenshot(path=f'{SHOTS}/cont-watch-live-{theme}.png')
+            await pg.evaluate("document.querySelector('.video-tabs [data-vtab=continue]').click()"); await pg.wait_for_timeout(500)
+            cw = await pg.evaluate(GRID); print(cw['rows'])
+            check(len(cw['rows']) == 2 and all(r['more'] for r in cw['rows']) and len(set(r['l'] for r in cw['rows'])) == 1,
+                  f'[{theme}] the Continue tab lists the two channels as stacked rows, each with More {cw["rows"]}')
+            check((await pg.evaluate(TABS, '.video-tabs'))['active'] == 'Continue', f'[{theme}] and is the open tab')
+            await pg.screenshot(path=f'{SHOTS}/cont-watch-{theme}.png')
+            # a row's More menu: Remove takes it off the list
+            await pg.evaluate("document.querySelector('#stationsGrid .cw-row .row-more-btn').click()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("Array.from(document.querySelectorAll('.v-menu .np-menu-item')).filter(function(b){ return /Remove/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(500)
+            check(len((await pg.evaluate(GRID))['rows']) == 1, f'[{theme}] Remove from Continue Watching takes the row away')
+            # remembered, like the other tabs
+            await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(500)
+            await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(700)
+            check((await pg.evaluate(TABS, '.video-tabs'))['active'] == 'Continue', f'[{theme}] Watch comes back on the Continue tab')
             await pg.evaluate("document.querySelector('.video-tabs [data-vtab=channels]').click()"); await pg.wait_for_timeout(300)
-            a3 = await pg.evaluate(ACC, 'watchContinue')
-            check(a3['expanded'] == 'true' and a3['rowShown'], f'[{theme}] stays open across a redraw')
-            o3 = await pg.evaluate(ACC, 'watchContinue')
-            fr = await pg.evaluate(SAMPLE, 'watchContinue')
-            a4 = await pg.evaluate(ACC, 'watchContinue')
-            check(not a4['rowShown'], f'[{theme}] tapping again closes it')
-            await pg.evaluate("document.querySelector('.video-tabs [data-vtab=movies]').click()"); await pg.wait_for_timeout(300)
-            await pg.evaluate("document.querySelector('.video-tabs [data-vtab=channels]').click()"); await pg.wait_for_timeout(300)
-            check(not (await pg.evaluate(ACC, 'watchContinue'))['rowShown'], f'[{theme}] a closed one stays closed across a redraw')
-            check(smooth(fr, o3['nextTop'], a4['nextTop']) and a4['nextTop'] - a4['headBottom'] == gap_closed, f'[{theme}] closing slides back up to exactly the closed spacing ({fr[0]} -> {fr[-1]}, gap {a4["nextTop"] - a4["headBottom"]})')
 
-            # ---- Podcasts: Continue Listening ----
+            # ---- Podcasts: no accordion; Continue is the last tab ----
             await pg.evaluate('__a.pod()'); await pg.wait_for_timeout(200)
             await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=podcasts]').click()"); await pg.wait_for_timeout(1200)
-            print('podcasts grid', await pg.evaluate("Array.prototype.map.call(document.getElementById('stationsGrid').children,function(e){return e.className+':'+e.textContent.slice(0,40);}).slice(0,6)"))
-            c = await pg.evaluate(ACC, 'podcastContinue')
-            print(c)
-            check(c and c['expanded'] == 'true' and c['rowShown'] and c['tiles'] == 3 and c['text'] == 'Continue Listening' and c['rowTop'] - c['headBottom'] >= 8,
-                  f'[{theme}] Continue Listening on Podcasts open by default with the three episodes, no count {c}')
-            await pg.evaluate("document.querySelector('.acc-head[data-acc=podcastContinue]').click()"); await pg.wait_for_timeout(500)
-            c2 = await pg.evaluate(ACC, 'podcastContinue')
-            check(not c2['rowShown'], f'[{theme}] and closes when tapped {c2}')
-            await pg.screenshot(path=f'{SHOTS}/acc-pod-closed-{theme}.png')
-            await pg.evaluate("document.querySelector('.acc-head[data-acc=podcastContinue]').click()"); await pg.wait_for_timeout(500)
-            await pg.screenshot(path=f'{SHOTS}/acc-pod-open-{theme}.png')
+            gp = await pg.evaluate(GRID)
+            check(gp['acc'] == 0 and gp['cl'] == 0 and 'Continue Listening' not in gp['text'], f'[{theme}] Latest has no Continue Listening section {gp["text"][:80]!r}')
+            tp = await pg.evaluate(TABS, '#podcastTabs')
+            check(tp['names'][-1] == 'Continue' and tp['scroll'] in ('auto', 'scroll') and tp['wrap'] == 'nowrap', f'[{theme}] Continue is the last Podcasts tab, and the tabs scroll sideways {tp}')
+            await pg.screenshot(path=f'{SHOTS}/cont-pod-latest-{theme}.png')
+            await pg.evaluate("Array.from(document.querySelectorAll('#podcastTabs .home-tab')).filter(function(b){ return b.textContent.trim() === 'Continue'; })[0].click()"); await pg.wait_for_timeout(900)
+            cp = await pg.evaluate(GRID); print(cp['rows'])
+            check(sorted(r['t'] for r in cp['rows']) == ['Episode 1', 'Episode 2', 'Episode 3'] and all(r['more'] for r in cp['rows']),
+                  f'[{theme}] the Continue tab lists the episodes in progress as rows with More {cp["rows"]}')
+            check(all('left' in r['s'] for r in cp['rows']), f'[{theme}] each says how much is left {[r["s"] for r in cp["rows"]]}')
+            await pg.screenshot(path=f'{SHOTS}/cont-pod-{theme}.png')
+            # My Library: bare numbers
+            await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=library]').click()"); await pg.wait_for_timeout(800)
+            subs = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .tile[data-entity=library-section] .tile-sub')).map(function(e){ return e.textContent; })")
+            check(subs and all(x.isdigit() for x in subs), f'[{theme}] My Library counts are numbers only {subs}')
+            # Add Music: no "never uploaded" line
+            note = await pg.evaluate("document.getElementById('addMusicOverlay').textContent")
+            check('never uploaded' not in note, f'[{theme}] the Add Music dialog has no "never uploaded" line')
             # Home's Continue Listening is untouched (not an accordion)
             await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(600)
             check(not await pg.evaluate("!!document.querySelector('#recentSection .acc-head')"), f'[{theme}] Home rows are not accordions')

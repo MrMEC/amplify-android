@@ -197,12 +197,12 @@ async def main():
         await pg.evaluate(pick, 'list'); await pg.wait_for_timeout(300)
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(await pg.evaluate(lbls) == ['My Channels'] and t == ['Link Three', 'PBS', 'ABC News Live', 'BBC News', 'Link One'], f'Manual + One List: your dragged order {t}')
+        check(await pg.evaluate(lbls) == [] and t == ['Link Three', 'PBS', 'ABC News Live', 'BBC News', 'Link One'], f'Manual + One List: your dragged order, with no "My Channels" label (build 180) {t}')
         check(not await pg.evaluate("!!document.querySelector('.ch-sort-opts')"), 'Done hides the sort options')
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(await pg.evaluate(lbls) == ['My Channels'] and t[0] == 'Link Three', f'choices and manual order kept after a restart {t}')
+        check(await pg.evaluate(lbls) == [] and t[0] == 'Link Three', f'choices and manual order kept after a restart {t}')
         # Back to A to Z: sorted again; the manual order is still there for next time.
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         await pg.evaluate(pick, 'az'); await pg.wait_for_timeout(300)

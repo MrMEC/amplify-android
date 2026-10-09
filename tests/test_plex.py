@@ -225,7 +225,8 @@ async def main():
         await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{SHOTS}/plex-movies.png')
         # Continue Watching: Severance from Plex's progress
-        cw = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .vw-tile'),function(t){return t.querySelector('.tile-name').textContent+'|'+t.querySelector('.tile-sub').textContent;})")
+        await pg.evaluate("document.querySelector('.video-tabs [data-vtab=continue]').click()"); await pg.wait_for_timeout(500)
+        cw = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .cw-row'),function(t){return t.querySelector('.song-row-title').textContent+'|'+t.querySelector('.song-row-sub').textContent;})")
         check(cw and cw[0] == 'Severance|S1 E1 · Good News About Hell', f'Continue Watching carries on with Plex progress {cw}')
 
         # TV Shows: Breaking Bad merged, Severance added
