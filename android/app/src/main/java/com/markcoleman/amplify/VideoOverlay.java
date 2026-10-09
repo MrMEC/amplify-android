@@ -37,6 +37,9 @@ public final class VideoOverlay {
     /** Two fingers pinching the picture (build 175): phase start / move / end, and the
      *  distance between the fingers now divided by the distance when the pinch began. */
     void onPinch(String phase, float scale);
+
+    /** A button of the controls drawn on the picture (build 181): play, pause, seek, full. */
+    void onControl(String action, double value);
   }
 
   /**
@@ -103,6 +106,12 @@ public final class VideoOverlay {
         boundTo = null;
       };
   private static final long UNBIND_DELAY_MS = 2500;
+
+  /** The controls drawn on the picture (build 181), and the last state the page sent. */
+  @Nullable private VideoControls controls;
+  private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull;
+  private double ctlPos, ctlDur;
+  private String ctlAccent = "";
 
   VideoOverlay(Activity activity, View webView, Listener listener) {
     this.activity = activity;
@@ -202,7 +211,22 @@ public final class VideoOverlay {
     captions.setVisibility(View.VISIBLE);
   }
 
+  /** What the page's controls show (build 181); kept for a box made later. */
+  void setControls(
+      boolean enabled, boolean playing, double pos, double dur, boolean live, boolean full, String accent) {
+    ctlEnabled = enabled;
+    ctlPlaying = playing;
+    ctlPos = pos;
+    ctlDur = dur;
+    ctlLive = live;
+    ctlFull = full;
+    ctlAccent = accent == null ? "" : accent;
+    if (controls != null) controls.update(enabled, playing, pos, dur, live, full, ctlAccent);
+  }
+
   void release() {
+    if (controls != null) controls.release();
+    controls = null;
     unbindNow();
     if (box != null && box.getParent() instanceof ViewGroup) {
       ((ViewGroup) box.getParent()).removeView(box);
@@ -219,8 +243,14 @@ public final class VideoOverlay {
     box.setBackgroundColor(Color.BLACK);
     box.setKeepScreenOn(true);
     box.setClickable(true);
-    box.setContentDescription("Video. Tap for full screen.");
-    box.setOnClickListener(v -> listener.onTap());
+    box.setContentDescription("Video. Tap for controls.");
+    // With the controls on (Now Playing), a tap shows or hides them; on the floating window
+    // (no controls) a tap goes to the page as before.
+    box.setOnClickListener(
+        v -> {
+          if (controls != null && controls.isActive()) controls.tapped();
+          else listener.onTap();
+        });
     // A tap is a tap; a finger that moves drags the picture instead (the page decides what a
     // drag does: it moves the floating window). Screen coordinates, so the box moving under
     // the finger doesn't change the distance.
@@ -329,6 +359,12 @@ public final class VideoOverlay {
             Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
     cp.bottomMargin = pad * 2;
     box.addView(captions, cp);
+    controls = new VideoControls(activity, (action, value) -> listener.onControl(action, value));
+    box.addView(
+        controls,
+        new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    controls.update(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
     // Posted: resizing the picture from inside a layout pass can be dropped until something else
     // asks for layout, which left a shrunk box drawing nothing.
     box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> box.post(this::fit));

@@ -2906,20 +2906,20 @@
      top buttons), the name sits right under it on one line, the controls follow, and the
      list below is the channels to flip to (My Channels, or more from the same category).
      Landscape (rotate-lock) and full screen keep their own layouts. */
-  body:not(.rotate-lock) .now-playing-screen.np-channel .np-art-wrap{
+  body:not(.rotate-lock) .now-playing-screen:is(.np-channel, .np-vplayer) .np-art-wrap{
     height:auto; aspect-ratio:auto; padding-top:calc(env(safe-area-inset-top, 0px) + 72px);
     min-height:calc(env(safe-area-inset-top, 0px) + 72px + min(56.25vw, 52vh)); box-sizing:border-box;
   }
-  body:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel .np-video-wrap{ position:relative; top:0; }
+  body:not(.rotate-lock):not(.np-video-full) .now-playing-screen:is(.np-channel, .np-vplayer) .np-video-wrap{ position:relative; top:0; }
   body:not(.rotate-lock) .now-playing-screen.np-channel .np-art{
     top:calc(env(safe-area-inset-top, 0px) + 72px); height:auto; bottom:0;
     -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
   }
   body:not(.rotate-lock) .now-playing-screen.np-channel .np-art img{ object-fit:contain; }
-  body:not(.rotate-lock) .now-playing-screen.np-channel .np-hero-foot{
-    position:relative; top:auto; margin-top:14px; padding:0 20px;
+  body:not(.rotate-lock) .now-playing-screen:is(.np-channel, .np-vplayer) .np-hero-foot{
+    position:relative; top:auto; margin-top:12px; padding:0 12px 0 20px;
   }
-  body:not(.rotate-lock) .now-playing-screen.np-channel .np-name{
+  body:not(.rotate-lock) .now-playing-screen:is(.np-channel, .np-vplayer) .np-name{
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; overflow-wrap:normal; width:100%;
   }
   body:not(.rotate-lock) .now-playing-screen.np-channel .np-sub{ margin-bottom:12px; }
@@ -2983,17 +2983,7 @@
   .np-video-wrap[hidden]{ display:none; }
   .np-video{ display:block; width:100%; aspect-ratio:16/9; max-height:52vh; object-fit:contain; background:#000; }
   .now-playing-screen.np-video-on #npArt{ visibility:hidden; }
-  .np-video-full-btn{
-    position:absolute; right:10px; bottom:10px; width:38px; height:38px; border-radius:50%;
-    display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
-    background:rgba(20,20,22,.55); border:1px solid rgba(255,255,255,.2); color:#fff;
-  }
-  .np-video-full-btn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-  .np-video-full-btn .when-full{ display:none; }
-  /* A live stream's picture is drawn natively on top of this box, so nothing of the page can
-     sit on it: no button (a tap on the picture toggles full screen instead). */
-  .now-playing-screen.np-video-stream .np-video-full-btn{ display:none; }
-  body.in-pip .np-video-full-btn{ display:none; }
+  body.in-pip .vctl{ display:none !important; }
   /* Full screen: the video alone on black, edge to edge; the app's own chrome is hidden
      (the system bars are hidden natively). The button moves to the top right to exit. */
   /* The art box is its own stacking context (z-index:0), which would keep the video's z-index
@@ -3001,9 +2991,85 @@
   body.np-video-full .np-art-wrap, body.np-video-full .np-hero{ position:relative; z-index:5000; }
   body.np-video-full .np-video-wrap{ position:fixed; inset:0; top:0; z-index:5000; background:#000; display:flex; align-items:center; justify-content:center; }
   body.np-video-full .np-video{ width:100%; height:100%; max-height:none; aspect-ratio:auto; }
-  body.np-video-full .np-video-full-btn{ top:calc(env(safe-area-inset-top, 0px) + 14px); right:calc(env(safe-area-inset-right, 0px) + 14px); bottom:auto; }
-  body.np-video-full .np-video-full-btn .when-full{ display:block; }
-  body.np-video-full .np-video-full-btn .when-small{ display:none; }
+  body.np-video-full .vctl-full .when-full{ display:block; }
+  body.np-video-full .vctl-full .when-small{ display:none; }
+  body.np-video-full .vctl-bar{ padding-left:calc(env(safe-area-inset-left, 0px) + 16px); padding-right:calc(env(safe-area-inset-right, 0px) + 10px); padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  /* ---------- Video player controls over the picture (build 181) ---------- */
+  .vctl{ display:none; position:absolute; z-index:3; -webkit-tap-highlight-color:transparent; }
+  /* Not on the landscape Now Playing (it keeps its own row of controls), except over a full screen video. */
+  body:is(:not(.rotate-lock), .np-video-full) .now-playing-screen.np-vplayer .vctl{ display:block; }
+  /* Over the channel's logo (no picture): the box under the top buttons. */
+  .np-art-wrap > .vctl{ left:0; right:0; top:calc(env(safe-area-inset-top, 0px) + 72px); bottom:0; }
+  /* Over the picture: the whole video box (full screen included). */
+  .np-video-wrap > .vctl{ inset:0; }
+  .vctl::before{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 46%), rgba(0,0,0,.18);
+    opacity:0; transition:opacity .22s ease;
+  }
+  .vctl-play, .vctl-bar{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
+  .vctl.show::before{ opacity:1; }
+  .vctl.show .vctl-play, .vctl.show .vctl-bar{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
+  .vctl-play{
+    position:absolute; left:50%; top:50%; width:64px; height:64px; margin:-32px 0 0 -32px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+    background:rgba(0,0,0,.45); border:none; color:#fff;
+  }
+  .vctl-play svg{ width:30px; height:30px; fill:currentColor; }
+  .vctl-ico-pause, .vctl.playing .vctl-ico-play{ display:none; }
+  .vctl.playing .vctl-ico-pause{ display:block; }
+  .vctl-bar{
+    position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:10px;
+    padding:0 6px 4px 14px; height:44px; box-sizing:content-box; color:#fff;
+  }
+  .vctl-time{ font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; text-shadow:0 1px 2px rgba(0,0,0,.5); flex-shrink:0; }
+  .vctl-live{
+    display:none; font-size:11px; font-weight:800; letter-spacing:.06em; padding:3px 7px; border-radius:4px;
+    background:#e5322d; color:#fff; flex-shrink:0;
+  }
+  .vctl-range{
+    flex:1 1 auto; min-width:0; height:24px; margin:0; background:transparent; cursor:pointer;
+    -webkit-appearance:none; appearance:none; --vctl-fill:0%;
+  }
+  .vctl-range::-webkit-slider-runnable-track{
+    height:3px; border-radius:2px;
+    background:linear-gradient(to right, var(--np-vivid, var(--accent)) var(--vctl-fill), rgba(255,255,255,.35) var(--vctl-fill));
+  }
+  .vctl-range::-webkit-slider-thumb{ -webkit-appearance:none; width:13px; height:13px; margin-top:-5px; border-radius:50%; background:var(--np-vivid, var(--accent)); border:none; }
+  .vctl-range::-moz-range-track{ height:3px; border-radius:2px; background:rgba(255,255,255,.35); }
+  .vctl-range::-moz-range-progress{ height:3px; border-radius:2px; background:var(--np-vivid, var(--accent)); }
+  .vctl-range::-moz-range-thumb{ width:13px; height:13px; border-radius:50%; background:var(--np-vivid, var(--accent)); border:none; }
+  .vctl.live .vctl-live{ display:block; }
+  .vctl.live .vctl-time, .vctl.live .vctl-range{ visibility:hidden; }
+  .vctl-full{
+    width:40px; height:40px; margin-left:auto; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    padding:0; border:none; background:none; color:#fff; cursor:pointer;
+  }
+  .vctl-full svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .vctl-full .when-full{ display:none; }
+  .vctl.no-full .vctl-full{ visibility:hidden; }
+  /* Under the picture: the title on the left and More on the right. Play, skip, the seek bar,
+     the heart (Favorite moved into More) and the Next card are gone; the controls are on the
+     picture now. */
+  #npFavMenuBtn{ display:none; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer #npFavMenuBtn{ display:flex; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer :is(#npFavBtn, #npPrevBtn, #npNextBtn, #npSkipBackBtn, #npSkipFwdBtn, #npPlayBtn, .np-seek, .np-upnext){ display:none !important; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details{
+    display:grid; grid-template-columns:minmax(0, 1fr) auto; column-gap:6px; align-items:center; text-align:left;
+  }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > *{ grid-column:1 / -1; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > :is(.np-name, .np-onair, .np-sub){ grid-column:1; justify-self:stretch; text-align:left; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-name{ grid-row:1; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-controls{ grid-column:2; grid-row:1 / span 3; margin:0; padding:0; width:auto; gap:0; align-self:center; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-video-toggle{ justify-self:start; margin-top:10px; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-sub{ margin-bottom:0; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-menu{ right:0; left:auto; }
+  /* Phones: it opens downward over the list (upward would cover the picture). */
+  @media (max-width: 900px){
+    body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-menu{ top:calc(100% + 6px); bottom:auto; }
+  }
+  /* The menu opens downward over the list, so the top part has to paint above it. */
+  body:not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-vplayer .np-hero{ position:relative; z-index:4; }
   body.np-video-full .sidebar-top, body.np-video-full .np-float, body.np-video-full .player-bar,
   body.np-video-full .bottom-nav, body.np-video-full .mobile-tabbar{ visibility:hidden; }
   .song-row-video{ display:flex; align-items:center; margin-top:4px; color:var(--text-dim); line-height:0; }
@@ -4057,7 +4123,7 @@
       flex:1 1 auto; min-height:0; display:flex; flex-direction:column; padding-top:0;
     }
     body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection{
-      flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin-top:14px;
+      flex:1 1 auto; min-height:0; display:flex; flex-direction:column; margin-top:10px;
     }
     body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection .np-related-heading{ flex-shrink:0; margin-bottom:6px; }
     body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollectionGrid{
@@ -5685,10 +5751,28 @@
           <!-- A podcast episode's video, in the artwork's place while video is on. -->
           <div class="np-video-wrap" id="npVideoWrap" hidden>
             <video class="np-video" id="npVideo" playsinline preload="none"></video>
-            <button type="button" class="np-video-full-btn" id="npVideoFullBtn" aria-label="Full screen">
-              <svg class="when-small" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path></svg>
-              <svg class="when-full" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"></path></svg>
+          </div>
+          <!-- Build 181: the video player's controls, over the picture (or the channel's logo while
+               there is no picture). Play/Pause in the middle; the progress bar (or LIVE) and full
+               screen along the bottom. A tap shows them, a tap on an empty spot hides them, and
+               they hide by themselves after 3 seconds. Moved into #npVideoWrap while a video shows
+               (so full screen carries them along). Where the phone draws the picture itself, it
+               draws the same controls on it (VideoControls.java). -->
+          <div class="vctl" id="vctl">
+            <button type="button" class="vctl-play" id="vctlPlay" aria-label="Play">
+              <svg class="vctl-ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5a.8.8 0 0 0-1.2.7z"/></svg>
+              <svg class="vctl-ico-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4.2" height="15" rx="1.2"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2"/></svg>
             </button>
+            <div class="vctl-bar">
+              <span class="vctl-live" id="vctlLive">LIVE</span>
+              <span class="vctl-time" id="vctlElapsed">0:00</span>
+              <input type="range" class="vctl-range" id="vctlRange" min="0" max="1000" value="0" step="1" aria-label="Seek">
+              <span class="vctl-time" id="vctlTotal">0:00</span>
+              <button type="button" class="vctl-full" id="npVideoFullBtn" aria-label="Full screen">
+                <svg class="when-small" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path></svg>
+                <svg class="when-full" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"></path></svg>
+              </button>
+            </div>
           </div>
           <div class="np-hero-fade" aria-hidden="true"></div>
         </div>
@@ -5736,6 +5820,10 @@
                   <span class="icon-ellipsis-v" aria-hidden="true"></span>
                 </button>
                 <div class="np-menu" id="npMenu" role="menu">
+                  <!-- Build 181: the video player has no heart button; Favorite is here instead. -->
+                  <button type="button" class="np-menu-item" id="npFavMenuBtn" role="menuitem">
+                    <i class="fa-regular fa-heart"></i><span id="npFavMenuLabel">Favorite</span>
+                  </button>
                   <button type="button" class="np-menu-item" id="npQueueMenuBtn" role="menuitem">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h10"/><path class="fill" d="M16 14.2v5.6l4.6-2.8z"/></svg><span>View Queue</span>
                   </button>
@@ -8758,6 +8846,7 @@
     nativeVideoUi({ fullscreen: false, landscape: false, awake: false });
     if(currentStation) syncNpVideoToggle(currentStation);
     syncVideoMini();
+    vctlSync();
   }
   function setNpVideo(on){
     if(on) setNpImmersive(false); // video has its own full-screen view
@@ -8771,6 +8860,7 @@
       npVideoWrap.hidden = false;
       syncNpVideoToggle(st);
       nativeVideoUi({ fullscreen: false, landscape: false, awake: true });
+      vctlSync();
       audio.attachVideo(npVideo, st.episodeUrl)['catch'](function(){
         if(audio.videoActive) audio.detachVideo();
         resetNpVideoUi();
@@ -8789,6 +8879,7 @@
     document.body.classList.add('np-video-full');
     npVideoFullBtn.setAttribute('aria-label', 'Exit full screen');
     nativeVideoUi({ fullscreen: true, landscape: !!lockLandscape, awake: true });
+    vctlSync();
   }
   function exitVideoFull(){
     if(!npVideoFull) return;
@@ -8800,6 +8891,7 @@
     npVideoFullBtn.setAttribute('aria-label', 'Full screen');
     // A stream's picture keeps the screen on by itself, and only while it shows.
     nativeVideoUi({ fullscreen: false, landscape: false, awake: npVideoOn && !npVideoStream });
+    vctlSync();
   }
   document.getElementById('npVideoMenuBtn').addEventListener('click', function(){
     closeNpMenu();
@@ -8814,11 +8906,6 @@
   npVideoFullBtn.addEventListener('click', function(e){
     e.stopPropagation();
     if(npVideoFull) exitVideoFull(); else enterVideoFull(true);
-  });
-  // In full screen, a tap on the picture pauses or plays.
-  npVideo.addEventListener('click', function(){
-    if(!npVideoFull) return;
-    if(npVideo.paused) audio.play()['catch'](function(){}); else audio.pause();
   });
   // Turning the phone on its side while the video shows goes full screen; upright again
   // comes back out (unless full screen was asked for with the button, which holds landscape).
@@ -8869,6 +8956,7 @@
       nowPlayingScreen.classList.add('np-video-on', 'np-video-stream');
       npVideoWrap.hidden = false;
       syncNpVideoToggle(currentStation);
+      vctlSync();
       if(window.innerWidth > window.innerHeight && !npVideoNoAutoFull) enterVideoFull(false);
     } else {
       resetNpVideoUi();
@@ -8995,6 +9083,140 @@
       syncStreamVideo();
     });
     document.addEventListener('visibilitychange', syncStreamVideo);
+  }
+
+  // ---------- Video player controls (build 181) ----------
+  // The video player (a channel, a music video, a movie or episode, a podcast's video) has its
+  // controls on the picture: Play/Pause in the middle, the progress bar (LIVE for a live
+  // stream) and full screen along the bottom. A tap shows them, a tap on an empty spot hides
+  // them, and they hide on their own after 3 seconds (not while paused, so Play is never
+  // hidden over a stopped picture). Where the phone draws the picture itself (channels, local
+  // and Plex videos), nothing of the page can sit on it, so the app draws the same controls
+  // there (VideoControls.java) from what vctlPushNative sends, and its buttons come back as
+  // 'videoctl' events.
+  var vctl = document.getElementById('vctl');
+  var vctlPlay = document.getElementById('vctlPlay');
+  var vctlRange = document.getElementById('vctlRange');
+  var vctlElapsed = document.getElementById('vctlElapsed');
+  var vctlTotal = document.getElementById('vctlTotal');
+  var VCTL_HIDE_MS = 3000;
+  var vctlTimer = 0, vctlDragging = false, vctlWasOn = false, vctlNativeKey = '', vctlAccent = '', vctlColorCtx = null;
+  function vctlPlaying(){ return !!npTarget() && npIsCurrent() && uiIsPlaying; }
+  function vctlArm(){
+    clearTimeout(vctlTimer);
+    vctlTimer = setTimeout(function(){
+      vctlTimer = 0;
+      if(vctlDragging || !vctlPlaying()) return;   // re-armed when playing starts again
+      vctl.classList.remove('show');
+    }, VCTL_HIDE_MS);
+  }
+  function vctlShow(show){
+    clearTimeout(vctlTimer); vctlTimer = 0;
+    vctl.classList.toggle('show', !!show);
+    if(show) vctlArm();
+  }
+  function vctlTimes(){
+    var cur = npIsCurrent(), st = npTarget();
+    var dur = cur && isFinite(audio.duration) && audio.duration > 0 ? audio.duration : ((st && st.duration) || 0);
+    return { cur: cur, dur: dur, pos: cur ? (audio.currentTime || 0) : 0 };
+  }
+  function vctlFill(){ vctlRange.style.setProperty('--vctl-fill', (Number(vctlRange.value) / 10) + '%'); }
+  function vctlSync(){
+    if(!vctl) return;
+    var st = npTarget();
+    var vp = !!st && (nowPlayingScreen.classList.contains('np-channel') || npVideoOn);
+    nowPlayingScreen.classList.toggle('np-vplayer', vp);
+    var home = npVideoOn ? npVideoWrap : npArtWrap;
+    if(vctl.parentNode !== home) home.appendChild(vctl);
+    if(!vp){
+      vctlWasOn = false;
+      vctlShow(false);
+      vctlPushNative();
+      return;
+    }
+    if(!vctlWasOn){ vctlWasOn = true; vctlShow(true); }
+    var playing = vctlPlaying();
+    vctl.classList.toggle('playing', playing);
+    vctlPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    var live = !npSeekApplies();
+    vctl.classList.toggle('live', live);
+    vctl.classList.toggle('no-full', !npVideoOn);
+    if(!live && !vctlDragging){
+      var t = vctlTimes();
+      vctlRange.disabled = !t.cur || !t.dur;
+      vctlRange.value = t.dur ? String(Math.round((t.pos / t.dur) * 1000)) : '0';
+      vctlElapsed.textContent = formatTime(t.pos);
+      vctlTotal.textContent = formatTime(t.dur);
+      vctlFill();
+    }
+    if(playing && vctl.classList.contains('show') && !vctlTimer) vctlArm();
+    vctlPushNative();
+  }
+  function vctlPushNative(){
+    if(!videoPlugin || typeof videoPlugin.setVideoControls !== 'function' || !vctl) return;
+    var on = !!(nowPlayingScreen.classList.contains('np-vplayer') && npVideoStream && !videoMiniOn);
+    var t = vctlTimes();
+    // The colour the screen's headings use (the cover's own, else the theme's).
+    try{
+      var cs = getComputedStyle(nowPlayingScreen);
+      var c = (cs.getPropertyValue('--np-vivid') || cs.getPropertyValue('--accent')).trim();
+      // As #rrggbb, which is all the phone reads (the cover's colour is written as hsl()).
+      var cx = vctlColorCtx || (vctlColorCtx = document.createElement('canvas').getContext('2d'));
+      cx.fillStyle = '#ffffff'; cx.fillStyle = c;
+      vctlAccent = String(cx.fillStyle);
+    }catch(e){}
+    var msg = { enabled: on, playing: vctlPlaying(), live: !npSeekApplies(), full: !!npVideoFull,
+      pos: Math.round(t.pos * 10) / 10, dur: Math.round(t.dur * 10) / 10, accent: vctlAccent };
+    // The phone counts the time along by itself; the position is sent again only when it moves
+    // on by a couple of seconds or jumps (so a timeupdate a few times a second isn't a message each).
+    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent].join('|');
+    if(key === vctlNativeKey) return;
+    vctlNativeKey = key;
+    videoPlugin.setVideoControls(msg)['catch'](function(){});
+  }
+  vctl.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(e.target.closest('.vctl-play, .vctl-bar')){ vctlShow(true); return; }
+    vctlShow(!vctl.classList.contains('show'));
+  });
+  // Any button or the bar touched keeps them up for another 3 seconds.
+  vctl.addEventListener('pointerdown', function(e){
+    if(vctl.classList.contains('show') && e.target.closest('button, input')) vctlArm();
+  }, true);
+  vctlPlay.addEventListener('click', function(){ npPlayBtn.click(); });
+  vctlRange.addEventListener('input', function(){
+    vctlFill();
+    var t = vctlTimes();
+    if(!t.cur || !t.dur) return;
+    vctlDragging = true;
+    clearTimeout(vctlTimer); vctlTimer = 0;
+    vctlElapsed.textContent = formatTime((Number(vctlRange.value) / 1000) * t.dur);
+  });
+  function vctlCommitSeek(){
+    if(!vctlDragging) return;
+    vctlDragging = false;
+    var t = vctlTimes();
+    if(t.cur && t.dur && npSeekApplies()){ try{ audio.currentTime = (Number(vctlRange.value) / 1000) * t.dur; }catch(e){} }
+    vctlArm();
+    vctlSync();
+  }
+  vctlRange.addEventListener('change', vctlCommitSeek);
+  vctlRange.addEventListener('pointerup', vctlCommitSeek);
+  document.getElementById('npFavMenuBtn').addEventListener('click', function(){
+    closeNpMenu();
+    npFavBtn.click();
+  });
+  if(videoPlugin){
+    videoPlugin.addListener('videoctl', function(ev){
+      var a = ev && ev.action;
+      if(a === 'play' || a === 'pause'){
+        if((a === 'pause') === vctlPlaying()) npPlayBtn.click();
+      } else if(a === 'seek'){
+        if(npSeekApplies() && npIsCurrent()){ try{ audio.currentTime = Math.max(0, Number(ev.value) || 0); }catch(e){} }
+      } else if(a === 'full'){
+        npVideoFullBtn.click();
+      }
+    });
   }
 
   // ---------- Picture-in-picture ----------
@@ -9138,6 +9360,7 @@
       videoMiniOn = want;
       videoMini.hidden = !want;
       document.body.classList.toggle('video-mini-on', want);
+      vctlPushNative();
     }
     // A podcast's picture lives wherever it is showing; moving the element keeps it playing.
     var home = want && !npVideoStream && audio && audio.videoActive ? videoMiniBox : npVideoWrap;
@@ -9725,6 +9948,7 @@
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
+    vctlSync();
     updateNowPlayingFavState();
     updateNpPlayBtn();
     syncSeekBar();
@@ -13492,8 +13716,9 @@
         heading.textContent = podcastDateHeadingLabel(iso);
         stationsGrid.appendChild(heading);
       }
-      // The Podcasts page: no menu, and titles get two lines (build 48).
-      var row = buildPodcastEpisodeRow(sub.latestEpisode, { menu: false });
+      // The Podcasts page: no menu, and titles get two lines (build 48). No date on the
+      // row either (build 181): the heading above it already gives the date.
+      var row = buildPodcastEpisodeRow(sub.latestEpisode, { menu: false, noDate: true });
       row.classList.add('podcast-date-row');
       stationsGrid.appendChild(row);
     });
@@ -21792,6 +22017,7 @@
     npSeekRange.style.setProperty('--seek-pct', pct + '%');
   }
   function syncSeekBar(){
+    vctlSync();
     syncNpPodcastControls();
     if(!npSeekApplies()){
       npSeek.style.display = 'none';
@@ -29374,7 +29600,7 @@
     body.appendChild(title);
 
     var bits = [];
-    if(ep.releaseDate){
+    if(ep.releaseDate && !(opts && opts.noDate)){
       var d = new Date(ep.releaseDate);
       if(!isNaN(d.getTime())) bits.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }));
     }
@@ -30606,6 +30832,9 @@
     var npFav = !!st && isFavorite(st);
     npFavBtn.classList.toggle('on', npFav);
     npFavBtn.innerHTML = npFav ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>';
+    var fm = document.getElementById('npFavMenuBtn');
+    if(fm) fm.innerHTML = (npFav ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>') +
+      '<span>' + (npFav ? 'Remove from Favorites' : 'Add to Favorites') + '</span>';
   }
   // Tracked separately from audio.paused because the UI leads the element: "Connecting..."
   // sets the pause icon before the stream has actually started, and audio.paused would
@@ -30647,6 +30876,7 @@
     npPlayBtn.disabled = !st;
     var showPause = !!st && npIsCurrent() && uiIsPlaying;
     npPlayBtn.innerHTML = showPause ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
+    vctlSync();
   }
 
   // Starts st from scratch (as opposed to resuming whatever's already loaded, which

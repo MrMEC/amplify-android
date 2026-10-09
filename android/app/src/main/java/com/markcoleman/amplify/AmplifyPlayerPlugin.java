@@ -1626,6 +1626,42 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   // ---------------- video ----------------
 
+  // The page's video controls (build 181), drawn on the picture by VideoOverlay/VideoControls.
+  private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull;
+  private double ctlPos, ctlDur;
+  private String ctlAccent = "";
+
+  /**
+   * What the controls on the picture show: {enabled (false on the floating window), playing,
+   * pos and dur in seconds, live, full, accent "#rrggbb"}. Their buttons come back as
+   * "videoctl" events {action: play|pause|seek|full, value}.
+   */
+  @PluginMethod
+  public void setVideoControls(PluginCall call) {
+    final boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+    final boolean playing = Boolean.TRUE.equals(call.getBoolean("playing", false));
+    final boolean live = Boolean.TRUE.equals(call.getBoolean("live", false));
+    final boolean full = Boolean.TRUE.equals(call.getBoolean("full", false));
+    Double p = call.getDouble("pos");
+    Double d = call.getDouble("dur");
+    final double pos = p == null ? 0 : p;
+    final double dur = d == null ? 0 : d;
+    final String accent = call.getString("accent", "");
+    main.post(
+        () -> {
+          ctlEnabled = enabled;
+          ctlPlaying = playing;
+          ctlLive = live;
+          ctlFull = full;
+          ctlPos = pos;
+          ctlDur = dur;
+          ctlAccent = accent == null ? "" : accent;
+          if (video != null)
+            video.setControls(enabled, playing, pos, dur, live, full, ctlAccent);
+          call.resolve();
+        });
+  }
+
   private JSObject videoJson() {
     JSObject o = new JSObject();
     o.put("id", currentId);
@@ -1697,8 +1733,17 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                         o.put("scale", scale);
                         notifyListeners("videopinch", o);
                       }
+
+                      @Override
+                      public void onControl(String action, double value) {
+                        JSObject o = new JSObject();
+                        o.put("action", action);
+                        o.put("value", value);
+                        notifyListeners("videoctl", o);
+                      }
                     });
             video.setVideoSize(videoW, videoH, videoRatio);
+            video.setControls(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
           }
           if (show && hasVideo) {
             if (VlcEngine.isActive()) video.show(VlcEngine.getTarget(), x, y, w, h);
