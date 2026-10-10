@@ -140,6 +140,8 @@ async def main():
               f'under a playing channel: Favorites (A to Z), then My Channels with the rest {np["list"]}')
         check(np['sub'] == np['head'], f'the My Channels heading matches the list heading {np["head"]} {np["sub"]}')
         check(all(x[0] == np['head'][0] and x[1] == np['head'][1] for x in lsz) and len(lsz) == 2, f'Live TV headings are the same size {lsz} vs {np["head"]}')
+        dim = await pg.evaluate("(()=>{ var d=document.createElement('div'); d.style.color='var(--text-dim)'; document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()")
+        check(all(x[2] == dim for x in lsz), f'Live TV headings use the default grey heading colour {lsz} vs {dim}')
         await pg.evaluate("document.getElementById('npCollectionGrid').scrollIntoView({block:'start'})"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{SHOTS}/favord-np.png')
         # un-favourite both channels: no headings (back to the plain My Channels list)
