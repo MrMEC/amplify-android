@@ -3213,7 +3213,7 @@
   .vd-actions{ display:flex; align-items:center; gap:10px; margin:18px 0 0; flex-wrap:wrap; }
   .vd-play{
     display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:999px; border:none; cursor:pointer;
-    background:var(--accent); color:#111; font:inherit; font-size:14px; font-weight:800;
+    background:var(--accent); color:#fff; font:inherit; font-size:14px; font-weight:800;
   }
   .vd-secondary{
     display:inline-flex; align-items:center; padding:10px 18px; border-radius:999px; cursor:pointer;
@@ -4738,6 +4738,11 @@
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
     body.rotate-lock .sidebar-top{ display:none !important; }
+    /* Build 184: on movie/TV pages and the pages with the floating menu button (album,
+       artist), the header (or the floating button) slides up out of view while scrolling
+       down and comes straight back on any scroll up. See syncHeaderAutoHide. */
+    .sidebar-top{ transition:transform .28s cubic-bezier(.4,0,.2,1); }
+    body.hdr-autohide.hdr-hidden:not(.np-open):not(.drawer-open) .sidebar-top{ transform:translateY(calc(-100% - 20px)); }
   }
 
   /* ---------- Now Playing: bare icon controls ---------- */
@@ -7946,6 +7951,47 @@
     hamburgerBtn.setAttribute('aria-expanded', 'false');
   }
   hamburgerBtn.addEventListener('click', openDrawer);
+
+  // ---- the header hides while scrolling down (build 184) ----
+  // Movie/TV pages and the pages whose menu button floats over a picture (album, artist): the
+  // header (or the floating button) slides up once the page has moved down a little, and comes
+  // back on the first scroll up. Near the top of the page it always shows.
+  var hdrLastY = 0, hdrDownRun = 0;
+  var HDR_SHOW_ABOVE = 80, HDR_HIDE_AFTER = 24;
+  function hdrAutoHidePage(){
+    var b = document.body.classList;
+    return isMobileLayout() && (b.contains('vdetail-open') || b.contains('album-open') || b.contains('artist-open'));
+  }
+  function syncHeaderAutoHide(){
+    var on = hdrAutoHidePage();
+    document.body.classList.toggle('hdr-autohide', on);
+    var y = window.scrollY || window.pageYOffset || 0;
+    var dy = y - hdrLastY;
+    hdrLastY = y;
+    if(!on || y < HDR_SHOW_ABOVE){ hdrDownRun = 0; document.body.classList.remove('hdr-hidden'); return; }
+    if(dy > 0){
+      hdrDownRun += dy;
+      if(hdrDownRun >= HDR_HIDE_AFTER) document.body.classList.add('hdr-hidden');
+    } else if(dy < 0){
+      hdrDownRun = 0;
+      document.body.classList.remove('hdr-hidden');
+    }
+  }
+  window.addEventListener('scroll', syncHeaderAutoHide, { passive: true });
+  // A new page (its body classes change) starts with the header showing.
+  if(window.MutationObserver){
+    var hdrPageKey = '';
+    new MutationObserver(function(){
+      var b = document.body.classList;
+      var key = ['vdetail-open', 'album-open', 'artist-open', 'np-open'].map(function(c){ return b.contains(c) ? 1 : 0; }).join('');
+      if(key === hdrPageKey) return;
+      hdrPageKey = key;
+      hdrDownRun = 0;
+      hdrLastY = window.scrollY || 0;
+      document.body.classList.remove('hdr-hidden');
+      document.body.classList.toggle('hdr-autohide', hdrAutoHidePage());
+    }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  }
   // Opened over a YouTube video (build 182): a choice that leaves closes the video page.
   sidebarScroll.addEventListener('click', function(e){
     if(!document.body.classList.contains('yt-open')) return;
