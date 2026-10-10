@@ -44,14 +44,25 @@ async def main():
             await pg.evaluate("document.getElementById('favoritesHeading').click()"); await pg.wait_for_timeout(800)
         async def names(sel='#stationsGrid .row-item'):
             return await pg.evaluate("(sel)=>Array.prototype.map.call(document.querySelectorAll(sel), function(r){ var n=r.querySelector('.row-name'); return (n||r).textContent.trim(); })", sel)
+        # Build 204: the Sort dropdown shows only while editing.
+        async def edit(on):
+            if await pg.evaluate("!!document.querySelector('#stationsGrid .fav-order-bar')") != on:
+                await pg.evaluate("document.getElementById('favPageEditBtn').click()"); await pg.wait_for_timeout(500)
         async def pick(v):
+            await edit(True)
             await pg.evaluate("document.querySelector('.fav-order-btn').click()"); await pg.wait_for_timeout(300)
             await pg.evaluate("(v)=>document.querySelector('.fav-order-menu [data-order=\"'+v+'\"]').click()", v); await pg.wait_for_timeout(500)
+            await edit(False)
+        async def cur():
+            await edit(True); t = await pg.evaluate("document.querySelector('.fav-order-btn').textContent.trim()"); await edit(False); return t
 
         await fav_page()
-        bar = await pg.evaluate("(()=>{ var b=document.querySelector('#stationsGrid > .fav-order-bar'); if(!b) return null; var r=b.getBoundingClientRect(); return {first: b===document.getElementById('stationsGrid').firstElementChild, text:b.textContent.trim(), w:r.width, x:r.left}; })()")
-        check(bar and bar['first'] and 'Manual, newest last' in bar['text'], f'Favorites page starts with the Sort dropdown, on Manual, newest last {bar}')
+        check(not await pg.evaluate("!!document.querySelector('.fav-order-bar, .fav-order-btn')"), 'no Sort dropdown on the Favorites page until Edit')
+        await pg.screenshot(path=f'{SHOTS}/favord-view.png')
         n0 = await names()
+        await edit(True)
+        bar = await pg.evaluate("(()=>{ var b=document.querySelector('#stationsGrid > .fav-order-bar'); if(!b) return null; var r=b.getBoundingClientRect(); return {first: b===document.getElementById('stationsGrid').firstElementChild, text:b.textContent.trim(), w:r.width, x:r.left}; })()")
+        check(bar and bar['first'] and 'Manual, newest last' in bar['text'], f'Edit shows the Sort dropdown first, on Manual, newest last {bar}')
         check(n0 == ['Kiss FM', 'Zed TV', 'Bravo Radio', 'Kitchen TV', 'Echo FM'], f'newest last keeps the stored order {n0}')
         await pg.evaluate("document.querySelector('.fav-order-btn').click()"); await pg.wait_for_timeout(400)
         menu = await pg.evaluate("(()=>{ var m=document.querySelector('.fav-order-menu'); if(!m) return null; var r=m.getBoundingClientRect(), br=document.querySelector('.fav-order-btn').getBoundingClientRect();"
@@ -61,6 +72,7 @@ async def main():
               f'the dropdown offers the three choices, current one ticked, under the button on screen {menu}')
         await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(300)
         check(not await pg.evaluate("!!document.querySelector('.fav-order-menu')"), 'a tap elsewhere closes it')
+        await edit(False)
 
         await pick('az')
         n1 = await names()
@@ -78,7 +90,7 @@ async def main():
         # kept across a restart
         await pg.reload(); await pg.wait_for_timeout(2500)
         await fav_page()
-        n2 = await names(); t2 = await pg.evaluate("document.querySelector('.fav-order-btn').textContent.trim()")
+        n2 = await names(); t2 = await cur()
         check(t2 == 'A to Z' and n2 == n1, f'A to Z is kept after a restart {t2} {n2}')
 
         await pick('newest')
@@ -104,7 +116,7 @@ async def main():
         check(n5[0] == 'Kiss FM' and len(n5) == 6, f'dragging in Manual, newest first reorders the list {n5}')
         await pg.reload(); await pg.wait_for_timeout(2500)
         await fav_page()
-        n6 = await names(); t6 = await pg.evaluate("document.querySelector('.fav-order-btn').textContent.trim()")
+        n6 = await names(); t6 = await cur()
         check(t6 == 'Manual, newest first' and n6 == n5, f'the choice and the hand-made order are kept after a restart {t6} {n6}')
 
         await pick('oldest')

@@ -4859,6 +4859,30 @@
   #albumHero .album-circle-btn.on{ color:var(--accent); border:none; }
   body.album-open #detailBackBtn, body.artist-open #detailBackBtn{ font-size:24px; }
   #albumHero .album-circle-btn{ font-size:28px; }
+  /* Build 204: one back button everywhere, the artist page's: a bare 24px arrow on a 52px tap
+     target, no pill and no label (the label stays for screen readers only). It is drawn in the
+     page's text colour; over a picture (artist, album, movie/TV pages) it is white with a soft
+     shadow, as before. */
+  #detailBackBtn{
+    width:52px; height:52px; padding:0; gap:0; justify-content:center; flex:0 0 auto;
+    font-size:24px; border-radius:0; background:none; border:none; box-shadow:none;
+    backdrop-filter:none; -webkit-backdrop-filter:none; color:var(--text);
+    margin-top:-12px; margin-bottom:-6px;
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  #detailBackBtn:hover{ background:none; border:none; color:var(--text); opacity:.8; }
+  #detailBackBtn:active{ transform:scale(.92); }
+  #detailBackLabel{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  body.album-open #detailBackBtn, body.artist-open #detailBackBtn, body.vdetail-open #detailBackBtn{
+    margin:0; color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.45));
+  }
+  @media (min-width: 901px){ body.vdetail-open #detailBackBtn{ color:var(--text); filter:none; margin-top:-12px; margin-bottom:-6px; } }
+  /* A movie or show with no backdrop picture: nothing to stand out from, so the page's text colour. */
+  body.vdetail-open:not(:has(.vd-backdrop img)) #detailBackBtn{ color:var(--text); filter:none; }
+  .yt-ov-back{ width:52px; height:52px; border-radius:0; font-size:24px; background:none; border:none;
+    color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.45)); margin-left:-6px; }
+  .art-url-back{ font-size:24px; color:var(--text); padding:6px 8px; }
+  .art-url-back:hover{ background:none; }
   #artistHero .album-shuffle-icon, #albumHero .album-shuffle-icon{ width:30px; height:30px; }
   #artistHero .album-circle-btn .icon-ellipsis-v, #albumHero .album-circle-btn .icon-ellipsis-v{ transform:scale(1.45); }
   #artistHero .artist-hero-actions, #albumHero .album-hero-actions{ gap:20px; }
@@ -8865,6 +8889,7 @@
       pill.addEventListener('click', function(){
         closeMoreLikeModal();
         closeNowPlaying();
+        pushView();
         searchByTag(label);
       });
       moreLikeTags.appendChild(pill);
@@ -13956,6 +13981,7 @@
       item.appendChild(label);
 
       item.addEventListener('click', function(){
+        pushView();
         searchInput.value = '';
         searchByTag(g);
       });
@@ -14782,7 +14808,7 @@
         sub: String(r.count),
         row: true,
         renderArt: function(art){ libraryIconArt(art, r.id); },
-        onClick: function(){ searchInput.value = ''; runLibrarySection(r.id); }
+        onClick: function(){ pushView(); searchInput.value = ''; runLibrarySection(r.id); }
       }));
     });
     stationsGrid.appendChild(buildEntityTile({
@@ -18889,7 +18915,7 @@
   // this page is already open, without redoing the rest of the page setup).
   function renderStationsGrid(){
     resetStationsGrid();
-    appendGridSection('Saved Searches', customSearches.length);
+    // Build 204: no 'Saved Searches' label or count on My Stations.
     if(!customSearches.length){
       var emptyForYou = document.createElement('div');
       emptyForYou.className = 'empty-state';
@@ -18940,7 +18966,7 @@
   function openPlaylistsHome(){
     enterLibraryChrome();
     onPlaylistsHomeView = true;
-    setDetailBack('Library', function(){ openMyLibraryHome(); });
+    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'My Library');
     renderStationPlaylistList();
     stationsHeading.textContent = 'Playlists';
     pageTitle.style.display = 'none';
@@ -18969,7 +18995,7 @@
         renderArt: function(art){ genreIconArt(art, g); },
         draggable: genresEditing,
         onReorder: function(){ reorderGenresFromGrid(); renderGenreNav(); },
-        onClick: function(){ searchInput.value = ''; searchByTag(g); }
+        onClick: function(){ pushView(); searchInput.value = ''; searchByTag(g); }
       }));
     });
   }
@@ -18977,7 +19003,7 @@
   function openGenresHome(){
     enterLibraryChrome();
     onGenresHomeView = true;
-    setDetailBack('Library', function(){ openMyLibraryHome(); });
+    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'My Library');
     renderGenreNav();
     stationsHeading.textContent = 'Genres';
     pageTitle.style.display = 'none';
@@ -24179,6 +24205,7 @@
       row.appendChild(label);
 
       row.addEventListener('click', function(){
+        pushView();
         searchInput.value = '';
         runLibrarySection(r.id);
       });
@@ -24276,6 +24303,11 @@
 
     function entry(label, open){ return { label: label, open: open, scroll: scroll }; }
 
+    // Build 204: the album/artist keys can outlive their page (My Stations or Playlists opened
+    // from an album left activeAlbumKey set), so they count only while that page is showing.
+    var bodyCls = document.body.classList;
+    if(album && !bodyCls.contains('album-open')) album = null;
+    if(artist && !album && !bodyCls.contains('artist-open')) artist = null;
     if(album){
       var al = null, list = buildAlbumIndex();
       album = resolveAlbumKey(album);
@@ -24390,7 +24422,7 @@
     // Artists / Albums / Songs are My Library's own subsections, so their back button always
     // returns there -- same fixed-destination treatment as the Podcasts show page's back
     // button, rather than a history-based one.
-    setDetailBack('Library', function(){ openMyLibraryHome(); });
+    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'My Library');
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
@@ -24603,7 +24635,7 @@
       return;
     }
     stationsGrid.innerHTML = '';
-    stationsGrid.appendChild(buildFavOrderBar());
+    // Build 204: the order dropdown shows only while editing.
     // Same per-item logic renderFavoritesList uses for the reorder list -- buildRow already
     // resolves an artist- or album-favourite record to its own portrait/cover and routes a
     // tap on one to that page rather than trying to play it directly.
@@ -29945,7 +29977,7 @@
     // A genre's station list is Genres' own category, so its back button always returns
     // there -- same fixed-destination treatment as the other sections' items above, rather
     // than a history-based one.
-    setDetailBack('Genres', function(){ openGenresHome(); });
+    setDetailBackToHistory(function(){ openGenresHome(); }, 'Genres');
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
