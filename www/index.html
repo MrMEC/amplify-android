@@ -7999,6 +7999,14 @@
     }
   }catch(e){}
   function renderDiagnostics(){
+    // Build 198: the cast log is read fresh (attempts made since the app opened).
+    var capD = window.Capacitor, PD = capD && capD.isNativePlatform && capD.isNativePlatform() && capD.Plugins && capD.Plugins.AmplifyPlayer;
+    if(PD && typeof PD.castLog === 'function' && !renderDiagnostics._fresh){
+      renderDiagnostics._fresh = true;
+      PD.castLog().then(function(r){ if(r && typeof r.caught === 'string') nativeCaught = r.caught; })['catch'](function(){})
+        .then(function(){ renderDiagnostics(); renderDiagnostics._fresh = false; });
+      return;
+    }
     diagnosticsEl.style.display = '';
     diagnosticsEl.innerHTML = 'Checking…';
     var lsOk = storageProbe();
@@ -8042,8 +8050,8 @@
             (log.freed.length ? line('Caches cleared to make room', log.freed.length) : '') +
             (log.failed ? line('A save was refused (storage full)', escapeHtml(log.failed.key) + ' at ' + escapeHtml(new Date(log.failed.at).toLocaleTimeString()), true) : '');
         })() +
-        (nativeCaught ? line('Errors caught (the app kept running)', nativeCaught.split('\n').filter(function(l){ return /^\[/.test(l); }).length, true)
-          + '<div style="white-space:pre-wrap;font-size:11px">' + escapeHtml(nativeCaught.split('\n').slice(-14).join('\n')) + '</div>' : '') +
+        (nativeCaught ? line('Cast and error log', nativeCaught.split('\n').filter(function(l){ return /^\[/.test(l); }).length, /\[(cast media|plugin|cast [a-z]+\])/.test(nativeCaught))
+          + '<div style="white-space:pre-wrap;font-size:11px">' + escapeHtml(nativeCaught.split('\n').filter(function(l){ return /^\[/.test(l) || /Exception:/.test(l); }).slice(-16).join('\n')) + '</div>' : '') +
         line('Saved cover-art URLs', customCount) +
         line('Resolved art entries', artCount) +
         (function(){
@@ -31050,6 +31058,12 @@
         reject(new Error('load-error'));
       }
       audio.addEventListener('error', onError);
+      // Build 198: a TV channel (or a station known to carry video) is cast as video.
+      try{
+        if(audio.isNative && currentStation && (currentStation.videoChannel || stationHasVideo(currentStation))){
+          audio._loadExtra = Object.assign(audio._loadExtra || {}, { castVideo: true });
+        }
+      }catch(e){}
       audio.src = url;
       audio.play().then(function(){
         if(settled) return;

@@ -75,6 +75,14 @@ final class CastBridge {
           RemoteMediaClient c = client;
           if (c != null) {
             int ps = c.getPlayerState();
+            // Build 198: the log says how each cast attempt went.
+            if (attemptAt > 0 && ps == MediaStatus.PLAYER_STATE_PLAYING) {
+              CrashLog.info(app, "cast playing after " + ((System.currentTimeMillis() - attemptAt) / 100) / 10.0 + " s");
+              attemptAt = 0;
+            } else if (attemptAt > 0 && ps == MediaStatus.PLAYER_STATE_IDLE && c.getIdleReason() == MediaStatus.IDLE_REASON_ERROR) {
+              attemptAt = 0;
+              fail("the Chromecast stopped with an error while loading");
+            }
             if (ps == MediaStatus.PLAYER_STATE_PLAYING) {
               wantPlay = true;
               loading = false;
@@ -268,6 +276,67 @@ final class CastBridge {
     return dot > slash ? path.substring(dot + 1) : "";
   }
 
+  /** Build 198: whether the address alone doesn't say what the stream is. */
+  static boolean needsSniff(String url, boolean video) {
+    String ext = extOf(url);
+    if (url.toLowerCase(Locale.ROOT).contains(".m3u8")) return false;
+    switch (ext) {
+      case "mp3": case "aac": case "m4a": case "ogg": case "oga": case "opus": case "flac": case "wav": return video;
+      case "mp4": case "m4v": case "mov": case "webm": case "mpd": return false;
+      default: return true;
+    }
+  }
+
+  /**
+   * Build 198: reads the first bytes of a stream whose address doesn't say what it is (most TV
+   * channels), so the Chromecast is told the right kind: an HLS playlist, an MPEG-TS stream, MP4,
+   * or audio. Off the main thread.
+   */
+  static String sniffMime(String url, boolean video) {
+    String fallback = video ? "application/x-mpegURL" : "audio/mpeg";
+    java.net.HttpURLConnection conn = null;
+    try {
+      String u = url;
+      for (int hop = 0; hop < 5; hop++) {
+        conn = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+        conn.setInstanceFollowRedirects(false);
+        conn.setConnectTimeout(6000);
+        conn.setReadTimeout(6000);
+        conn.setRequestProperty("Range", "bytes=0-2047");
+        conn.setRequestProperty("Icy-MetaData", "0");
+        int code = conn.getResponseCode();
+        if (code >= 300 && code < 400 && conn.getHeaderField("Location") != null) {
+          u = new java.net.URL(new java.net.URL(u), conn.getHeaderField("Location")).toString();
+          conn.disconnect();
+          continue;
+        }
+        break;
+      }
+      String ct = conn.getContentType();
+      byte[] buf = new byte[2048];
+      int n = 0;
+      try (java.io.InputStream in = conn.getInputStream()) {
+        int r;
+        while (n < buf.length && (r = in.read(buf, n, buf.length - n)) > 0) n += r;
+      }
+      String head = new String(buf, 0, n, java.nio.charset.StandardCharsets.ISO_8859_1);
+      if (head.contains("#EXTM3U")) return "application/x-mpegURL";
+      if (n > 188 && (buf[0] & 0xff) == 0x47 && (buf[188] & 0xff) == 0x47) return "video/mp2t";
+      if (n > 12 && head.startsWith("ftyp", 4)) return video ? "video/mp4" : "audio/mp4";
+      if (ct != null) {
+        String c = ct.toLowerCase(Locale.ROOT);
+        if (c.contains("mpegurl")) return "application/x-mpegURL";
+        if (c.contains("dash")) return "application/dash+xml";
+        if (c.startsWith("video/") || c.startsWith("audio/")) return c.split(";")[0].trim();
+      }
+      return fallback;
+    } catch (Throwable t) {
+      return fallback;
+    } finally {
+      if (conn != null) try { conn.disconnect(); } catch (Throwable ignored) {}
+    }
+  }
+
   static String mimeFor(String url) {
     String low = url.toLowerCase(Locale.ROOT);
     String ext = extOf(url);
@@ -293,10 +362,10 @@ final class CastBridge {
     return ext.isEmpty() || ext.equals("pls") || ext.equals("m3u");
   }
 
-  void load(String url, boolean live, String title, String artist, @Nullable String artUrl, long startMs, boolean play, boolean video) {
+  void load(String url, boolean live, String title, String artist, @Nullable String artUrl, long startMs, boolean play, boolean video, @Nullable String mimeOverride) {
     RemoteMediaClient c = client;
     if (c == null) return;
-    String mime = mimeFor(url);
+    String mime = mimeOverride != null ? mimeOverride : mimeFor(url);
     boolean isVideo = video || mime.startsWith("video/");
     MediaMetadata md = new MediaMetadata(isVideo ? MediaMetadata.MEDIA_TYPE_MOVIE : MediaMetadata.MEDIA_TYPE_MUSIC_TRACK);
     md.putString(MediaMetadata.KEY_TITLE, title == null ? "" : title);
@@ -321,6 +390,15 @@ final class CastBridge {
     lastPos = live ? 0L : Math.max(0L, startMs);
     failNote = null;
     lastUrl = url;
+    attemptAt = System.currentTimeMillis();
+    CrashLog.info(app, "cast load " + mime + (live ? " live" : "") + " " + url);
+    final long mine = attemptAt;
+    handler.postDelayed(() -> safe("stuck", () -> {
+      if (attemptAt != mine) return;
+      RemoteMediaClient cc = client;
+      CrashLog.info(app, "cast still not playing after 25 s: player state " + playerState() + ", idle reason " + idleReason()
+          + (cc != null && cc.getMediaStatus() != null ? ", receiver state " + cc.getMediaStatus().getPlayerState() : ""));
+    }), 25000L);
     try {
       c.load(req).setResultCallback(
           r -> safe("loadResult", () -> {
@@ -338,9 +416,12 @@ final class CastBridge {
   // Build 197: why the Chromecast couldn't play the last item (its detailed error code), for
   // the page's error message and Check storage.
   @Nullable String failNote;
+  private long attemptAt;
+  private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
   @Nullable private String lastUrl;
   private void fail(String why) {
     loading = false;
+    attemptAt = 0;
     failNote = why;
     CrashLog.note(app, "cast media", new RuntimeException(why + " [" + mimeFor(lastUrl == null ? "" : lastUrl) + "] " + (lastUrl == null ? "" : lastUrl)));
     listener.onCastStatus();

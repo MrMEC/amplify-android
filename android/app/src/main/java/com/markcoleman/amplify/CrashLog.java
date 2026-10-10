@@ -44,6 +44,15 @@ final class CrashLog {
     }
   }
 
+  /** Build 198: one line of what happened (no stack trace), e.g. each cast attempt and its outcome. */
+  static void info(Context context, String line) {
+    try {
+      String when = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+      write(context.getApplicationContext(), NOTES, "[" + when + "] " + line, true);
+    } catch (Throwable ignored) {
+    }
+  }
+
   private static String describe(Thread t, Throwable e) {
     StringWriter sw = new StringWriter();
     PrintWriter pw = new PrintWriter(sw);

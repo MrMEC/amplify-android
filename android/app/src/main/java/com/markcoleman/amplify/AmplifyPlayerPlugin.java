@@ -256,8 +256,29 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       if (m.artist != null) artist = m.artist.toString();
       if (m.artworkUri != null) art = m.artworkUri.toString();
     }
-    boolean live = CastBridge.liveFor(castUrl, castLiveHint || lastLive);
-    cast.load(castUrl, live, title, artist, art, castStartMs, castPlay, castVideoHint);
+    final boolean live = CastBridge.liveFor(castUrl, castLiveHint || lastLive);
+    final String url = castUrl, t = title, ar = artist, im = art;
+    final boolean video = castVideoHint;
+    if (!CastBridge.needsSniff(url, video)) {
+      cast.load(url, live, t, ar, im, castStartMs, castPlay, video, null);
+      return;
+    }
+    // Build 198: the address doesn't say what it is: look at the stream first.
+    new Thread(() -> {
+      final String mime = CastBridge.sniffMime(url, video);
+      main.post(() -> castSafe("loadSniffed", () -> {
+        if (!castActive || cast == null || !url.equals(castUrl)) return;
+        cast.load(url, live, t, ar, im, castStartMs, castPlay, video || mime.startsWith("video/"), mime);
+      }));
+    }, "cast-sniff").start();
+  }
+
+  /** Build 198: the cast log (attempts, outcomes, errors), read fresh for Check storage. */
+  @PluginMethod
+  public void castLog(PluginCall call) {
+    JSObject o = new JSObject();
+    o.put("caught", CrashLog.take(getContext(), true));
+    call.resolve(o);
   }
 
   /** A session started: what the phone is playing (a stream) moves to the Chromecast. */

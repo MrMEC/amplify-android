@@ -14,6 +14,7 @@ CASTMOCK = """(function(){
   window.__castInfo = { supported: true, available: false, connected: false, connecting: false, device: '', active: false };
   window.__picks = 0;
   window.Capacitor.Plugins.AmplifyPlayer = new Proxy({}, { get: function(t, k){
+    if(k === 'load') return function(a){ window.__loads = (window.__loads || []).concat([{ url: a.url, castVideo: !!a.castVideo }]); return P.load(a); };
     if(k === 'castInfo') return function(){ return Promise.resolve(window.__castInfo); };
     if(k === 'castPick') return function(){ window.__picks++; return Promise.resolve({}); };
     if(k === 'lastCrash') return function(){ var t = window.__crashText || ''; window.__crashText = ''; return Promise.resolve({ text: t, caught: '' }); };
@@ -96,6 +97,8 @@ async def run(p, theme):
     await pg.evaluate("document.querySelector('#stationsGrid .tile-row').click()"); await pg.wait_for_timeout(1500)
     await pg.evaluate("(id)=>window.__emit('state', {id:id, state:'ready', isPlaying:true, playWhenReady:true, position:0, duration:-1, live:true, cast:true, castDevice:'Living Room TV', external:true})", await pg.evaluate("window.__cur"))
     await pg.wait_for_timeout(500)
+    lv = await pg.evaluate("window.__loads")
+    check(lv and lv[-1]['castVideo'] and not lv[0]['castVideo'], f'{t}: a TV channel is sent as video for casting, a station is not {lv}')
     note = await pg.evaluate(NOTE)
     g = await pg.evaluate("(()=>{ var n=document.getElementById('npCastNote').getBoundingClientRect(), nm=document.getElementById('npName').getBoundingClientRect(), c=getComputedStyle(document.getElementById('npCastNote')).color; return {below: n.top >= nm.bottom - 1, color: c}; })()")
     check(note == 'Casting to Living Room TV' and g['below'], f'{t}: a TV channel on the Chromecast: the line sits under the channel name {note} {g}')
