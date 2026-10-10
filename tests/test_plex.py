@@ -354,6 +354,19 @@ async def main():
         await pg.wait_for_timeout(2500)
         syncs = len([x for x in REQ if x[1].startswith(REMOTE + '/library/sections/1/all')])
         check(syncs == 1, f'a fresh library isn\'t fetched again on start-up ({syncs} fetches)')
+        # build 200: the library is kept in the database, not settings storage; an old copy there is moved over
+        ls = await pg.evaluate("localStorage.getItem('radioPlayerPlexLib')")
+        check(ls is None, 'build 200: the Plex library is not in settings storage')
+        lib = await pg.evaluate("""new Promise(function(res){ var r=indexedDB.open('amplifyLibrary'); r.onsuccess=function(){ try{ var g=r.result.transaction('meta').objectStore('meta').get('plexLib'); g.onsuccess=function(){ res(g.result ? JSON.stringify(g.result) : null); }; g.onerror=function(){ res('err'); }; }catch(e){ res('x'+e); } }; r.onerror=function(){ res('open err'); }; })""")
+        check(lib and lib.startswith('{') and 'Dune' in lib, f'it is in the database ({(lib or "")[:40]})')
+        await pg.evaluate("""(lib)=>new Promise(function(res){ localStorage.setItem('radioPlayerPlexLib', lib); var r=indexedDB.open('amplifyLibrary'); r.onsuccess=function(){ var tx=r.result.transaction('meta','readwrite'); tx.objectStore('meta').delete('plexLib'); tx.oncomplete=function(){ r.result.close(); res(1); }; }; })""", lib)
+        await pg.reload(); await pg.wait_for_timeout(1500)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(400)
+        await tab(pg, 'movies')
+        mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')
+        ls = await pg.evaluate("localStorage.getItem('radioPlayerPlexLib')")
+        lib2 = await pg.evaluate("""new Promise(function(res){ var r=indexedDB.open('amplifyLibrary'); r.onsuccess=function(){ var g=r.result.transaction('meta').objectStore('meta').get('plexLib'); g.onsuccess=function(){ res(!!g.result); }; }; })""")
+        check('Dune' in mv and ls is None and lib2, f'an old copy in settings storage is moved to the database and shown ({ls is None}, {lib2}, {mv[:3]})')
 
         # bigger text at 360 wide: the Plex part of Settings still fits
         await pg.set_viewport_size({'width': 360, 'height': 780})

@@ -16219,14 +16219,49 @@
   var PLEX_CLIENT_KEY = 'radioPlayerPlexClientId';
   var PLEX_STALE_MS = 6 * 3600 * 1000;
   var plexAccount = vload(PLEX_ACCOUNT_KEY, null);   // { token, user, servers:[{ id, name, token, owned, conns:[{ uri, local, relay }] }], serverId, base }
-  var plexLib = vload(PLEX_LIB_KEY, null);           // { serverId, at, movies:[], shows:[], episodes:[] }
+  // Build 200: the synced library ({ serverId, at, movies:[], shows:[], episodes:[] }) lives in
+  // the app's database, not settings storage (it reached 3.8 M characters on Mark's phone and
+  // crowded out everything else). An older copy in settings storage is moved over once.
+  var plexLib = null;
+  var PLEX_LIB_META = 'plexLib';
+  var plexLibLegacy = vload(PLEX_LIB_KEY, null);
   var plexClientId = vload(PLEX_CLIENT_KEY, '');
   if(!plexClientId || typeof plexClientId !== 'string'){
     plexClientId = 'amplify-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
     vsave(PLEX_CLIENT_KEY, plexClientId);
   }
   if(plexAccount && (typeof plexAccount !== 'object' || !plexAccount.token)) plexAccount = null;
-  if(plexLib && (typeof plexLib !== 'object' || !Array.isArray(plexLib.movies))) plexLib = null;
+  if(plexLibLegacy && (typeof plexLibLegacy !== 'object' || !Array.isArray(plexLibLegacy.movies))) plexLibLegacy = null;
+  function plexLibValid(v){ return !!(v && typeof v === 'object' && Array.isArray(v.movies)); }
+  function plexLibSave(lib){
+    return idbDo([LIB_STORE_META], 'readwrite', function(tx){ return tx.objectStore(LIB_STORE_META).put(lib, PLEX_LIB_META); })
+      .then(function(){ return true; }, function(err){ noteIdbFailure(err); return false; });
+  }
+  function plexLibForget(){
+    try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){}
+    idbDo([LIB_STORE_META], 'readwrite', function(tx){ return tx.objectStore(LIB_STORE_META)['delete'](PLEX_LIB_META); })['catch'](function(){});
+  }
+  // Ready once the saved library has been read (or moved over from settings storage).
+  // Run after the rest of the script has set up (the database helpers are further down).
+  var plexLibReady = new Promise(function(res){ setTimeout(function(){ plexLibLoad().then(res, res); }, 0); });
+  function plexLibLoad(){
+    if(plexLibValid(plexLibLegacy)){
+      var legacy = plexLibLegacy;
+      plexLibLegacy = null;
+      plexLib = legacy;
+      try{ plexMergeProgress(); invalidateVideoLib(); }catch(e){}
+      return plexLibSave(legacy).then(function(ok){
+        if(ok){ try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){} }
+      });
+    }
+    return withTimeout(idbDo([LIB_STORE_META], 'readonly', function(tx){ return tx.objectStore(LIB_STORE_META).get(PLEX_LIB_META); }), 8000, 'plex library read timed out')
+      .then(function(v){
+        if(plexLibValid(v) && !plexLib){
+          plexLib = v;
+          try{ plexMergeProgress(); invalidateVideoLib(); refreshVideoPages(); refreshContinueWatching(); renderPlexSettings(); }catch(e){}
+        }
+      }, function(err){ noteIdbFailure(err); });
+  }
   var plexSyncBusy = false, plexSignIn = null, plexBaseOk = false, plexNote = '', plexLibUnsaved = false;
 
   function plexSignedIn(){ return !!(plexAccount && plexAccount.token); }
@@ -16629,7 +16664,7 @@
     plexAccount = null; plexLib = null; plexBaseOk = false;
     plexLiveList = null; try{ localStorage.removeItem(PLEX_LIVE_KEY); }catch(e){}
     savePlexAccount();
-    try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){}
+    plexLibForget();
     invalidateVideoLib();
     renderPlexSettings('');
     refreshVideoPages();
@@ -16642,7 +16677,7 @@
     plexBaseOk = false;
     plexLib = null;
     savePlexAccount();
-    try{ localStorage.removeItem(PLEX_LIB_KEY); }catch(e){}
+    plexLibForget();
     invalidateVideoLib();
     refreshVideoPages();
     plexSync({ connect: true, quiet: true });
@@ -16759,7 +16794,8 @@
       return chain.then(function(){ return lib; });
     }).then(function(lib){
       plexLib = lib;
-      plexLibUnsaved = !vsave(PLEX_LIB_KEY, plexLib);
+      plexLibUnsaved = false;
+      plexLibSave(lib).then(function(ok){ if(!ok){ plexLibUnsaved = true; renderPlexSettings(); } });
       plexMergeProgress();
       invalidateVideoLib();
       plexSyncBusy = false;
@@ -17143,7 +17179,7 @@
   setTimeout(function(){
     renderPlexSettings();
     if(!plexServer()) return;
-    plexConnect().then(function(){
+    plexLibReady.then(function(){ return plexConnect(); }).then(function(){
       invalidateVideoLib();
       if(!plexLib || !plexLib.sections || plexLib.serverId !== plexServer().id || Date.now() - (plexLib.at || 0) > PLEX_STALE_MS) return plexSync({ quiet: true });
       plexMergeProgress();
