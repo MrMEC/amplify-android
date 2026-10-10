@@ -1509,6 +1509,11 @@
      painted in the artist page's own colour. Back and Menu on top, the video under
      them, its title, then "More videos by ..." -- only that list scrolls, so the video stays
      put at the top. */
+  /* Build 183: the page is the artist's tint (always dark), so it carries the same light text
+     colours the artist page sets on its column; it sits outside that column, so in the light
+     theme it used to get dark text on the dark tint. */
+  .yt-overlay{ --text:#f5f6f8; --text-dim:rgba(255,255,255,.78); --text-faint:rgba(255,255,255,.58);
+    --border:rgba(255,255,255,.16); --panel:rgba(255,255,255,.08); --panel-2:rgba(255,255,255,.12); --art-bg:rgba(255,255,255,.08); }
   .yt-overlay{ position:fixed; inset:0; z-index:3000; background:var(--page-tint, #1c1d22); color:var(--text);
     display:none; flex-direction:column; }
   .yt-overlay.open{ display:flex; }
@@ -3243,6 +3248,28 @@
   .vep-row.playing .vep-title{ color:var(--accent); }
   .vep-row.playing .vep-thumb{ box-shadow:0 0 0 3px var(--accent); }
   @media (max-width: 900px){ .vep-thumb{ width:112px; } }
+  /* Build 183: on a phone the backdrop runs the full width of the screen, from right under
+     the header, and fades into the page; Back floats over it. The picture fills its box with
+     object-fit:cover (cropped, never stretched), anchored near its top where faces usually are. */
+  @media (max-width: 900px){
+    body.vdetail-open #browseView{ position:relative; padding-top:var(--vd-header-h, 60px); }
+    body.vdetail-open #sectionHeadingRow{
+      position:absolute; top:calc(var(--vd-header-h, 60px) + 14px); left:0; z-index:5; margin:0; width:auto;
+    }
+    body.vdetail-open #detailBackBtn{ margin-bottom:0; }
+    body.vdetail-open .tile-grid > .vd-wrap{ margin-top:0; }
+    body.vdetail-open .vd-backdrop{
+      width:100vw; margin-left:calc(50% - 50vw); margin-top:-30px;
+      aspect-ratio:auto; height:min(82vw, 62vh); max-height:none; border-radius:0; background:transparent;
+    }
+    body.vdetail-open .vd-backdrop img{ object-fit:cover; object-position:50% 22%; }
+    body.vdetail-open .vd-backdrop::after{
+      background:linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 38%,
+        color-mix(in srgb, var(--main-bg) 55%, transparent) 70%, var(--main-bg) 99%);
+    }
+    body.vdetail-open .vd-head{ margin:-150px 0 0; }
+    body.vdetail-open .vd-poster{ width:112px; }
+  }
   /* Build 182: titles get the room. Words wrap whole (no "Bewitche / d"); a show or movie's
      name sits under the poster at the full width of the page on a phone, and episode titles
      get three lines beside a smaller still. */

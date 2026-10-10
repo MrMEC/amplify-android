@@ -37,6 +37,11 @@ async def main():
         check(nm[0] == 2 and nm[1] == 'normal', f'a long show name takes two lines in the grid {nm}')
         await pg.screenshot(path=f'{SHOTS}/tvs-grid.png')
         await pg.evaluate("(t)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile.vposter'),function(x){return x.querySelector('.tile-name').textContent===t;}).click()", LONG); await pg.wait_for_timeout(800)
+        hero = await pg.evaluate("""(()=>{ var b=document.querySelector('.vd-backdrop').getBoundingClientRect(), k=document.getElementById('detailBackBtn').getBoundingClientRect();
+            var h=document.querySelector('.sidebar-top').getBoundingClientRect(); var img=document.querySelector('.vd-backdrop img');
+            return {left:b.left, w:b.width, top:Math.round(b.top), hb:Math.round(h.bottom), backIn:k.top>b.top && k.bottom<b.bottom, fit: img ? getComputedStyle(img).objectFit : 'cover'}; })()""")
+        check(hero['left'] == 0 and hero['w'] == 390 and hero['top'] == hero['hb'] and hero['backIn'] and hero['fit'] == 'cover',
+              f'build 183: the backdrop runs full width from the header, Back over it, cropped not stretched {hero}')
         tb = await pg.evaluate("""(()=>{var t=document.querySelector('.vd-seasons'); var r=t.getBoundingClientRect();
             return {n:t.children.length, sw:t.scrollWidth, cw:t.clientWidth, right:Math.round(r.right), ox:getComputedStyle(t).overflowX};})()""")
         check(tb['n'] == 12 and tb['sw'] > tb['cw'] and tb['ox'] == 'auto' and tb['right'] <= 390, f'season tabs overflow inside a scroller {tb}')
