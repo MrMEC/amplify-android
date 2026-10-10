@@ -3109,6 +3109,18 @@
   }
   .ch-sort-menu .ch-sort-check{ width:14px; display:inline-flex; justify-content:center; color:var(--accent); }
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
+  /* Build 189: Favorites page order dropdown. */
+  .tile-grid > .fav-order-bar{ grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:0 0 2px; }
+  .fav-order-label{ font-size:12.5px; font-weight:700; color:var(--text-dim); }
+  .fav-order-btn{ display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px;
+    border:1px solid var(--border); background:var(--panel); color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .fav-order-chev{ width:14px; height:14px; fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  /* Build 189: Favorites / My Channels headings on Live TV, drawn like the list heading under a
+     playing channel (.np-related-heading: 13px, bold, accent). */
+  .tile-grid > .ch-group-head{ grid-column:1/-1; font-size:13px; font-weight:700; letter-spacing:.01em; color:var(--accent); margin:-4px 0 -12px; }
+  .tile-grid > .tile-row + .ch-group-head{ margin-top:6px; }
+  .tile-grid > .ch-group-head + .grid-section-label.ch-row-label{ margin-top:4px; }
+  .np-related-grid.np-ch-list > .ch-group-head{ margin:16px 0 6px; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
   .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
   /* Build 180: tab rows scroll sideways rather than squeeze (Watch now has four tabs). */
@@ -7916,7 +7928,7 @@
   }
   function renderDrawerShortcuts(){
     drawerShortcutsGrid.innerHTML = '';
-    favorites.forEach(function(f){ drawerShortcutsGrid.appendChild(buildShortcut(f)); });
+    favoritesInOrder().forEach(function(f){ drawerShortcutsGrid.appendChild(buildShortcut(f)); });
     drawerShortcutsEmpty.hidden = favorites.length > 0;
     drawerLatestPodGrid.innerHTML = '';
     var subs = latestPodcastSubs();
@@ -11493,9 +11505,47 @@
     }catch(e){}
   }
 
+  // Build 189: how Favorites are ordered, chosen on the Favorites page and kept.
+  // 'az' (A to Z by name), 'newest' (Manual, a new favourite goes first) or 'oldest' (Manual,
+  // a new favourite goes last; the order before build 189). The stored array always holds the
+  // manual order, so A to Z only changes how lists are shown.
+  var FAV_ORDER_KEY = 'radioPlayerFavOrder';
+  var FAV_ORDER_OPTS = [['az', 'A to Z'], ['newest', 'Manual, newest first'], ['oldest', 'Manual, newest last']];
+  var favOrder = 'oldest';
+  try{ var fo0 = localStorage.getItem(FAV_ORDER_KEY); if(fo0 === 'az' || fo0 === 'newest') favOrder = fo0; }catch(e){}
+  function favDisplayName(f){
+    if(!f) return '';
+    if(f.type === 'album') return f.album || f.name || '';
+    return stripExclusively(f.name || '');
+  }
+  function favAzCompare(a, b){ return alphaCompare(alphaSortKey(favDisplayName(a)), alphaSortKey(favDisplayName(b))); }
+  // Favorites as every list shows them.
+  function favoritesInOrder(){
+    return favOrder === 'az' ? favorites.slice().sort(favAzCompare) : favorites;
+  }
+  function setFavOrder(v){
+    if(v === favOrder) return;
+    // Between the two Manual choices the list flips, so the newest favourite is at the end
+    // they chose (and a hand-made order is kept, just mirrored).
+    var nowManual = v !== 'az';
+    var lastManual = favOrder !== 'az' ? favOrder : 'oldest';
+    try{ if(favOrder === 'az') lastManual = localStorage.getItem(FAV_ORDER_KEY + 'Manual') || 'oldest'; }catch(e){}
+    if(nowManual && lastManual !== v){ favorites = favorites.slice().reverse(); saveFavorites(); }
+    favOrder = v;
+    try{
+      localStorage.setItem(FAV_ORDER_KEY, v);
+      if(nowManual) localStorage.setItem(FAV_ORDER_KEY + 'Manual', v);
+    }catch(e){}
+    renderFavoritesList();
+    if(typeof renderDrawerShortcuts === 'function') renderDrawerShortcuts();
+    refreshChannelListsForFavs();
+  }
+
   function toggleFavorite(station){
     if(isFavorite(station)){
       favorites = favorites.filter(function(f){ return favKey(f) !== favKey(station); });
+    } else if(favOrder === 'newest'){
+      favorites.unshift(station);
     } else {
       favorites.push(station);
     }
@@ -11503,6 +11553,8 @@
     renderFavoritesList();
     refreshFavIcons(station);
     updateNowPlayingFavState();
+    // Favourite channels lead the channel lists (Live TV, and the list under a playing channel).
+    if(station && (station.videoChannel || findVideoChannel(station.urlToResolve || ''))) refreshChannelListsForFavs();
   }
 
   // Force-sets (never blindly toggles) every visible star for this station,
@@ -12890,7 +12942,7 @@
     var npLandToggle = document.getElementById('npLandToggle');
     var npLandFavsRow = document.getElementById('npLandFavsRow');
     var landFavs = function(){
-      return favorites.filter(function(f){ return !isArtistFav(f) && !isAlbumFav(f); });
+      return favoritesInOrder().filter(function(f){ return !isArtistFav(f) && !isAlbumFav(f); });
     };
     renderLandFavs = function(){
       var list = landFavs();
@@ -13506,7 +13558,7 @@
     if(!favorites.length){
       favoritesGrid.innerHTML = '<div class="empty-state">Tap the heart on any station to save it here.</div>';
     } else {
-      favorites.forEach(function(s){
+      favoritesInOrder().forEach(function(s){
         // A song is a full-width row everywhere else; in a row of cards it has to be a card
         // like everything beside it.
         var tile = isLocalTrack(s) ? buildEntityTile({
@@ -14631,6 +14683,25 @@
     else if(videoTab === 'continue') renderVideoContinueTab();
     else renderVideoLibraryTab(videoTab);
   }
+  // Build 189: favourite channels lead the channel lists, A to Z, under "Favorites", with
+  // the rest under "My Channels". Without favourite channels, no headings.
+  function splitFavChannels(list){
+    var favs = [], rest = [];
+    list.forEach(function(ch){ (isFavorite(channelToStation(ch)) ? favs : rest).push(ch); });
+    favs.sort(channelAzCompare);
+    return { favs: favs, rest: rest };
+  }
+  function buildChGroupHead(text){
+    var h = document.createElement('div');
+    h.className = 'ch-group-head';
+    h.textContent = text;
+    return h;
+  }
+  function refreshChannelListsForFavs(){
+    if(typeof onVideoView !== 'undefined' && onVideoView && videoTab === 'channels' && !videoChannelsEditing) renderVideoHome();
+    var st = typeof npTarget === 'function' ? npTarget() : null;
+    if(st && isNpChannel(st) && document.body.classList.contains('np-channel-open')) renderNpChannels(st);
+  }
   function renderChannelsTab(){
     videoRefreshHeaderBtnEl.style.display = 'none';
     var mine = visibleVideoChannels();
@@ -14667,6 +14738,14 @@
         stationsGrid.appendChild(row);
       });
       return;
+    }
+    var split = splitFavChannels(mine);
+    if(split.favs.length){
+      stationsGrid.appendChild(buildChGroupHead('Favorites'));
+      split.favs.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
+      if(!split.rest.length) return;
+      stationsGrid.appendChild(buildChGroupHead('My Channels'));
+      mine = split.rest;
     }
     if(channelSort === 'list'){
       mine.forEach(function(ch){ stationsGrid.appendChild(buildChannelRow(ch)); });
@@ -14814,6 +14893,16 @@
       if(!list.length){ npCollection.style.display = 'none'; return; }
       npCollection.style.display = '';
       npCollectionHeading.textContent = heading;
+      if(saved){
+        // Favourite channels first (build 189), under Favorites, then the rest under My Channels.
+        var split = splitFavChannels(list);
+        if(split.favs.length){
+          npCollectionHeading.textContent = 'Favorites';
+          split.favs.forEach(function(ch){ npCollectionGrid.appendChild(buildChannelRow(ch, { saved: true })); });
+          if(split.rest.length){ var mh = buildChGroupHead('My Channels'); mh.classList.add('np-related-heading'); npCollectionGrid.appendChild(mh); }
+          list = split.rest;
+        }
+      }
       list.forEach(function(ch){ npCollectionGrid.appendChild(buildChannelRow(ch, { saved: saved })); });
     }
     if(findVideoChannel(url)){ show('My Channels', visibleVideoChannels(), true); return; }
@@ -24067,6 +24156,7 @@
   });
   // Saves the order the rows are now in (after a drag).
   function commitFavPageOrder(){
+    if(favOrder === 'az') return;   // A to Z isn't an order to keep; the manual one stays as it was
     var keys = Array.prototype.map.call(stationsGrid.querySelectorAll('.row-item'), function(el){ return el.dataset.key; });
     var byKey = {};
     favorites.forEach(function(f){ byKey[favKey(f)] = f; });
@@ -24081,11 +24171,13 @@
     var row = document.createElement('div');
     row.className = 'row-item fav-edit-row';
     row.dataset.key = favKey(s);
+    // Grips only in Manual: in A to Z there's nothing to drag.
+    var manual = favOrder !== 'az';
     var handle = document.createElement('div');
     handle.className = 'row-drag-handle';
     handle.setAttribute('aria-hidden', 'true');
     handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
-    row.appendChild(handle);
+    if(manual) row.appendChild(handle);
     var artistEntry = isArtistFav(s) ? artistEntryForFav(s) : null;
     var albumEntry = isAlbumFav(s) ? albumEntryForFav(s) : null;
     var thumb = document.createElement('div');
@@ -24116,6 +24208,7 @@
       renderFavoritesPage();
     });
     row.appendChild(remove);
+    if(!manual) return row;
     // Mouse: native drag and drop. Touch: the same finger-drag the other reorder lists use.
     row.draggable = true;
     row.addEventListener('dragstart', function(e){
@@ -24135,9 +24228,11 @@
   }
 
   function renderFavoritesPage(){
+    closeFavOrderMenu();
     if(favPageEditing){
       stationsGrid.innerHTML = '';
-      favorites.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
+      stationsGrid.appendChild(buildFavOrderBar());
+      favoritesInOrder().forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
       setResultCount(favorites.length, 'favorite');
       return;
     }
@@ -24146,12 +24241,79 @@
       setResultCount(0);
       return;
     }
+    stationsGrid.innerHTML = '';
+    stationsGrid.appendChild(buildFavOrderBar());
     // Same per-item logic renderFavoritesList uses for the reorder list -- buildRow already
     // resolves an artist- or album-favourite record to its own portrait/cover and routes a
     // tap on one to that page rather than trying to play it directly.
-    favorites.forEach(function(s){ stationsGrid.appendChild(buildRow(s, false)); });
+    favoritesInOrder().forEach(function(s){ stationsGrid.appendChild(buildRow(s, false)); });
     setResultCount(favorites.length);
   }
+  // Build 189: the Favorites page's order dropdown (A to Z / Manual, newest first / Manual,
+  // newest last), a button showing the current choice that opens a small menu under it.
+  var favOrderMenu = null;
+  function closeFavOrderMenu(){
+    if(favOrderMenu){ favOrderMenu.remove(); favOrderMenu = null; }
+    var b = document.querySelector('.fav-order-btn');
+    if(b) b.setAttribute('aria-expanded', 'false');
+  }
+  function favOrderLabel(v){
+    for(var i = 0; i < FAV_ORDER_OPTS.length; i++) if(FAV_ORDER_OPTS[i][0] === v) return FAV_ORDER_OPTS[i][1];
+    return '';
+  }
+  function buildFavOrderBar(){
+    var bar = document.createElement('div');
+    bar.className = 'fav-order-bar';
+    var label = document.createElement('span');
+    label.className = 'fav-order-label';
+    label.textContent = 'Sort';
+    bar.appendChild(label);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fav-order-btn';
+    btn.setAttribute('aria-haspopup', 'menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.innerHTML = '<span class="fav-order-cur"></span><svg class="fav-order-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>';
+    btn.firstChild.textContent = favOrderLabel(favOrder);
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(favOrderMenu){ closeFavOrderMenu(); return; }
+      var m = document.createElement('div');
+      m.className = 'ch-sort-menu fav-order-menu';
+      m.setAttribute('role', 'menu');
+      FAV_ORDER_OPTS.forEach(function(o){
+        var it = document.createElement('button');
+        it.type = 'button';
+        var on = favOrder === o[0];
+        it.className = 'np-menu-item' + (on ? ' on' : '');
+        it.setAttribute('role', 'menuitemradio');
+        it.setAttribute('aria-checked', on ? 'true' : 'false');
+        it.dataset.order = o[0];
+        it.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (on ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
+        it.lastChild.textContent = o[1];
+        it.addEventListener('click', function(ev){
+          ev.stopPropagation();
+          closeFavOrderMenu();
+          if(favPageEditing) commitFavPageOrder();
+          setFavOrder(o[0]);
+          renderFavoritesPage();
+        });
+        m.appendChild(it);
+      });
+      document.body.appendChild(m);
+      var r = btn.getBoundingClientRect();
+      m.style.top = Math.round(r.bottom + 6) + 'px';
+      m.style.left = Math.max(8, Math.round(r.left)) + 'px';
+      favOrderMenu = m;
+      btn.setAttribute('aria-expanded', 'true');
+    });
+    bar.appendChild(btn);
+    return bar;
+  }
+  document.addEventListener('click', function(e){
+    if(favOrderMenu && !favOrderMenu.contains(e.target)) closeFavOrderMenu();
+  });
+  window.addEventListener('scroll', closeFavOrderMenu, { passive: true });
 
   // recentStations holds both stations and local tracks, split by kind wherever it is shown
   // (see renderRecentSection); these two pages want the same split, just not truncated to
@@ -30217,7 +30379,7 @@
       favoritesList.innerHTML = '<div class="aside-empty">Tap the star on any station to save it here.</div>';
       return;
     }
-    favorites.forEach(function(s){ favoritesList.appendChild(buildRow(s, favoritesEditing)); });
+    favoritesInOrder().forEach(function(s){ favoritesList.appendChild(buildRow(s, favoritesEditing)); });
   }
 
   function setFavoritesEditing(on){
@@ -31524,7 +31686,7 @@
         var prog = {};
         (r[0] || []).forEach(function(rec){ if(rec && rec.guid) prog[rec.guid] = rec; });
         var lists = {};
-        lists.favorites = compact(favorites.map(function(f){
+        lists.favorites = compact(favoritesInOrder().map(function(f){
           if(isPodcastTrack(f)) return carEpisode(f, prog);
           if(isLocalTrack(f)) return carSong(f);
           if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
