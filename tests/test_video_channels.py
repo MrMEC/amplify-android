@@ -6,11 +6,7 @@ from playwright.async_api import async_playwright
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = '/tmp/claude-0/t/srv-ch'; SHOTS = '/tmp/claude-0/t/shots'
 os.makedirs(ROOT, exist_ok=True); os.makedirs(SHOTS, exist_ok=True)
-_src = open(os.path.join(HERE, '..', 'www', 'index.html')).read()
-_mark = '  var coverFlow = null;\n'
-assert _src.count(_mark) == 1
-_src = _src.replace(_mark, "window.__sc = function(q){ return searchChannels(q).map(function(c){ return c.name; }); };\n" + _mark)
-open(os.path.join(ROOT, 'index.html'), 'w').write(_src)
+shutil.copy(os.path.join(HERE, '..', 'www', 'index.html'), ROOT)
 H = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT); H.log_message = lambda *a: None
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 8777), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
 
@@ -119,20 +115,8 @@ async def main():
         catopts = "Array.prototype.map.call(document.querySelectorAll('.ch-tools select')[1].options,function(o){return o.textContent;})"
         names = [x['name'] for x in await rows(pg)]
         cats = await pg.evaluate(catopts)
-        sethide = await pg.evaluate("document.getElementById('adultChannelsSelect').value")
-        check('Hidden Adult' not in names and not any(c in ('Adult', 'XXX', 'xxx') for c in cats) and sethide == 'hide', f'adult channels hidden by default (setting Hide) {names} {cats} {sethide}')
-        # Build 201: Settings > Adult channels > Show brings them (and the Adult category) in.
-        setadult = "(v)=>{var s=document.getElementById('adultChannelsSelect');s.value=v;s.dispatchEvent(new Event('change'));}"
-        await pg.evaluate(setadult, 'show'); await pg.wait_for_timeout(500)
-        names2 = [x['name'] for x in await rows(pg)]; cats2 = await pg.evaluate(catopts)
-        stored = await pg.evaluate("localStorage.getItem('radioPlayerAdultChannels')")
-        check('Hidden Adult' in names2 and 'Adult' in cats2 and stored == 'show', f'Show: adult channel and Adult category listed {names2} {cats2}')
-        sch = await pg.evaluate("window.__sc('hidden adult')")
-        check(sch == ['Hidden Adult'], f'Show: adult channel found by search {sch}')
-        await pg.evaluate(setadult, 'hide'); await pg.wait_for_timeout(500)
-        names3 = [x['name'] for x in await rows(pg)]
-        sch = await pg.evaluate("window.__sc('hidden adult').length")
-        check('Hidden Adult' not in names3 and sch == 0, f'Hide again: gone from the list and search {names3}')
+        noset = await pg.evaluate("!document.getElementById('adultChannelsSelect') && !/Adult channels/.test(document.getElementById('settingsPanel').textContent)")
+        check('Hidden Adult' not in names and not any(c in ('Adult', 'XXX', 'xxx') for c in cats) and noset, f'no adult channels, no Adult category, no setting {names} {cats}')
         for n in ('ABC News Live', 'BBC News'):
             await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent===n;}).querySelector('.ch-add').click()", n)
         await pg.wait_for_timeout(200)
