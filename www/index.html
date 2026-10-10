@@ -3074,8 +3074,10 @@
   }
   body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > *{ grid-column:1 / -1; }
   body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > :is(.np-name, .np-onair, .np-sub){ grid-column:1; justify-self:stretch; text-align:left; }
-  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-name{ grid-row:1; }
-  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-controls{ grid-column:2; grid-row:1 / span 3; margin:0; padding:0; width:auto; gap:0; align-self:center; }
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-name{ grid-row:1; margin-top:0; margin-bottom:0; }
+  /* Build 191: More sits level with the title line (it spanned the title and the lines under
+     it, so with an empty line below it hung lower than the name). */
+  body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-controls{ grid-column:2; grid-row:1; margin:0; padding:0; width:auto; gap:0; align-self:center; }
   body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-video-toggle{ justify-self:start; margin-top:10px; }
   body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-sub{ margin-bottom:0; }
   body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-menu{ right:0; left:auto; }
@@ -4997,6 +4999,14 @@
   html[data-theme="light"] .now-playing-screen.np-channel .np-sub{ color:rgba(0,0,0,.62); }
   html[data-theme="light"] .now-playing-screen.np-channel .np-fav-btn:not(.on),
   html[data-theme="light"] .now-playing-screen.np-channel .np-menu-btn{ color:#111; }
+  /* Build 191: the More menu on the white channel screen: a light surface (it was the dark
+     panel with this screen's dark text on it). */
+  html[data-theme="light"] .now-playing-screen.np-channel .np-menu{
+    background:#fff; border-color:rgba(0,0,0,.12); box-shadow:0 14px 36px rgba(0,0,0,.2);
+  }
+  html[data-theme="light"] .now-playing-screen.np-channel .np-menu .np-menu-item{ color:#111; }
+  html[data-theme="light"] .now-playing-screen.np-channel .np-menu .np-menu-item.danger{ color:var(--danger); }
+  html[data-theme="light"] .now-playing-screen.np-channel .np-menu .np-menu-item:hover{ background:rgba(0,0,0,.06); }
   html[data-theme="light"] .now-playing-screen.np-channel .np-play-btn{ background:#111; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.18); }
   html[data-theme="light"] .now-playing-screen.np-channel .row-more-btn{ color:var(--text-dim); filter:none; }
   html[data-theme="light"] .now-playing-screen.np-channel .row-more-btn:hover{ background:rgba(0,0,0,.06); }
@@ -7059,6 +7069,81 @@
 })();
 </script>
 
+<script>
+// ---------- Saved lists kept by Android too (build 191) ----------
+// The WebView holds localStorage writes in memory and puts them on disk later (much later
+// when the page writes a lot), so a change made just before the app is closed could be lost:
+// Mark added a channel to Favorites and it was gone after reopening. Every write of the keys
+// below is copied to the app's own storage (AmplifyPlayer.kvSet, written to disk at once).
+// At start-up, if Android's copy differs from what localStorage held when the page loaded, a
+// write was lost: Android's copy is put back and the page reloads once.
+(function(){
+  var cap = window.Capacitor;
+  var P = cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer;
+  if(!P || typeof P.kvSet !== 'function' || typeof P.kvGetAll !== 'function') return;
+  var KEYS = ['radioPlayerFavorites', 'radioPlayerFavOrder', 'radioPlayerFavOrderManual', 'radioPlayerFavArtistOrder',
+    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort',
+    'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
+    'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
+    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent'];
+  var MIRROR = {};
+  KEYS.forEach(function(k){ MIRROR[k] = true; });
+  var ls;
+  try{ ls = window.localStorage; }catch(e){ return; }
+  var origSet = Storage.prototype.setItem, origRemove = Storage.prototype.removeItem;
+  var atLoad = {};
+  KEYS.forEach(function(k){ try{ atLoad[k] = ls.getItem(k); }catch(e){ atLoad[k] = null; } });
+  var ready = false, pending = {};
+  function push(k){
+    var v = null;
+    try{ v = ls.getItem(k); }catch(e){}
+    P.kvSet({ key: k, value: v })['catch'](function(){});
+  }
+  function changed(k){ if(ready) push(k); else pending[k] = true; }
+  Storage.prototype.setItem = function(k, v){
+    origSet.call(this, k, v);
+    if(this === ls && MIRROR[k]) changed(k);
+  };
+  Storage.prototype.removeItem = function(k){
+    origRemove.call(this, k);
+    if(this === ls && MIRROR[k]) changed(k);
+  };
+  function go(){
+    ready = true;
+    Object.keys(pending).forEach(push);
+    pending = {};
+  }
+  P.kvGetAll().then(function(res){
+    var vals = (res && res.values) || {};
+    if(vals.__seeded !== '1'){
+      // First run with this build: Android takes what localStorage has.
+      KEYS.forEach(function(k){ if(atLoad[k] !== null) pending[k] = true; });
+      P.kvSet({ key: '__seeded', value: '1' })['catch'](function(){});
+      go();
+      return;
+    }
+    var lost = KEYS.filter(function(k){
+      var nv = Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : null;
+      return nv !== atLoad[k];
+    });
+    var again = false;
+    try{ again = sessionStorage.getItem('amplifyKvRestored') === '1'; }catch(e){}
+    if(lost.length && !again){
+      lost.forEach(function(k){
+        var nv = Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : null;
+        try{ if(nv === null) origRemove.call(ls, k); else origSet.call(ls, k, nv); }catch(e){}
+      });
+      try{ sessionStorage.setItem('amplifyKvRestored', '1'); }catch(e){}
+      location.reload();
+      return;
+    }
+    try{ sessionStorage.removeItem('amplifyKvRestored'); }catch(e){}
+    // After a restore (or if it couldn't take), whatever localStorage has now is the truth.
+    if(lost.length) lost.forEach(function(k){ pending[k] = true; });
+    go();
+  }, function(){ go(); });
+})();
+</script>
 <script>
 (function(){
   "use strict";

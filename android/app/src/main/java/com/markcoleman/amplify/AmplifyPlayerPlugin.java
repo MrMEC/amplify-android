@@ -1499,6 +1499,36 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   // ---------------- files ----------------
 
+  // Build 191: a copy of the page's own saved lists (Favorites, My Channels, playlists...) in
+  // SharedPreferences. The WebView keeps localStorage writes in memory and puts them on disk
+  // later (later still when the page writes a lot), so closing the app soon after a change
+  // could lose it. commit() writes to disk before returning; plugin calls run off the main
+  // thread, in order.
+  private static final String KV_PREFS = "amplify_kv";
+  @PluginMethod
+  public void kvSet(PluginCall call) {
+    String key = call.getString("key");
+    if (key == null || key.isEmpty()) { call.reject("key"); return; }
+    android.content.SharedPreferences.Editor e = getContext().getSharedPreferences(KV_PREFS, Context.MODE_PRIVATE).edit();
+    if (call.getData().has("value") && !call.getData().isNull("value")) e.putString(key, call.getString("value"));
+    else e.remove(key);
+    boolean ok = e.commit();
+    JSObject r = new JSObject();
+    r.put("ok", ok);
+    call.resolve(r);
+  }
+  @PluginMethod
+  public void kvGetAll(PluginCall call) {
+    java.util.Map<String, ?> all = getContext().getSharedPreferences(KV_PREFS, Context.MODE_PRIVATE).getAll();
+    JSObject values = new JSObject();
+    for (java.util.Map.Entry<String, ?> en : all.entrySet()) {
+      if (en.getValue() instanceof String) values.put(en.getKey(), (String) en.getValue());
+    }
+    JSObject r = new JSObject();
+    r.put("values", values);
+    call.resolve(r);
+  }
+
   /** Export: writes {name, text, mime} into Downloads and says where it went (build 48). */
   @PluginMethod
   public void saveToDownloads(PluginCall call) {
