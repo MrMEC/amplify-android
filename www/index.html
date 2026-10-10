@@ -15066,6 +15066,7 @@
     var subBits = [];
     if(e.country) subBits.push((iptvIndex && iptvIndex.countries[e.country]) || e.country);
     if(e.src === 'plex') subBits.push(['Plex'].concat((e.cats || []).slice(0, 2)).join(' · '));
+    else if(e.src === 'pluto') subBits.push(['Pluto TV'].concat((e.cats || []).slice(0, 2)).join(' · '));
     else if(e.cats && e.cats.length && iptvIndex) subBits.push(e.cats.map(function(c){ return iptvIndex.cats[c] || c; }).join(', '));
     if(subBits.length){ var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = subBits.join(' · '); text.appendChild(sb); }
     row.appendChild(text);
@@ -15141,10 +15142,13 @@
       tools = document.createElement('div');
       tools.className = 'ch-tools';
       var tabs = document.createElement('div');
-      tabs.className = 'home-tabs';
-      // Short labels: they all have to fit across a phone. Plex only while signed in to Plex.
+      // Five tabs (with Plex) don't all fit across a phone with larger text: the row scrolls
+      // sideways like the Watch tabs, and the open tab is scrolled into view.
+      tabs.className = 'home-tabs scroll-tabs';
+      // Short labels. Plex only while signed in to Plex.
       if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
       var tabList = [['recommended', 'Recommended'], ['all', 'All']];
+      tabList.push(['pluto', 'Pluto']);
       if(plexSignedIn()) tabList.push(['plex', 'Plex']);
       tabList.push(['link', 'Link']);
       tabList.forEach(function(t){
@@ -15163,6 +15167,7 @@
       });
       tools.appendChild(tabs);
       stationsGrid.appendChild(tools);
+      revealActiveTab(tabs);
       if(addChannelsTab === 'link') buildLinkTools(tools);
       else buildBrowseTools(tools);
     }
@@ -15172,7 +15177,7 @@
     if(addChannelsTab === 'link'){ renderLinkResults(body); return; }
     body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; })
-      : addChannelsTab === 'plex' ? loadPlexLive() : loadFreeTv();
+      : addChannelsTab === 'plex' ? loadPlexLive() : addChannelsTab === 'pluto' ? loadPluto() : loadFreeTv();
     var tab = addChannelsTab;
     loader.then(function(list){
       if(!onAddChannelsView || addChannelsTab !== tab) return;
@@ -15181,7 +15186,7 @@
       var host = document.createElement('div');
       host.style.display = 'contents';
       stationsGrid.appendChild(host);
-      var entries = filterChannels(list, addChannelsTab !== 'plex');
+      var entries = filterChannels(list, addChannelsTab !== 'plex' && addChannelsTab !== 'pluto');
       if(!entries.length){
         host.innerHTML = '<div class="empty-state">No channels match. Try another country, category or name.</div>';
         setResultCount(0, 'channel');
@@ -15192,6 +15197,8 @@
       if(!onAddChannelsView || addChannelsTab !== tab) return;
       body.innerHTML = tab === 'plex'
         ? '<div class="empty-state">Couldn’t load Plex’s channels (' + ((err && err.message) || 'network error') + '). Check your connection, or sign in to Plex again in Settings.</div>'
+        : tab === 'pluto'
+        ? '<div class="empty-state">Couldn’t load Pluto TV’s channels (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>'
         : '<div class="empty-state">Couldn’t load the channel list (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>';
     });
   }
@@ -15226,7 +15233,7 @@
       if(e.country) countries[e.country] = true;
       (e.cats || []).forEach(function(c){ cats[c] = true; });
     });
-    if(addChannelsTab === 'plex'){
+    if(addChannelsTab === 'plex' || addChannelsTab === 'pluto'){
       addChannelsState.country = '';
       var pk = Object.keys(cats).sort(function(a, b){ return a.localeCompare(b); });
       if(addChannelsState.cat && !cats[addChannelsState.cat]) addChannelsState.cat = '';
@@ -15961,6 +15968,136 @@
       throw e;
     }).then(function(l){ plexLivePromise = null; return l; }, function(e){ plexLivePromise = null; throw e; });
     return plexLivePromise;
+  }
+
+  // ---- Pluto TV channels (build 186)
+  // Pluto's free channels, as their own source in Add Channels (the Pluto tab, no account).
+  // The list is Pluto's public channel list (the one its web player reads). A channel is
+  // saved to My Channels with its stream address and no session details; those are put on at
+  // play time (plutoStreamUrl): a device id kept on this phone, a fresh session id per play,
+  // and deviceDNT, which the stream server refuses to answer without. Checked 2026-10-10:
+  // 438 channels, all public, plain AES-128 HLS (no DRM), playing with app-made ids.
+  var PLUTO_API = 'https://api.pluto.tv/v2/channels.json';
+  var PLUTO_KEY = 'radioPlayerPluto';
+  var PLUTO_DEVICE_KEY = 'radioPlayerPlutoDevice';
+  var PLUTO_STALE_MS = 12 * 3600 * 1000;
+  var plutoList = null, plutoPromise = null;
+  function isPlutoUrl(u){ return /^https?:\/\/[^\/?#]*\.pluto\.tv\/stitch\//i.test(String(u || '')); }
+  function plutoUuid(){
+    try{ if(window.crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(ch){
+      var r = Math.random() * 16 | 0;
+      return (ch === 'x' ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+  function plutoDeviceId(){
+    var id = null;
+    try{ id = localStorage.getItem(PLUTO_DEVICE_KEY); }catch(e){}
+    if(!id){
+      id = plutoUuid();
+      try{ localStorage.setItem(PLUTO_DEVICE_KEY, id); }catch(e){}
+    }
+    return id;
+  }
+  // The channel id in a Pluto stream address (".../stitch/hls/channel/<id>/master.m3u8").
+  function plutoChannelId(u){
+    var m = /\/stitch\/hls\/channel\/([0-9a-f]{24})\//i.exec(String(u || ''));
+    return m ? m[1] : '';
+  }
+  // Pluto has moved its stream servers before; a saved channel follows the address the
+  // latest list gives for the same channel.
+  function plutoCurrentAddress(u){
+    var id = plutoChannelId(u);
+    if(!id) return u;
+    var list = plutoList;
+    if(!list){ var saved = vload(PLUTO_KEY, null); list = saved && Array.isArray(saved.list) ? saved.list : null; }
+    if(!list) return u;
+    for(var i = 0; i < list.length; i++){
+      if(list[i].plutoId === id) return list[i].url;
+    }
+    return u;
+  }
+  function plutoStripQuery(u){ return String(u || '').split('?')[0]; }
+  function plutoStreamUrl(u){
+    if(!isPlutoUrl(u)) return u;
+    var base = plutoStripQuery(plutoCurrentAddress(plutoStripQuery(u)));
+    var q = {
+      appName: 'web', appVersion: 'unknown', deviceType: 'web', deviceMake: 'Chrome', deviceModel: 'web',
+      deviceVersion: 'unknown', deviceDNT: '0', deviceId: plutoDeviceId(), sid: plutoUuid(),
+      marketingRegion: 'US', serverSideAds: 'false'
+    };
+    return base + '?' + Object.keys(q).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
+  }
+  // Every stream address goes through here before it is played (phone and car): Plex gets
+  // its token, Pluto its session details. liveStreamStrip undoes both before anything is saved.
+  function liveStreamUrl(u){ return plutoStreamUrl(plexLiveUrl(u)); }
+  function liveStreamStrip(u){
+    u = plexLiveStrip(u);
+    return isPlutoUrl(u) ? plutoStripQuery(u) : u;
+  }
+  function plutoLogo(c){
+    var pick = [c.colorLogoPNG, c.logo, c.solidLogoPNG, c.thumbnail];
+    for(var i = 0; i < pick.length; i++){
+      var p = pick[i] && (typeof pick[i] === 'string' ? pick[i] : pick[i].path);
+      if(p) return String(p);
+    }
+    return '';
+  }
+  // Turns Pluto's list into Add Channels entries. Read defensively: it isn't a documented
+  // service. Pluto's own test channels and office-only ones are left out.
+  function plutoEntries(d){
+    var list = [], seen = {};
+    (Array.isArray(d) ? d : (d && Array.isArray(d.channels) ? d.channels : [])).forEach(function(c){
+      if(!c) return;
+      var id = String(c._id || c.id || '');
+      var name = String(c.name || '').trim();
+      if(!/^[0-9a-f]{24}$/i.test(id) || !name || seen[id]) return;
+      if(c.plutoOfficeOnly || c.directOnly) return;
+      if(c.visibility && c.visibility !== 'everyone') return;
+      var cat = String(c.category || '').trim();
+      if(/\btest/i.test(cat) || /\btest/i.test(name)) return;
+      var urls = c.stitched && Array.isArray(c.stitched.urls) ? c.stitched.urls : [];
+      var hls = null;
+      urls.forEach(function(x){ if(!hls && x && x.url && (!x.type || /hls/i.test(x.type))) hls = x.url; });
+      var url = hls ? plutoStripQuery(hls) : '';
+      if(!isPlutoUrl(url) || plutoChannelId(url) !== id) url = 'https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/stitch/hls/channel/' + id + '/master.m3u8';
+      seen[id] = true;
+      var cats = cat ? [cat] : [];
+      list.push({ id: 'pluto:' + id, plutoId: id, name: name, url: url, logo: plutoLogo(c),
+        cats: cats, catNames: cats.slice(), country: '', src: 'pluto', number: c.number || 0 });
+    });
+    list.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+    return list;
+  }
+  // Kept a while like Plex's list, so the tab opens at once; a failed refresh uses the kept copy.
+  function loadPluto(force){
+    var saved = vload(PLUTO_KEY, null);
+    if(!force && plutoList) return Promise.resolve(plutoList);
+    if(!force && saved && Array.isArray(saved.list) && saved.list.length && Date.now() - (saved.at || 0) < PLUTO_STALE_MS){
+      plutoList = saved.list;
+      return Promise.resolve(plutoList);
+    }
+    if(plutoPromise) return plutoPromise;
+    plutoPromise = fetchTextAny(PLUTO_API).then(function(t){
+      if(typeof t !== 'string' || !t) throw new Error('no answer');
+      var d;
+      try{ d = JSON.parse(t); }catch(e){ throw new Error('unreadable answer'); }
+      var list = plutoEntries(d);
+      if(!list.length) throw new Error('Pluto sent no channels');
+      plutoList = list;
+      vsave(PLUTO_KEY, { at: Date.now(), list: list });
+      return list;
+    })['catch'](function(e){
+      if(saved && Array.isArray(saved.list) && saved.list.length){ plutoList = saved.list; return plutoList; }
+      throw e;
+    }).then(function(l){ plutoPromise = null; return l; }, function(e){ plutoPromise = null; throw e; });
+    return plutoPromise;
+  }
+  // A list kept from an earlier visit is searchable straight away (no download).
+  function peekPluto(){
+    if(plutoList) return;
+    var saved = vload(PLUTO_KEY, null);
+    if(saved && Array.isArray(saved.list) && saved.list.length) plutoList = saved.list;
   }
 
   // ---- signing in
@@ -28758,7 +28895,8 @@
     var seen = {};
     mine.forEach(function(c){ seen[c.url] = true; });
     var dir = [];
-    [iptvIndex && iptvIndex.list, freeTvList].forEach(function(list){
+    peekPluto();
+    [iptvIndex && iptvIndex.list, freeTvList, plutoList].forEach(function(list){
       (list || []).forEach(function(c){
         if(seen[c.url] || isAdultChannel(c) || !matchesQuery([c.name], pq)) return;
         seen[c.url] = true; dir.push(c);
@@ -30554,7 +30692,7 @@
       });
     }
 
-    var url = plexLiveUrl(station.urlToResolve);
+    var url = liveStreamUrl(station.urlToResolve);
     var canFallback = looksLikePlaylist(url);
     function stillWanted(){ return currentStation === station; }
     function fail(urlTried, err){
@@ -31218,7 +31356,7 @@
       var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
       // place: the location line the phone's Now Playing shows under a station, which the
       // car's Now Playing card repeats (sub stays the genre tags the car's lists show).
-      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: plexLiveUrl(s.urlToResolve) };
+      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: liveStreamUrl(s.urlToResolve) };
     }
     // ---- pictures: the car shows the same art as the phone ----
     // Custom cover art the user set wins, then the logo the page looked up for a station
@@ -31748,7 +31886,7 @@
                 if(favKey(pools[i][j]) === it.k){ obj = pools[i][j]; break; }
               }
             }
-            if(!obj) obj = { name: it.title || 'Station', urlToResolve: plexLiveStrip(it.url), favicon: it.art || '' };
+            if(!obj) obj = { name: it.title || 'Station', urlToResolve: liveStreamStrip(it.url), favicon: it.art || '' };
           }
           if(!obj || isBlacklisted(obj)) return;
           // Folded into Recent here and drawn once at the end: recordRecent redraws the
@@ -31795,7 +31933,7 @@
             if(spools[a][b] && !isLocalTrack(spools[a][b]) && favKey(spools[a][b]) === it.k) return spools[a][b];
           }
         }
-        var o = { name: it.title || 'Station', urlToResolve: plexLiveStrip(it.url), favicon: it.art || '' };
+        var o = { name: it.title || 'Station', urlToResolve: liveStreamStrip(it.url), favicon: it.art || '' };
         if(/^[0-9a-f-]{36}$/i.test(it.k || '')) o.stationuuid = it.k;
         return o;
       }

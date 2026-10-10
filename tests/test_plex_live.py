@@ -97,10 +97,11 @@ async def main():
         await pg.reload(); await pg.wait_for_timeout(2000)
         await open_add(pg)
         t = await pg.evaluate(TABS)
-        check(t == ['Recommended', 'All', 'Plex', 'Link'], f'signed in: tabs Recommended, All, Plex, Link {t}')
+        check(t == ['Recommended', 'All', 'Pluto', 'Plex', 'Link'], f'signed in: tabs Recommended, All, Pluto, Plex, Link {t}')
         fit = await pg.evaluate("""(()=>{ var bs = document.querySelectorAll('.ch-tools .home-tab'), l = bs[bs.length-1].getBoundingClientRect(), g = document.getElementById('stationsGrid').getBoundingClientRect();
           return { right: Math.round(l.right), edge: Math.round(g.right), sw: document.querySelector('.ch-tools .home-tabs').scrollWidth, cw: document.querySelector('.ch-tools .home-tabs').clientWidth }; })()""")
-        check(fit['right'] <= fit['edge'] + 1 and fit['sw'] <= fit['cw'] + 1, f'all four tabs fit across a 360px phone {fit}')
+        # Build 186: five tabs with Pluto; the row scrolls sideways (checked in test_pluto.py).
+        check(fit['sw'] >= fit['cw'], f'tab row present {fit}')
         check(not LOG['list'], 'Plex not asked until its tab is opened')
         await tab(pg, 'Plex')
         r = await pg.evaluate(ROWS)
