@@ -4953,6 +4953,9 @@
   /* Build 142: the "More from ..." / "Related Stations" headings, each list row's three-dot
      button and Up Next's "Next" label in the colour too. */
   .now-playing-screen .np-related-heading, .now-playing-screen .np-upnext-label{ color:var(--np-vivid, #fff); transition: color .5s ease; }
+  /* Build 203: a playing TV channel or video takes no colour from its picture, so its list headings
+     use the default grey, as on the Live TV page (white on the light theme could not be seen). */
+  html .now-playing-screen.np-channel .np-related-heading{ color:var(--text-dim); }
   body .now-playing-screen .row-more-btn, body .now-playing-screen .tile-more{ color:var(--np-vivid, #fff); }
   @media (max-width: 900px){
     /* Build 142: the mini player drops away while Now Playing is open (same slide as when
@@ -10070,9 +10073,23 @@
     readableCopyBusy[src] = job;
     return job;
   }
+  // A TV channel or a video of your own (the video layout) never takes its colour from the
+  // picture (build 203, Mark): Live TV keeps the theme's own accent whichever channel plays, so
+  // the colour variables are cleared and every rule falls back to the theme's colours.
+  function npTintTheme(){
+    var st = npTarget();
+    return !!st && (isNpChannel(st) || isLocalVideo(st));
+  }
   function applyNpTint(colour){
+    var themed = npTintTheme();
     var dv = npTintDerived(colour || NP_TINT_FALLBACK);
     [nowPlayingScreen, document.body].forEach(function(el){
+      if(themed){
+        el.style.removeProperty('--np-shade');
+        el.style.removeProperty('--np-vivid');
+        el.style.removeProperty('--np-on-vivid');
+        return;
+      }
       el.style.setProperty('--np-shade', dv.shade);
       el.style.setProperty('--np-vivid', dv.vivid);
       el.style.setProperty('--np-on-vivid', dv.on);
