@@ -101,9 +101,12 @@ final class CastBridge {
       };
 
   private final CastStateListener stateCb =
-      state -> {
-        castState = state;
-        listener.onCastChanged();
+      new CastStateListener() {
+        @Override
+        public void onCastStateChanged(int state) {
+          castState = state;
+          CastBridge.this.listener.onCastChanged();
+        }
       };
 
   private final MediaRouter.Callback discoveryCb = new MediaRouter.Callback() {};
