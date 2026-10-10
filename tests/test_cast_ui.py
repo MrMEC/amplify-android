@@ -79,6 +79,13 @@ async def run(p, theme):
     await pg.wait_for_timeout(300)
     note = await pg.evaluate(NOTE)
     check(note and note.startswith('Playing on this phone'), f'{t}: something not cast says it plays on the phone ({note})')
+    # the Chromecast refuses something: the reason is shown, and it isn't retried as a network error
+    loads0 = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'load'])
+    await pg.evaluate("(id)=>window.__emit('error', {id:id, code:4005, cast:true, name:'Chromecast couldn\\'t play it (error 311 HLS)', message:'The Chromecast couldn\\'t play this (error 311 HLS)'})", await pg.evaluate("window.__cur"))
+    await pg.wait_for_timeout(2500)
+    st = await pg.evaluate("document.getElementById('statusLine').textContent")
+    loads1 = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'load'])
+    check('error 311' in st and 'Check storage' in st and loads1 - loads0 <= 1, f'{t}: a Chromecast refusal shows its reason, no retry loop ({st.strip()[:90]}, loads {loads0}->{loads1})')
     # session ends
     await pg.evaluate("window.__castInfo.connected = false; window.__castInfo.device = ''; window.__emit('cast', window.__castInfo)"); await pg.wait_for_timeout(300)
     check(await pg.evaluate(NOTE) is None and (await pg.evaluate(VIS))['title'] == 'Cast', f'{t}: session over: the line goes, the button says Cast')

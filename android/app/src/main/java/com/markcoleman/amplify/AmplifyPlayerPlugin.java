@@ -106,6 +106,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   // from the Chromecast instead (castSnapshot). Only internet streams are cast.
   @Nullable private CastBridge cast;
   private boolean castActive;
+  private String castErrorSentFor;
   private String castUrl;
   private boolean castLiveHint;
   private boolean castVideoHint;
@@ -221,6 +222,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       sp.clearOnAir();
     }
     castActive = true;
+    castErrorSentFor = null;
     currentId = id;
     castUrl = url;
     castLiveHint = live;
@@ -297,13 +299,19 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private void onCastStatus() {
     if (!castActive || cast == null || currentId == null) return;
     int ps = cast.playerState();
-    if (ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_IDLE
-        && cast.idleReason() == com.google.android.gms.cast.MediaStatus.IDLE_REASON_ERROR) {
+    String failNote = cast.takeFailNote();
+    if (failNote != null
+        || (ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_IDLE
+            && cast.idleReason() == com.google.android.gms.cast.MediaStatus.IDLE_REASON_ERROR)) {
+      if (castErrorSentFor != null && castErrorSentFor.equals(currentId) && failNote == null) return;
+      castErrorSentFor = currentId;
       JSObject o = new JSObject();
       o.put("id", currentId);
-      o.put("code", 2004);
-      o.put("name", "CAST_ERROR");
-      o.put("message", "The Chromecast couldn't play this");
+      // Not a network code (2xxx): the page mustn't keep retrying what the Chromecast refused.
+      o.put("code", 4005);
+      o.put("name", "Chromecast couldn't play it" + (failNote != null ? " (" + failNote + ")" : ""));
+      o.put("message", "The Chromecast couldn't play this" + (failNote != null ? " (" + failNote + ")" : ""));
+      o.put("cast", true);
       notifyListeners("error", o);
       return;
     }

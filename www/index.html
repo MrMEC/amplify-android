@@ -7067,6 +7067,8 @@
   });
   P.addListener('error', function(ev){
     if(!ev || ev.id !== audio._id || audio._car) return;
+    // Build 197: the Chromecast refused it; say so with its reason.
+    if(ev.cast){ try{ window.dispatchEvent(new CustomEvent('amplify-cast-error', { detail: ev })); }catch(e){} }
     var net = ev.code >= 2000 && ev.code < 3000;
     audio._fail(net ? 2 : 4, ev.name || ev.message || 'Playback error');
   });
@@ -11509,6 +11511,11 @@
     }
   }
   window.addEventListener('amplify-cast', syncCastUi);
+  window.addEventListener('amplify-cast-error', function(e){
+    var m = (e.detail && e.detail.message) || 'The Chromecast couldn\u2019t play this';
+    // After the page's own "couldn't play" handling, so this is what stays on screen.
+    setTimeout(function(){ setStatus(m + '. Details are in Settings \u203a Check storage.', true, true); }, 60);
+  });
   // Build 196: if the app closed because of an error last time, say so once, with the details.
   var nativeCaught = '';
   (function(){

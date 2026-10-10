@@ -63,6 +63,14 @@ final class CastBridge {
         public void onStatusUpdated() {
           safe("status", this::status);
         }
+        @Override
+        public void onMediaError(com.google.android.gms.cast.MediaError e) {
+          safe("mediaError", () -> {
+            Integer code = e == null ? null : e.getDetailedErrorCode();
+            String reason = e == null ? null : e.getReason();
+            fail("error " + (code == null ? "?" : code) + (reason != null ? " " + reason : "") + (e != null && e.getType() != null ? " (" + e.getType() + ")" : ""));
+          });
+        }
         private void status() {
           RemoteMediaClient c = client;
           if (c != null) {
@@ -311,12 +319,33 @@ final class CastBridge {
     wantPlay = play;
     loading = true;
     lastPos = live ? 0L : Math.max(0L, startMs);
+    failNote = null;
+    lastUrl = url;
     try {
-      c.load(req);
+      c.load(req).setResultCallback(
+          r -> safe("loadResult", () -> {
+            if (r != null && r.getStatus() != null && !r.getStatus().isSuccess()) {
+              fail("load refused (status " + r.getStatus().getStatusCode()
+                  + (r.getStatus().getStatusMessage() != null ? " " + r.getStatus().getStatusMessage() : "") + ")");
+            }
+          }));
     } catch (Throwable t) {
       loading = false;
+      fail("load threw " + t);
     }
   }
+
+  // Build 197: why the Chromecast couldn't play the last item (its detailed error code), for
+  // the page's error message and Check storage.
+  @Nullable String failNote;
+  @Nullable private String lastUrl;
+  private void fail(String why) {
+    loading = false;
+    failNote = why;
+    CrashLog.note(app, "cast media", new RuntimeException(why + " [" + mimeFor(lastUrl == null ? "" : lastUrl) + "] " + (lastUrl == null ? "" : lastUrl)));
+    listener.onCastStatus();
+  }
+  @Nullable String takeFailNote() { String n = failNote; failNote = null; return n; }
 
   void play() { RemoteMediaClient c = client; if (c != null) { wantPlay = true; try { c.play(); } catch (Throwable ignored) {} } }
   void pause() { RemoteMediaClient c = client; if (c != null) { wantPlay = false; try { c.pause(); } catch (Throwable ignored) {} } }
