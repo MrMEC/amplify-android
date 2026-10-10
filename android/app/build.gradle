@@ -74,6 +74,9 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:1.8.0"
     implementation "androidx.media3:media3-exoplayer-hls:1.8.0"
     implementation "androidx.media3:media3-session:1.8.0"
+    // Google Cast (build 194): casting streams to a Chromecast.
+    implementation "com.google.android.gms:play-services-cast-framework:21.5.0"
+    implementation "androidx.mediarouter:mediarouter:1.7.0"
     // VLC, for videos the phone's own decoders can't play (build 153). 3.x is the stable line.
     implementation "org.videolan.android:libvlc-all:3.7.6"
     testImplementation "junit:junit:$junitVersion"

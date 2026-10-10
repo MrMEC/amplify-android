@@ -51,6 +51,11 @@
                 android:resource="@xml/widget_now_playing_info" />
         </receiver>
 
+        <!-- Google Cast (build 194): settings for casting streams to a Chromecast. -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.markcoleman.amplify.CastOptionsProvider" />
+
         <!-- Android Auto: this is a media app, and its artwork comes through ArtProvider. -->
         <meta-data
             android:name="com.google.android.gms.car.application"

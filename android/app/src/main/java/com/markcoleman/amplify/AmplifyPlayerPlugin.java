@@ -100,12 +100,227 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         this.progressTick();
       };
 
+  // ---- Google Cast (build 194) ----
+  // While castActive, the current item (currentId) plays on the Chromecast: the phone's player is
+  // stopped and its events are ignored, and play/pause/seek/stop and the state the page sees come
+  // from the Chromecast instead (castSnapshot). Only internet streams are cast.
+  @Nullable private CastBridge cast;
+  private boolean castActive;
+  private String castUrl;
+  private boolean castLiveHint;
+  private boolean castVideoHint;
+  private boolean castPlay;
+  private long castStartMs;
+  private final Runnable castLoadNow = this::castLoadNow;
+  private final CastBridge.Listener castListener =
+      new CastBridge.Listener() {
+        @Override public void onCastChanged() { notifyListeners("cast", castInfoObj()); }
+        @Override public void onCastSessionStarted() { castTakeOver(); }
+        @Override public void onCastSessionEnded(long positionMs, boolean wasPlaying) { castGiveBack(positionMs); }
+        @Override public void onCastStatus() { onCastStatus(); }
+      };
+
   @Override // com.getcapacitor.Plugin
   public void load() {
     this.main.post(
         () -> {
           this.connect();
+          try {
+            this.cast = new CastBridge(getContext(), this.castListener);
+            if (!this.cast.supported()) this.cast = null;
+            else this.cast.setDiscovery(true);
+          } catch (Throwable t) {
+            this.cast = null;
+          }
         });
+  }
+
+  @Override
+  protected void handleOnResume() {
+    super.handleOnResume();
+    main.post(() -> { if (cast != null) cast.setDiscovery(true); });
+  }
+
+  @Override
+  protected void handleOnPause() {
+    super.handleOnPause();
+    main.post(() -> { if (cast != null) cast.setDiscovery(false); });
+  }
+
+  private JSObject castInfoObj() {
+    JSObject o = new JSObject();
+    CastBridge c = cast;
+    o.put("supported", c != null);
+    o.put("available", c != null && c.devicesAvailable());
+    o.put("connecting", c != null && c.connecting());
+    o.put("connected", c != null && c.connected());
+    String name = c == null ? null : c.deviceName();
+    o.put("device", name == null ? "" : name);
+    o.put("active", castActive);
+    return o;
+  }
+
+  @PluginMethod
+  public void castInfo(PluginCall call) {
+    main.post(() -> call.resolve(castInfoObj()));
+  }
+
+  /** The Cast button: the device picker, or (while casting) the device's panel with Stop casting. */
+  @PluginMethod
+  public void castPick(PluginCall call) {
+    main.post(
+        () -> {
+          if (cast == null || getActivity() == null) {
+            call.reject("Cast isn't available on this phone");
+            return;
+          }
+          try {
+            cast.showPicker(getActivity());
+            call.resolve();
+          } catch (Throwable t) {
+            call.reject(String.valueOf(t.getMessage()));
+          }
+        });
+  }
+
+  @PluginMethod
+  public void castEnd(PluginCall call) {
+    main.post(
+        () -> {
+          if (cast != null) cast.endSession();
+          call.resolve();
+        });
+  }
+
+  /** Plays url on the Chromecast as the current item (the phone's player stops). */
+  private void startCast(String url, String id, boolean play, long startMs, boolean live, boolean isVideo) {
+    leaveVlc();
+    SkipAwarePlayer sp = sessionPlayer();
+    if (sp != null) {
+      sp.exitNativeMode();
+      sp.clearOnAir();
+    }
+    castActive = true;
+    currentId = id;
+    castUrl = url;
+    castLiveHint = live;
+    castVideoHint = isVideo;
+    castPlay = play;
+    castStartMs = startMs;
+    ExoPlayer e = exo();
+    if (e != null) {
+      e.stop();
+      e.clearMediaItems();
+    }
+    hasVideo = false;
+    videoW = videoH = 0;
+    if (this.video != null) this.video.hide();
+    // The page sends the title and picture just before or after the address: give it a moment.
+    main.removeCallbacks(castLoadNow);
+    main.postDelayed(castLoadNow, 350L);
+    if (cast != null) {
+      cast.loading = true;
+      cast.wantPlay = play;
+    }
+    emitState(false);
+  }
+
+  private void castLoadNow() {
+    if (!castActive || cast == null || castUrl == null) return;
+    String title = "", artist = "", art = null;
+    MediaMetadata m = lastMeta;
+    if (m != null) {
+      if (m.title != null) title = m.title.toString();
+      if (m.artist != null) artist = m.artist.toString();
+      if (m.artworkUri != null) art = m.artworkUri.toString();
+    }
+    boolean live = CastBridge.liveFor(castUrl, castLiveHint || lastLive);
+    cast.load(castUrl, live, title, artist, art, castStartMs, castPlay, castVideoHint);
+  }
+
+  /** A session started: what the phone is playing (a stream) moves to the Chromecast. */
+  private void castTakeOver() {
+    if (castActive || cast == null || currentId == null || VlcEngine.isActive()) return;
+    SkipAwarePlayer sp = sessionPlayer();
+    if (sp != null && sp.isNativeMode()) return; // Android Auto's own queue stays in the car
+    ExoPlayer e = exo();
+    if (e == null) return;
+    MediaItem cur = e.getCurrentMediaItem();
+    if (cur == null || cur.localConfiguration == null) return;
+    String url = cur.localConfiguration.uri.toString();
+    if (!CastBridge.castable(url)) return;
+    boolean playing = e.getPlayWhenReady();
+    boolean live = e.isCurrentMediaItemLive() || e.getDuration() == C.TIME_UNSET;
+    long pos = live ? 0L : Math.max(0L, e.getCurrentPosition());
+    startCast(url, currentId, playing, pos, live, hasVideo);
+  }
+
+  /** The session ended: the item comes back to the phone, paused where the Chromecast was. */
+  private void castGiveBack(long positionMs) {
+    main.removeCallbacks(castLoadNow);
+    if (!castActive) return;
+    castActive = false;
+    String url = castUrl;
+    ExoPlayer e = exo();
+    if (url == null || e == null || currentId == null) return;
+    boolean live = CastBridge.liveFor(url, castLiveHint || lastLive);
+    MediaItem.Builder b = new MediaItem.Builder().setUri(url).setMediaId(currentId);
+    if (url.toLowerCase().contains(".m3u8")) b.setMimeType("application/x-mpegURL");
+    if (lastMeta != null) b.setMediaMetadata(lastMeta);
+    e.setMediaItem(b.build(), live ? 0L : Math.max(0L, positionMs));
+    e.prepare();
+    e.setPlayWhenReady(false);
+    main.removeCallbacks(progressTick);
+    emitState(true);
+  }
+
+  private void onCastStatus() {
+    if (!castActive || cast == null || currentId == null) return;
+    int ps = cast.playerState();
+    if (ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_IDLE
+        && cast.idleReason() == com.google.android.gms.cast.MediaStatus.IDLE_REASON_ERROR) {
+      JSObject o = new JSObject();
+      o.put("id", currentId);
+      o.put("code", 2004);
+      o.put("name", "CAST_ERROR");
+      o.put("message", "The Chromecast couldn't play this");
+      notifyListeners("error", o);
+      return;
+    }
+    emitState(true);
+    main.removeCallbacks(progressTick);
+    if (ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_PLAYING) main.postDelayed(progressTick, 500);
+  }
+
+  private JSObject castSnapshot() {
+    JSObject o = new JSObject();
+    o.put("id", currentId);
+    o.put("onAirTitle", "");
+    o.put("onAirArtist", "");
+    CastBridge c = cast;
+    int ps = c == null ? 0 : c.playerState();
+    long d = c == null ? -1L : c.duration();
+    boolean live = c != null && (c.live() || CastBridge.liveFor(castUrl == null ? "" : castUrl, castLiveHint || lastLive));
+    o.put("position", (c == null ? 0L : c.position()) / 1000.0d);
+    o.put("duration", live || d <= 0 ? -1.0d : d / 1000.0d);
+    o.put("live", live);
+    boolean playing = ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_PLAYING;
+    o.put("isPlaying", playing);
+    o.put("playWhenReady", c != null && c.wantPlay);
+    String st;
+    if (playing || ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_PAUSED) st = "ready";
+    else if (ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_BUFFERING
+        || ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_LOADING
+        || (c != null && c.loading)) st = "buffering";
+    else if (ps == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_IDLE
+        && c != null && c.idleReason() == com.google.android.gms.cast.MediaStatus.IDLE_REASON_FINISHED) st = "ended";
+    else st = "idle";
+    o.put("state", st);
+    o.put("at", System.currentTimeMillis());
+    o.put("cast", true);
+    String name = c == null ? null : c.deviceName();
+    o.put("castDevice", name == null ? "" : name);
+    return o;
   }
 
   public void connect() {
@@ -238,6 +453,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       run(
           pluginCall,
           () -> {
+            leaveCast();
             loadInVlc(string, string2, zEquals, dDoubleValue, d, d2, subs, textOff, vlcHw);
             pluginCall.resolve();
           });
@@ -245,6 +461,15 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       run(
           pluginCall,
           () -> {
+            // Build 194: while casting, a stream goes to the Chromecast.
+            if (cast != null && cast.connected() && CastBridge.castable(string)) {
+              startCast(string, string2, zEquals, (long) (dDoubleValue * 1000.0d),
+                  Boolean.TRUE.equals(pluginCall.getBoolean("castLive", false)),
+                  Boolean.TRUE.equals(pluginCall.getBoolean("castVideo", false)));
+              pluginCall.resolve();
+              return;
+            }
+            leaveCast();
             leaveVlc();
             ExoPlayer exoPlayerExo = exo();
             SkipAwarePlayer skipAwarePlayerSessionPlayer = sessionPlayer();
@@ -294,6 +519,14 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             call.resolve();
             return;
           }
+          if (castActive && cast != null) {
+            castPlay = true;
+            if (cast.loading) cast.wantPlay = true;
+            else if (cast.playerState() == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_IDLE) castLoadNow();
+            else cast.play();
+            call.resolve();
+            return;
+          }
           ExoPlayer p = exo();
           if (p.getMediaItemCount() == 0) {
             call.reject("Nothing loaded");
@@ -311,7 +544,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          if (VlcEngine.isActive()) VlcEngine.pause();
+          if (castActive && cast != null) {
+            castPlay = false;
+            cast.pause();
+          } else if (VlcEngine.isActive()) VlcEngine.pause();
           else exo().setPlayWhenReady(false);
           call.resolve();
         });
@@ -323,6 +559,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         pluginCall,
         () -> {
           ExoPlayer exoPlayerExo = exo();
+          leaveCast();
           this.currentId = null;
           leaveVlc();
           exoPlayerExo.stop();
@@ -344,7 +581,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          if (VlcEngine.isActive()) VlcEngine.seekTo((long) (pos * 1000));
+          if (castActive && cast != null) {
+            castStartMs = (long) (pos * 1000);
+            cast.seek((long) (pos * 1000));
+          } else if (VlcEngine.isActive()) VlcEngine.seekTo((long) (pos * 1000));
           else exo().seekTo((long) (pos * 1000));
           call.resolve();
         });
@@ -984,7 +1224,16 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     return null;
   }
 
+  /** Something else plays now (on the phone): the Chromecast stops the cast item. */
+  private void leaveCast() {
+    main.removeCallbacks(castLoadNow);
+    if (!castActive) return;
+    castActive = false;
+    if (cast != null) cast.stopMedia();
+  }
+
   public void onCarTookOver() {
+    leaveCast();
     if (this.currentId == null) {
       return;
     }
@@ -1327,6 +1576,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   public JSObject snapshot() {
     String str;
+    if (castActive) return castSnapshot();
     if (VlcEngine.isActive()) return vlcSnapshot();
     ExoPlayer exoPlayerExo = exo();
     JSObject jSObject = new JSObject();
@@ -1425,6 +1675,13 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   public void progressTick() {
+    if (castActive) {
+      if (cast == null || this.currentId == null
+          || cast.playerState() != com.google.android.gms.cast.MediaStatus.PLAYER_STATE_PLAYING) return;
+      notifyListeners("progress", castSnapshot());
+      this.main.postDelayed(this.progressTick, 500L);
+      return;
+    }
     ExoPlayer exoPlayerExo = exo();
     boolean playing = VlcEngine.isActive() ? VlcEngine.isPlaying() : exoPlayerExo != null && exoPlayerExo.isPlaying();
     if (!playing || this.currentId == null) {
@@ -2156,19 +2413,19 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private final class ExoListener implements Player.Listener {
     @Override
     public void onTracksChanged(Tracks tracks) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       onTracks(tracks);
     }
 
     @Override
     public void onVideoSizeChanged(VideoSize videoSize) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       onVideoSize(videoSize);
     }
 
     @Override
     public void onCues(CueGroup cueGroup) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       AmplifyPlayerPlugin.this.onCues(cueGroup);
     }
 
@@ -2176,7 +2433,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onPlaybackStateChanged(int state) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       if (state == Player.STATE_ENDED) schedulePageTakeover();
       else main.removeCallbacks(pageTakeover);
       emitState(false);
@@ -2184,7 +2441,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onIsPlayingChanged(boolean isPlaying) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       emitState(false);
       main.removeCallbacks(progressTick);
       if (isPlaying) main.postDelayed(progressTick, 500);
@@ -2192,7 +2449,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override // androidx.media3.common.Player.Listener
     public void onPlayWhenReadyChanged(boolean z, int i) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       SkipAwarePlayer skipAwarePlayerSessionPlayer = AmplifyPlayerPlugin.this.sessionPlayer();
       if (z
           && skipAwarePlayerSessionPlayer != null
@@ -2206,20 +2463,20 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override // androidx.media3.common.Player.Listener
     public void onMediaItemTransition(MediaItem mediaItem, int i) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       AmplifyPlayerPlugin.this.announceCar();
     }
 
     @Override
     public void onPositionDiscontinuity(
         Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       if (currentId != null) notifyListeners("progress", snapshot());
     }
 
     @Override
     public void onPlayerError(PlaybackException error) {
-      if (VlcEngine.isActive()) return; // the phone's player is idle while VLC plays
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       if (currentId == null) return;
       JSObject o = new JSObject();
       o.put("id", currentId);
