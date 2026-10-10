@@ -15974,9 +15974,8 @@
   // Pluto's free channels, as their own source in Add Channels (the Pluto tab, no account).
   // The list is Pluto's public channel list (the one its web player reads). A channel is
   // saved to My Channels with its stream address and no session details; those are put on at
-  // play time (plutoStreamUrl): a device id kept on this phone, a fresh session id per play,
-  // and deviceDNT, which the stream server refuses to answer without. Checked 2026-10-10:
-  // 438 channels, all public, plain AES-128 HLS (no DRM), playing with app-made ids.
+  // play time (plutoStreamUrl) from a Pluto session (see "Pluto session" below). Checked
+  // 2026-10-10: 438 channels, all public, plain AES-128 HLS (no DRM).
   var PLUTO_API = 'https://api.pluto.tv/v2/channels.json';
   // v2 (build 187): build 186 kept only one channel (it wrongly skipped directOnly ones);
   // its saved list is thrown away so the full list is fetched at once.
@@ -15985,7 +15984,7 @@
   var PLUTO_DEVICE_KEY = 'radioPlayerPlutoDevice';
   var PLUTO_STALE_MS = 12 * 3600 * 1000;
   var plutoList = null, plutoPromise = null;
-  function isPlutoUrl(u){ return /^https?:\/\/[^\/?#]*\.pluto\.tv\/stitch\//i.test(String(u || '')); }
+  function isPlutoUrl(u){ return /^https?:\/\/[^\/?#]*\.pluto\.tv\/(?:v\d+\/)?stitch\//i.test(String(u || '')); }
   function plutoUuid(){
     try{ if(window.crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(ch){
@@ -16007,29 +16006,77 @@
     var m = /\/stitch\/hls\/channel\/([0-9a-f]{24})\//i.exec(String(u || ''));
     return m ? m[1] : '';
   }
-  // Pluto has moved its stream servers before; a saved channel follows the address the
-  // latest list gives for the same channel.
-  function plutoCurrentAddress(u){
-    var id = plutoChannelId(u);
-    if(!id) return u;
-    var list = plutoList;
-    if(!list){ var saved = vload(PLUTO_KEY, null); list = saved && Array.isArray(saved.list) ? saved.list : null; }
-    if(!list) return u;
-    for(var i = 0; i < list.length; i++){
-      if(list[i].plutoId === id) return list[i].url;
-    }
-    return u;
-  }
   function plutoStripQuery(u){ return String(u || '').split('?')[0]; }
+  // ---- Pluto session (build 188)
+  // Pluto's stream server only plays a channel for a session started at boot.pluto.tv (what
+  // its own web player does): without one it plays a "Pluto has closed here" slate (Mark saw
+  // the Danish one on every channel in build 187). The start answer gives the stream server,
+  // the stream parameters and a session token (good for refreshInSec, 8 hours). The session
+  // is kept on the phone (radioPlayerPlutoSession) and renewed in the background half an
+  // hour before it runs out; a Pluto channel started without a valid one waits for a new one.
+  var PLUTO_BOOT = 'https://boot.pluto.tv/v4/start';
+  var PLUTO_SESSION_KEY = 'radioPlayerPlutoSession';
+  var PLUTO_SESSION_MARGIN_MS = 30 * 60000;
+  var plutoSession = vload(PLUTO_SESSION_KEY, null), plutoSessionPromise = null, plutoSessionTimer = null;
+  function plutoSessionValid(){
+    return !!(plutoSession && plutoSession.token && plutoSession.stitcher && plutoSession.params &&
+      Date.now() < (plutoSession.until || 0) - PLUTO_SESSION_MARGIN_MS);
+  }
+  function plutoBootUrl(){
+    var q = {
+      appName: 'web', appVersion: '9.0.0', deviceVersion: '120.0.0', deviceModel: 'web', deviceMake: 'chrome',
+      deviceType: 'web', clientID: plutoDeviceId(), clientModelNumber: '1.0.0', serverSideAds: 'false',
+      drmCapabilities: '', blockingMode: ''
+    };
+    return PLUTO_BOOT + '?' + Object.keys(q).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
+  }
+  function plutoEnsureSession(force){
+    if(!force && plutoSessionValid()) return Promise.resolve(plutoSession);
+    if(plutoSessionPromise) return plutoSessionPromise;
+    plutoSessionPromise = fetchTextAny(plutoBootUrl()).then(function(t){
+      var d = null;
+      try{ d = JSON.parse(t); }catch(e){}
+      var stitcher = d && d.servers && d.servers.stitcher;
+      if(!d || !d.sessionToken || !stitcher || !d.stitcherParams) throw new Error('Pluto didn’t start a session');
+      var secs = Math.max(3600, Math.min(Number(d.refreshInSec) || 28800, 86400));
+      var now = Date.now();
+      plutoSession = { at: now, until: now + secs * 1000, stitcher: String(stitcher).replace(/\/+$/, ''),
+        params: String(d.stitcherParams).replace(/^[?&]+/, ''), token: String(d.sessionToken),
+        region: (d.session && d.session.activeRegion) || '' };
+      vsave(PLUTO_SESSION_KEY, plutoSession);
+      plutoScheduleRenew();
+      // The car's menu carries playable addresses; send it again with the new session.
+      try{ if(window.AmplifyPublishCarMenu && videoChannels.some(function(c){ return isPlutoUrl(c.url); })) window.AmplifyPublishCarMenu(); }catch(e){}
+      return plutoSession;
+    }).then(function(x){ plutoSessionPromise = null; return x; }, function(e){ plutoSessionPromise = null; throw e; });
+    return plutoSessionPromise;
+  }
+  function plutoScheduleRenew(){
+    clearTimeout(plutoSessionTimer);
+    if(!plutoSession || !plutoSession.until) return;
+    var wait = Math.max(60000, plutoSession.until - PLUTO_SESSION_MARGIN_MS - Date.now() + 1000);
+    plutoSessionTimer = setTimeout(function(){
+      if(videoChannels.some(function(c){ return isPlutoUrl(c.url); }) || plutoList) plutoEnsureSession(true)['catch'](function(){});
+    }, Math.min(wait, 0x7fffffff));
+  }
+  // Start-up: renew a session that has run out (or is about to) when Pluto channels are saved.
+  setTimeout(function(){
+    try{
+      if(!videoChannels.some(function(c){ return isPlutoUrl(c.url); })) return;
+      if(plutoSessionValid()) plutoScheduleRenew(); else plutoEnsureSession()['catch'](function(){});
+    }catch(e){}
+  }, 1500);
+  // The playable address for a saved Pluto channel: the session's stream server and
+  // parameters plus its token. With no session (Pluto unreachable) the bare address is
+  // returned, which Pluto refuses, so the usual "couldn't play" message shows.
   function plutoStreamUrl(u){
     if(!isPlutoUrl(u)) return u;
-    var base = plutoStripQuery(plutoCurrentAddress(plutoStripQuery(u)));
-    var q = {
-      appName: 'web', appVersion: 'unknown', deviceType: 'web', deviceMake: 'Chrome', deviceModel: 'web',
-      deviceVersion: 'unknown', deviceDNT: '0', deviceId: plutoDeviceId(), sid: plutoUuid(),
-      marketingRegion: 'US', serverSideAds: 'false'
-    };
-    return base + '?' + Object.keys(q).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
+    var id = plutoChannelId(u);
+    var ses = plutoSession;
+    if(!id || !ses || !ses.token || !ses.stitcher || !ses.params) return plutoStripQuery(u);
+    if(!plutoSessionValid()) plutoEnsureSession()['catch'](function(){});
+    return ses.stitcher + '/v2/stitch/hls/channel/' + id + '/master.m3u8?' + ses.params +
+      '&jwt=' + encodeURIComponent(ses.token) + '&masterJWTPassthrough=true';
   }
   // Every stream address goes through here before it is played (phone and car): Plex gets
   // its token, Pluto its session details. liveStreamStrip undoes both before anything is saved.
@@ -30696,6 +30743,15 @@
       });
     }
 
+    // A Pluto channel needs a Pluto session first (build 188); it is fetched once and kept.
+    if(isPlutoUrl(station.urlToResolve) && !plutoSessionValid()){
+      plutoEnsureSession()['catch'](function(){}).then(function(){
+        if(currentStation === station) startStream();
+      });
+      return;
+    }
+    startStream();
+    function startStream(){
     var url = liveStreamUrl(station.urlToResolve);
     var canFallback = looksLikePlaylist(url);
     function stillWanted(){ return currentStation === station; }
@@ -30719,6 +30775,7 @@
         });
       });
     });
+    }
   }
 
   function onPlaybackSuccess(station, isReconnect){
@@ -31455,10 +31512,14 @@
     }
 
     function buildCatalog(){
+      // Pluto channels in the car need a Pluto session in their addresses (build 188).
+      var plutoReady = (!plutoSessionValid() && videoChannels.some(function(c){ return isPlutoUrl(c.url); }))
+        ? plutoEnsureSession()['catch'](function(){ return null; }) : null;
       return Promise.all([
         getAllPodcastProgress()['catch'](function(){ return []; }),
         loadContinueListening(20)['catch'](function(){ return []; }),
-        refreshNetLists()
+        refreshNetLists(),
+        plutoReady
       ]).then(function(r){
         var prog = {};
         (r[0] || []).forEach(function(rec){ if(rec && rec.guid) prog[rec.guid] = rec; });

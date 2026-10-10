@@ -1,8 +1,10 @@
-"""Build 186: Pluto TV channels as their own source in Video > Add Channels (a Pluto tab, no account).
+"""Builds 186-188: Pluto TV channels as their own source in Video > Add Channels (a Pluto tab, no account).
 The list comes from Pluto's public channel list; channels are added to My Channels with a bare
-stream address; at play time a kept device id, a fresh session id and deviceDNT are put on (never
-stored); Pluto's test and office-only channels are left out; a saved channel follows a moved stream
-server; the list is kept for a restart; search finds Pluto channels; the car gets a playable address.
+stream address; at play time the address is built from a Pluto session started at boot.pluto.tv
+(stream server, parameters and token; build 188, since without one Pluto plays its "no longer
+available on this device" slate); the session is kept and renewed when it runs out; nothing saved
+carries it; Pluto's test and office-only channels are left out; the list is kept for a restart;
+search finds Pluto channels; the car gets a playable address.
 Run: python3 tests/test_pluto.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools, sys
 from urllib.parse import urlparse, parse_qs
@@ -18,7 +20,7 @@ srv = http.server.ThreadingHTTPServer(('127.0.0.1', 8807), H); threading.Thread(
 HOST1 = 'cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv'
 HOST2 = 'cfd-v5-service-channel-stitcher-use1-2.prd.pluto.tv'
 QS = '?advertisingId=&appName=web&deviceDNT=0&deviceId=PLUTOSID&deviceLat=40.0400&deviceLon=-82.8600&marketingRegion=US&sid=SESSIONX&userId='
-state = {'host': HOST1, 'down': False}
+state = {'host': HOST1, 'down': False, 'stitcher': HOST1, 'bootDown': False}
 def ch(cid, name, cat, number, **kw):
     c = {'_id': cid, 'slug': name.lower().replace(' ', '-'), 'name': name, 'number': number, 'category': cat,
          'summary': 'About ' + name, 'visibility': 'everyone', 'isStitched': True, 'directOnly': True, 'plutoOfficeOnly': False,
@@ -37,7 +39,7 @@ def channels():
         ch('bbbbbbbbbbbbbbbbbbbbbbbb', 'QA Channel', 'Testing', 2),
         ch('cccccccccccccccccccccccc', 'Hidden One', 'Drama', 3, visibility='hidden'),
     ]
-LOG = {'list': 0}
+LOG = {'list': 0, 'boot': 0, 'bootq': None}
 
 MOCK = """
 (function(){
@@ -70,6 +72,14 @@ async def route(r):
         LOG['list'] += 1
         if state['down']: return await r.fulfill(status=503, headers=cors, body='')
         return await r.fulfill(status=200, content_type='application/json', headers=cors, body=json.dumps(channels()))
+    if u.netloc == 'boot.pluto.tv' and u.path == '/v4/start':
+        LOG['boot'] += 1; LOG['bootq'] = parse_qs(u.query, keep_blank_values=True)
+        if state['bootDown']: return await r.fulfill(status=503, headers=cors, body='')
+        n = LOG['boot']
+        body = {'servers': {'stitcher': 'https://' + state['stitcher']}, 'session': {'activeRegion': 'US'},
+                'stitcherParams': f'appName=web&deviceDNT=0&deviceId=DEV&marketingRegion=US&sid=S{n}&sessionID=S{n}',
+                'sessionToken': f'JWTTOKEN{n}', 'refreshInSec': 28800}
+        return await r.fulfill(status=200, content_type='application/json', headers=cors, body=json.dumps(body))
     if u.netloc == 'images.pluto.tv': return await r.fulfill(status=404, headers=cors, body='')
     if '127.0.0.1' in u.netloc: return await r.continue_()
     return await r.abort()
@@ -131,31 +141,36 @@ async def main():
         check(saved[0]['url'] == f'https://{HOST1}/stitch/hls/channel/5421f71da6af422839419cb3/master.m3u8', f'saved without session details ({saved[0]["url"]})')
         check(saved[0]['src'] == 'pluto' and saved[0]['catNames'] == ['News + Opinion'] and 'colorLogoPNG' in saved[0]['logo'], f'source, category, colour logo kept {saved[0]}')
 
-        # ---- play ----
+        # ---- play: through a Pluto session ----
+        check(LOG['boot'] == 0, 'no Pluto session started before anything is played')
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent==='CNN Headlines';}).click()")
         await pg.wait_for_timeout(1500)
-        l1 = loads(await pg.evaluate('window.__calls'))[-1]
+        ls = loads(await pg.evaluate('window.__calls'))
+        l1 = ls[-1]
         print('load', l1)
         u1 = urlparse(l1); q1 = parse_qs(u1.query)
-        check(u1.netloc == HOST1 and u1.path == '/stitch/hls/channel/5421f71da6af422839419cb3/master.m3u8', f'plays the channel {l1}')
-        check(q1.get('deviceDNT') == ['0'] and q1.get('deviceId') and q1.get('sid') and q1.get('appName') == ['web'] and q1.get('marketingRegion') == ['US'],
-              f'session details put on (deviceDNT, deviceId, sid) {q1}')
-        check('PLUTOSID' not in l1 and 'SESSIONX' not in l1 and 'deviceLat' not in l1, 'Pluto\'s sample ids are not reused')
+        check(LOG['boot'] == 1, f'a Pluto session is started for the first play ({LOG["boot"]})')
+        bq = LOG['bootq'] or {}
+        check(bq.get('appName') == ['web'] and bq.get('clientID') and bq.get('deviceType') == ['web'], f'started like Pluto\'s web player {bq}')
+        check(all('jwt=' in x for x in ls if 'pluto' in x), 'never played without the session (no slate-only address)')
+        check(u1.netloc == HOST1 and u1.path == '/v2/stitch/hls/channel/5421f71da6af422839419cb3/master.m3u8', f'plays the channel from the session\'s stream server {l1}')
+        check(q1.get('jwt') == ['JWTTOKEN1'] and q1.get('masterJWTPassthrough') == ['true'] and q1.get('sid') == ['S1'] and q1.get('deviceDNT') == ['0'],
+              f'session token and parameters on the address {q1}')
         await pg.screenshot(path=f'{SHOTS}/pluto-playing.png')
-        store = await pg.evaluate("[localStorage.getItem('radioPlayerChannelHistory')||'', localStorage.getItem('radioPlayerFavorites')||'', localStorage.getItem('radioPlayerRecent')||'', localStorage.getItem('radioPlayerVideoChannels')||''].join('|')")
-        check(q1['sid'][0] not in store and 'deviceDNT' not in store, 'nothing saved after playing carries session details')
-        await pg.wait_for_timeout(1500)
+        store = await pg.evaluate("[localStorage.getItem('radioPlayerChannelHistory')||'', localStorage.getItem('radioPlayerFavorites')||'', localStorage.getItem('radioPlayerRecent')||'', localStorage.getItem('radioPlayerVideoChannels')||'', localStorage.getItem('radioPlayerPluto2')||''].join('|')")
+        check('JWTTOKEN' not in store and 'sid=S' not in store, 'nothing saved with channels, history or the list carries the session')
+        await pg.wait_for_timeout(2500)
         car = await pg.evaluate("JSON.stringify(window.__car||{})")
         if 'cnn headlines' in car.lower():
-            check('deviceDNT=0' in car, 'Android Auto gets a playable address')
+            check('jwt=JWTTOKEN1' in car and '/v2/stitch/' in car, 'Android Auto gets a playable (session) address')
         else:
             print('note: CNN Headlines not in the car catalog yet')
 
-        # ---- second play: same device id, new session ----
+        # ---- second play: same session, no new start ----
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.ch-row'),function(r){return r.querySelector('.ch-name').textContent==='Pluto TV Westerns';}).click()")
         await pg.wait_for_timeout(1500)
         q2 = parse_qs(urlparse(loads(await pg.evaluate('window.__calls'))[-1]).query)
-        check(q2['deviceId'] == q1['deviceId'] and q2['sid'] != q1['sid'], 'device id kept, a new session id per play')
+        check(q2.get('jwt') == ['JWTTOKEN1'] and LOG['boot'] == 1, f'the session is reused ({LOG["boot"]} starts)')
 
         # ---- search finds Pluto channels once the list is on the phone (Search > Channels) ----
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(600)
@@ -175,17 +190,38 @@ async def main():
         r = await pg.evaluate(ROWS)
         check(len(r) == 4 and LOG['list'] == n0, f'Pluto tab opens from the kept list (no request) {len(r)}')
         check([x['name'] for x in r if x['added']] == ['CNN Headlines', 'Pluto TV Westerns'], 'added ones show a check')
-        state['down'] = False; state['host'] = HOST2
+        state['down'] = False
         await pg.evaluate("(()=>{var k=JSON.parse(localStorage.getItem('radioPlayerPluto2'));k.at=0;localStorage.setItem('radioPlayerPluto2',JSON.stringify(k));})()")
         await pg.reload(); await pg.wait_for_timeout(2000)
         await open_add(pg); await tab(pg, 'Pluto')
         check(LOG['list'] == n0 + 1, 'an old kept list is refreshed')
+        # the kept session is used after a restart; once it has run out a new one is started,
+        # and its stream server is used
+        b0 = LOG['boot']
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        await pg.evaluate("""(()=>{ var t = Array.prototype.find.call(document.querySelectorAll('#stationsGrid .ch-list .tile, #stationsGrid .tile'), function(x){ var n = x.querySelector('.tile-name'); return n && n.textContent === 'CNN Headlines'; }); t.click(); })()""")
-        await pg.wait_for_timeout(1500)
+        PLAY_CNN = """(()=>{ var t = Array.prototype.find.call(document.querySelectorAll('#stationsGrid .ch-list .tile, #stationsGrid .tile'), function(x){ var n = x.querySelector('.tile-name'); return n && n.textContent === 'CNN Headlines'; }); t.click(); })()"""
+        await pg.evaluate(PLAY_CNN); await pg.wait_for_timeout(1500)
         l3 = loads(await pg.evaluate('window.__calls'))[-1]
-        check(urlparse(l3).netloc == HOST2 and 'deviceDNT=0' in l3, f'a saved channel plays from Pluto\'s new server {l3}')
+        check('jwt=JWTTOKEN1' in l3 and LOG['boot'] == b0, f'after a restart the kept session plays My Channels without a new start {l3}')
         await pg.screenshot(path=f'{SHOTS}/pluto-mychannels.png')
+        state['stitcher'] = HOST2
+        await pg.evaluate("(()=>{var s=JSON.parse(localStorage.getItem('radioPlayerPlutoSession'));s.until=Date.now()-1000;localStorage.setItem('radioPlayerPlutoSession',JSON.stringify(s));})()")
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        check(LOG['boot'] == b0 + 1, f'a run-out session is renewed at start-up when Pluto channels are saved ({LOG["boot"] - b0})')
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
+        await pg.evaluate(PLAY_CNN); await pg.wait_for_timeout(1500)
+        l4 = loads(await pg.evaluate('window.__calls'))[-1]
+        check(urlparse(l4).netloc == HOST2 and 'jwt=JWTTOKEN2' in l4, f'plays from the new session\'s stream server with its token {l4}')
+        # Pluto's start service down and no session: no slate address is played
+        state['bootDown'] = True
+        await pg.evaluate("localStorage.removeItem('radioPlayerPlutoSession')")
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        n_before = len(loads(await pg.evaluate('window.__calls')))
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
+        await pg.evaluate(PLAY_CNN); await pg.wait_for_timeout(1800)
+        after = loads(await pg.evaluate('window.__calls'))[n_before:]
+        check(not any('deviceDNT' in x or 'jwt' in x for x in after), f'without a session nothing playable-looking is sent (bare address fails normally) {after}')
+        state['bootDown'] = False
 
         # ---- Pluto down, nothing kept: a clear message ----
         await pg.evaluate("localStorage.removeItem('radioPlayerPluto2')")
