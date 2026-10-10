@@ -6229,6 +6229,14 @@
         <option value="500">500</option>
       </select>
     </div>
+    <!-- Build 201: adult channels back as a choice (hidden unless Show is picked). -->
+    <div class="settings-row">
+      <span class="settings-label">Adult channels</span>
+      <select class="settings-select" id="adultChannelsSelect" title="Show or hide adult channels in Video and Search" aria-label="Adult channels">
+        <option value="hide">Hide</option>
+        <option value="show">Show</option>
+      </select>
+    </div>
     <!-- Build 159: which player plays the videos on the phone (movies, TV, music videos). VLC
          is the default; the phone's own player stays as an alternative. -->
     <div class="settings-row" id="videoPlayerRow" style="display:none;">
@@ -14824,9 +14832,11 @@
   var videoChannels = [];
   try{ videoChannels = JSON.parse(localStorage.getItem(VIDEO_CHANNELS_KEY) || '[]') || []; }catch(e){ videoChannels = []; }
   if(!Array.isArray(videoChannels)) videoChannels = [];
-  // Adult channels (iptv-org's "XXX" category, or a playlist group named that way) are never
-  // shown in Video: not in Add Channels, its category list, or My Channels.
-  try{ localStorage.removeItem('radioPlayerAdultChannels'); }catch(e){}
+  // Adult channels (iptv-org's "XXX" category, or a playlist group named that way) are hidden
+  // everywhere (Video, Add Channels, My Channels, Search) unless Settings says Show (build 201).
+  var ADULT_CHANNELS_KEY = 'radioPlayerAdultChannels';
+  var allowAdultChannels = false;
+  try{ allowAdultChannels = localStorage.getItem(ADULT_CHANNELS_KEY) === 'show'; }catch(e){}
   var ADULT_GROUP_RE = /^(xxx|adult|adults|18\+|porn|nsfw)$/i;
   function isAdultChannel(e){
     if(!e) return false;
@@ -14834,7 +14844,23 @@
     return (e.cats || []).some(function(c){ return c === 'xxx' || ADULT_GROUP_RE.test(String(c)); }) ||
       ADULT_GROUP_RE.test(String(e.group || ''));
   }
-  function channelVisible(e){ return !isAdultChannel(e); }
+  function channelVisible(e){ return allowAdultChannels || !isAdultChannel(e); }
+  (function(){
+    var sel = document.getElementById('adultChannelsSelect');
+    if(!sel) return;
+    sel.value = allowAdultChannels ? 'show' : 'hide';
+    sel.addEventListener('change', function(){
+      allowAdultChannels = sel.value === 'show';
+      try{ localStorage.setItem(ADULT_CHANNELS_KEY, allowAdultChannels ? 'show' : 'hide'); }catch(e){}
+      if(typeof renderChannelsHome === 'function') renderChannelsHome();
+      if(typeof onVideoView !== 'undefined' && onVideoView && typeof renderVideoHome === 'function') renderVideoHome();
+      if(typeof onAddChannelsView !== 'undefined' && onAddChannelsView && typeof renderAddChannels === 'function'){
+        addChannelsState.cat = ''; addChannelsState.shown = 60; renderAddChannels();
+      }
+      if(typeof refreshSearchChannels === 'function') refreshSearchChannels();
+      if(typeof window.AmplifyPublishCarMenu === 'function') window.AmplifyPublishCarMenu();
+    });
+  })();
   // My Channels runs A to Z by name unless Manual is chosen (in edit mode), in which case
   // it's the order the channels were last dragged into (new ones go on the end). The stored
   // list keeps that manual order whichever is showing, so switching back finds it intact.
@@ -14896,6 +14922,7 @@
   // A category's display name: the directory's own name when it's loaded, else the id
   // tidied up ("news" -> "News", "kids" -> "Kids").
   function categoryName(id){
+    if(id === 'xxx') return 'Adult';
     if(iptvIndex && iptvIndex.cats && iptvIndex.cats[id]) return iptvIndex.cats[id];
     return String(id || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
   }
@@ -15324,11 +15351,11 @@
 
   // ---- the iptv-org directory, reduced to what the browser needs, kept for a day
   var IPTV_API = 'https://iptv-org.github.io/api/';
-  var IPTV_CACHE = 'amplify-iptv-v3';
+  var IPTV_CACHE = 'amplify-iptv-v4';
   var iptvIndex = null, iptvIndexPromise = null;
   // Older copies of the directory (one kept adult channels) are thrown away.
   if(typeof caches !== 'undefined'){
-    ['amplify-iptv-v1', 'amplify-iptv-v2'].forEach(function(n){ try{ caches['delete'](n)['catch'](function(){}); }catch(e){} });
+    ['amplify-iptv-v1', 'amplify-iptv-v2', 'amplify-iptv-v3'].forEach(function(n){ try{ caches['delete'](n)['catch'](function(){}); }catch(e){} });
   }
   function loadIptvIndex(){
     if(iptvIndex) return Promise.resolve(iptvIndex);
@@ -15359,11 +15386,12 @@
       j('countries.json'), j('blocklist.json')['catch'](function(){ return []; })]).then(function(r){
       var channels = r[0], streams = r[1], logos = r[2], cats = r[3], countries = r[4], block = r[5];
       var blocked = {};
-      block.forEach(function(b){ if(b && b.channel) blocked[b.channel] = true; });
+      // Build 201: adult channels are kept and flagged (shown only when Settings says Show);
+      // blocked for being adult is not a reason to drop them, any other block reason is.
+      block.forEach(function(b){ if(b && b.channel && b.reason !== 'nsfw') blocked[b.channel] = true; });
       var byId = {};
       channels.forEach(function(c){
-        if(!c || !c.id || c.is_nsfw || c.closed || blocked[c.id]) return;
-        if((c.categories || []).indexOf('xxx') !== -1) return;
+        if(!c || !c.id || c.closed || blocked[c.id]) return;
         byId[c.id] = c;
       });
       var logoFor = {};
@@ -15383,12 +15411,16 @@
       var list = [];
       Object.keys(best).forEach(function(id){
         var c = byId[id], st = best[id];
-        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: c.categories || [],
-          url: st.url, logo: logoFor[id] ? logoFor[id].url : '' });
+        var cs = (c.categories || []).slice();
+        var adult = !!c.is_nsfw || cs.indexOf('xxx') !== -1;
+        if(adult && cs.indexOf('xxx') === -1) cs.push('xxx');
+        list.push({ id: 'iptv:' + id, name: c.name, country: c.country || '', cats: cs,
+          url: st.url, logo: logoFor[id] ? logoFor[id].url : '', adult: adult || undefined });
       });
       list.sort(function(a, b){ return a.name.localeCompare(b.name); });
       var catNames = {};
       cats.forEach(function(c){ if(c && c.id) catNames[c.id] = c.name; });
+      catNames.xxx = 'Adult';
       var countryNames = {};
       countries.forEach(function(c){ if(c && c.code) countryNames[c.code] = c.name; });
       return { at: Date.now(), list: list, cats: catNames, countries: countryNames };
@@ -29455,7 +29487,7 @@
     peekPluto();
     [iptvIndex && iptvIndex.list, freeTvList, plutoList].forEach(function(list){
       (list || []).forEach(function(c){
-        if(seen[c.url] || isAdultChannel(c) || !matchesQuery([c.name], pq)) return;
+        if(seen[c.url] || !channelVisible(c) || !matchesQuery([c.name], pq)) return;
         seen[c.url] = true; dir.push(c);
       });
     });
