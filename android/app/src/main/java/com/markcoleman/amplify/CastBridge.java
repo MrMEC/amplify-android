@@ -397,7 +397,8 @@ final class CastBridge {
       if (attemptAt != mine) return;
       RemoteMediaClient cc = client;
       CrashLog.info(app, "cast still not playing after 25 s: player state " + playerState() + ", idle reason " + idleReason()
-          + (cc != null && cc.getMediaStatus() != null ? ", receiver state " + cc.getMediaStatus().getPlayerState() : ""));
+          + (cc != null && cc.getMediaStatus() != null ? ", receiver state " + cc.getMediaStatus().getPlayerState() : "")
+          + (url.contains("/p/") ? ", relay served " + CastRelay.get().served.get() + (CastRelay.get().lastError != null ? ", relay error " + CastRelay.get().lastError : "") : ""));
     }), 25000L);
     try {
       c.load(req).setResultCallback(

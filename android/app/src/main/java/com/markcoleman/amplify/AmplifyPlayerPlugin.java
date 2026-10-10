@@ -259,6 +259,28 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean live = CastBridge.liveFor(castUrl, castLiveHint || lastLive);
     final String url = castUrl, t = title, ar = artist, im = art;
     final boolean video = castVideoHint;
+    // Build 199: Pluto only lets its own pages read its playlists: the phone hands them over.
+    if (CastRelay.needed(url)) {
+      new Thread(() -> {
+        String target = url;
+        try {
+          String base = CastRelay.get().start();
+          target = CastRelay.get().wrap(url);
+          CrashLog.info(getContext(), "cast through the phone's relay " + base);
+        } catch (Throwable e) {
+          CrashLog.info(getContext(), "cast relay unavailable (" + e + "), casting directly");
+        }
+        final String to = target;
+        final boolean relayed = !to.equals(url);
+        main.post(() -> castSafe("loadRelay", () -> {
+          if (!castActive || cast == null || !url.equals(castUrl)) return;
+          relayAwake(relayed);
+          cast.load(to, live, t, ar, im, castStartMs, castPlay, true, "application/x-mpegURL");
+        }));
+      }, "cast-relay-start").start();
+      return;
+    }
+    relayAwake(false);
     if (!CastBridge.needsSniff(url, video)) {
       cast.load(url, live, t, ar, im, castStartMs, castPlay, video, null);
       return;
@@ -271,6 +293,35 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         cast.load(url, live, t, ar, im, castStartMs, castPlay, video || mime.startsWith("video/"), mime);
       }));
     }, "cast-sniff").start();
+  }
+
+  // Build 199: while the relay feeds the Chromecast, the phone keeps its Wi-Fi and processor
+  // awake (screen off included); released when casting moves on or ends.
+  private android.os.PowerManager.WakeLock relayWake;
+  private android.net.wifi.WifiManager.WifiLock relayWifi;
+  private void relayAwake(boolean on) {
+    try {
+      if (on) {
+        if (relayWake == null) {
+          android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+          relayWake = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Amplify:castRelay");
+          relayWake.setReferenceCounted(false);
+        }
+        if (relayWifi == null) {
+          android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+          int mode = Build.VERSION.SDK_INT >= 29 ? android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY : android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF;
+          relayWifi = wm.createWifiLock(mode, "Amplify:castRelay");
+          relayWifi.setReferenceCounted(false);
+        }
+        if (!relayWake.isHeld()) relayWake.acquire(6L * 60 * 60 * 1000);
+        if (!relayWifi.isHeld()) relayWifi.acquire();
+      } else {
+        if (relayWake != null && relayWake.isHeld()) relayWake.release();
+        if (relayWifi != null && relayWifi.isHeld()) relayWifi.release();
+      }
+    } catch (Throwable e) {
+      CrashLog.note(getContext(), "relay locks", e);
+    }
   }
 
   /** Build 198: the cast log (attempts, outcomes, errors), read fresh for Check storage. */
@@ -301,6 +352,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   /** The session ended: the item comes back to the phone, paused where the Chromecast was. */
   private void castGiveBack(long positionMs) {
     main.removeCallbacks(castLoadNow);
+    relayAwake(false);
     if (!castActive) return;
     castActive = false;
     String url = castUrl;
@@ -1282,6 +1334,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   /** Something else plays now (on the phone): the Chromecast stops the cast item. */
   private void leaveCast() {
     main.removeCallbacks(castLoadNow);
+    relayAwake(false);
     if (!castActive) return;
     castActive = false;
     if (cast != null) cast.stopMedia();
