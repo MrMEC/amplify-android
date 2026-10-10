@@ -15978,7 +15978,10 @@
   // and deviceDNT, which the stream server refuses to answer without. Checked 2026-10-10:
   // 438 channels, all public, plain AES-128 HLS (no DRM), playing with app-made ids.
   var PLUTO_API = 'https://api.pluto.tv/v2/channels.json';
-  var PLUTO_KEY = 'radioPlayerPluto';
+  // v2 (build 187): build 186 kept only one channel (it wrongly skipped directOnly ones);
+  // its saved list is thrown away so the full list is fetched at once.
+  var PLUTO_KEY = 'radioPlayerPluto2';
+  try{ localStorage.removeItem('radioPlayerPluto'); }catch(e){}
   var PLUTO_DEVICE_KEY = 'radioPlayerPlutoDevice';
   var PLUTO_STALE_MS = 12 * 3600 * 1000;
   var plutoList = null, plutoPromise = null;
@@ -16044,7 +16047,7 @@
     return '';
   }
   // Turns Pluto's list into Add Channels entries. Read defensively: it isn't a documented
-  // service. Pluto's own test channels and office-only ones are left out.
+  // service. Pluto's own test channels, office-only and hidden ones are left out.
   function plutoEntries(d){
     var list = [], seen = {};
     (Array.isArray(d) ? d : (d && Array.isArray(d.channels) ? d.channels : [])).forEach(function(c){
@@ -16052,7 +16055,8 @@
       var id = String(c._id || c.id || '');
       var name = String(c.name || '').trim();
       if(!/^[0-9a-f]{24}$/i.test(id) || !name || seen[id]) return;
-      if(c.plutoOfficeOnly || c.directOnly) return;
+      // (Not directOnly: Pluto sets it on nearly every channel, 437 of 438 on 2026-10-10.)
+      if(c.plutoOfficeOnly) return;
       if(c.visibility && c.visibility !== 'everyone') return;
       var cat = String(c.category || '').trim();
       if(/\btest/i.test(cat) || /\btest/i.test(name)) return;

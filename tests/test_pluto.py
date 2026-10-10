@@ -21,7 +21,7 @@ QS = '?advertisingId=&appName=web&deviceDNT=0&deviceId=PLUTOSID&deviceLat=40.040
 state = {'host': HOST1, 'down': False}
 def ch(cid, name, cat, number, **kw):
     c = {'_id': cid, 'slug': name.lower().replace(' ', '-'), 'name': name, 'number': number, 'category': cat,
-         'summary': 'About ' + name, 'visibility': 'everyone', 'isStitched': True,
+         'summary': 'About ' + name, 'visibility': 'everyone', 'isStitched': True, 'directOnly': True, 'plutoOfficeOnly': False,
          'colorLogoPNG': {'path': f'https://images.pluto.tv/channels/{cid}/colorLogoPNG.png'},
          'logo': {'path': f'https://images.pluto.tv/channels/{cid}/logo.png'},
          'stitched': {'urls': [{'type': 'hls', 'url': f'https://{state["host"]}/stitch/hls/channel/{cid}/master.m3u8{QS}'}]}}
@@ -95,7 +95,11 @@ async def main():
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route)
 
-        await pg.goto('http://127.0.0.1:8807/index.html'); await pg.wait_for_timeout(2000)
+        # a one-channel list saved by build 186 must not be used
+        await pg.goto('http://127.0.0.1:8807/index.html'); await pg.wait_for_timeout(500)
+        await pg.evaluate("localStorage.setItem('radioPlayerPluto', JSON.stringify({at: Date.now(), list: [{id:'pluto:x', plutoId:'5421f71da6af422839419cb3', name:'Only One', url:'https://x.pluto.tv/stitch/hls/channel/5421f71da6af422839419cb3/master.m3u8', cats:[], src:'pluto'}]}))")
+        await pg.reload(); await pg.wait_for_timeout(2000)
+        check(await pg.evaluate("localStorage.getItem('radioPlayerPluto')") is None, 'build 186\'s saved list is thrown away')
         await open_add(pg)
         t = await pg.evaluate(TABS)
         check(t == ['Recommended', 'All', 'Pluto', 'Link'], f'tabs Recommended, All, Pluto, Link (no account needed) {t}')
@@ -172,7 +176,7 @@ async def main():
         check(len(r) == 4 and LOG['list'] == n0, f'Pluto tab opens from the kept list (no request) {len(r)}')
         check([x['name'] for x in r if x['added']] == ['CNN Headlines', 'Pluto TV Westerns'], 'added ones show a check')
         state['down'] = False; state['host'] = HOST2
-        await pg.evaluate("(()=>{var k=JSON.parse(localStorage.getItem('radioPlayerPluto'));k.at=0;localStorage.setItem('radioPlayerPluto',JSON.stringify(k));})()")
+        await pg.evaluate("(()=>{var k=JSON.parse(localStorage.getItem('radioPlayerPluto2'));k.at=0;localStorage.setItem('radioPlayerPluto2',JSON.stringify(k));})()")
         await pg.reload(); await pg.wait_for_timeout(2000)
         await open_add(pg); await tab(pg, 'Pluto')
         check(LOG['list'] == n0 + 1, 'an old kept list is refreshed')
@@ -184,7 +188,7 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/pluto-mychannels.png')
 
         # ---- Pluto down, nothing kept: a clear message ----
-        await pg.evaluate("localStorage.removeItem('radioPlayerPluto')")
+        await pg.evaluate("localStorage.removeItem('radioPlayerPluto2')")
         state['down'] = True
         await pg.reload(); await pg.wait_for_timeout(2000)
         await open_add(pg); await tab(pg, 'Pluto')
