@@ -1676,6 +1676,11 @@
     border-bottom:1px solid var(--border);
   }
   .grid-album .song-row:first-child{ border-top:1px solid var(--border); }
+  /* Build 193: on album pages a long song title wraps to a second line (then ellipsis). */
+  .grid-album .song-row .song-row-title{
+    white-space:normal; overflow:hidden; text-overflow:ellipsis; overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; line-height:1.3;
+  }
   .song-row-num{
     width:30px; flex-shrink:0; text-align:center;
     font-size:15px; font-variant-numeric:tabular-nums; color:var(--text-faint);
