@@ -156,7 +156,11 @@ async def main():
         await pg.evaluate("window.scrollTo(0, 500)"); await pg.wait_for_timeout(300)
         tb = await pg.evaluate("""(()=>{ var t = document.getElementById('searchTabs').getBoundingClientRect();
           var el = document.elementFromPoint(200, t.top + t.height / 2); return { top: t.top, y: window.scrollY, onTop: !!(el && el.closest('#searchTabs')) }; })()""")
-        check(tb['y'] > 100 and 58 <= tb['top'] <= 72 and tb['onTop'], f'tabs stay fixed under the header while scrolling (was {t0}, now {tb})')
+        # build 185: scrolling down slides the header away and the tabs ride up to the top
+        check(tb['y'] > 100 and 0 <= tb['top'] <= 12 and tb['onTop'], f'tabs stay pinned at the top while scrolling down, header slid away (was {t0}, now {tb})')
+        await pg.evaluate("window.scrollBy(0, -20)"); await pg.wait_for_timeout(450)
+        tb2 = await pg.evaluate("document.getElementById('searchTabs').getBoundingClientRect().top")
+        check(58 <= tb2 <= 72, f'a scroll up brings the header back and the tabs sit under it again ({tb2})')
         await pg.screenshot(path=f'{shots}/search-sticky.png')
         await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(200)
         # no heading row above the tabs (no "Results for", count, save or clear icons)

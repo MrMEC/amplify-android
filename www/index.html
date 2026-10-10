@@ -967,10 +967,13 @@
   @media (max-width: 900px){
     body.search-view #searchTabs{
       position:sticky; top:60px; z-index:20; background:var(--main-bg);
+      transition:top .28s cubic-bezier(.4,0,.2,1);
       margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
       padding:10px var(--main-pad); margin-top:-10px; margin-bottom:14px;
     }
   }
+  /* Build 185: with the header slid away, the tabs ride up to the top of the screen. */
+  @media (max-width: 900px){ body.hdr-autohide.hdr-hidden.search-view #searchTabs{ top:0; } }
   .clear-search-btn.search-save-btn{ padding:7px 14px; }
   .recent-searches-head{ grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; }
   .recent-searches-clear{ border:none; background:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; padding:4px 6px; }
@@ -4738,11 +4741,12 @@
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
     body.rotate-lock .sidebar-top{ display:none !important; }
-    /* Build 184: on movie/TV pages and the pages with the floating menu button (album,
-       artist), the header (or the floating button) slides up out of view while scrolling
-       down and comes straight back on any scroll up. See syncHeaderAutoHide. */
+    /* Builds 184-185: on every page the header (or the floating Menu button, and Now
+       Playing's minimise button) slides up out of view while scrolling down and comes
+       straight back on any scroll up. See syncHeaderAutoHide. */
     .sidebar-top{ transition:transform .28s cubic-bezier(.4,0,.2,1); }
-    body.hdr-autohide.hdr-hidden:not(.np-open):not(.drawer-open) .sidebar-top{ transform:translateY(calc(-100% - 20px)); }
+    body.hdr-autohide.hdr-hidden:not(.drawer-open) .sidebar-top{ transform:translateY(calc(-100% - 20px)); }
+    body.hdr-autohide.hdr-hidden.np-open:not(.drawer-open) .np-float .np-back{ transform:translateY(-90px); }
   }
 
   /* ---------- Now Playing: bare icon controls ---------- */
@@ -7952,20 +7956,31 @@
   }
   hamburgerBtn.addEventListener('click', openDrawer);
 
-  // ---- the header hides while scrolling down (build 184) ----
-  // Movie/TV pages and the pages whose menu button floats over a picture (album, artist): the
-  // header (or the floating button) slides up once the page has moved down a little, and comes
-  // back on the first scroll up. Near the top of the page it always shows.
+  // ---- the header hides while scrolling down (builds 184-185) ----
+  // Every page on a phone: the header (on album/artist pages the floating Menu button; on Now
+  // Playing its Menu and minimise buttons) slides up once the page has moved down a little,
+  // and comes back on the first scroll up. Near the top of the page it always shows. Now
+  // Playing scrolls inside its own screen, so that is the scroll followed while it is open.
   var hdrLastY = 0, hdrDownRun = 0;
   var HDR_SHOW_ABOVE = 80, HDR_HIDE_AFTER = 24;
   function hdrAutoHidePage(){
     var b = document.body.classList;
-    return isMobileLayout() && (b.contains('vdetail-open') || b.contains('album-open') || b.contains('artist-open'));
+    return isMobileLayout() && !b.contains('rotate-lock');
+  }
+  function hdrScrollY(){
+    if(document.body.classList.contains('np-open')) return nowPlayingScreen.scrollTop || 0;
+    return window.scrollY || window.pageYOffset || 0;
+  }
+  function hdrReset(){
+    hdrDownRun = 0;
+    hdrLastY = hdrScrollY();
+    document.body.classList.remove('hdr-hidden');
+    document.body.classList.toggle('hdr-autohide', hdrAutoHidePage());
   }
   function syncHeaderAutoHide(){
     var on = hdrAutoHidePage();
     document.body.classList.toggle('hdr-autohide', on);
-    var y = window.scrollY || window.pageYOffset || 0;
+    var y = hdrScrollY();
     var dy = y - hdrLastY;
     hdrLastY = y;
     if(!on || y < HDR_SHOW_ABOVE){ hdrDownRun = 0; document.body.classList.remove('hdr-hidden'); return; }
@@ -7977,19 +7992,24 @@
       document.body.classList.remove('hdr-hidden');
     }
   }
-  window.addEventListener('scroll', syncHeaderAutoHide, { passive: true });
-  // A new page (its body classes change) starts with the header showing.
+  window.addEventListener('scroll', function(){ if(!document.body.classList.contains('np-open')) syncHeaderAutoHide(); }, { passive: true });
+  nowPlayingScreen.addEventListener('scroll', function(){ if(document.body.classList.contains('np-open')) syncHeaderAutoHide(); }, { passive: true });
+  window.addEventListener('resize', hdrReset);
+  window.addEventListener('popstate', hdrReset);
+  // A new page starts with the header showing: a change of view (these body classes), or a
+  // tab in the tab bar.
+  document.addEventListener('click', function(e){
+    if(e.target.closest && e.target.closest('.mobile-nav-btn')) setTimeout(hdrReset, 0);
+  }, true);
   if(window.MutationObserver){
+    var HDR_VIEW_CLASSES = ['vdetail-open', 'album-open', 'artist-open', 'np-open', 'search-view', 'home-view', 'rotate-lock'];
     var hdrPageKey = '';
     new MutationObserver(function(){
       var b = document.body.classList;
-      var key = ['vdetail-open', 'album-open', 'artist-open', 'np-open'].map(function(c){ return b.contains(c) ? 1 : 0; }).join('');
+      var key = HDR_VIEW_CLASSES.map(function(c){ return b.contains(c) ? 1 : 0; }).join('');
       if(key === hdrPageKey) return;
       hdrPageKey = key;
-      hdrDownRun = 0;
-      hdrLastY = window.scrollY || 0;
-      document.body.classList.remove('hdr-hidden');
-      document.body.classList.toggle('hdr-autohide', hdrAutoHidePage());
+      hdrReset();
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
   // Opened over a YouTube video (build 182): a choice that leaves closes the video page.
