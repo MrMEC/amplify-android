@@ -111,13 +111,13 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private boolean castVideoHint;
   private boolean castPlay;
   private long castStartMs;
-  private final Runnable castLoadNow = this::castLoadNow;
+  private final Runnable castLoadNow = () -> castSafe("load", this::castLoadNow);
   private final CastBridge.Listener castListener =
       new CastBridge.Listener() {
-        @Override public void onCastChanged() { notifyListeners("cast", castInfoObj()); }
-        @Override public void onCastSessionStarted() { castTakeOver(); }
-        @Override public void onCastSessionEnded(long positionMs, boolean wasPlaying) { castGiveBack(positionMs); }
-        @Override public void onCastStatus() { onCastStatus(); }
+        @Override public void onCastChanged() { castSafe("changed", () -> notifyListeners("cast", castInfoObj())); }
+        @Override public void onCastSessionStarted() { castSafe("takeOver", AmplifyPlayerPlugin.this::castTakeOver); }
+        @Override public void onCastSessionEnded(long positionMs, boolean wasPlaying) { castSafe("giveBack", () -> castGiveBack(positionMs)); }
+        @Override public void onCastStatus() { castSafe("status", AmplifyPlayerPlugin.this::onCastStatus); }
       };
 
   @Override // com.getcapacitor.Plugin
@@ -125,6 +125,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     this.main.post(
         () -> {
           this.connect();
+          CrashLog.install(getContext());
           try {
             this.cast = new CastBridge(getContext(), this.castListener);
             if (!this.cast.supported()) this.cast = null;
@@ -145,6 +146,24 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   protected void handleOnPause() {
     super.handleOnPause();
     main.post(() -> { if (cast != null) cast.setDiscovery(false); });
+  }
+
+  /** Build 196: an error while casting is recorded (Check storage) and never closes the app. */
+  private void castSafe(String where, Runnable r) {
+    try {
+      r.run();
+    } catch (Throwable t) {
+      CrashLog.note(getContext(), "plugin " + where, t);
+    }
+  }
+
+  /** The error that closed the app last time (once), and errors caught since (Check storage). */
+  @PluginMethod
+  public void lastCrash(PluginCall call) {
+    JSObject o = new JSObject();
+    o.put("text", CrashLog.take(getContext(), false));
+    o.put("caught", CrashLog.take(getContext(), true));
+    call.resolve(o);
   }
 
   private JSObject castInfoObj() {
@@ -178,6 +197,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             cast.showPicker(getActivity());
             call.resolve();
           } catch (Throwable t) {
+            CrashLog.note(getContext(), "plugin picker", t);
             call.reject(String.valueOf(t.getMessage()));
           }
         });
@@ -463,11 +483,17 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           () -> {
             // Build 194: while casting, a stream goes to the Chromecast.
             if (cast != null && cast.connected() && CastBridge.castable(string)) {
-              startCast(string, string2, zEquals, (long) (dDoubleValue * 1000.0d),
-                  Boolean.TRUE.equals(pluginCall.getBoolean("castLive", false)),
-                  Boolean.TRUE.equals(pluginCall.getBoolean("castVideo", false)));
-              pluginCall.resolve();
-              return;
+              try {
+                startCast(string, string2, zEquals, (long) (dDoubleValue * 1000.0d),
+                    Boolean.TRUE.equals(pluginCall.getBoolean("castLive", false)),
+                    Boolean.TRUE.equals(pluginCall.getBoolean("castVideo", false)));
+                pluginCall.resolve();
+                return;
+              } catch (Throwable t) {
+                // Casting it failed: it plays on the phone instead.
+                CrashLog.note(getContext(), "plugin startCast", t);
+                castActive = false;
+              }
             }
             leaveCast();
             leaveVlc();

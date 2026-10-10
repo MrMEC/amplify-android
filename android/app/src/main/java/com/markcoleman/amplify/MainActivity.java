@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
   // androidx.activity.ComponentActivity, androidx.core.app.ComponentActivity,
   // android.app.Activity
   public void onCreate(Bundle bundle) {
+    CrashLog.install(this);
     registerPlugin(AmplifyPlayerPlugin.class);
     super.onCreate(bundle);
     if (Build.VERSION.SDK_INT < 33

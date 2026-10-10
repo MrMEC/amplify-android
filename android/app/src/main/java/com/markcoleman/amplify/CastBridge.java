@@ -61,6 +61,9 @@ final class CastBridge {
       new RemoteMediaClient.Callback() {
         @Override
         public void onStatusUpdated() {
+          safe("status", this::status);
+        }
+        private void status() {
           RemoteMediaClient c = client;
           if (c != null) {
             int ps = c.getPlayerState();
@@ -76,16 +79,19 @@ final class CastBridge {
             lastPos = Math.max(0L, c.getApproximateStreamPosition());
             lastPlaying = ps == MediaStatus.PLAYER_STATE_PLAYING;
           }
-          listener.onCastStatus();
+          CastBridge.this.listener.onCastStatus();
         }
       };
 
   private final SessionManagerListener<CastSession> sessionCb =
       new SessionManagerListener<CastSession>() {
         @Override public void onSessionStarting(CastSession s) {}
-        @Override public void onSessionStarted(CastSession s, String id) { attach(s); listener.onCastSessionStarted(); listener.onCastChanged(); }
-        @Override public void onSessionStartFailed(CastSession s, int error) { listener.onCastChanged(); }
+        @Override public void onSessionStarted(CastSession s, String id) { safe("started", () -> { attach(s); CastBridge.this.listener.onCastSessionStarted(); CastBridge.this.listener.onCastChanged(); }); }
+        @Override public void onSessionStartFailed(CastSession s, int error) { safe("startFailed", CastBridge.this.listener::onCastChanged); }
         @Override public void onSessionEnding(CastSession s) {
+          try { ending(); } catch (Throwable t) { CrashLog.note(app, "cast ending", t); }
+        }
+        private void ending() {
           RemoteMediaClient c = client;
           if (c != null) {
             lastPos = Math.max(0L, c.getApproximateStreamPosition());
@@ -93,11 +99,11 @@ final class CastBridge {
                 || c.getPlayerState() == MediaStatus.PLAYER_STATE_BUFFERING;
           }
         }
-        @Override public void onSessionEnded(CastSession s, int error) { detach(); listener.onCastSessionEnded(lastPos, lastPlaying); listener.onCastChanged(); }
+        @Override public void onSessionEnded(CastSession s, int error) { safe("ended", () -> { detach(); CastBridge.this.listener.onCastSessionEnded(lastPos, lastPlaying); CastBridge.this.listener.onCastChanged(); }); }
         @Override public void onSessionResuming(CastSession s, String id) {}
-        @Override public void onSessionResumed(CastSession s, boolean wasSuspended) { attach(s); listener.onCastSessionStarted(); listener.onCastChanged(); }
-        @Override public void onSessionResumeFailed(CastSession s, int error) { listener.onCastChanged(); }
-        @Override public void onSessionSuspended(CastSession s, int reason) { listener.onCastChanged(); }
+        @Override public void onSessionResumed(CastSession s, boolean wasSuspended) { safe("resumed", () -> { attach(s); CastBridge.this.listener.onCastSessionStarted(); CastBridge.this.listener.onCastChanged(); }); }
+        @Override public void onSessionResumeFailed(CastSession s, int error) { safe("resumeFailed", CastBridge.this.listener::onCastChanged); }
+        @Override public void onSessionSuspended(CastSession s, int reason) { safe("suspended", CastBridge.this.listener::onCastChanged); }
       };
 
   private final CastStateListener stateCb =
@@ -105,7 +111,7 @@ final class CastBridge {
         @Override
         public void onCastStateChanged(int state) {
           castState = state;
-          CastBridge.this.listener.onCastChanged();
+          safe("state", CastBridge.this.listener::onCastChanged);
         }
       };
 
@@ -125,11 +131,21 @@ final class CastBridge {
       if (s != null && s.isConnected()) attach(s);
     } catch (Throwable t) {
       // No Google Play services (or Cast) on this phone: no Cast button.
+      CrashLog.note(app, "cast init", t);
       ctx = null;
     }
   }
 
   boolean supported() { return ctx != null; }
+
+  /** Build 196: an error in a Cast callback is recorded, never allowed to close the app. */
+  private void safe(String where, Runnable r) {
+    try {
+      r.run();
+    } catch (Throwable t) {
+      CrashLog.note(app, "cast " + where, t);
+    }
+  }
 
   /** Looks for devices while the app is in front (the Cast button shows when there are some). */
   void setDiscovery(boolean on) {

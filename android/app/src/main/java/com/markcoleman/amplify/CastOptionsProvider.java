@@ -29,6 +29,8 @@ public class CastOptionsProvider implements OptionsProvider {
         .setReceiverApplicationId(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID)
         .setCastMediaOptions(media)
         .setStopReceiverApplicationWhenEndingSession(true)
+        // Build 196: no background reconnection service (fewer moving parts while Cast is new).
+        .setEnableReconnectionService(false)
         .build();
   }
 

@@ -16,6 +16,7 @@ CASTMOCK = """(function(){
   window.Capacitor.Plugins.AmplifyPlayer = new Proxy({}, { get: function(t, k){
     if(k === 'castInfo') return function(){ return Promise.resolve(window.__castInfo); };
     if(k === 'castPick') return function(){ window.__picks++; return Promise.resolve({}); };
+    if(k === 'lastCrash') return function(){ var t = window.__crashText || ''; window.__crashText = ''; return Promise.resolve({ text: t, caught: '' }); };
     return P[k];
   }});
 })();"""
@@ -30,26 +31,38 @@ async def run(p, theme):
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme, locale='en-US')
     await ctx.add_init_script(MOCK)
     await ctx.add_init_script(CASTMOCK)
+    if theme == 'dark':
+        await ctx.add_init_script("if(!sessionStorage.getItem('crashShown')){ sessionStorage.setItem('crashShown','1'); window.__crashText = '2026-10-10 12:31:00 Android 16 (36) SM-S948U thread main\\njava.lang.IllegalStateException: test crash\\n\\tat com.markcoleman.amplify.CastBridge.load(CastBridge.java:1)'; }")
     await ctx.add_init_script("localStorage.setItem('radioPlayerVideoChannels', %s); localStorage.setItem('radioPlayerFavorites', %s); localStorage.setItem('radioPlayerTheme', '%s');" % (repr(json.dumps(CHS)), repr(json.dumps(FAVS)), theme))
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.route('**/*', route)
     await pg.goto('http://127.0.0.1:8826/index.html'); await pg.wait_for_timeout(2500)
     t = theme
+    if theme == 'dark':
+        await pg.wait_for_timeout(1200)
+        d = await pg.evaluate("[document.getElementById('dataDialogOverlay').classList.contains('open'), document.getElementById('dataDialogTitle').textContent, document.getElementById('dataDialogMessage').textContent]")
+        check(d[0] and d[1] == 'Amplify closed unexpectedly' and 'IllegalStateException: test crash' in d[2], f'{t}: after a crash the next start shows the error once {d[:2]}')
+        await pg.screenshot(path=f'{SHOTS}/cast-crash-dialog.png')
+        await pg.evaluate("document.getElementById('dataDialogOkBtn').click()"); await pg.wait_for_timeout(300)
     v = await pg.evaluate(VIS)
     check(not v['shown'], f'{t}: no Cast button without a Chromecast on the network {v}')
     await pg.evaluate("window.__castInfo.available = true; window.__emit('cast', window.__castInfo)"); await pg.wait_for_timeout(300)
     v = await pg.evaluate(VIS)
-    check(v['shown'] and v['leftOfMenu'] and abs(v['cy'] - v['mcy']) <= 1 and 6 <= v['gap'] <= 14 and v['inView'] and v['title'] == 'Cast',
-          f'{t}: a Chromecast found: Cast button just left of Menu, level with it {v}')
+    check(not v['shown'], f'{t}: build 196: no Cast button in the header, even with a Chromecast found {v}')
+    mb = await pg.evaluate("(()=>{ var b=document.getElementById('hamburgerBtn'), r=b.getBoundingClientRect(), l=b.querySelector('.hb-label'); return {w:Math.round(r.width), h:Math.round(r.height), label: !!(l && getComputedStyle(l).display!=='none'), right: Math.round(innerWidth - r.right)}; })()")
+    check(not mb['label'] and mb['w'] == mb['h'] and mb['w'] in (38, 40), f'{t}: the Menu button is its icon only, round {mb}')
     await pg.screenshot(path=f'{SHOTS}/cast-{t}-header.png', clip={'x': 0, 'y': 0, 'width': 412, 'height': 140})
-    await pg.evaluate("document.getElementById('castBtn').click()"); await pg.wait_for_timeout(300)
-    check(await pg.evaluate("window.__picks") == 1, f'{t}: tapping it opens the device picker')
     # play a station (a stream)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(500)
     await pg.evaluate("document.getElementById('favoritesHeading').click()"); await pg.wait_for_timeout(800)
     await pg.evaluate("document.querySelector('#stationsGrid .row-item').click()"); await pg.wait_for_timeout(1200)
     await pg.evaluate("(()=>{ var b=document.getElementById('playerNowTrigger') || document.querySelector('.player-bar'); b && b.click(); })()"); await pg.wait_for_timeout(1000)
     check(await pg.evaluate(NOTE) is None, f'{t}: no cast line while not casting')
+    v = await pg.evaluate(VIS)
+    check(v['shown'] and v['leftOfMenu'] and abs(v['cy'] - v['mcy']) <= 1 and 6 <= v['gap'] <= 14 and v['title'] == 'Cast', f'{t}: on Now Playing the Cast button is just left of Menu, level with it {v}')
+    sty = await pg.evaluate("(()=>{ function st(e){ var c=getComputedStyle(e), r=e.getBoundingClientRect(); return [c.backgroundColor, c.backdropFilter || c.webkitBackdropFilter, Math.round(r.width), Math.round(r.height)]; } var ln=getComputedStyle(document.querySelector('#hamburgerBtn span')).backgroundColor; return [st(document.getElementById('castBtn')), st(document.getElementById('hamburgerBtn')), getComputedStyle(document.getElementById('castBtn')).color, ln]; })()")
+    check(sty[0][0] == sty[1][0] and sty[0][1] == sty[1][1] and sty[0][2:] == sty[1][2:] == [40, 40] and sty[2] == sty[3], f'{t}: on Now Playing Cast and Menu are matching round glass buttons, same icon colour {sty}')
+    await pg.screenshot(path=f'{SHOTS}/cast-{t}-np-off.png', clip={'x': 0, 'y': 0, 'width': 412, 'height': 120})
     await pg.evaluate("window.__castInfo.connected = true; window.__castInfo.device = 'Living Room TV'; window.__emit('cast', window.__castInfo)"); await pg.wait_for_timeout(200)
     await pg.evaluate("(id)=>window.__emit('state', {id:id, state:'ready', isPlaying:true, playWhenReady:true, position:0, duration:-1, live:true, cast:true, castDevice:'Living Room TV', external:true})", await pg.evaluate("window.__cur"))
     await pg.wait_for_timeout(400)
@@ -58,6 +71,8 @@ async def run(p, theme):
     acc = await pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()")
     check(note == 'Casting to Living Room TV', f'{t}: Now Playing says "Casting to Living Room TV" ({note})')
     check(v['shown'] and v['title'] == 'Casting to Living Room TV' and abs(v['cy'] - v['mcy']) <= 1, f'{t}: on Now Playing the button sits beside Menu and names the device {v}')
+    await pg.evaluate("document.getElementById('castBtn').click()"); await pg.wait_for_timeout(300)
+    check(await pg.evaluate("window.__picks") == 1, f'{t}: tapping it opens the device picker')
     await pg.screenshot(path=f'{SHOTS}/cast-{t}-np.png')
     # a song on the phone while connected
     await pg.evaluate("(id)=>window.__emit('state', {id:id, state:'ready', isPlaying:true, playWhenReady:true, position:0, duration:-1, live:true, external:true})", await pg.evaluate("window.__cur"))

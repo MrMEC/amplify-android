@@ -140,6 +140,7 @@ public class PlaybackService extends MediaLibraryService {
 
   @Override // androidx.media3.session.MediaSessionService, android.app.Service
   public void onCreate() {
+    CrashLog.install(this);
     super.onCreate();
     this.exo =
         new ExoPlayer.Builder(this)
