@@ -7070,44 +7070,80 @@
 </script>
 
 <script>
-// ---------- Saved lists kept by Android too (build 191) ----------
-// The WebView holds localStorage writes in memory and puts them on disk later (much later
-// when the page writes a lot), so a change made just before the app is closed could be lost:
-// Mark added a channel to Favorites and it was gone after reopening. Every write of the keys
-// below is copied to the app's own storage (AmplifyPlayer.kvSet, written to disk at once).
-// At start-up, if Android's copy differs from what localStorage held when the page loaded, a
-// write was lost: Android's copy is put back and the page reloads once.
+// ---------- Saved lists kept safe (builds 191-192) ----------
+// Mark added a channel to Favorites and it was gone after reopening the app, twice.
+// 1) Space (build 192): localStorage has a fixed quota, shared with caches that only save a
+//    network call (artist bios, artwork lookups, Pluto / Plex lists, ...). Once it is full a
+//    write is refused and the app's own lists stop being saved, silently. Now a refused write
+//    frees cache entries (largest first) and tries again; it is reported in Check storage.
+// 2) Android's copy (build 191): every write of the keys below is also copied to the app's own
+//    storage (AmplifyPlayer.kvSet, on disk at once), whether or not localStorage took it. At
+//    start-up, if Android's copy differs from what localStorage held when the page loaded, a
+//    write was lost: Android's copy is put back and the page reloads once.
 (function(){
+  var ls;
+  try{ ls = window.localStorage; if(!ls) return; }catch(e){ return; }
+  var origSet = Storage.prototype.setItem, origRemove = Storage.prototype.removeItem;
+  // Caches that can be fetched again. Never the listener's own data.
+  var CACHE_PREFIXES = ['amplifyFallback:'];
+  var CACHE_KEYS = ['radioPlayerArtCache', 'radioPlayerPluto2', 'radioPlayerPluto', 'radioPlayerPlexLib', 'radioPlayerPodcastPopular',
+    'amplifyTagVocab', 'amplifySlowMoments', 'radioPlayerLastSearch', 'radioPlayerVideoStations', 'radioPlayerMadeForYou'];
+  function isCache(k){
+    if(CACHE_KEYS.indexOf(k) !== -1) return true;
+    for(var i = 0; i < CACHE_PREFIXES.length; i++) if(k.indexOf(CACHE_PREFIXES[i]) === 0) return true;
+    return false;
+  }
+  function quotaErr(e){ var n = e && e.name; return n === 'QuotaExceededError' || n === 'NS_ERROR_DOM_QUOTA_REACHED' || (e && e.code === 22); }
+  var lsLog = window.__amplifyLsLog = { freed: [], failed: null };
+  function setWithRoom(store, k, v){
+    try{ origSet.call(store, k, v); return; }catch(e){
+      if(store !== ls || !quotaErr(e)) throw e;
+      var cands = [];
+      for(var i = 0; i < ls.length; i++){
+        var key = ls.key(i);
+        if(key && key !== k && isCache(key)) cands.push([key, (ls.getItem(key) || '').length]);
+      }
+      cands.sort(function(a, b){ return b[1] - a[1]; });
+      for(var j = 0; j < cands.length; j++){
+        try{ origRemove.call(ls, cands[j][0]); }catch(err){}
+        lsLog.freed.push({ key: cands[j][0], size: cands[j][1], at: Date.now(), for: k });
+        if(lsLog.freed.length > 30) lsLog.freed.shift();
+        try{ origSet.call(ls, k, v); return; }catch(err){ if(!quotaErr(err)) throw err; }
+      }
+      lsLog.failed = { key: k, size: String(v).length, at: Date.now() };
+      throw e;
+    }
+  }
+
   var cap = window.Capacitor;
   var P = cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer;
-  if(!P || typeof P.kvSet !== 'function' || typeof P.kvGetAll !== 'function') return;
+  var native = !!(P && typeof P.kvSet === 'function' && typeof P.kvGetAll === 'function');
   var KEYS = ['radioPlayerFavorites', 'radioPlayerFavOrder', 'radioPlayerFavOrderManual', 'radioPlayerFavArtistOrder',
     'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
     'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent'];
   var MIRROR = {};
-  KEYS.forEach(function(k){ MIRROR[k] = true; });
-  var ls;
-  try{ ls = window.localStorage; }catch(e){ return; }
-  var origSet = Storage.prototype.setItem, origRemove = Storage.prototype.removeItem;
+  if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
   var atLoad = {};
   KEYS.forEach(function(k){ try{ atLoad[k] = ls.getItem(k); }catch(e){ atLoad[k] = null; } });
-  var ready = false, pending = {};
+  var ready = false, pending = {}, latest = {};
   function push(k){
-    var v = null;
-    try{ v = ls.getItem(k); }catch(e){}
+    var v = Object.prototype.hasOwnProperty.call(latest, k) ? latest[k] : null;
     P.kvSet({ key: k, value: v })['catch'](function(){});
   }
-  function changed(k){ if(ready) push(k); else pending[k] = true; }
+  function changed(k, v){ latest[k] = v; if(ready) push(k); else pending[k] = true; }
   Storage.prototype.setItem = function(k, v){
-    origSet.call(this, k, v);
-    if(this === ls && MIRROR[k]) changed(k);
+    k = String(k);
+    try{ setWithRoom(this, k, String(v)); }
+    finally{ if(this === ls && MIRROR[k]) changed(k, String(v)); }
   };
   Storage.prototype.removeItem = function(k){
+    k = String(k);
     origRemove.call(this, k);
-    if(this === ls && MIRROR[k]) changed(k);
+    if(this === ls && MIRROR[k]) changed(k, null);
   };
+  if(!native) return;
   function go(){
     ready = true;
     Object.keys(pending).forEach(push);
@@ -7117,29 +7153,29 @@
     var vals = (res && res.values) || {};
     if(vals.__seeded !== '1'){
       // First run with this build: Android takes what localStorage has.
-      KEYS.forEach(function(k){ if(atLoad[k] !== null) pending[k] = true; });
+      KEYS.forEach(function(k){ if(atLoad[k] !== null && !Object.prototype.hasOwnProperty.call(latest, k)){ latest[k] = atLoad[k]; pending[k] = true; } });
       P.kvSet({ key: '__seeded', value: '1' })['catch'](function(){});
       go();
       return;
     }
-    var lost = KEYS.filter(function(k){
-      var nv = Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : null;
-      return nv !== atLoad[k];
-    });
+    function nv(k){ return Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : null; }
+    var lost = KEYS.filter(function(k){ return nv(k) !== atLoad[k]; });
     var again = false;
     try{ again = sessionStorage.getItem('amplifyKvRestored') === '1'; }catch(e){}
     if(lost.length && !again){
+      var putBack = true;
       lost.forEach(function(k){
-        var nv = Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : null;
-        try{ if(nv === null) origRemove.call(ls, k); else origSet.call(ls, k, nv); }catch(e){}
+        try{ if(nv(k) === null) origRemove.call(ls, k); else setWithRoom(ls, k, nv(k)); }catch(e){ putBack = false; }
       });
       try{ sessionStorage.setItem('amplifyKvRestored', '1'); }catch(e){}
-      location.reload();
-      return;
+      if(putBack){ location.reload(); return; }
     }
     try{ sessionStorage.removeItem('amplifyKvRestored'); }catch(e){}
-    // After a restore (or if it couldn't take), whatever localStorage has now is the truth.
-    if(lost.length) lost.forEach(function(k){ pending[k] = true; });
+    // Anything still out of step: whatever this page holds now is the truth.
+    lost.forEach(function(k){
+      if(!Object.prototype.hasOwnProperty.call(latest, k)){ try{ latest[k] = ls.getItem(k); }catch(e){ latest[k] = null; } }
+      pending[k] = true;
+    });
     go();
   }, function(){ go(); });
 })();
@@ -7890,6 +7926,18 @@
         line('Tracks in library', num(counts[0]), counts[0] < 0) +
         line('Embedded covers stored', num(counts[1]), counts[1] < 0) +
         line('Artist portraits stored', num(counts[2]), counts[2] < 0) +
+        (function(){
+          // Build 192: how full settings storage is, its largest entries, and any writes it refused.
+          var total = 0, keys = [];
+          try{ for(var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i), n = k.length + (localStorage.getItem(k) || '').length; total += n; keys.push([k, n]); } }catch(e){}
+          keys.sort(function(a, b){ return b[1] - a[1]; });
+          function kb(n){ return n >= 1048576 ? (n / 1048576).toFixed(1) + ' M' : Math.round(n / 1024) + ' K'; }
+          var log = window.__amplifyLsLog || { freed: [], failed: null };
+          return line('Settings storage used', kb(total) + ' characters', total > 4.5 * 1048576) +
+            '<div>' + keys.slice(0, 6).map(function(x){ return escapeHtml(x[0]) + ' ' + kb(x[1]); }).join('<br>') + '</div>' +
+            (log.freed.length ? line('Caches cleared to make room', log.freed.length) : '') +
+            (log.failed ? line('A save was refused (storage full)', escapeHtml(log.failed.key) + ' at ' + escapeHtml(new Date(log.failed.at).toLocaleTimeString()), true) : '');
+        })() +
         line('Saved cover-art URLs', customCount) +
         line('Resolved art entries', artCount) +
         (function(){

@@ -7,7 +7,7 @@ Run: python3 tests/test_kv_mirror.py"""
 import asyncio, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_fav_order.py')).read()
-exec(src[:src.index('async def main')].replace('8819', '8823').replace('srv-favord', 'srv-kv'))
+exec(src[:src.index('\nasync def main():')].replace('8819', '8823').replace('srv-favord', 'srv-kv'))
 KV = """(function(){
   var oset = Storage.prototype.setItem, oget = Storage.prototype.getItem;
   window.__oset = function(k, v){ oset.call(localStorage, k, v); };
