@@ -5312,6 +5312,29 @@
       width:40px; height:40px; padding:0; gap:0; justify-content:center; border-radius:50%;
     }
   }
+  /* ---------- Build 205: one left edge on phones ----------
+     Everything in the main column starts exactly where the mini player's cover starts:
+     the bar sits 8px in, with a 1px edge and 12px of padding, so its cover is 21px from the
+     screen's edge, and so is the column's gutter. Rows that pad their content (for a hover
+     or playing background) lose that padding on the left, so their pictures sit on the same
+     line as the headings above them, and the back arrow is drawn from the left of its tap
+     area rather than centred in it. */
+  @media (max-width: 900px){
+    :root{ --main-pad: 21px; }
+    #detailBackBtn, body.album-open #detailBackBtn, body.artist-open #detailBackBtn, body.vdetail-open #detailBackBtn{ justify-content:flex-start; }
+    .song-row, .tile.tile-row, .tile-grid > .row-item, .fav-artists-list .row-item{ padding-left:0; }
+    .status-line{ margin-left:0; margin-right:0; }
+    .song-letter{ padding-left:0; }
+    /* Bare icon "covers" (Genres, like My Library's rows) are drawn from the left of a box as
+       wide as the icon, so the icon itself, not empty box, sits on the edge. */
+    .tile.tile-row .tile-art.tile-art-icon{ justify-content:flex-start; width:25px; max-width:25px; }
+    .tile.tile-row .tile-art-icon .tile-art-icon-svg{ width:25px; height:25px; margin-left:-3px; }  /* the icons' own 3px inner margin */
+    /* The header (logo, menu button), Now Playing's corner buttons and everything under its
+       artwork keep the same gutter, on both sides. */
+    .sidebar-top{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
+    .np-float .np-back{ left:var(--main-pad); }
+    body.np-open .np-below, body.np-sheet .np-below{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
+  }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
