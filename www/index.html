@@ -5229,7 +5229,10 @@
     -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
     animation:amp-ring-turn 3.2s linear infinite; animation-play-state:var(--ring-run, paused);
+    opacity:var(--ring-shown, 0); transition:opacity .35s ease;
   }
+  /* Build 209: shown only once the playing cover's own colour is known (see syncRingColour). */
+  body.ring-ready{ --ring-shown: 1; }
   .row-item.playing .row-thumb::after{ --ring-w: 2px; }
   body.ui-playing{ --ring-run: running; }
   @media (prefers-reduced-motion: reduce){
@@ -10386,35 +10389,71 @@
   // and your own videos keep the theme colour (build 203 rule for Live TV).
   var RING_TINT_OPTS = { minS: 0.5, maxS: 0.92, minL: 0.5, maxL: 0.64, scaleL: 1 };
   var ringTintCache = {};
+  // Build 209 (Mark): the theme colours flashed on the new cover before its own colours arrived.
+  // Now the ring stays hidden (body without .ring-ready) until this cover's colour is known, then
+  // fades in. The theme colour is used only when the cover's colour can't be had: the picture
+  // refuses both reads or has no colour in it. A cover with no picture at all is the generated
+  // one, whose colour comes from its seed. RING_WAIT_MS bounds the wait for a picture to arrive.
+  var RING_WAIT_MS = 2500;
+  var ringJob = 0, ringWaitTimer = null;
   function applyRingColour(c){
     if(c) document.body.style.setProperty('--ring-base', c);
     else document.body.style.removeProperty('--ring-base');
+    document.body.classList.add('ring-ready');
+  }
+  function ringPending(){
+    document.body.classList.remove('ring-ready');
+  }
+  function generatedRingColour(seed){
+    if(!seed) return null;
+    var rand = mulberry32(seedHash(seed));
+    var hue = Math.floor(rand() * 360);
+    rand(); rand();
+    var sat = 55 + Math.floor(rand() * 30);
+    return 'hsl(' + hue + ',' + sat + '%,56%)';
   }
   function syncRingColour(){
+    var job = ++ringJob;
+    if(ringWaitTimer){ clearTimeout(ringWaitTimer); ringWaitTimer = null; }
     var st = currentStation;
+    if(!st || isNpChannel(st) || isLocalVideo(st)){ applyRingColour(null); return; }
     var img = playerIcon && playerIcon.querySelector('img');
-    if(!st || !img || isNpChannel(st) || isLocalVideo(st)){ applyRingColour(null); return; }
-    var src = img.currentSrc || img.src;
-    if(!src){ applyRingColour(null); return; }
-    if(ringTintCache[src] !== undefined){ applyRingColour(ringTintCache[src]); return; }
-    applyRingColour(null);
-    function current(){ var i = playerIcon.querySelector('img'); return !!i && (i.currentSrc || i.src) === src; }
+    var src = img ? (img.currentSrc || img.src) : '';
+    if(src && ringTintCache[src] !== undefined){ applyRingColour(ringTintCache[src]); return; }
+    ringPending();
+    if(!src){
+      // The picture may still be on its way (the art lookup paints later); meanwhile the box
+      // shows the generated cover, which is what stays if nothing arrives.
+      ringWaitTimer = setTimeout(function(){
+        ringWaitTimer = null;
+        if(job !== ringJob) return;
+        applyRingColour(generatedRingColour(playerIcon.dataset.artSeed || favKey(st)));
+      }, RING_WAIT_MS);
+      return;
+    }
+    function done(c){
+      ringTintCache[src] = c || null;
+      if(job === ringJob) applyRingColour(c || null);
+    }
     function read(){
-      if(!img.naturalWidth) return;
+      if(job !== ringJob) return;
       var c = null;
       try{ c = dominantColorFrom(img, RING_TINT_OPTS); }catch(e){}
-      if(c){ ringTintCache[src] = c; if(current()) applyRingColour(c); return; }
+      if(c){ done(c); return; }
       readableImageCopy(src).then(function(copy){
-        if(!copy) return;
         var c2 = null;
-        try{ c2 = dominantColorFrom(copy.img, RING_TINT_OPTS); }catch(e){}
-        copy.done();
-        ringTintCache[src] = c2;
-        if(current()) applyRingColour(c2);
+        if(copy){
+          try{ c2 = dominantColorFrom(copy.img, RING_TINT_OPTS); }catch(e){}
+          copy.done();
+        }
+        done(c2);
       });
     }
     if(img.complete && img.naturalWidth) read();
-    else img.addEventListener('load', read, { once: true });
+    else {
+      img.addEventListener('load', read, { once: true });
+      // A picture that fails is removed by the art renderer, which runs this again.
+    }
   }
   if(window.MutationObserver && playerIcon){
     new MutationObserver(function(){ syncRingColour(); })

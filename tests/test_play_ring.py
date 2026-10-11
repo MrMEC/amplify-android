@@ -17,15 +17,30 @@ def svg(c, t):
     return 'data:image/svg+xml;utf8,' + ('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%s"/><text x="100" y="118" font-size="60" text-anchor="middle" fill="white" font-family="sans-serif">%s</text></svg>' % (c, t)).replace('#', '%23')
 ST = [{'stationuuid': 'st-%d' % i, 'name': 'Station %d' % i, 'url': 'http://radio.example/%d' % i, 'url_resolved': 'http://radio.example/%d' % i,
        'urlToResolve': 'http://radio.example/%d' % i, 'favicon': svg(COLS[i], 'S%d' % i), 'country': 'United States', 'tags': 'pop'} for i in range(6)]
+# Build 209: covers served slowly (as from a station's site), to catch any colour shown before the cover's own.
+import time as _time, io as _io
+from PIL import Image as _Image
+def png_of(hexcol):
+    b = _io.BytesIO(); _Image.new('RGB', (200, 200), hexcol).save(b, 'PNG'); return b.getvalue()
+SVG_SLOW = {'pink': '#b83280', 'grey': '#808080'}
+ST.append({'stationuuid': 'st-slow', 'name': 'Slow Pink', 'url': 'http://radio.example/sp', 'url_resolved': 'http://radio.example/sp', 'urlToResolve': 'http://radio.example/sp', 'favicon': 'https://covers.example/slow/pink.png', 'country': 'United States', 'tags': 'pop'})
+ST.append({'stationuuid': 'st-grey', 'name': 'Grey', 'url': 'http://radio.example/gr', 'url_resolved': 'http://radio.example/gr', 'urlToResolve': 'http://radio.example/gr', 'favicon': 'https://covers.example/slow/grey.png', 'country': 'United States', 'tags': 'pop'})
 class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+    def do_GET(self):
+        if self.path.startswith('/slow/'):
+            name = self.path.split('/')[2].split('.')[0]
+            _time.sleep(0.9)
+            body = ('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%s"/></svg>' % SVG_SLOW.get(name, '#808080')).encode()
+            self.send_response(200); self.send_header('Content-Type', 'image/svg+xml'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+        return super().do_GET()
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), functools.partial(Q, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 MOCK = """(function(){ var L = {}; var impl = {
  addListener: function(n, f){ (L[n] = L[n] || []).push(f); return Promise.resolve({remove:function(){}}); },
  load: function(o){ setTimeout(function(){ (L.state||[]).forEach(function(f){ f({ state: o.play ? 'playing' : 'paused', playing: !!o.play, id: o.id }); }); }, 50); return Promise.resolve({}); } };
  var P = new Proxy({}, {get:function(t,k){ if(k==='then') return undefined; if(k==='setCarLibraryPart') return undefined; if(impl[k]) return impl[k]; return function(){ return Promise.resolve({}); }; }});
- window.Capacitor = { isNativePlatform:function(){return true;}, getPlatform:function(){return 'android';}, registerPlugin:function(){ return P; }, Plugins:{AmplifyPlayer:P}, convertFileSrc:function(u){return u;} };
+ window.Capacitor = { isNativePlatform:function(){return true;}, getPlatform:function(){return 'android';}, registerPlugin:function(){ return P; }, Plugins:{AmplifyPlayer:P, CapacitorHttp:{ request: function(o){ return fetch(o.url).then(function(r){ return r.blob().then(function(b){ return new Promise(function(res){ var fr = new FileReader(); fr.onload = function(){ res({ status: r.status, data: String(fr.result).replace(/^data:[^,]*,/, '') }); }; fr.readAsDataURL(b); }); }); }); } }}, convertFileSrc:function(u){return u;} };
 })();"""
 async def main():
     async with async_playwright() as pw:
@@ -33,6 +48,11 @@ async def main():
         for theme in ['dark', 'light']:
             ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True)
             await ctx.route('**/*', lambda r: r.continue_() if '127.0.0.1' in r.request.url or r.request.url.startswith('data:') else r.abort())
+            async def slow_cover(route):
+                name = route.request.url.rsplit('/', 1)[1].split('.')[0]
+                await asyncio.sleep(0.9)
+                await route.fulfill(status=200, content_type='image/png', headers={'Access-Control-Allow-Origin': '*'}, body=png_of(SVG_SLOW.get(name, '#808080')))
+            await ctx.route('https://covers.example/**', slow_cover)
             await ctx.add_init_script(MOCK)
             await ctx.add_init_script("try{ localStorage.setItem('radioPlayerFavorites', %s); localStorage.setItem('radioPlayerRecent', %s); localStorage.setItem('radioPlayerTheme', %s); localStorage.setItem('radioPlayerArtistPlays', JSON.stringify({madonna:{name:'Madonna',count:9,last:Date.now()},prince:{name:'Prince',count:7,last:Date.now()},adele:{name:'Adele',count:5,last:Date.now()}})); localStorage.setItem('radioPlayerArtistPlaysReset1','1');}catch(e){}" % (json.dumps(json.dumps(ST)), json.dumps(json.dumps(ST[:5])), json.dumps(theme)))
             pg = await ctx.new_page()
@@ -76,6 +96,30 @@ async def main():
             base2 = await pg.evaluate("document.body.style.getPropertyValue('--ring-base')")
             print(theme, 'ring base for purple cover', base2)
             check(base2.startswith('hsl(') and 250 <= int(base2[4:].split(',')[0]) <= 285, theme + ': ring colour changes with the new (purple) cover')
+            # Build 209: tap a station whose cover arrives late; sample every 30ms. The ring may be hidden while
+            # its colour is worked out, but must never show in any colour but the cover's (pink, hue ~322).
+            samples = await pg.evaluate("""(async () => { __r.play(6); setTimeout(()=>__r.ui(true), 300); const out = [];
+              for(let i = 0; i < 90; i++){ await new Promise(r => setTimeout(r, 30));
+                out.push([document.body.classList.contains('ring-ready'), document.body.style.getPropertyValue('--ring-base')]); }
+              return out; })()""")
+            shown = [b for r, b in samples if r]
+            print(theme, 'slow cover: first shown', shown[:1], 'hidden samples', sum(1 for r, b in samples if not r))
+            check(len(shown) > 0 and all(b.startswith('hsl(') and 300 <= int(b[4:].split(',')[0]) <= 340 for b in shown), theme + ': slow cover never shows the old or theme colours, only its own')
+            check(not samples[0][0], theme + ': ring hidden straight after tapping a cover whose colour is not known yet')
+            # Screenshots of the hand-over on a fresh slow cover (cache cleared): during the wait, and after.
+            await pg.evaluate("__r.play(1)"); await pg.wait_for_timeout(500)
+            await pg.evaluate("__r.ev('for (var k in ringTintCache) delete ringTintCache[k]'); __r.play(6)")
+            for n, ms in enumerate([150, 700, 1500, 2600]):
+                await pg.wait_for_timeout(ms - ([0, 150, 700, 1500][n]))
+                e3 = await pg.query_selector('.fav-card.playing')
+                if e3: await e3.screenshot(path='%s/ring-slow-%s-%d.png' % (OUT, theme, ms))
+            # A colourless (grey) cover: the theme colour is the fallback, shown once known.
+            await pg.evaluate("__r.play(7)"); await pg.wait_for_timeout(2600)
+            check(await pg.evaluate("document.body.classList.contains('ring-ready') && !document.body.style.getPropertyValue('--ring-base')"), theme + ': grey cover falls back to the theme colours')
+            # Back to the orange cover: known already, so it shows at once with no hidden gap.
+            r2 = await pg.evaluate("(() => { __r.play(1); return new Promise(r => requestAnimationFrame(() => r([document.body.classList.contains('ring-ready'), document.body.style.getPropertyValue('--ring-base')]))); })()")
+            check(r2[0] and r2[1].startswith('hsl(20'), theme + ': a cover seen before shows its colours at once')
+            await pg.evaluate("__r.play(3)"); await pg.wait_for_timeout(600)
             await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
             await pg.screenshot(path='%s/ring-home2-%s.png' % (OUT, theme))
             for n, sel in enumerate(['.fav-card.playing', '#recentGrid .tile.playing, .home-row .tile.playing:not(.fav-card)']):
