@@ -5198,15 +5198,21 @@
   @property --amp-ring-a{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
   :root{
     --play-glow: var(--shadow);
-    --ring-c1: color-mix(in srgb, var(--accent) 55%, #ffffff);
-    --ring-c2: var(--accent);
-    --ring-c3: color-mix(in srgb, var(--accent) 70%, #000000);
+    /* Build 208: the shades come from the playing cover itself (--ring-base, set on body by
+       syncRingColour from the mini player's picture); the theme colour only when the cover has
+       no readable colour, and for TV channels. */
     --ring-w: 2.5px;
   }
+  /* On body (where --ring-base is set), so the shades are worked out from it there. */
+  body{
+    --ring-c2: var(--ring-base, var(--accent));
+    --ring-c1: color-mix(in srgb, var(--ring-c2) 55%, #ffffff);
+    --ring-c3: color-mix(in srgb, var(--ring-c2) 70%, #000000);
+  }
   @supports (color: hsl(from red h s l)){
-    :root{
-      --ring-c1: hsl(from var(--accent) calc(h + 24) s calc(l * 1.14));
-      --ring-c3: hsl(from var(--accent) calc(h - 30) s calc(l * .92));
+    body{
+      --ring-c1: hsl(from var(--ring-c2) calc(h + 24) s calc(l * 1.34));
+      --ring-c3: hsl(from var(--ring-c2) calc(h - 30) s calc(l * .9));
     }
   }
   @keyframes amp-ring-turn{ to{ --amp-ring-a: 360deg; } }
@@ -5222,7 +5228,7 @@
     background:conic-gradient(from var(--amp-ring-a), var(--ring-c1), var(--ring-c2), var(--ring-c3), var(--ring-c2), var(--ring-c1));
     -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-    animation:amp-ring-turn 7s linear infinite; animation-play-state:var(--ring-run, paused);
+    animation:amp-ring-turn 3.2s linear infinite; animation-play-state:var(--ring-run, paused);
   }
   .row-item.playing .row-thumb::after{ --ring-w: 2px; }
   body.ui-playing{ --ring-run: running; }
@@ -5242,6 +5248,11 @@
   /* Artists: a thin grey ring round every portrait. */
   .tile[data-entity="artist"]:not(.fav-card) .tile-art{ border:3px solid var(--artist-ring); }
   .song-row .song-row-art.round, .fav-artists-list .row-thumb.fav-artist-thumb{ border:2px solid var(--artist-ring); }
+  /* Build 208: Home's Top Artists get a thin solid grey ring (the see-through white let the
+     colourful portrait show through it, so it read as a coloured border). */
+  :root{ --top-artist-ring: #3a3a3e; }
+  html[data-theme="light"]{ --top-artist-ring: #d1d1d6; }
+  #topArtistsGrid .tile[data-entity="artist"] .tile-art{ border:1.5px solid var(--top-artist-ring); background-clip:padding-box; }
   /* Headings: full-strength text, heavier and larger. */
   .home-section-head h2, .recent-col-heading, .section-heading{
     color:var(--text); font-weight:800; letter-spacing:-.01em; font-size:20px;
@@ -10365,6 +10376,49 @@
     }
     if(img.complete && img.naturalWidth){ read(); return; }
     img.addEventListener('load', read, { once: true });
+  }
+
+  // ---------- the playing cover's ring colour (build 208) ----------
+  // Mark: the animated border on the playing cover takes its shades from that cover, not the
+  // theme colour, and changes with each new cover. Read from the mini player's picture (always
+  // the playing item) with the same reader as the Now Playing tint, bright enough to be a line
+  // of colour; station logos that refuse a pixel read go through the native copy. TV channels
+  // and your own videos keep the theme colour (build 203 rule for Live TV).
+  var RING_TINT_OPTS = { minS: 0.5, maxS: 0.92, minL: 0.5, maxL: 0.64, scaleL: 1 };
+  var ringTintCache = {};
+  function applyRingColour(c){
+    if(c) document.body.style.setProperty('--ring-base', c);
+    else document.body.style.removeProperty('--ring-base');
+  }
+  function syncRingColour(){
+    var st = currentStation;
+    var img = playerIcon && playerIcon.querySelector('img');
+    if(!st || !img || isNpChannel(st) || isLocalVideo(st)){ applyRingColour(null); return; }
+    var src = img.currentSrc || img.src;
+    if(!src){ applyRingColour(null); return; }
+    if(ringTintCache[src] !== undefined){ applyRingColour(ringTintCache[src]); return; }
+    applyRingColour(null);
+    function current(){ var i = playerIcon.querySelector('img'); return !!i && (i.currentSrc || i.src) === src; }
+    function read(){
+      if(!img.naturalWidth) return;
+      var c = null;
+      try{ c = dominantColorFrom(img, RING_TINT_OPTS); }catch(e){}
+      if(c){ ringTintCache[src] = c; if(current()) applyRingColour(c); return; }
+      readableImageCopy(src).then(function(copy){
+        if(!copy) return;
+        var c2 = null;
+        try{ c2 = dominantColorFrom(copy.img, RING_TINT_OPTS); }catch(e){}
+        copy.done();
+        ringTintCache[src] = c2;
+        if(current()) applyRingColour(c2);
+      });
+    }
+    if(img.complete && img.naturalWidth) read();
+    else img.addEventListener('load', read, { once: true });
+  }
+  if(window.MutationObserver && playerIcon){
+    new MutationObserver(function(){ syncRingColour(); })
+      .observe(playerIcon, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
   }
 
   // The art in this box is replaced by several paths -- a lookup resolving, a custom URL
