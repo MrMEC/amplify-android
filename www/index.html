@@ -5191,6 +5191,45 @@
   .row-item.playing{ background:transparent; }
   .row-item.playing .row-thumb{ box-shadow:var(--play-glow); }
   .row-item.playing .row-name{ color:var(--accent); }
+  /* Build 207: what is playing gets a thin border in shades of the theme colour instead of the
+     glow (Mark's example: a pink-red-purple frame). The shades turn slowly around the cover while
+     it plays and hold still when paused. The ring sits on the cover's own edge (::after), so no
+     layout moves. Only one cover plays at a time, so repainting that one ring is cheap. */
+  @property --amp-ring-a{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+  :root{
+    --play-glow: var(--shadow);
+    --ring-c1: color-mix(in srgb, var(--accent) 55%, #ffffff);
+    --ring-c2: var(--accent);
+    --ring-c3: color-mix(in srgb, var(--accent) 70%, #000000);
+    --ring-w: 2.5px;
+  }
+  @supports (color: hsl(from red h s l)){
+    :root{
+      --ring-c1: hsl(from var(--accent) calc(h + 24) s calc(l * 1.14));
+      --ring-c3: hsl(from var(--accent) calc(h - 30) s calc(l * .92));
+    }
+  }
+  @keyframes amp-ring-turn{ to{ --amp-ring-a: 360deg; } }
+  .tile.playing:not(.fav-card) .tile-art:not(.tile-art-icon), .row-item.playing .row-thumb{ position:relative; }
+  .tile.playing:not(.fav-card) .tile-art:not(.tile-art-icon)::after,
+  .row-item.playing .row-thumb::after,
+  .fav-card.playing::after,
+  .shortcut.playing .shortcut-art::after,
+  .vep-row.playing .vep-thumb::after,
+  .np-land-fav.playing::after{
+    content:''; position:absolute; inset:0; z-index:2; pointer-events:none;
+    border-radius:inherit; box-shadow:none; padding:var(--ring-w);
+    background:conic-gradient(from var(--amp-ring-a), var(--ring-c1), var(--ring-c2), var(--ring-c3), var(--ring-c2), var(--ring-c1));
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation:amp-ring-turn 7s linear infinite; animation-play-state:var(--ring-run, paused);
+  }
+  .row-item.playing .row-thumb::after{ --ring-w: 2px; }
+  body.ui-playing{ --ring-run: running; }
+  @media (prefers-reduced-motion: reduce){
+    .tile.playing .tile-art::after, .row-item.playing .row-thumb::after, .fav-card.playing::after,
+    .shortcut.playing .shortcut-art::after, .vep-row.playing .vep-thumb::after, .np-land-fav.playing::after{ animation:none; }
+  }
   /* Covers cast a shadow everywhere they appear. */
   .fav-card{ box-shadow:var(--shadow); }
   .tile-grid > .row-item .row-thumb, .vw-thumb, .vep-thumb, .fav-artists-list .row-thumb.fav-artist-thumb{ box-shadow:var(--shadow); }

@@ -140,12 +140,14 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   @Override
   protected void handleOnResume() {
     super.handleOnResume();
+    pageAwake = true;
     main.post(() -> { if (cast != null) cast.setDiscovery(true); });
   }
 
   @Override
   protected void handleOnPause() {
     super.handleOnPause();
+    pageAwake = false;
     main.post(() -> { if (cast != null) cast.setDiscovery(false); });
   }
 
@@ -523,13 +525,72 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         });
   }
 
+  /** Build 207: false while the app is in the background (its page may not run until it returns). */
+  private volatile boolean pageAwake = true;
+
   @Override
   public boolean onRemote(String action) {
     if (!hasListeners("remote")) return false;
+    // Build 207: Pause from the home screen widget, the notification or the lock screen used to
+    // wait for the page, which Android holds while the app is in the background, so nothing
+    // happened until the app was opened again. Pause and Stop now stop the sound here at once;
+    // Play does too while the app is in the background. The page is still told, so it catches
+    // up (its handlers do nothing when it already matches).
+    try {
+      if ("pause".equals(action) || "stop".equals(action)) nativePauseNow();
+      else if ("play".equals(action) && !pageAwake) nativePlayNow();
+    } catch (Throwable t) {
+      CrashLog.note(getContext(), "plugin remote " + action, t);
+    }
     JSObject o = new JSObject();
     o.put("action", action);
     notifyListeners("remote", o);
     return true;
+  }
+
+  private void onMain(Runnable r) {
+    if (Looper.myLooper() == Looper.getMainLooper()) r.run();
+    else main.post(r);
+  }
+
+  /** Same as pause() below, without a call from the page. */
+  private void nativePauseNow() {
+    onMain(
+        () -> {
+          if (castActive && cast != null) {
+            castPlay = false;
+            cast.pause();
+          } else if (VlcEngine.isActive()) VlcEngine.pause();
+          else {
+            ExoPlayer p = exo();
+            if (p != null) p.setPlayWhenReady(false);
+          }
+        });
+  }
+
+  /**
+   * Same as play() below, for a Play pressed while the app is in the background. A stream that
+   * failed is left for the page, which starts it over properly when it next runs.
+   */
+  private void nativePlayNow() {
+    onMain(
+        () -> {
+          if (VlcEngine.isActive()) {
+            VlcEngine.play();
+            return;
+          }
+          if (castActive && cast != null) {
+            if (cast.loading || cast.playerState() == com.google.android.gms.cast.MediaStatus.PLAYER_STATE_IDLE) return;
+            castPlay = true;
+            cast.play();
+            return;
+          }
+          ExoPlayer p = exo();
+          if (p == null || p.getMediaItemCount() == 0 || p.getPlayerError() != null) return;
+          if (p.getPlaybackState() == Player.STATE_IDLE) return;
+          if (p.getPlaybackState() == Player.STATE_ENDED) return;
+          p.setPlayWhenReady(true);
+        });
   }
 
   @PluginMethod
