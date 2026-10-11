@@ -1,4 +1,4 @@
-"""Build 120: the A logo's dark version on the dark theme and light one on the light theme;
+"""Build 120 (210: page headed Library, Top Artists ring on the portraits): the A logo's dark version on the dark theme and light one on the light theme;
 My Library's Favorite Artists as stacked rows with Edit (a word, far right) for dragging rows
 into order and removing artists; For You renamed My Stations (Home, its page, the save button,
 Android Auto). Build 129: A to Z by default, Order A to Z / Manual in Edit, grips only in Manual. Run: python3 tests/test_fav_artists.py (screenshots in /tmp/claude-0/t/shots)"""
@@ -122,6 +122,10 @@ async def main():
           return { text: b.textContent, icon: !!b.querySelector('i, svg'), right: Math.round(g.right - r.right) }; })()""")
         check(ed['text'] == 'Edit' and not ed['icon'] and ed['right'] <= 4, f'"Edit" as a word, on the far right {ed}')
         await pg.screenshot(path=f'{shots}/favart-rows.png')
+        # Build 210: the page is headed Library, and the portraits wear Top Artists' thin solid grey ring.
+        check(await pg.evaluate("document.getElementById('stationsHeading').textContent") == 'Library', 'the page is headed Library (build 210)')
+        ring = await pg.evaluate("Array.from(document.querySelectorAll('.fav-artists-list .fav-artist-thumb')).map(function(e){ var c = getComputedStyle(e); return c.borderTopColor + ' ' + c.borderTopWidth; })")
+        check(len(ring) == 4 and all(r.startswith('rgb(58, 58, 62)') and r.split(' ')[-1] in ('1px', '1.5px') for r in ring), f'Favorite Artists: thin solid grey ring like Top Artists (build 210) {ring[:1]}')
         await pg.evaluate("document.querySelectorAll('.fav-artist-row')[1].click()"); await pg.wait_for_timeout(600)
         check(await pg.evaluate("document.body.classList.contains('artist-open') && /Bravo/.test(document.getElementById('artistHeroName').textContent)"), 'a row opens the artist')
         await pg.evaluate('__f.library()'); await pg.wait_for_timeout(700)

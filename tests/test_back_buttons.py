@@ -119,12 +119,12 @@ async def run(p, theme):
     h = await back(pg); check(h[1], f'{theme}: Back from My Stations returns to the album {h}')
     h = await back(pg); check(h[2] and not h[1], f'{theme}: then the artist {h}')
     h = await back(pg); check(h[0] == 'Artists', f'{theme}: then Artists {h}')
-    h = await back(pg); check(h[0] == 'My Library' and not await pg.evaluate("getComputedStyle(document.getElementById('detailBackBtn')).display!=='none'"),
+    h = await back(pg); check(h[0] == 'Library' and not await pg.evaluate("getComputedStyle(document.getElementById('detailBackBtn')).display!=='none'"),
           f'{theme}: then My Library, which has no back button {h}')
     # Genres from My Library, a genre, Back twice
     await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .tile')).filter(function(t){ return /Genres/.test(t.textContent); })[0].click()")
     await look(pg, 'genres', theme, x=ax)
-    h = await back(pg); check(h[0] == 'My Library', f'{theme}: Back from Genres returns to My Library {h}')
+    h = await back(pg); check(h[0] == 'Library', f'{theme}: Back from Genres returns to My Library {h}')
     check(not errs, f'{theme}: no page errors {errs[:3]}')
     await b.close()
 async def main():

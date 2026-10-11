@@ -753,7 +753,7 @@
      single sampled value: a station logo comes from someone else's host without CORS headers
      and its pixels cannot be read at all, so anything computed would be a guess for exactly
      the covers most likely to be in here. */
-  .fav-card{ display:flex; flex-direction:column; border-radius:16px; overflow:hidden; }
+  .fav-card{ display:flex; flex-direction:column; border-radius:9.5px; overflow:hidden; }
   .fav-card .tile-art{
     border-radius:0; box-shadow:none; flex:0 0 auto;
   }
@@ -831,19 +831,19 @@
      (.fav-artists-row), not the 150px covers the other home rows use -- a row of people,
      sized so several fit across a phone at once. */
   body.home-stacked .home-row > #topArtistsGrid{ gap:0 16px; }
-  body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 92px; }
+  body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 100px; } /* build 210: a little larger (was 92) */
   /* The arrows sit on the middle of the circle rather than the middle of a 150px cover. */
   #topArtistsSection .home-row-nav{ top:29px; }
   @media (max-width: 900px){
-    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 78px; }
+    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 86px; }
     /* Sized from the screen's width so the last visible portrait is always cut off -- the
        cue that the row scrolls. The row is the viewport less 46px of padding, with 16px
        gaps: 3 whole portraits and a third of the next on a narrow phone, 4 and a third on a
        wider one. (A phone with a large display-size setting is only ~320px wide.) */
-    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 min(78px, calc((100vw - 46px - 64px) / 4.35)); }
+    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 min(86px, calc((100vw - 46px - 64px) / 3.85)); } /* build 210: about 13% larger (was /4.35, max 78) */
   }
   @media (max-width: 380px){
-    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 min(78px, calc((100vw - 46px - 48px) / 3.35)); }
+    body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 min(86px, calc((100vw - 46px - 48px) / 3.1)); }
   }
 
 
@@ -913,7 +913,7 @@
   .song-row .song-row-art.shuffle-all-art{ display:flex; align-items:center; justify-content:center; background:var(--accent); color:var(--accent-text); }
   .shuffle-all-art .shuffle-icon{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .song-row .song-row-art{
-    width:64px; height:64px; flex-shrink:0; aspect-ratio:auto; border-radius:10px;
+    width:64px; height:64px; flex-shrink:0; aspect-ratio:auto; border-radius:6px;
     font-size:22px;
   }
   .song-row-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
@@ -1065,7 +1065,7 @@
   .tile.tile-draggable:active{ cursor:grabbing; }
   .tile.dragging{ opacity:.4; }
   .tile-art{
-    width:100%; max-width:100%; aspect-ratio:1/1; border-radius:14px; overflow:hidden; background:var(--art-bg);
+    width:100%; max-width:100%; aspect-ratio:1/1; border-radius:8.5px; overflow:hidden; background:var(--art-bg);
     display:flex; align-items:center; justify-content:center; font-size:38px; box-shadow:var(--shadow); color:var(--text-faint);
     transition: filter .15s ease, box-shadow .15s ease; min-width:0;
   }
@@ -1147,7 +1147,7 @@
      thumbnail used by the icon-led lists. */
   .tile.tile-row[data-entity="playlist"] .tile-art,
   .tile.tile-row[data-entity="custom-search"] .tile-art{
-    width:64px; height:64px; max-width:64px; border-radius:10px;
+    width:64px; height:64px; max-width:64px; border-radius:6px;
   }
   @media (max-width: 900px){
     .tile.tile-row[data-entity="playlist"] .tile-art,
@@ -1494,7 +1494,7 @@
     flex:0 0 min(240px, 66vw); scroll-snap-align:start; display:flex; flex-direction:column;
     text-align:left; background:none; border:0; padding:0; margin:0; color:inherit; font:inherit; cursor:pointer;
   }
-  .yt-thumb{ position:relative; display:block; width:100%; aspect-ratio:16/9; border-radius:10px; overflow:hidden;
+  .yt-thumb{ position:relative; display:block; width:100%; aspect-ratio:16/9; border-radius:6px; overflow:hidden;
     background:rgba(255,255,255,.08); }
   .yt-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .yt-play{ position:absolute; left:50%; top:50%; width:42px; height:42px; margin:-21px 0 0 -21px; border-radius:50%;
@@ -1549,7 +1549,7 @@
   .yt-ov-list-head{ font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); margin:8px 0 12px; }
   .yt-row{ display:flex; align-items:flex-start; gap:12px; width:100%; padding:0; margin:0 0 14px;
     background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-  .yt-row .yt-thumb{ flex:0 0 auto; width:min(150px, 42vw); border-radius:8px; }
+  .yt-row .yt-thumb{ flex:0 0 auto; width:min(150px, 42vw); border-radius:5px; }
   .yt-row .yt-play{ width:30px; height:30px; margin:-15px 0 0 -15px; }
   .yt-row .yt-play svg{ width:12px; height:12px; margin-left:2px; }
   .yt-row-text{ flex:1 1 auto; min-width:0; padding-top:2px; }
@@ -1613,7 +1613,7 @@
     margin-bottom:22px;
   }
   .album-hero-art{
-    width:100%; height:100%; border-radius:12px; overflow:hidden;
+    width:100%; height:100%; border-radius:7px; overflow:hidden;
     background:var(--art-bg); display:flex; align-items:center; justify-content:center;
     /* The shadow is what tells the eye this is a physical thing on the surface rather than
        a hole cut in it, which is the whole difference from the Now Playing hero. */
@@ -3108,7 +3108,7 @@
   .tile-grid > .grid-section-label.ch-row-label{ margin:10px 0 -28px; }
   .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; }
   @media (max-width: 900px){ .tile-grid > .grid-section-label.ch-row-label{ margin:-6px 0 -18px; } .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; } }
-  .tile.tile-row.ch-item .tile-art{ border-radius:8px; }
+  .tile.tile-row.ch-item .tile-art{ border-radius:5px; }
   .clear-search-btn .hdr-svg{ width:13px; height:12px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.8; stroke-linecap:round; stroke-linejoin:round; }
   .ch-sort-menu{
     position:fixed; z-index:420; min-width:180px; padding:6px; border-radius:12px;
@@ -3163,7 +3163,7 @@
   /* Continue Watching: wide stills in a sideways row. */
   .tile-grid > .cl-row.vw-row{ gap:14px; }
   .vw-tile{ flex:0 0 auto; width:min(62vw, 260px); cursor:pointer; scroll-snap-align:start; min-width:0; }
-  .vw-thumb{ position:relative; width:100%; aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:var(--art-bg, var(--panel-2)); }
+  .vw-thumb{ position:relative; width:100%; aspect-ratio:16/9; border-radius:7px; overflow:hidden; background:var(--art-bg, var(--panel-2)); }
   .vw-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .vw-tile .tile-name{ margin-top:8px; }
   .vw-thumb .vw-more{ top:4px; right:2px; z-index:3; }
@@ -3194,7 +3194,7 @@
   }
   .vw-tile .tile-name, .vw-tile .tile-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
   /* Movie and show posters: tall 2:3 covers in the grid. */
-  .tile.vposter .tile-art.vposter-art{ aspect-ratio:2/3; height:auto; position:relative; overflow:hidden; border-radius:10px; }
+  .tile.vposter .tile-art.vposter-art{ aspect-ratio:2/3; height:auto; position:relative; overflow:hidden; border-radius:6px; }
   .tile.vposter .tile-art.vposter-art img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .vposter-fallback{
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center;
@@ -3227,7 +3227,7 @@
   .vd-backdrop img{ width:100%; height:100%; object-fit:cover; display:block; }
   .vd-backdrop::after{ content:''; position:absolute; inset:0; background:linear-gradient(to bottom, rgba(0,0,0,0) 45%, rgba(0,0,0,.45)); }
   .vd-head{ display:flex; align-items:flex-end; gap:16px; margin:-64px 14px 0; position:relative; z-index:1; }
-  .vd-poster{ position:relative; flex:0 0 auto; width:112px; aspect-ratio:2/3; border-radius:10px; overflow:hidden; background:var(--panel); box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .vd-poster{ position:relative; flex:0 0 auto; width:112px; aspect-ratio:2/3; border-radius:6px; overflow:hidden; background:var(--panel); box-shadow:0 10px 30px rgba(0,0,0,.4); }
   .vd-poster img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .vd-text{ flex:1; min-width:0; padding-bottom:4px; }
   .vd-title{ font-size:22px; font-weight:800; line-height:1.2; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow-wrap:anywhere; }
@@ -3249,7 +3249,7 @@
   .vd-file{ margin-top:18px; font-size:12px; color:var(--text-faint); overflow-wrap:anywhere; }
   .vd-overview{ margin-top:18px; }
   .vd-overview .vd-overview-text{ margin:0 0 6px; text-align:left; }
-  .artist-bio-avatar.vbio-poster{ border-radius:8px; aspect-ratio:2/3; height:auto; overflow:hidden; }
+  .artist-bio-avatar.vbio-poster{ border-radius:5px; aspect-ratio:2/3; height:auto; overflow:hidden; }
   .artist-bio-avatar.vbio-poster img{ width:100%; height:100%; object-fit:cover; display:block; }
   /* Episode rows (a show's page, and the list under a video on Now Playing). */
   .tile-grid > .vep-row, .np-related-grid .vep-row{ grid-column:1/-1; }
@@ -3260,7 +3260,7 @@
   .tile-grid > .vep-row{ margin-top:-40px; }
   .tile-grid > .grid-section-label + .vep-row, .tile-grid > .video-tabs + .vep-row{ margin-top:0; }
   @media (max-width: 900px){ .tile-grid > .vep-row{ margin-top:-24px; } }
-  .vep-thumb{ position:relative; flex:0 0 auto; width:132px; aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:var(--panel-2); }
+  .vep-thumb{ position:relative; flex:0 0 auto; width:132px; aspect-ratio:16/9; border-radius:5px; overflow:hidden; background:var(--panel-2); }
   .vep-thumb.vep-poster{ width:52px; aspect-ratio:2/3; }
   .vep-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   .vep-thumb .v-progress{ left:5px; right:5px; bottom:5px; height:3px; }
@@ -3327,7 +3327,7 @@
   .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
   .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
   .ch-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; min-width:0; }
-  .ch-logo{ width:52px; height:52px; flex:none; border-radius:10px; overflow:hidden; background:#2b2c31;
+  .ch-logo{ width:52px; height:52px; flex:none; border-radius:6px; overflow:hidden; background:#2b2c31;
     display:flex; align-items:center; justify-content:center; color:var(--text-faint); }
   .ch-logo img{ width:100%; height:100%; object-fit:contain; padding:5px; box-sizing:border-box; }
   .ch-logo svg{ width:24px; height:24px; fill:currentColor; }
@@ -3408,7 +3408,7 @@
   .tag-body{ overflow-y:auto; overscroll-behavior:contain; padding:0 16px 18px; -webkit-overflow-scrolling:touch; }
   .tag-head{ display:flex; align-items:center; gap:12px; padding:2px 0 14px; }
   .tag-art{
-    width:64px; height:64px; border-radius:8px; flex-shrink:0; overflow:hidden; position:relative;
+    width:64px; height:64px; border-radius:5px; flex-shrink:0; overflow:hidden; position:relative;
     background:var(--panel-2); display:flex; align-items:center; justify-content:center;
   }
   .tag-art img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -3424,7 +3424,7 @@
   .tag-v{ flex:1; min-width:0; color:var(--text); overflow-wrap:anywhere; white-space:pre-wrap; }
   .tag-v.empty{ color:var(--text-faint); }
   .tag-row.multi .tag-v{ max-height:9.5em; overflow-y:auto; }
-  .tag-pic{ display:block; width:96px; height:96px; object-fit:cover; border-radius:6px; margin-bottom:6px; background:var(--panel-2); }
+  .tag-pic{ display:block; width:96px; height:96px; object-fit:cover; border-radius:3.5px; margin-bottom:6px; background:var(--panel-2); }
   .tag-empty{ padding:14px 0; color:var(--text-faint); font-size:13px; }
   .tag-panel.editing .tag-row{ align-items:center; padding:5px 0; }
   .tag-panel.editing .tag-row.multi{ align-items:flex-start; }
@@ -3465,7 +3465,7 @@
   .art-suggest-src{ font-size:11px; color:var(--text-dim); }
   .art-suggest-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; }
   .art-suggest-tile{
-    position:relative; aspect-ratio:1; padding:0; border:0; border-radius:8px; overflow:hidden;
+    position:relative; aspect-ratio:1; padding:0; border:0; border-radius:5px; overflow:hidden;
     background:rgba(127,127,127,.14); cursor:pointer;
     transition:transform .12s ease, box-shadow .12s ease;
   }
@@ -3478,14 +3478,14 @@
   }
   .art-suggest-tile.busy img{ filter:brightness(.55); }
   .art-suggest-grid.picking .art-suggest-tile:not(.busy){ opacity:.4; pointer-events:none; }
-  .art-suggest-skel{ aspect-ratio:1; border-radius:8px; background:rgba(127,127,127,.14); animation:artSuggestPulse 1.2s ease-in-out infinite; }
+  .art-suggest-skel{ aspect-ratio:1; border-radius:5px; background:rgba(127,127,127,.14); animation:artSuggestPulse 1.2s ease-in-out infinite; }
   @keyframes artSuggestSpin{ to{ transform:rotate(360deg); } }
   @keyframes artSuggestPulse{ 50%{ opacity:.45; } }
   @media (prefers-reduced-motion: reduce){ .art-suggest-skel{ animation:none; } .art-suggest-tile{ transition:none; } }
   .art-suggest-note{ font-size:12px; color:var(--text-dim); margin-top:6px; }
   .art-suggest-note:empty{ display:none; }
   .art-url-preview{
-    width:120px; height:120px; margin:0 auto 14px; border-radius:12px; overflow:hidden;
+    width:120px; height:120px; margin:0 auto 14px; border-radius:7px; overflow:hidden;
     background:var(--panel-2); border:1px solid var(--border);
   }
   .art-url-preview img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -3499,7 +3499,7 @@
   .cs-cover-row{ display:flex; align-items:center; gap:12px; }
   .cs-cover-thumb{
     width:56px; height:56px; max-width:56px; flex-shrink:0; padding:0; border:1px solid var(--border);
-    border-radius:10px; overflow:hidden; cursor:pointer; display:block;
+    border-radius:6px; overflow:hidden; cursor:pointer; display:block;
   }
   .cs-cover-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
   /* The cover dialog can be opened from on top of another dialog (a custom search's edit
@@ -3517,7 +3517,7 @@
   .artist-info-row:hover, .artist-info-row:focus-visible{ background:color-mix(in srgb, var(--text) 8%, transparent); outline:none; }
   .artist-info-row[aria-selected="true"]{ background:color-mix(in srgb, var(--accent) 16%, transparent); }
   .artist-info-thumb{
-    flex:none; width:44px; height:44px; border-radius:8px; object-fit:cover;
+    flex:none; width:44px; height:44px; border-radius:5px; object-fit:cover;
     background:color-mix(in srgb, var(--text) 10%, transparent);
   }
   .artist-info-text{ min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
@@ -3604,7 +3604,7 @@
   .row-drag-handle:active{ cursor:grabbing; }
   .row-drag-handle i{ pointer-events:none; }
   .row-thumb{
-    width:38px; height:38px; border-radius:8px; overflow:hidden; background:var(--art-bg); flex-shrink:0;
+    width:38px; height:38px; border-radius:5px; overflow:hidden; background:var(--art-bg); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--text-faint);
   }
   .row-thumb img{ width:100%; height:100%; object-fit:cover; }
@@ -3636,7 +3636,7 @@
   .tile-grid > .row-item{
     grid-column:1/-1; padding:8px 6px; border-radius:12px; gap:14px;
   }
-  .tile-grid > .row-item .row-thumb{ width:64px; height:64px; border-radius:10px; font-size:22px; }
+  .tile-grid > .row-item .row-thumb{ width:64px; height:64px; border-radius:6px; font-size:22px; }
   .tile-grid > .row-item .row-name{ font-size:15px; font-weight:600; }
   /* A playlist in Edit: the title with the song's artist and album under it. */
   .row-item .row-text{ flex:1; min-width:0; }
@@ -3807,7 +3807,7 @@
      is coming out. */
 
   .player-icon{
-    width:42px; height:42px; border-radius:8px; background:var(--art-bg); flex-shrink:0;
+    width:42px; height:42px; border-radius:5px; background:var(--art-bg); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:18px; color:var(--text-faint);
   }
   .player-icon img{ width:100%; height:100%; object-fit:cover; }
@@ -4385,7 +4385,7 @@
   }
   #settingsPanel .plex-server-select{ width:100%; }
   /* Movies & TV search rows (build 134): posters keep their 2:3 shape, episodes 16:9 */
-  .song-row .song-row-art.video-result-art{ width:38px; height:56px; margin:0 9px; border-radius:6px; overflow:hidden; background:var(--art-bg); flex-shrink:0; }
+  .song-row .song-row-art.video-result-art{ width:38px; height:56px; margin:0 9px; border-radius:3.5px; overflow:hidden; background:var(--art-bg); flex-shrink:0; }
   .song-row .song-row-art.video-result-art.wide{ width:72px; height:41px; margin:7px 0 8px; }
   .video-result-art img{ width:100%; height:100%; object-fit:cover; display:block; }
   /* Video Details (build 133) */
@@ -4533,13 +4533,13 @@
   body.rotate-lock .np-art-wrap{
     position:relative; flex-shrink:0;
     width:auto; height:100%; aspect-ratio:1/1;
-    border-radius:18px; overflow:hidden; box-shadow:0 14px 34px rgba(0,0,0,.35);
+    border-radius:11px; overflow:hidden; box-shadow:0 14px 34px rgba(0,0,0,.35);
   }
   body.rotate-lock .np-art{
     position:relative; inset:auto; width:100%; height:100%;
     -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
   }
-  body.rotate-lock .np-art img{ border-radius:18px; }
+  body.rotate-lock .np-art img{ border-radius:11px; }
   /* margin-top:0 explicitly cancels the vertical-centring offset the plain (portrait) mobile
      rule above gives .np-hero-foot (calc(50vh - 100vw), meant to land the title on a tall
      phone screen's centre) -- rotate-lock is its own row layout, centred by .np-hero's own
@@ -4612,12 +4612,12 @@
   .np-land-favs-row::-webkit-scrollbar{ display:none; }
   .np-land-fav{
     flex:0 0 auto; width:var(--lf-size); height:var(--lf-size); padding:0; border:none;
-    border-radius:10px; overflow:hidden; background:rgba(255,255,255,.12); cursor:pointer;
+    border-radius:6px; overflow:hidden; background:rgba(255,255,255,.12); cursor:pointer;
     box-shadow:0 6px 16px rgba(0,0,0,.28); position:relative;
   }
   .np-land-fav > *{ width:100%; height:100%; }
   .np-land-fav img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .np-land-fav.playing::after{ content:''; position:absolute; inset:0; border-radius:10px; box-shadow:inset 0 0 0 2px #fff; }
+  .np-land-fav.playing::after{ content:''; position:absolute; inset:0; border-radius:6px; box-shadow:inset 0 0 0 2px #fff; }
   body.rotate-lock:not(.np-video-full) .np-land-toggle.has-favs{
     display:flex; align-items:center; justify-content:center;
     position:absolute; right:18px; bottom:18px; z-index:3;
@@ -5156,7 +5156,7 @@
   .queue-row:hover{ background:rgba(255,255,255,.07); }
   .queue-row.dragging{ opacity:.55; background:rgba(255,255,255,.12); }
   .queue-row.now{ cursor:default; background:rgba(255,255,255,.08); }
-  .queue-row .queue-art{ width:46px; height:46px; flex-shrink:0; aspect-ratio:auto; border-radius:8px; font-size:17px; }
+  .queue-row .queue-art{ width:46px; height:46px; flex-shrink:0; aspect-ratio:auto; border-radius:5px; font-size:17px; }
   .queue-row-body{ flex:1; min-width:0; }
   .queue-row-title{ font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .queue-row.now .queue-row-title{ color:var(--accent); }
@@ -5255,7 +5255,8 @@
      colourful portrait show through it, so it read as a coloured border). */
   :root{ --top-artist-ring: #3a3a3e; }
   html[data-theme="light"]{ --top-artist-ring: #d1d1d6; }
-  #topArtistsGrid .tile[data-entity="artist"] .tile-art{ border:1.5px solid var(--top-artist-ring); background-clip:padding-box; }
+  #topArtistsGrid .tile[data-entity="artist"] .tile-art,
+  .fav-artists-list .row-thumb.fav-artist-thumb{ border:1.5px solid var(--top-artist-ring); background-clip:padding-box; } /* build 210: Library's Favorite Artists too */
   /* Headings: full-strength text, heavier and larger. */
   .home-section-head h2, .recent-col-heading, .section-heading{
     color:var(--text); font-weight:800; letter-spacing:-.01em; font-size:20px;
@@ -5265,7 +5266,7 @@
   .grid-section-label{ font-size:19px; font-weight:800; letter-spacing:-.01em; color:var(--text); }
   .grid-section-label.acc-head{ font-size:15px; font-weight:700; }
   .podcast-date-heading{
-    font-size:13.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-dim);
+    font-size:13.5px; font-weight:700; letter-spacing:.01em; text-transform:none; color:var(--text-dim); /* build 210: no capitals */
   }
   @media (max-width: 900px){
     .home-section-head h2{ font-size:24px; }
@@ -14961,7 +14962,7 @@
     activeLibrarySection = null;
     setDetailBack(null);
     renderLibraryList();
-    stationsHeading.textContent = 'My Library';
+    stationsHeading.textContent = 'Library'; // build 210: was 'My Library' (Mark)
     pageTitle.style.display = 'none';
     albumPlayBtn.style.display = 'none';
     libraryShuffleBtn.style.display = '';
@@ -19144,7 +19145,7 @@
   function openPlaylistsHome(){
     enterLibraryChrome();
     onPlaylistsHomeView = true;
-    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'My Library');
+    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
     renderStationPlaylistList();
     stationsHeading.textContent = 'Playlists';
     pageTitle.style.display = 'none';
@@ -19181,7 +19182,7 @@
   function openGenresHome(){
     enterLibraryChrome();
     onGenresHomeView = true;
-    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'My Library');
+    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
     renderGenreNav();
     stationsHeading.textContent = 'Genres';
     pageTitle.style.display = 'none';
@@ -24511,7 +24512,7 @@
       return entry(sub ? sub.collectionName : 'Show', function(){ openShowPage(showKey); });
     }
     if(onPodcastsView) return entry('Podcasts', function(){ openPodcastsHome(); });
-    if(onMyLibraryHomeView) return entry('My Library', function(){ openMyLibraryHome(); });
+    if(onMyLibraryHomeView) return entry('Library', function(){ openMyLibraryHome(); });
     if(onStationsHomeView) return entry('My Stations', function(){ openStationsHome(); });
     if(onVideoView) return entry('Watch', function(){ openVideoHome(); });
     if(onAddChannelsView) return entry('Add Channels', function(){ openAddChannelsPage(); });
@@ -24600,7 +24601,7 @@
     // Artists / Albums / Songs are My Library's own subsections, so their back button always
     // returns there -- same fixed-destination treatment as the Podcasts show page's back
     // button, rather than a history-based one.
-    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'My Library');
+    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
@@ -24683,7 +24684,7 @@
     var list = topArtistList();
     if(!list.length){
       stationsGrid.innerHTML = '<div class="empty-state">Artists you play will show up here.</div>';
-      setResultCount(0);
+      setResultCount(null);
       return;
     }
     list.forEach(function(entry){
@@ -24695,7 +24696,7 @@
       row.appendChild(count);
       stationsGrid.appendChild(row);
     });
-    setResultCount(list.length, 'artist');
+    setResultCount(null); /* build 210: no count (Mark) */
   }
 
   // Build 176: the Favorites page is on screen only while its own title is showing. Switching
@@ -24804,12 +24805,12 @@
       stationsGrid.innerHTML = '';
       stationsGrid.appendChild(buildFavOrderBar());
       favoritesInOrder().forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
-      setResultCount(favorites.length, 'favorite');
+      setResultCount(null); /* build 210: no count (Mark) */
       return;
     }
     if(!favorites.length){
       stationsGrid.innerHTML = '<div class="empty-state">Tap the heart on any station to save it here.</div>';
-      setResultCount(0);
+      setResultCount(null); /* build 210: no count (Mark) */
       return;
     }
     stationsGrid.innerHTML = '';
@@ -24818,7 +24819,7 @@
     // resolves an artist- or album-favourite record to its own portrait/cover and routes a
     // tap on one to that page rather than trying to play it directly.
     favoritesInOrder().forEach(function(s){ stationsGrid.appendChild(buildRow(s, false)); });
-    setResultCount(favorites.length);
+    setResultCount(null); /* build 210: no count (Mark) */
   }
   // Build 189: the Favorites page's order dropdown (A to Z / Manual, newest first / Manual,
   // newest last), a button showing the current choice that opens a small menu under it.
@@ -24896,18 +24897,18 @@
     var list = recentStations.slice();
     if(!list.length){
       stationsGrid.innerHTML = '<div class="empty-state">Songs, stations and podcasts you play will show up here.</div>';
-      setResultCount(0);
+      setResultCount(null); /* build 210: no count (Mark) */
       return;
     }
     list.forEach(function(s){ stationsGrid.appendChild(withRecentDismiss(buildRow(s, false), s)); });
-    setResultCount(list.length, 'item');
+    setResultCount(null); /* build 210: no count (Mark) */
   }
 
   function renderRecentSongsPage(){
     var list = recentSongsOnly();
     if(!list.length){
       stationsGrid.innerHTML = '<div class="empty-state">Songs you play will show up here.</div>';
-      setResultCount(0);
+      setResultCount(null); /* build 210: no count (Mark) */
       return;
     }
     // queueList/queueLabel so Next/Previous on Now Playing walks the rest of this list,
@@ -24915,12 +24916,12 @@
     list.forEach(function(t){
       stationsGrid.appendChild(buildSongRow(t, { queueList: list, queueLabel: 'Recent Songs' }));
     });
-    setResultCount(list.length, 'song');
+    setResultCount(null); /* build 210: no count (Mark) */
   }
 
   function renderTopStationsPage(){
     stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-    setResultCount(null);
+    setResultCount(null); /* build 210: no count (Mark) */
     // Same query loadTopStations() itself uses for the home row, just not sliced down to a
     // row's width -- every one of the 48 it fetches gets its own line here.
     apiFetch('/json/stations/search?limit=48&countrycode=US&hidebroken=true&order=clickcount&reverse=true')
@@ -24931,18 +24932,18 @@
         stationsGrid.classList.add('grid-songs');
         if(!cards.length){
           stationsGrid.innerHTML = '<div class="empty-state">No stations found.</div>';
-          setResultCount(0);
+          setResultCount(null); /* build 210: no count (Mark) */
           return;
         }
         cards.forEach(function(s){ stationsGrid.appendChild(buildRow(s, false)); });
-        setResultCount(cards.length, 'station');
+        setResultCount(null); /* build 210: no count (Mark) */
       })
       ['catch'](function(err){
         if(activeHomeSection !== 'topStations') return;
         setStatus(err.message, true);
         resetStationsGrid();
         stationsGrid.innerHTML = '<div class="empty-state">Couldn\'t load Top Stations.</div>';
-        setResultCount(0);
+        setResultCount(null); /* build 210: no count (Mark) */
       });
   }
 
