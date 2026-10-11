@@ -51,7 +51,7 @@ async def main():
             color: getComputedStyle(document.getElementById('queueShuffleBtn')).color, vivid: getComputedStyle(document.body).getPropertyValue('--np-vivid').trim(),
             clearInRow: c.closest('.queue-heading-row') !== null, clearVis: getComputedStyle(c).visibility, cTop: cr.top, cBottom: cr.bottom, hTop: h.top, hBottom: h.bottom, cR: cr.right }; })()""")
         print(geo)
-        check(not geo['hidden'] and geo['W'] - geo['sR'] <= 20 and abs(geo['sTop'] - geo['tTop']) < 20, f'Shuffle sits at the top right of the panel {geo}')
+        check(not geo['hidden'] and geo['W'] - geo['sR'] <= 22 and abs(geo['sTop'] - geo['tTop']) < 20, f'Shuffle sits at the top right of the panel {geo}')
         check(geo['clearInRow'] and geo['clearVis'] == 'visible' and geo['cR'] > geo['W'] - 40, f'Clear sits at the right end of the Up Next heading {geo}')
         rgb = await pg.evaluate("(function(){ var d=document.createElement('div'); d.style.color=getComputedStyle(document.body).getPropertyValue('--np-vivid'); document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()")
         check(geo['color'] == rgb, f"Shuffle wears the artwork's colour {geo['color']} vs {rgb}")

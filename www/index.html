@@ -5115,6 +5115,12 @@
   .queue-close:hover{ background:rgba(255,255,255,.18); }
   .queue-close svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   .queue-title{ flex:1; font-size:19px; font-weight:700; }
+  /* Build 206: the queue's back button is the app's one back button (the artist page's bare arrow). */
+  #queueCloseBtn{ width:52px; height:52px; margin:-6px 0; border-radius:0; background:none; justify-content:flex-start;
+    font-size:24px; color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
+  #queueCloseBtn:hover{ background:none; opacity:.8; }
+  #queueCloseBtn:active{ transform:scale(.92); }
+  #queueCloseBtn + .queue-title{ margin-left:-12px; }
   @media (min-width: 901px){ .queue-head{ cursor:pointer; } .queue-head .queue-clear{ cursor:pointer; } }
   .queue-clear{
     border:1px solid rgba(255,255,255,.22); background:none; color:#fff; border-radius:999px;
@@ -5322,13 +5328,30 @@
   @media (max-width: 900px){
     :root{ --main-pad: 21px; }
     #detailBackBtn, body.album-open #detailBackBtn, body.artist-open #detailBackBtn, body.vdetail-open #detailBackBtn{ justify-content:flex-start; }
-    .song-row, .tile.tile-row, .tile-grid > .row-item, .fav-artists-list .row-item{ padding-left:0; }
+    .song-row, .tile.tile-row, .tile-grid > .row-item, .fav-artists-list .row-item, .vep-row{ padding-left:0; }
     .status-line{ margin-left:0; margin-right:0; }
     .song-letter{ padding-left:0; }
     /* Bare icon "covers" (Genres, like My Library's rows) are drawn from the left of a box as
        wide as the icon, so the icon itself, not empty box, sits on the edge. */
     .tile.tile-row .tile-art.tile-art-icon{ justify-content:flex-start; width:25px; max-width:25px; }
     .tile.tile-row .tile-art-icon .tile-art-icon-svg{ width:25px; height:25px; margin-left:-3px; }  /* the icons' own 3px inner margin */
+    /* Build 206: rows that scroll sideways (Home's rows of covers, Continue rows, the tab
+       rows) run to both edges of the screen, so covers and tabs slide off the edges. The
+       first item still starts on the page's edge, and comes back to it when scrolled home. */
+    body.home-stacked .home-row > .tile-grid, .tile-grid > .cl-row, .fav-artists-row,
+    .search-tabs, .scroll-tabs, .video-tabs.vd-seasons,
+    .tile-grid > .search-tabs, .tile-grid > .scroll-tabs, .tile-grid > .video-tabs.scroll-tabs, .tile-grid > .video-tabs.vd-seasons{
+      margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
+      padding-left:var(--main-pad); padding-right:var(--main-pad);
+      scroll-padding-left:var(--main-pad); scroll-padding-inline:var(--main-pad);
+      max-width:none;
+    }
+    /* The queue: same gutter; its rows keep their padding (the playing row is shaded) and
+       give it back with a negative margin, so the pictures sit on the edge too. */
+    .queue-head{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
+    .queue-scroll{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
+    .queue-row{ margin-left:-8px; margin-right:-4px; }
+    .queue-heading{ padding-left:0; }
     /* The header (logo, menu button), Now Playing's corner buttons and everything under its
        artwork keep the same gutter, on both sides. */
     .sidebar-top{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
@@ -6705,8 +6728,8 @@
      View Queue in its menu. -->
 <div class="queue-panel" id="queuePanel" role="dialog" aria-label="Queue" aria-hidden="true">
   <div class="queue-head">
-    <button type="button" class="queue-close" id="queueCloseBtn" title="Close queue" aria-label="Close queue">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>
+    <button type="button" class="queue-close" id="queueCloseBtn" title="Back" aria-label="Back">
+      <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
     </button>
     <div class="queue-title">Queue</div>
     <!-- Build 144: shuffles everything coming up (Up Next and the rest after it). -->
