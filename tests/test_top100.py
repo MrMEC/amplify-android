@@ -68,12 +68,15 @@ MOCK = r"""(function(){
       if(n === 7 || n === 11) return Promise.resolve({ text: JSON.stringify({ data: [] }) });
       var title = n === 1 ? 'Patient Zero' : 'Song ' + String(n).padStart(3, '0');
       var artist = ['Taylor Swift', 'Ella Langley', 'Morgan Wallen', 'Sabrina Carpenter', 'Alex Warren'][(n - 1) % 5];
-      return Promise.resolve({ text: JSON.stringify({ data: [{ title: title + ' (Live)', artist: { name: artist }, album: { cover_big: 'https://art.example/999/500.jpg' } },
-        { title: title, artist: { name: artist }, album: { cover_big: 'https://art.example/' + n + '/500.jpg' } }] }) });
+      return Promise.resolve({ text: JSON.stringify({ data: [{ title: title + ' (Live)', artist: { name: artist }, album: { title: 'Live', cover_big: 'https://art.example/999/500.jpg' } },
+        { title: title, artist: { name: artist }, album: { title: 'Eighties 100 Hits', cover_big: 'https://art.example/998/500.jpg' } },
+        { title: title, artist: { name: artist }, album: { title: n === 2 ? title : 'Album ' + n, cover_big: 'https://art.example/' + n + '/500.jpg' } }] }) });
     }
     __nat.feeds.push(o.url);
-    var m = /playlist_id=UULF(\w+)|channel_id=UC(\w+)/.exec(o.url || '');
+    var m = /playlist_id=UU(?:LF|LP)(\w+)|channel_id=UC(\w+)/.exec(o.url || '');
     var ch = m ? (m[1] || m[2]) : '';
+    if(ch === 'tsTaylorChannel0000001' && /UULP/.test(o.url)) return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">'
+      + '<entry><yt:videoId>tsOld006vid</yt:videoId><title>Taylor Swift - Song 006</title><link href="https://www.youtube.com/watch?v=tsOld006vid"/><published>2014-01-01T00:00:00Z</published></entry></feed>' });
     if(ch === 'tsTaylorChannel0000001') return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">'
       + '<entry><yt:videoId>tsLyric0001</yt:videoId><title>Taylor Swift - Patient Zero (Lyric Video)</title><link href="https://www.youtube.com/watch?v=tsLyric0001"/><published>2026-10-09T00:00:00Z</published></entry>'
       + '<entry><yt:videoId>tsPatient01</yt:videoId><title>Taylor Swift - Patient Zero (Official Music Video)</title><link href="https://www.youtube.com/watch?v=tsPatient01"/><published>2026-10-08T00:00:00Z</published></entry>'
@@ -112,6 +115,7 @@ async def run(theme, b):
         if p.netloc == 'itunes.apple.com':
             counts['itunes'] += 1
             q = parse_qs(p.query); cb = q['callback'][0]; term = q['term'][0]
+            counts.setdefault('iterms', []).append(term)
             m = re.search(r'Song (\d+)|Patient Zero', term)
             n = int(m.group(1)) if m and m.group(1) else 1
             title = 'Patient Zero' if n == 1 else f'Song {n:03d}'
@@ -175,6 +179,9 @@ async def run(theme, b):
     check(len(imgs) >= 2 and all(u.endswith('/500.jpg') and '/999/' not in u for u in imgs), f'{theme}: covers come from Deezer (the studio version, not a live one) {imgs[:2]}')
     await el.screenshot(path=f'{OUT}/top100-home-{theme}.png')
 
+    await pg.wait_for_timeout(14000)
+    pre = await pg.evaluate("__h.ev('Object.keys(songArt).length')")
+    check(pre >= 95, f'{theme}: this week\'s covers are fetched in the background from Home, before the page is opened ({pre})')
     # ---- a chart song that's in the library: its own cover
     await pg.evaluate("""__h.ev("libraryTracks.push({ type: 'local', localId: 'lib-song-009', name: 'Song 009', artist: 'Sabrina Carpenter', album: '' }); setCustomArtUrl('lib-song-009', 'https://art.example/9/library.jpg')")""")
     # ---- the page
@@ -213,7 +220,8 @@ async def run(theme, b):
     check(not missing, f'{theme}: all 100 rows get their covers, past the first 20 (one that failed is asked again) missing={missing[:8]}')
     lib9 = await pg.evaluate("document.querySelectorAll('.chart-row')[8].querySelector('.tile-art img').src")
     check(lib9.endswith('/9/library.jpg'), f'{theme}: a chart song in the library shows the library\'s cover ({lib9})')
-    check(counts['itunes'] == 2 and counts['mb'] >= 1, f'{theme}: Apple only for what Deezer lacks (2 asks: Song 007 found, Song 011 not), then MusicBrainz ({counts["itunes"]}, {counts["mb"]})')
+    cover_asks = [t for t in counts.get('iterms', []) if 'Song ' in t or 'Patient Zero' in t]
+    check(len(cover_asks) == 2 and counts['mb'] >= 1, f'{theme}: Apple only for what Deezer lacks (2 asks: Song 007 found, Song 011 not), then MusicBrainz ({cover_asks}, {counts["mb"]})')
     check(not await pg.evaluate("__nat.dzQuota || 0"), f'{theme}: Deezer paced under its limit (no quota refusals)')
     diag = await pg.evaluate("__h.ev('songArtStats')")
     print(theme, 'stats', diag)
@@ -280,6 +288,10 @@ async def run(theme, b):
     await pg.screenshot(path=f'{OUT}/top100-novideo-{theme}.png')
     await pg.evaluate("document.querySelector('.chart-v-actions button:last-child').click()"); await pg.wait_for_timeout(1500)
     check(await pg.evaluate("document.querySelector('.chart-vrow.on .chart-vrow-title').textContent") == 'Song 004', f'{theme}: Next Song moves down the chart')
+    # an older hit: not among the latest uploads, found in the channel's popular uploads
+    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][5].click()"); await pg.wait_for_timeout(1800)
+    src6 = await pg.evaluate("(document.querySelector('#ytOvFrame iframe')||{}).src || ''")
+    check('/embed/tsOld006vid' in src6, f'{theme}: an older hit is found among the channel\'s most popular videos {src6[:60]}')
     # found videos are remembered: reopening #1 asks nothing new
     nwiki, nfeeds = len(counts['wiki']), await pg.evaluate("__nat.feeds.length")
     await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][0].click()"); await pg.wait_for_timeout(800)

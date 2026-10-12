@@ -12552,6 +12552,17 @@
       top100HomeGrid.appendChild(tile);
     });
     if(top100Section && document.body.classList.contains('home-stacked')) top100Section.style.display = hot100Shown ? '' : 'none';
+    // Build 215: the rest of this week's covers are fetched in the background (after the ones on
+    // screen), so the Top 100 page opens with them already there.
+    if(hot100Latest && renderTop100HomeSection._prefetched !== hot100Latest.date){
+      renderTop100HomeSection._prefetched = hot100Latest.date;
+      setTimeout(function(){
+        items.forEach(function(item){
+          var k = item.songKey;
+          if(!songArtKnown(k) && !songArtIsNone(k) && !libraryTrackForSong(item)) requestSongArt(item, function(){}, null);
+        });
+      }, 1500);
+    }
   }
 
   // ---------- the page ----------
@@ -12705,16 +12716,17 @@
   // second), so none refuses or locks the app out. A service that's busy or unreachable passes
   // the song to the next; one that answers "no such song" too. Found covers and songs with none
   // anywhere are remembered (the misses for a week). Tallies: Settings > Check storage.
-  var SONG_ART_KEY = 'songArt';               // lsGet: { songKey: url | '' (none, with songArtNone time) }
-  var SONG_ART_NONE_KEY = 'songArtNone';      // lsGet: { songKey: ts }
+  var SONG_ART_KEY = 'songArt2';             // build 215: fresh (compilation covers dropped)               // lsGet: { songKey: url | '' (none, with songArtNone time) }
+  var SONG_ART_NONE_KEY = 'songArtNone2';      // lsGet: { songKey: ts }
   var SONG_ART_NONE_MS = 7 * 24 * 60 * 60 * 1000;
   var SONG_ART_MAX = 4000;
+  ['songArt', 'songArtNone', 'chartVideos'].forEach(function(k){ try{ localStorage.removeItem('amplifyFallback:' + k); }catch(e){} });
   var songArt = lsGet(SONG_ART_KEY) || {};
   var songArtNone = lsGet(SONG_ART_NONE_KEY) || {};
   var songArtLocal = {};                      // songKey -> blob url from the library (this session)
   var songArtWaiting = {};                    // songKey -> [callbacks]
   var songArtQueue = [];                      // [{ item, el }]
-  var songArtBusy = 0, SONG_ART_PARALLEL = 4;
+  var songArtBusy = 0, SONG_ART_PARALLEL = 6;
   var songArtStats = { library: 0, deezer: 0, itunes: 0, musicbrainz: 0, none: 0, errors: {}, last: '' };
   var songArtSaveTimer = null;
   function saveSongArtSoon(){
@@ -12841,7 +12853,7 @@
       return new Promise(function(r){ setTimeout(r, at - now); }).then(fn);
     };
   }
-  var deezerPace = pacer(130), itunesPace = pacer(3500);
+  var deezerPace = pacer(110), itunesPace = pacer(3500);
   var deezerPausedUntil = 0;
   // ---- your library
   var libSongIndex = null, libSongIndexFor = -1;
@@ -12877,24 +12889,43 @@
   // The best result for a chart song: same artist; the exact title ahead of one that merely starts
   // with it; never a live, remixed, acoustic, sped-up or karaoke version when the original is there.
   var ALT_VERSION_RE = /\b(live|remix|acoustic|sped\s*up|slowed|karaoke|instrumental|demo|version|edit)\b/i;
-  function bestSongMatch(list, item, titleOf, artistOf){
+  // Build 215: and the song's own release ahead of a compilation ("Decade", "Eighties 100 Hits",
+  // "...Hits"): the single (album titled like the song) first, an artist album next.
+  var COMPILATION_RE = /\b(hits|greatest|best of|the best|collection|essential|anthology|decade|gold|ultimate|now that|now!?\s*\d|top\s*\d+|\d0s|eighties|seventies|nineties|sixties|fifties|compilation|various|classics|jukebox|party|mix(?:tape)?|vol\.?\s*\d|volume|soundtrack|karaoke|tribute|retro|oldies|radio)\b/i;
+  function bestSongMatch(list, item, titleOf, artistOf, albumOf){
     var main = mainArtistOf(item.artist), want = normTitle(plainTitle(item.name));
     var best = null, bestScore = -1;
-    (list || []).forEach(function(r){
+    (list || []).forEach(function(r, i){
       if(!r) return;
       var t = titleOf(r) || '', a = artistOf(r) || '';
       if(!looseMatch(t, item.name) && !looseMatch(t, plainTitle(item.name))) return;
       var score = looseMatch(a, main) ? 4 : 0;
       if(normTitle(plainTitle(t)) === want) score += 2;
       if(!ALT_VERSION_RE.test(t) || ALT_VERSION_RE.test(item.name)) score += 3;
+      if(albumOf){
+        var al = albumOf(r) || '';
+        if(normTitle(plainTitle(al)) === want) score += 2;            // the single
+        else if(COMPILATION_RE.test(al) && !COMPILATION_RE.test(item.name)) score -= 2;
+      }
+      score -= i * 0.01;                                                // the service's own order breaks ties
       if(score > bestScore){ bestScore = score; best = r; }
     });
-    return bestScore >= 4 || (best && bestScore >= 5) ? best : null;
+    return bestScore >= 3.9 ? best : null;
   }
   function deezerSongArt(item){
     var main = mainArtistOf(item.artist);
-    var q = 'artist:"' + main.replace(/"/g, '') + '" track:"' + plainTitle(item.name).replace(/"/g, '') + '"';
-    var url = 'https://api.deezer.com/search?limit=10&q=' + encodeURIComponent(q);
+    // Build 215: a plain search first (Deezer's own matching is forgiving: "Prince And The
+    // Revolution", "Would I Lie To You?"), the strict field search only if that finds nothing.
+    var loose = 'https://api.deezer.com/search?limit=25&q=' + encodeURIComponent(main + ' ' + plainTitle(item.name));
+    var strict = 'https://api.deezer.com/search?limit=25&q=' + encodeURIComponent('artist:"' + main.replace(/"/g, '') + '" track:"' + plainTitle(item.name).replace(/"/g, '') + '"');
+    function pick(d){
+      var best = bestSongMatch((d && d.data) || [], item, function(r){ return r.title; }, function(r){ return r.artist && r.artist.name; }, function(r){ return r.album && r.album.title; });
+      var al = best && best.album;
+      return al ? (al.cover_big || al.cover_xl || al.cover_medium || null) : null;
+    }
+    return deezerAsk(loose).then(function(d){ return pick(d) || deezerAsk(strict).then(pick); });
+  }
+  function deezerAsk(url){
     function ask(){
       // While Deezer rests (it said it was busy), wait for the rest to end rather than skip it.
       var wait = Math.max(0, deezerPausedUntil - Date.now());
@@ -12910,17 +12941,13 @@
       if(!/busy/.test(e.message)) throw e;
       deezerPausedUntil = Date.now() + 5500;
       return new Promise(function(r){ setTimeout(r, 5600); }).then(ask);
-    }).then(function(d){
-      var best = bestSongMatch((d && d.data) || [], item, function(r){ return r.title; }, function(r){ return r.artist && r.artist.name; });
-      var al = best && best.album;
-      return al ? (al.cover_big || al.cover_xl || al.cover_medium || null) : null;
     });
   }
   function itunesSongArt(item){
     var term = mainArtistOf(item.artist) + ' ' + plainTitle(item.name);
     var url = ITUNES_BASE + '/search?media=music&entity=song&limit=8&country=US&term=' + encodeURIComponent(term);
     return itunesPace(function(){ return itunesJsonpNow(url, 12000); }).then(function(d){
-      var best = bestSongMatch((d && d.results) || [], item, function(r){ return r.trackName; }, function(r){ return r.artistName; });
+      var best = bestSongMatch((d && d.results) || [], item, function(r){ return r.trackName; }, function(r){ return r.artistName; }, function(r){ return r.collectionName; });
       var art = best && best.artworkUrl100;
       return art ? art.replace(/\/\d+x\d+bb\./, '/600x600bb.') : null;
     });
@@ -12942,7 +12969,7 @@
   }
 
   // ---------- finding each song's music video ----------
-  var CHART_VIDEO_KEY = 'chartVideos';        // lsGet: { songKey: { id, title } | { none: ts } }
+  var CHART_VIDEO_KEY = 'chartVideos2';     // build 215: fresh (popular uploads now searched too)        // lsGet: { songKey: { id, title } | { none: ts } }
   var CHART_VIDEO_MISS_MS = 2 * 24 * 60 * 60 * 1000;
   var CHART_VIDEO_MAX = 3000;
   var chartVideos = lsGet(CHART_VIDEO_KEY) || {};
@@ -12978,9 +13005,41 @@
       if(i >= entries.length) return Promise.resolve(null);
       return Promise.resolve(loadArtistVideos(entries[i])).then(function(rec){
         var hit = rec && (rec.videos || []).filter(function(v){ return videoIsSong(v, item); })[0];
-        return hit ? { id: hit.id, title: hit.title } : next(i + 1);
+        if(hit) return { id: hit.id, title: hit.title };
+        // Build 215: the channel's most popular videos too. The uploads feed holds only the latest
+        // 15, so a hit from years ago ("A View To A Kill") was never in it; it is among the most
+        // watched.
+        var chs = (rec && rec.channels) || [];
+        return (function nextCh(j){
+          if(j >= chs.length) return next(i + 1);
+          return channelPopular(chs[j]).then(function(list){
+            var h = (list || []).filter(function(v){ return videoIsSong(v, item); })[0];
+            return h ? { id: h.id, title: h.title } : nextCh(j + 1);
+          });
+        })(0);
       }, function(){ return next(i + 1); });
     })(0);
+  }
+  // A channel's most watched long videos: YouTube's own "popular uploads" list (UULP + the channel
+  // id), read from its public feed like the uploads. Kept 3 days.
+  var CHART_POP_KEY = 'chartChannelPopular', CHART_POP_TTL = 3 * 24 * 60 * 60 * 1000;
+  var chartPop = lsGet(CHART_POP_KEY) || {}, chartPopPending = {};
+  function channelPopular(ch){
+    var rec = chartPop[ch];
+    if(rec && Date.now() - (rec.ts || 0) < CHART_POP_TTL) return Promise.resolve(rec.list || []);
+    if(chartPopPending[ch]) return chartPopPending[ch];
+    var p = ytFeed('playlist_id=UULP' + ch.slice(2)).then(function(list){
+      if(list){
+        chartPop[ch] = { ts: Date.now(), list: list.map(function(v){ return { id: v.id, title: v.title }; }) };
+        var keys = Object.keys(chartPop);
+        if(keys.length > 300){ keys.sort(function(a, b){ return chartPop[a].ts - chartPop[b].ts; }).slice(0, keys.length - 300).forEach(function(k){ delete chartPop[k]; }); }
+        lsPut(CHART_POP_KEY, chartPop);
+      }
+      return list || [];
+    }, function(){ return []; });
+    chartPopPending[ch] = p;
+    p.then(function(){ delete chartPopPending[ch]; });
+    return p;
   }
   // The song's own item on Wikidata (a "song"/"single" by the artist) and its YouTube video ID (P1651).
   function videoFromWikidata(item){
