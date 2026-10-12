@@ -1702,12 +1702,17 @@
   .chart-row .song-row-art{ width:52px; height:52px; }
   .chart-row .song-row-title{ font-size:15px; }
   .chart-week{ grid-column:1/-1; display:flex; align-items:center; gap:6px; margin:-4px 0 6px; }
-  .chart-week-label{ flex:1; min-width:0; text-align:center; font-size:14px; font-weight:600; color:var(--text); position:relative; }
-  .chart-week-label small{ display:block; font-size:12px; font-weight:500; color:var(--text-dim); margin-top:1px; }
+  .chart-week-label{ flex:1; min-width:0; text-align:center; color:var(--text); }
   .chart-week-btn{ flex:0 0 40px; height:40px; border:none; border-radius:50%; background:var(--panel-2); color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
   .chart-week-btn:disabled{ opacity:.35; cursor:default; }
   .chart-week-btn svg{ width:18px; height:18px; }
-  .chart-date-input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; border:0; padding:0; }
+  .chart-week-of{ font-size:12.5px; font-weight:600; color:var(--text-dim); }
+  .chart-week-date{ font-size:17px; font-weight:700; line-height:1.35; }
+  .chart-week-label small{ display:block; font-size:12px; font-weight:500; color:var(--text-dim); margin-top:1px; }
+  /* Month, day and year are each a picker: a native select laid over the word. */
+  .cw-seg{ position:relative; display:inline-block; cursor:pointer; text-decoration:underline dotted; text-decoration-color:var(--text-faint); text-underline-offset:4px; }
+  .cw-seg select{ position:absolute; inset:-6px -4px; width:calc(100% + 8px); height:calc(100% + 12px); opacity:0; cursor:pointer; font-size:16px; border:0; padding:0; -webkit-appearance:none; appearance:none; }
+  .chart-retry{ margin-left:6px; border:0; border-radius:999px; padding:7px 14px; background:var(--panel-2); color:var(--text); font:inherit; font-weight:700; cursor:pointer; }
   .song-row-num{
     width:30px; flex-shrink:0; text-align:center;
     font-size:15px; font-variant-numeric:tabular-nums; color:var(--text-faint);
@@ -12430,12 +12435,30 @@
     return ((chart && chart.data) || []).slice().sort(function(a, b){ return a.this_week - b.this_week; })
       .map(function(r){ return hot100Item(r, chart.date); });
   }
-  function hot100Get(path){
-    return fetchWithTimeout(HOT100_BASE + path, {}, 15000).then(function(res){
+  // Build 213: two places to get a file from: jsDelivr's CDN (fast and steady; may lag GitHub by
+  // a few hours, so the newest chart is asked of GitHub first) and GitHub's raw files.
+  var HOT100_CDN = 'https://cdn.jsdelivr.net/gh/mhollingshead/billboard-hot-100@main/';
+  function hot100GetFrom(base, path){
+    return fetchWithTimeout(base + path, {}, 12000).then(function(res){
       if(!res || !res.ok) throw new Error('chart ' + (res && res.status));
       return res.json();
     });
   }
+  function hot100Get(path, newestFirst){
+    var order = newestFirst ? [HOT100_BASE, HOT100_CDN] : [HOT100_CDN, HOT100_BASE];
+    return hot100GetFrom(order[0], path)['catch'](function(){ return hot100GetFrom(order[1], path); });
+  }
+  // The last few weeks looked at, kept on the phone, so going back to them is instant offline too.
+  var HOT100_WEEKS_KEY = 'hot100Weeks', HOT100_WEEKS_MAX = 12;
+  function keptWeek(date){ var w = lsGet(HOT100_WEEKS_KEY); return w && w[date] && validChart(w[date].c) ? w[date].c : null; }
+  function keepWeek(c){
+    var w = lsGet(HOT100_WEEKS_KEY) || {};
+    w[c.date] = { c: c, at: Date.now() };
+    var keys = Object.keys(w).sort(function(a, b){ return (w[b].at || 0) - (w[a].at || 0); });
+    keys.slice(HOT100_WEEKS_MAX).forEach(function(k){ delete w[k]; });
+    lsPut(HOT100_WEEKS_KEY, w);
+  }
+  var hot100Loading = {};
   function validChart(c){ return !!(c && /^\d{4}-\d{2}-\d{2}$/.test(c.date || '') && Array.isArray(c.data) && c.data.length); }
   // The newest chart: the saved copy while it's fresh, else asked again (the saved copy if that fails).
   function loadHot100Latest(force){
@@ -12445,7 +12468,7 @@
       hot100Charts[saved.chart.date] = saved.chart;
       if(!force && Date.now() - (saved.at || 0) < HOT100_TTL_MS) return Promise.resolve(hot100Latest);
     }
-    return hot100Get('recent.json').then(function(c){
+    return hot100Get('recent.json', true).then(function(c){
       if(!validChart(c)) throw new Error('bad chart');
       hot100Latest = c;
       hot100Charts[c.date] = c;
@@ -12460,11 +12483,18 @@
   function loadHot100Chart(date){
     if(!date) return loadHot100Latest();
     if(hot100Charts[date]) return Promise.resolve(hot100Charts[date]);
-    return hot100Get('date/' + date + '.json').then(function(c){
+    var kept = keptWeek(date);
+    if(kept){ hot100Charts[date] = kept; return Promise.resolve(kept); }
+    if(hot100Loading[date]) return hot100Loading[date];
+    var p = hot100Get('date/' + date + '.json').then(function(c){
       if(!validChart(c)) throw new Error('bad chart');
       hot100Charts[c.date] = c;
+      keepWeek(c);
       return c;
     });
+    hot100Loading[date] = p;
+    p.then(function(){ delete hot100Loading[date]; }, function(){ delete hot100Loading[date]; });
+    return p;
   }
   function loadHot100Dates(){
     if(hot100Dates) return Promise.resolve(hot100Dates);
@@ -12570,35 +12600,91 @@
         b.addEventListener('click', function(){ if(date) showHot100Week(date); });
         return b;
       }
-      var label = document.createElement('div');
-      label.className = 'chart-week-label';
-      label.appendChild(document.createTextNode(hot100WeekLabel(chart.date)));
-      var small = document.createElement('small');
-      small.textContent = 'Billboard Hot 100' + (hot100Latest && chart.date === hot100Latest.date ? ' \u00B7 this week' : '');
-      label.appendChild(small);
-      if(dates.length){
-        var pick = document.createElement('input');
-        pick.type = 'date'; pick.className = 'chart-date-input';
-        pick.min = dates[0]; pick.max = dates[dates.length - 1]; pick.value = chart.date;
-        pick.setAttribute('aria-label', 'Pick a week');
-        pick.addEventListener('change', function(){
-          var v = pick.value; if(!v) return;
-          // The chart for that week: the last one published on or before the day picked.
-          var best = null;
-          for(var k = 0; k < dates.length; k++){ if(dates[k] <= v) best = dates[k]; else break; }
-          showHot100Week(best || dates[0]);
-        });
-        label.appendChild(pick);
-      }
       bar.appendChild(weekBtn(CHART_PREV_SVG, 'Previous week', prevDate));
-      bar.appendChild(label);
+      bar.appendChild(buildChartWeekLabel(chart.date, dates));
       bar.appendChild(weekBtn(CHART_NEXT_SVG, 'Next week', nextDate));
       stationsGrid.appendChild(bar);
       items.forEach(function(item, n){ stationsGrid.appendChild(buildChartRow(item, items, n)); });
+      // The week before is fetched now, so the back arrow is instant.
+      if(prevDate) loadHot100Chart(prevDate)['catch'](function(){});
     })['catch'](function(){
       if(job !== hot100Render || activeHomeSection !== 'top100') return;
-      stationsGrid.innerHTML = '<div class="empty-state">The chart couldn\u2019t be loaded. Check the connection and try again.</div>';
+      stationsGrid.innerHTML = '';
+      var e = document.createElement('div');
+      e.className = 'empty-state chart-load-fail';
+      e.appendChild(document.createTextNode('The chart couldn\u2019t be loaded. '));
+      var again = document.createElement('button');
+      again.type = 'button'; again.className = 'chart-retry'; again.textContent = 'Try Again';
+      again.addEventListener('click', renderTop100Page);
+      e.appendChild(again);
+      stationsGrid.appendChild(e);
     });
+  }
+  // "Week of" on its own line, then the date, whose month, day and year each open a picker
+  // (build 213). The day lists the chart weeks in that month; month and year keep as close as
+  // they can to the day shown.
+  var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function chartNearest(dates, target){
+    // The chart on or before the day, else the first one after it.
+    var best = null;
+    for(var i = 0; i < dates.length; i++){ if(dates[i] <= target) best = dates[i]; else { if(!best) best = dates[i]; break; } }
+    return best || dates[dates.length - 1];
+  }
+  function chartInMonth(dates, y, m, day){
+    var pre = y + '-' + (m < 10 ? '0' : '') + m + '-';
+    var inMonth = dates.filter(function(d){ return d.indexOf(pre) === 0; });
+    if(!inMonth.length) return chartNearest(dates, pre + (day < 10 ? '0' : '') + day);
+    var best = inMonth[0];
+    inMonth.forEach(function(d){ if(Math.abs(+d.slice(8) - day) < Math.abs(+best.slice(8) - day)) best = d; });
+    return best;
+  }
+  function buildChartWeekLabel(date, dates){
+    var y = +date.slice(0, 4), m = +date.slice(5, 7), d = +date.slice(8, 10);
+    var label = document.createElement('div');
+    label.className = 'chart-week-label';
+    var of = document.createElement('div'); of.className = 'chart-week-of'; of.textContent = 'Week of';
+    label.appendChild(of);
+    var line = document.createElement('div'); line.className = 'chart-week-date';
+    function seg(cls, text, aria, options, onPick){
+      var span = document.createElement('span');
+      span.className = 'cw-seg ' + cls;
+      span.appendChild(document.createTextNode(text));
+      if(dates.length){
+        var sel = document.createElement('select');
+        sel.setAttribute('aria-label', aria);
+        options.forEach(function(o){
+          var opt = document.createElement('option');
+          opt.value = o.value; opt.textContent = o.text;
+          if(o.disabled) opt.disabled = true;
+          if(o.selected) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', function(){ onPick(sel.value); });
+        span.appendChild(sel);
+      }
+      return span;
+    }
+    var have = {};
+    dates.forEach(function(x){ have[x.slice(0, 7)] = true; });
+    var first = dates.length ? +dates[0].slice(0, 4) : y, last = dates.length ? +dates[dates.length - 1].slice(0, 4) : y;
+    var months = MONTH_NAMES.map(function(n, i){
+      var key = y + '-' + (i < 9 ? '0' : '') + (i + 1);
+      return { value: i + 1, text: n, disabled: !have[key], selected: i + 1 === m };
+    });
+    var pre = date.slice(0, 8);
+    var days = dates.filter(function(x){ return x.indexOf(pre) === 0; }).map(function(x){ return { value: x, text: MONTH_NAMES[m - 1] + ' ' + (+x.slice(8)), selected: x === date }; });
+    var years = [];
+    for(var yy = last; yy >= first; yy--) years.push({ value: yy, text: String(yy), selected: yy === y });
+    line.appendChild(seg('cw-m', MONTH_NAMES[m - 1], 'Month', months, function(v){ showHot100Week(chartInMonth(dates, y, +v, d)); }));
+    line.appendChild(document.createTextNode(' '));
+    line.appendChild(seg('cw-d', String(d), 'Week', days, function(v){ showHot100Week(v); }));
+    line.appendChild(document.createTextNode(', '));
+    line.appendChild(seg('cw-y', String(y), 'Year', years, function(v){ showHot100Week(chartInMonth(dates, +v, m, d)); }));
+    label.appendChild(line);
+    var small = document.createElement('small');
+    small.textContent = 'Billboard Hot 100' + (hot100Latest && date === hot100Latest.date ? ' \u00B7 this week' : '');
+    label.appendChild(small);
+    return label;
   }
   function showHot100Week(date){
     hot100Week = (hot100Latest && date === hot100Latest.date) ? null : date;
@@ -12611,7 +12697,10 @@
   var SONG_ART_MAX = 3000;
   var songArt = lsGet(SONG_ART_KEY) || {};
   var songArtWaiting = {};                    // songKey -> [callbacks]
-  var songArtQueue = [], songArtBusy = 0, SONG_ART_PARALLEL = 2;
+  var songArtQueue = [], songArtBusy = 0, SONG_ART_PARALLEL = 3;
+  var songArtMiss = {};                       // songKey -> true: no cover anywhere (this session)
+  var songArtTries = {};                      // songKey -> failed attempts (network, busy service)
+  var SONG_ART_RETRIES = 4;
   var songArtSaveTimer = null;
   function saveSongArtSoon(){
     if(songArtSaveTimer) return;
@@ -12645,6 +12734,7 @@
   function requestSongArt(item, done){
     var k = item.songKey || songKeyOf(item.artist, item.name);
     if(songArt[k] !== undefined){ if(songArt[k]) done(songArt[k]); return; }
+    if(songArtMiss[k]) return;
     if(songArtWaiting[k]){ songArtWaiting[k].push(done); return; }
     songArtWaiting[k] = [done];
     songArtQueue.push(item);
@@ -12656,10 +12746,18 @@
       songArtBusy++;
       (function(item){
         var k = item.songKey || songKeyOf(item.artist, item.name);
-        lookUpSongArt(item).then(function(url){ finish(url); }, function(){ finish(null); });
+        lookUpSongArt(item).then(function(url){ finish(url); }, function(){
+          // Couldn't ask (offline, or the services busy): tried again shortly, a few times.
+          songArtBusy--;
+          var n = songArtTries[k] = (songArtTries[k] || 0) + 1;
+          if(n < SONG_ART_RETRIES) setTimeout(function(){ songArtQueue.push(item); pumpSongArt(); }, 4000 * n);
+          else delete songArtWaiting[k];
+          pumpSongArt();
+        });
         function finish(url){
           songArtBusy--;
           if(url){ songArt[k] = url; saveSongArtSoon(); }
+          else songArtMiss[k] = true;
           var cbs = songArtWaiting[k] || [];
           delete songArtWaiting[k];
           if(url) cbs.forEach(function(cb){ try{ cb(url); }catch(e){} });
@@ -12675,16 +12773,52 @@
     var x = songKeyOf('', a).slice(1), y = songKeyOf('', b).slice(1);
     return !!x && !!y && (x === y || x.indexOf(y) === 0 || y.indexOf(x) === 0);
   }
+  // Build 213: Deezer's public search first (no key; about 50 asks per 5 seconds, so a whole
+  // chart's covers come at once), then Apple's iTunes search (about 20 a minute, which ran out
+  // after Home's 20 covers). Resolves to a picture, null when neither has one, or rejects when
+  // neither could be asked (then it's tried again).
   function lookUpSongArt(item){
+    return deezerSongArt(item).then(function(url){
+      return url || itunesSongArt(item)['catch'](function(){ return null; });
+    }, function(){ return itunesSongArt(item); });
+  }
+  // The best result for a chart song: same artist; the exact title ahead of one that merely starts
+  // with it; never a live, remixed, acoustic, sped-up or karaoke version when the original is there.
+  var ALT_VERSION_RE = /\b(live|remix|acoustic|sped\s*up|slowed|karaoke|instrumental|demo|version|edit)\b/i;
+  function bestSongMatch(list, item, titleOf, artistOf){
+    var main = mainArtistOf(item.artist), want = normTitle(plainTitle(item.name));
+    var best = null, bestScore = -1;
+    (list || []).forEach(function(r){
+      if(!r) return;
+      var t = titleOf(r) || '', a = artistOf(r) || '';
+      if(!looseMatch(t, item.name) && !looseMatch(t, plainTitle(item.name))) return;
+      var score = looseMatch(a, main) ? 4 : 0;
+      if(normTitle(plainTitle(t)) === want) score += 2;
+      if(!ALT_VERSION_RE.test(t) || ALT_VERSION_RE.test(item.name)) score += 3;
+      if(score > bestScore){ bestScore = score; best = r; }
+    });
+    return bestScore >= 4 || (best && bestScore >= 5) ? best : null;
+  }
+  function deezerSongArt(item){
+    var main = mainArtistOf(item.artist);
+    var q = 'artist:"' + main.replace(/"/g, '') + '" track:"' + plainTitle(item.name).replace(/"/g, '') + '"';
+    return ytFetchText('https://api.deezer.com/search?limit=10&q=' + encodeURIComponent(q)).then(function(t){
+      if(t == null) throw new Error('deezer unreachable');
+      var d = JSON.parse(t);
+      if(d && d.error) throw new Error('deezer busy');
+      var best = bestSongMatch((d && d.data) || [], item, function(r){ return r.title; }, function(r){ return r.artist && r.artist.name; });
+      var al = best && best.album;
+      return al ? (al.cover_big || al.cover_xl || al.cover_medium || null) : null;
+    });
+  }
+  function itunesSongArt(item){
     var term = mainArtistOf(item.artist) + ' ' + item.name;
     var url = ITUNES_BASE + '/search?media=music&entity=song&limit=8&country=US&term=' + encodeURIComponent(term);
     return itunesJsonp(url, 12000, { background: true }).then(function(d){
-      var res = (d && d.results) || [];
-      var best = res.filter(function(r){ return looseMatch(r.trackName, item.name) && looseMatch(r.artistName, mainArtistOf(item.artist)); })[0]
-        || res.filter(function(r){ return looseMatch(r.trackName, item.name); })[0];
+      var best = bestSongMatch((d && d.results) || [], item, function(r){ return r.trackName; }, function(r){ return r.artistName; });
       var art = best && best.artworkUrl100;
       return art ? art.replace(/\/\d+x\d+bb\./, '/600x600bb.') : null;
-    }, function(){ return null; });
+    });
   }
 
   // ---------- finding each song's music video ----------

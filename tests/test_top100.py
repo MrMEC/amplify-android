@@ -32,8 +32,9 @@ def chart(date, shift):
         rows.append({'song': f'Song {rank:03d}' if i else 'Patient Zero', 'artist': ARTISTS[i % 5], 'this_week': rank,
                      'last_week': lw, 'peak_position': max(1, rank - 3), 'weeks_on_chart': 1 if lw is None else 5 + i % 7})
     return {'date': date, 'data': rows}
-CHARTS = {'2026-10-10': chart('2026-10-10', 0), '2026-10-03': chart('2026-10-03', 4), '2026-09-26': chart('2026-09-26', 2)}
-DATES = ['1958-08-04', '2026-09-26', '2026-10-03', '2026-10-10']
+CHARTS = {'2026-10-10': chart('2026-10-10', 0), '2026-10-03': chart('2026-10-03', 4), '2026-09-26': chart('2026-09-26', 2),
+          '2026-08-29': chart('2026-08-29', 1), '1958-08-04': chart('1958-08-04', 3)}
+DATES = ['1958-08-04', '2026-08-29', '2026-09-26', '2026-10-03', '2026-10-10']
 COLORS = ['#e0457b', '#3a7bd5', '#f59e0b', '#10b981', '#8b5cf6']
 
 def art_svg(i):
@@ -41,7 +42,7 @@ def art_svg(i):
             '<text x="300" y="350" font-size="160" text-anchor="middle" fill="white" font-family="sans-serif">%d</text></svg>') % (COLORS[i % 5], i)
 
 MOCK = r"""(function(){
- var L = {}; window.__nat = { feeds: [], loads: [], plays: 0, pauses: 0 };
+ var L = {}; window.__nat = { feeds: [], deezer: [], loads: [], plays: 0, pauses: 0 };
  function emit(n, ev){ (L[n] || []).forEach(function(f){ f(ev); }); }
  window.__emit = emit;
  var cur = null;
@@ -56,7 +57,18 @@ MOCK = r"""(function(){
     return Promise.resolve({}); },
   play: function(){ __nat.plays++; if(cur) setTimeout(function(){ emit('state', { id: cur.id, state: 'ready', isPlaying: true, playWhenReady: true, duration: 200, position: 10, external: true }); }, 20); return Promise.resolve({}); },
   pause: function(){ __nat.pauses++; if(cur) setTimeout(function(){ emit('state', { id: cur.id, state: 'ready', isPlaying: false, playWhenReady: false, duration: 200, position: 10, external: true }); }, 20); return Promise.resolve({}); },
-  fetchText: function(o){ __nat.feeds.push(o.url);
+  fetchText: function(o){
+    if(/api\.deezer\.com/.test(o.url || '')){
+      __nat.deezer.push(o.url);
+      var q = decodeURIComponent((/[?&]q=([^&]*)/.exec(o.url) || [])[1] || '');
+      var m = /Song (\d+)|Patient Zero/.exec(q), n = m && m[1] ? +m[1] : 1;
+      if(n === 50 && !__nat.failed50){ __nat.failed50 = true; return Promise.resolve({ text: JSON.stringify({ error: { type: 'Exception', message: 'Quota limit exceeded', code: 4 } }) }); }
+      var title = n === 1 ? 'Patient Zero' : 'Song ' + String(n).padStart(3, '0');
+      var artist = ['Taylor Swift', 'Ella Langley', 'Morgan Wallen', 'Sabrina Carpenter', 'Alex Warren'][(n - 1) % 5];
+      return Promise.resolve({ text: JSON.stringify({ data: [{ title: title + ' (Live)', artist: { name: artist }, album: { cover_big: 'https://art.example/999/500.jpg' } },
+        { title: title, artist: { name: artist }, album: { cover_big: 'https://art.example/' + n + '/500.jpg' } }] }) });
+    }
+    __nat.feeds.push(o.url);
     var m = /playlist_id=UULF(\w+)|channel_id=UC(\w+)/.exec(o.url || '');
     var ch = m ? (m[1] || m[2]) : '';
     if(ch === 'tsTaylorChannel0000001') return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">'
@@ -83,8 +95,10 @@ async def run(theme, b):
         p = urlparse(u)
         if p.netloc.startswith('127.0.0.1') or u.startswith('data:'):
             return await r.continue_()
-        if p.netloc == 'raw.githubusercontent.com':
-            counts['charts'].append(p.path)
+        if p.netloc in ('raw.githubusercontent.com', 'cdn.jsdelivr.net'):
+            counts['charts'].append(p.netloc + p.path)
+            if p.netloc == 'raw.githubusercontent.com' and '/date/' in p.path:
+                return await r.fulfill(status=503, body='busy')   # GitHub's raw files flaky: the CDN has them
             if p.path.endswith('/recent.json'): body = json.dumps(CHARTS['2026-10-10'])
             elif p.path.endswith('/valid_dates.json'): body = json.dumps(DATES)
             else:
@@ -146,19 +160,21 @@ async def run(theme, b):
     el = await pg.query_selector('#top100Section')
     await el.scroll_into_view_if_needed(); await pg.wait_for_timeout(1800)
     imgs = await pg.evaluate("[...document.querySelectorAll('#top100HomeGrid .tile-art img')].map(i => i.src).slice(0, 3)")
-    check(len(imgs) >= 2 and all('600x600bb' in u for u in imgs), f'{theme}: covers come from iTunes at 600px {imgs[:2]}')
+    check(len(imgs) >= 2 and all(u.endswith('/500.jpg') and '/999/' not in u for u in imgs), f'{theme}: covers come from Deezer (the studio version, not a live one) {imgs[:2]}')
     await el.screenshot(path=f'{OUT}/top100-home-{theme}.png')
 
     # ---- the page
     await pg.evaluate("document.getElementById('top100Heading').click()"); await pg.wait_for_timeout(1200)
     page = await pg.evaluate("""(()=>({ head: document.getElementById('stationsHeading').textContent,
-      week: (document.querySelector('.chart-week-label')||{}).innerText, rows: document.querySelectorAll('.chart-row').length,
+      week: (()=>{ const x = document.querySelector('.chart-week-label'); const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })(), rows: document.querySelectorAll('.chart-row').length,
       prev: document.querySelectorAll('.chart-week-btn')[0].disabled, next: document.querySelectorAll('.chart-week-btn')[1].disabled,
       moves: document.querySelectorAll('.chart-move').length, more: document.querySelectorAll('.chart-row .row-more-btn, .chart-row button').length }))()""")
     print(theme, page)
     check(page['head'] == 'Top 100' and page['rows'] == 100, f'{theme}: the page lists all 100 {page["head"]} {page["rows"]}')
-    check(page['week'].startswith('Week of October 10, 2026') and 'this week' in page['week'], f'{theme}: headed with the week {page["week"]!r}')
+    check(page['week'].startswith('Week of\nOctober 10, 2026') and 'this week' in page['week'], f'{theme}: "Week of" on its own line, then the date {page["week"]!r}')
     check(not page['prev'] and page['next'], f'{theme}: previous week offered, no next week on the newest chart')
+    btns = await pg.evaluate("[...document.querySelectorAll('.chart-week-btn')].map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })")
+    check(btns == [[40, 40], [40, 40]], f'{theme}: the week arrows are round 40px buttons {btns}')
     check(page['moves'] == 0 and page['more'] == 0, f'{theme}: no chart-movement column and no More button (build 212)')
     geo = await pg.evaluate("""(()=>{ const r = [...document.querySelectorAll('.chart-row')].slice(0, 12), x = r[11] || r[0];
       const k = x.querySelector('.chart-rank').getBoundingClientRect(), a = x.querySelector('.tile-art').getBoundingClientRect(),
@@ -173,16 +189,42 @@ async def run(theme, b):
     painted = await pg.evaluate("[...document.querySelectorAll('.chart-row')].slice(0, 6).map(r => { const i = r.querySelector('.tile-art img'); return i ? i.src.split('/')[3] : null; })")
     check(painted == ['1', '2', '3', '4', '5', '6'], f'{theme}: every row on screen has its cover, including ones found on Home {painted}')
     await pg.screenshot(path=f'{OUT}/top100-page-{theme}.png')
-    # previous week, then the date picker
+    for y in range(0, 9000, 600):
+        await pg.evaluate(f"window.scrollTo(0, {y})"); await pg.wait_for_timeout(250)
+    await pg.wait_for_timeout(9000)   # Song 050's first ask failed: asked again a few seconds later
+    allp = await pg.evaluate("[...document.querySelectorAll('.chart-row')].map(r => { const i = r.querySelector('.tile-art img'); return i ? +i.src.split('/')[3] : 0; })")
+    missing = [i + 1 for i, v in enumerate(allp) if v != i + 1]
+    check(not missing, f'{theme}: all 100 rows get their covers, past the first 20 (one that failed is asked again) missing={missing[:8]}')
+    check(counts['itunes'] <= 1, f'{theme}: Apple\'s search (about 20 a minute) only as a fallback, once, when Deezer was busy ({counts["itunes"]} asks)')
+    await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
+    hdr = await pg.query_selector('.chart-week')
+    await hdr.screenshot(path=f'{OUT}/top100-week-{theme}.png')
+    # previous week, then the month, day and year pickers
     await pg.evaluate("document.querySelectorAll('.chart-week-btn')[0].click()"); await pg.wait_for_timeout(900)
-    w2 = await pg.evaluate("document.querySelector('.chart-week-label').innerText")
+    w2 = await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-label'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")
     nx2 = await pg.evaluate("document.querySelectorAll('.chart-week-btn')[1].disabled")
-    check(w2.startswith('Week of October 3, 2026') and not nx2, f'{theme}: Previous shows the week before, with Next back ({w2!r})')
-    await pg.evaluate("(()=>{ const i = document.querySelector('.chart-date-input'); i.value = '2026-09-30'; i.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(900)
-    w3 = await pg.evaluate("document.querySelector('.chart-week-label').innerText")
-    check(w3.startswith('Week of September 26, 2026'), f'{theme}: a picked day shows the chart for that week ({w3!r})')
-    await pg.evaluate("document.querySelectorAll('.chart-week-btn')[1].click()"); await pg.wait_for_timeout(500)
-    await pg.evaluate("document.querySelectorAll('.chart-week-btn')[1].click()"); await pg.wait_for_timeout(700)
+    check(w2.startswith('Week of\nOctober 3, 2026') and not nx2, f'{theme}: Previous shows the week before, with Next back ({w2!r})')
+    check(any('cdn.jsdelivr.net' in c and '2026-10-03' in c for c in counts['charts']), f'{theme}: past weeks come from the CDN when GitHub\'s raw files fail')
+    def pick(cls, value):
+        return pg.evaluate(f"(()=>{{ const s = document.querySelector('.cw-seg.{cls} select'); s.value = '{value}'; s.dispatchEvent(new Event('change')); }})()")
+    sels = await pg.evaluate("[...document.querySelectorAll('.cw-seg select')].map(s => [s.getAttribute('aria-label'), s.options.length, [...s.options].filter(o => o.disabled).length])")
+    check([x[0] for x in sels] == ['Month', 'Week', 'Year'] and sels[0][1] == 12 and sels[0][2] == 9 and sels[1][1] == 2 and sels[2][1] == 2026 - 1958 + 1,
+          f'{theme}: month, day and year each open a picker (months without charts greyed, the month\'s chart weeks, every year) {sels}')
+    await pick('cw-d', '2026-10-10'); await pg.wait_for_timeout(800)
+    check((await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-date'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")) == 'October 10, 2026', f'{theme}: picking a day shows that week')
+    await pick('cw-m', '9'); await pg.wait_for_timeout(900)
+    w3 = await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-date'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")
+    check(w3 == 'September 26, 2026', f'{theme}: picking a month shows its week closest to the day ({w3!r})')
+    await pick('cw-m', '8'); await pg.wait_for_timeout(900)
+    check((await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-date'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")) == 'August 29, 2026', f'{theme}: and another month')
+    await pick('cw-y', '1958'); await pg.wait_for_timeout(900)
+    w4 = await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-date'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")
+    rows4 = await pg.evaluate("document.querySelectorAll('.chart-row').length")
+    check(w4 == 'August 4, 1958' and rows4 == 100, f'{theme}: picking a year jumps to that year\'s chart nearest the date ({w4!r})')
+    await pick('cw-y', '2026'); await pg.wait_for_timeout(900)
+    await pick('cw-m', '10'); await pg.wait_for_timeout(900)
+    await pick('cw-d', '2026-10-10'); await pg.wait_for_timeout(900)
+    check((await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-label'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")).endswith('this week'), f'{theme}: back on this week')
 
     # ---- a song plays its music video (artist's channel), with the chart under it
     await pg.evaluate("document.querySelectorAll('.chart-row')[0].click()"); await pg.wait_for_timeout(1800)
