@@ -77,6 +77,10 @@ dependencies {
     // Google Cast (build 194): casting streams to a Chromecast.
     implementation "com.google.android.gms:play-services-cast-framework:21.5.0"
     implementation "androidx.mediarouter:mediarouter:1.7.0"
+    // Build 211: Spotify App Remote (from github.com/spotify/android-sdk, kept in libs/) and the
+    // JSON library it needs.
+    implementation files('libs/spotify-app-remote-release-0.8.0.aar')
+    implementation "com.google.code.gson:gson:2.10.1"
     // VLC, for videos the phone's own decoders can't play (build 153). 3.x is the stable line.
     implementation "org.videolan.android:libvlc-all:3.7.6"
     testImplementation "junit:junit:$junitVersion"
