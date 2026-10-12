@@ -121,8 +121,23 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         @Override public void onCastStatus() { castSafe("status", AmplifyPlayerPlugin.this::onCastStatus); }
       };
 
+  /** The plugin, once loaded (build 223: an opened music file is handed to it). */
+  static volatile AmplifyPlayerPlugin instance;
+
+  /** Build 223: a music file opened from another app is ready; the page asks for it. */
+  void openedFileReady() {
+    try { notifyListeners("openfile", new JSObject()); } catch (Throwable ignored) { }
+  }
+
+  @PluginMethod
+  public void takeOpenedFile(PluginCall call) {
+    JSObject o = OpenedFile.take();
+    call.resolve(o == null ? new JSObject() : o);
+  }
+
   @Override // com.getcapacitor.Plugin
   public void load() {
+    instance = this;
     this.main.post(
         () -> {
           this.connect();

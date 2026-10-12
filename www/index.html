@@ -1297,10 +1297,11 @@
   .nph-slide{ flex:0 0 100%; min-width:0; position:relative; scroll-snap-align:start; scroll-snap-stop:always;
     display:flex; flex-direction:column; }
   .nph-slide.nph-tap{ cursor:pointer; }
-  .nph-dots{ display:flex; justify-content:center; align-items:center; gap:6px; height:6px; margin-top:16px; }
-  .nph-dot{ width:6px; height:6px; border-radius:50%; background:var(--text-faint); opacity:.55; transition:background .2s, opacity .2s; }
-  .nph-dot.small{ width:4px; height:4px; }
-  .nph-dot.on{ background:var(--accent); opacity:1; }
+  /* Build 223: a thin progress bar in place of the dots, in the same 78 x 6px they took
+     (seven 6px dots, six 6px gaps): how far through the slides you are, no knob. */
+  .nph-progress{ position:relative; width:78px; height:6px; margin:16px auto 0; border-radius:3px; overflow:hidden;
+    background:color-mix(in srgb, var(--text-faint) 45%, transparent); }
+  .nph-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--accent); }
   /* Build 221: half the height it was (Mark). */
   .nph-media{ position:relative; flex:1 0 auto; min-height:min(28vh, 260px); overflow:hidden; background:var(--main-bg); }
   @media (max-width: 900px){ .nph-media{ min-height:min(56vw, 250px); } }
@@ -5739,7 +5740,7 @@
            podcast's or video's cover with its details. See "Home hero" in the script. -->
       <section class="home-hero" id="npHero" style="display:none;" aria-label="Now playing and recently played" aria-roledescription="carousel">
         <div class="nph-track" id="npHeroTrack" tabindex="0"></div>
-        <div class="nph-dots" id="npHeroDots" aria-hidden="true"></div>
+        <div class="nph-progress" id="npHeroProgress" aria-hidden="true"><div class="nph-progress-fill"></div></div>
       </section>
       <div class="home-tabs" id="homeTabs" style="display:none;" role="tablist">
         <button type="button" class="home-tab" id="tabTop" role="tab">
@@ -24135,6 +24136,19 @@
       el.classList.toggle('playing', el.dataset.key === favKey(track));
     });
 
+    // Build 223: a file opened from another app plays from the copy the phone made of it.
+    if(track.openedUrl){
+      releasePlaybackUrl();
+      tryPlayUrl(track.openedUrl).then(function(){
+        if(currentStation === track) onPlaybackSuccess(track);
+      })['catch'](function(err){
+        if(currentStation !== track) return;
+        attemptInProgress = false;
+        setPlayingUI(false);
+        updatePlayerMeta(track, 'Could not play this file (' + ((err && err.message) || 'unsupported format') + ').', true);
+      });
+      return;
+    }
     localFileBlob(track).then(function(blob){
       if(!blob){
         attemptInProgress = false;
@@ -24164,6 +24178,50 @@
       updatePlayerMeta(track, 'Could not read this file from the library (' + ((err && err.message) || 'storage error') + ').', true);
     });
   }
+
+  // ---------- music files opened from other apps (build 223) ----------
+  // Amplify is offered as a player for music files (Files, downloads, chats). The phone copies
+  // the file and reads its tags (OpenedFile.java); here it plays like a song, with Now Playing
+  // opened, without joining the library. It isn't kept anywhere: Continue Listening and the
+  // Home hero drop it again on the next start (it isn't in the library).
+  function playOpenedFile(info){
+    if(!info || (!info.url && !info.error)) return;
+    if(info.error){ setStatus(info.error + (info.name ? ' (' + info.name + ')' : ''), true); return; }
+    var base = String(info.name || 'Audio file').replace(/\.[A-Za-z0-9]{1,5}$/, '');
+    var guess = null;
+    try{ guess = guessFromFilename(info.name || ''); }catch(e){}
+    var track = {
+      type: 'local', opened: true,
+      localId: 'opened:' + (info.size || 0) + ':' + (info.name || '') + ':' + (info.seq || Date.now()),
+      openedUrl: info.url,
+      name: info.title || (guess && guess.title) || base,
+      artist: info.artist || info.albumArtist || (guess && guess.artist) || '',
+      album: info.album || '',
+      genre: info.genre || '',
+      duration: info.duration || 0,
+      fileName: info.name || '',
+      hasArt: !!info.art
+    };
+    if(info.art){
+      try{ libraryArtUrls[favKey(track)] = window.Capacitor.convertFileSrc('file://' + info.art); }catch(e){}
+    }
+    clearQueue();
+    playStation(track);
+    try{ openNowPlaying(track, true); }catch(e){}
+  }
+  function takeOpenedFile(){
+    var P = videoPlugin2();
+    if(!P || typeof P.takeOpenedFile !== 'function') return;
+    P.takeOpenedFile().then(function(info){ if(info && (info.url || info.error)) playOpenedFile(info); })['catch'](function(){});
+  }
+  (function(){
+    var P = videoPlugin2();
+    if(!P || typeof P.addListener !== 'function') return;
+    try{ P.addListener('openfile', function(){ takeOpenedFile(); }); }catch(e){}
+    // Started by opening a file: it may be ready before the page was listening.
+    setTimeout(takeOpenedFile, 400);
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden) takeOpenedFile(); });
+  })();
 
   // ---------- seek bar ----------
   function formatTime(sec){
@@ -33375,6 +33433,31 @@
     var song = onAirFor(st);
     return song ? onAirText(song) : subtitleFor(st);
   }
+  // The last song each station named (build 223), kept for the Home hero's station slides:
+  // radioPlayerStationLastSong { favKey: { t, a, at } }, the 300 most recent stations.
+  var STATION_SONG_KEY = 'radioPlayerStationLastSong';
+  var stationSongs = null;
+  function stationSongMap(){
+    if(stationSongs) return stationSongs;
+    try{ var v = JSON.parse(localStorage.getItem(STATION_SONG_KEY) || '{}'); stationSongs = (v && typeof v === 'object') ? v : {}; }catch(e){ stationSongs = {}; }
+    return stationSongs;
+  }
+  function noteStationSong(st, title, artist){
+    var m = stationSongMap(), k = favKey(st);
+    m[k] = { t: title, a: artist || '', at: Date.now() };
+    var keys = Object.keys(m);
+    if(keys.length > 300){ keys.sort(function(x, y){ return m[x].at - m[y].at; }); keys.slice(0, keys.length - 300).forEach(function(x){ delete m[x]; }); }
+    try{ localStorage.setItem(STATION_SONG_KEY, JSON.stringify(m)); }catch(e){}
+    if(typeof syncHeroStationLines === 'function') try{ syncHeroStationLines(); }catch(e){}
+  }
+  // "Song · Artist" (the artist left off when it is the station's own name, as on an artist
+  // channel), or '' when the station hasn't named one.
+  function stationLastSongText(st){
+    var r = st ? stationSongMap()[favKey(st)] : null;
+    if(!r || !r.t) return '';
+    var a = r.a && nameKey(r.a) !== nameKey(stripExclusively(st.name || '')) ? r.a : '';
+    return a ? r.t + ' \u00b7 ' + a : r.t;
+  }
   function setOnAir(ev){
     var prev = onAir;
     var st = currentStation;
@@ -33388,6 +33471,7 @@
       onAir = { key: key, title: title, artist: artist, at: Date.now() };
       onAirLog.unshift({ key: key, station: stripExclusively(st.name), title: title, artist: artist, at: onAir.at });
       if(onAirLog.length > ON_AIR_LOG_MAX) onAirLog.length = ON_AIR_LOG_MAX;
+      noteStationSong(st, title, artist);
     }
     if(!prev && !onAir) return;
     // The bar only when it is showing the normal line: never over "Buffering…", "Paused",
@@ -33577,7 +33661,7 @@
 
   var npHero = document.getElementById('npHero');
   var npHeroTrack = document.getElementById('npHeroTrack');
-  var npHeroDots = document.getElementById('npHeroDots');
+  var npHeroProgress = document.getElementById('npHeroProgress');
   var heroSlides = [];       // the slides on screen, in order
   var heroSlideByKey = {};   // favKey -> slide, kept between redraws so nothing flickers
   function heroText(html){
@@ -33641,6 +33725,7 @@
     } else {
       o.kicker = isChannelEntry(item) ? 'Live TV' : 'Station';
       o.title = stripExclusively((item.channel && item.channel.name) || item.name || '');
+      o.line = stationLastSongText(item);
     }
     return o;
   }
@@ -33655,17 +33740,19 @@
       e.stopPropagation();
       heroPlay(slide);
     });
-    // A library song: the rest of the slide opens the artist's page.
+    // A library song: the rest of the slide opens the artist's page. A station or channel:
+    // tapping anywhere on it plays it (build 223).
     slide.addEventListener('click', function(){
       if(slide._swiped) return;
-      if(slide._entry) openArtistPage(slide._entry.key);
+      if(slide._entry){ openArtistPage(slide._entry.key); return; }
+      if(heroIsStation(slide._item)) heroPlayStation(slide);
     });
     return slide;
   }
   function fillHeroSlide(slide, item){
     var entry = heroArtistEntry(item);
     slide._item = item; slide._entry = entry;
-    slide.classList.toggle('nph-tap', !!entry);
+    slide.classList.toggle('nph-tap', !!entry || heroIsStation(item));
     var o = heroTextFor(item, entry);
     slide.querySelector('.nph-kicker').textContent = o.kicker;
     slide.querySelector('.nph-title').textContent = o.title;
@@ -33694,21 +33781,18 @@
   function heroPaintAround(){
     var i = heroIndex();
     for(var j = i - 1; j <= i + 1; j++) paintHeroSlide(heroSlides[j]);
-    syncHeroDots(i);
+    syncHeroProgress();
   }
-  // Up to seven dots, the one on screen highlighted, the window following along.
-  function syncHeroDots(i){
-    if(!npHeroDots) return;
+  // The bar fills as you swipe: slide 1 of 50 shows 1/50, the last fills it. It follows the
+  // finger (the scroll position), not just the slide it settles on.
+  function syncHeroProgress(){
+    if(!npHeroProgress) return;
     var n = heroSlides.length;
-    npHeroDots.style.display = n > 1 ? '' : 'none';
+    npHeroProgress.style.display = n > 1 ? '' : 'none';
     if(n < 2) return;
-    var start = Math.max(0, Math.min(i - 3, n - 7)), end = Math.min(n, start + 7);
-    var html = '';
-    for(var k = start; k < end; k++){
-      var edge = (k === start && start > 0) || (k === end - 1 && end < n);
-      html += '<span class="nph-dot' + (k === i ? ' on' : '') + (edge ? ' small' : '') + '"></span>';
-    }
-    if(npHeroDots._html !== html){ npHeroDots._html = html; npHeroDots.innerHTML = html; }
+    var w = npHeroTrack.clientWidth || 1;
+    var pos = Math.max(0, Math.min(n - 1, npHeroTrack.scrollLeft / w));
+    npHeroProgress.firstChild.style.width = ((pos + 1) / n * 100).toFixed(2) + '%';
   }
   function renderNpHero(){
     if(!npHero || !npHeroTrack) return;
@@ -33788,6 +33872,25 @@
       return;
     }
     playStation(first);
+  }
+  function heroIsStation(item){ return !!item && isLiveStream(item); }
+  // Tapping a station's slide plays it; tapping the one already playing leaves it playing.
+  function heroPlayStation(slide){
+    var item = slide._item;
+    if(currentStation && favKey(currentStation) === favKey(item)){
+      if(!uiIsPlaying) togglePlayPause();
+      return;
+    }
+    startNpTarget(item);
+  }
+  // The station slides' song line, redrawn when a station names a new song.
+  function syncHeroStationLines(){
+    heroSlides.forEach(function(slide){
+      if(!heroIsStation(slide._item)) return;
+      var el = slide.querySelector('.nph-line');
+      var t = stationLastSongText(slide._item);
+      if(el.textContent !== t) el.textContent = t;
+    });
   }
   function heroPlay(slide){
     var item = slide._item;

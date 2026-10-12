@@ -1,4 +1,4 @@
-"""Builds 220-222: the Home hero (222: swipeable through the last 50 played) follows playback (artist portrait + bio for a library song with a
+"""Builds 220-223: the Home hero (222: swipeable through the last 50 played; 223: progress bar, station tap plays, last song line, opened files) follows playback (artist portrait + bio for a library song with a
 shuffle Play and a tap to the artist page; a channel logo; a podcast or video cover with details).
 (Harness from build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos rows on Home, under Top 100.
 Each mix row shows 20 songs and its heading opens the whole list; Daily Mix features one of the most
@@ -20,9 +20,14 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         " play: function(name){ __h.stub(); var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; playTrackInList([t], t, 'Test'); },"
         " fake: function(st){ __h.stub(); audio.play(); currentStation = st; noteHeroPlayed(st); updatePlayerMeta(st, ''); setPlayingUI(true); },"
         " playing: function(v){ setPlayingUI(v); },"
-        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroDots').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
+        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroProgress').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
         " titles: function(){ return heroSlides.map(function(x){ return x.querySelector('.nph-title').textContent; }); },"
-        " dots: function(){ var d = Array.from(document.querySelectorAll('#npHeroDots .nph-dot')); return { n: d.length, on: d.findIndex(function(x){ return x.classList.contains('on'); }) }; },"
+        " bar: function(){ var b = document.getElementById('npHeroProgress'), f = b.firstChild, r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), fill: f.getBoundingClientRect().width / r.width, shown: getComputedStyle(b).display !== 'none', knobs: b.querySelectorAll('*').length, bg: getComputedStyle(b).backgroundColor, fc: getComputedStyle(f).backgroundColor }; },"
+        " onair: function(t, a){ window.dispatchEvent(new CustomEvent('amplify-onair', { detail: { id: 'x', title: t, artist: a } })); },"
+        " slideLine: function(title){ var sl = heroSlides.filter(function(x){ return x.querySelector('.nph-title').textContent === title; })[0]; return sl ? sl.querySelector('.nph-line').textContent : null; },"
+        " cur: function(){ return currentStation ? (currentStation.name || '') : ''; }, inLib: function(){ return libraryTracks.length; },"
+        " npOpen: function(){ return document.body.classList.contains('np-open'); }, curArt: function(){ return currentStation ? (libraryArtUrls[favKey(currentStation)] || '') : ''; },"
+        " tapSlide: function(title){ var sl = heroSlides.filter(function(x){ return x.querySelector('.nph-title').textContent === title; })[0]; sl.querySelector('.nph-media').click(); },"
         " go: function(i){ var t = document.getElementById('npHeroTrack'); t.scrollLeft = i * t.clientWidth; },"
         " hero: function(){ var h = document.getElementById('npHero'); var sl = heroSlides[heroIndex()] || h; var r = h.getBoundingClientRect(); var d = sl.querySelector('.nph-desc') || h;"
         "   var img = sl.querySelector('.nph-art img'); var lh = parseFloat(getComputedStyle(d).lineHeight); var pb = sl.querySelector('.nph-play') || h; var ti = sl.querySelector('.nph-title') || h;"
@@ -77,6 +82,7 @@ MOCK = """
 (function(){
  var picked = %s, listeners = {};
  window.__dz = [];
+ window.__fireOpen = function(info){ window.__opened = info; (listeners.openfile || []).forEach(function(f){ f({}); }); };
  function dz(u){
    window.__dz.push(u);
    if(/search\\/artist/.test(u)){ return /q=Prince$/.test(u) ? { data: [{ id: 77, name: 'Prince' }] } : { data: [] }; }
@@ -86,6 +92,7 @@ MOCK = """
  var impl = {
    pickMusicFolder: function(){ return Promise.resolve({folder:'Music', files:picked, truncated:false}); },
    fetchText: function(o){ if(/api\\.deezer\\.com/.test(o.url)) return Promise.resolve({ text: JSON.stringify(dz(o.url)) }); return Promise.reject(new Error('offline')); },
+   takeOpenedFile: function(){ var o = window.__opened || {}; window.__opened = null; return Promise.resolve(o); },
    addListener: function(n, f){ (listeners[n] = listeners[n] || []).push(f); return Promise.resolve({remove:function(){}}); }
  };
  var P = new Proxy({}, {get:function(t,k){
@@ -227,15 +234,16 @@ async def run(theme, b):
     # build 222: swipe through what was played
     t = await pg.evaluate('__h.titles()'); print(t)
     check(t[:4] == ['Heat', 'Funk History Hour', 'Ray TV News', 'Prince'] and await pg.evaluate('__h.idx()') == 0, f'[{theme}] the slides are what is playing, then what was played, newest first {t[:5]}')
-    d = await pg.evaluate('__h.dots()')
-    check(d['n'] == min(7, len(t)) and d['on'] == 0, f'[{theme}] dots under it, the first lit {d}')
+    d = await pg.evaluate('__h.bar()')
+    n = len(t)
+    check(d['shown'] and d['w'] == 78 and d['h'] == 6 and d['knobs'] == 1 and abs(d['fill'] - 1 / n) < .02, f'[{theme}] a thin 78x6 progress bar (where the dots were), no knob, filled 1/{n} {d}')
     await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(600)
     h = await pg.evaluate('__h.hero()')
-    check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and (await pg.evaluate('__h.dots()'))['on'] == 2,
+    check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and abs((await pg.evaluate('__h.bar()'))['fill'] - 3 / n) < .02,
           f'[{theme}] swiping shows the next one, picture and all {h["title"]}')
     await pg.screenshot(path=f'{shots}/hero-swipe-{theme}.png')
     gaps = await pg.evaluate("__h.gaps()")
-    check(max(gaps) - min(gaps) <= 2 and max(gaps) < 40, f'[{theme}] every slide\'s Play button sits the same short way above the dots {gaps}')
+    check(max(gaps) - min(gaps) <= 2 and max(gaps) < 40, f'[{theme}] every slide\'s Play button sits the same short way above the bar {gaps}')
     # a drag (mouse) pages one slide on
     box = await pg.evaluate("(()=>{ var r = document.getElementById('npHeroTrack').getBoundingClientRect(); return [r.left + r.width * .7, r.top + 80]; })()")
     await pg.mouse.move(box[0], box[1]); await pg.mouse.down(); await pg.mouse.move(box[0] - 150, box[1], steps=8); await pg.mouse.up(); await pg.wait_for_timeout(900)
@@ -252,6 +260,19 @@ async def run(theme, b):
     await pg.evaluate("__h.fake({ name: 'Jazz 24', url: 'https://radio.example/jazz', urlToResolve: 'https://radio.example/jazz', favicon: 'https://covers.example/cover.jpg', stationuuid: 'jazz-1' })"); await pg.wait_for_timeout(700)
     h = await pg.evaluate('__h.hero()')
     check(h['title'] == 'Jazz 24' and h['kicker'] == 'Station' and await pg.evaluate('__h.idx()') == 0, f'[{theme}] on the first slide, the new track takes its place')
+    # build 223: the song a station names shows under its name, and stays once it's gone
+    check(h['line'] == '', f'[{theme}] a station that hasn\'t named a song has no song line')
+    await pg.evaluate("__h.onair('Take Five', 'Dave Brubeck')"); await pg.wait_for_timeout(300)
+    check((await pg.evaluate('__h.hero()'))['line'] == 'Take Five \u00b7 Dave Brubeck', f'[{theme}] the song on air shows under the station name')
+    await pg.screenshot(path=f'{shots}/hero-station-song-{theme}.png')
+    await pg.evaluate("__h.onair('Blue Rondo', 'Dave Brubeck')"); await pg.wait_for_timeout(300)
+    await pg.evaluate("__h.fake({ name: 'KISS FM', url: 'https://radio.example/kiss', urlToResolve: 'https://radio.example/kiss', favicon: 'https://covers.example/logo.png', stationuuid: 'kiss-1' })"); await pg.wait_for_timeout(700)
+    check(await pg.evaluate("__h.slideLine('Jazz 24')") == 'Blue Rondo \u00b7 Dave Brubeck', f'[{theme}] and the latest one stays on its slide after switching away')
+    # tapping a station's cover plays it
+    await pg.evaluate("__h.tapSlide('Jazz 24')"); await pg.wait_for_timeout(900)
+    check(await pg.evaluate('__h.cur()') == 'Jazz 24', f'[{theme}] tapping a station\'s cover plays it ({await pg.evaluate("__h.cur()")})')
+    check(not await pg.evaluate("document.body.classList.contains('artist-open')"), f'[{theme}] (and goes nowhere)')
+    await pg.evaluate('__h.go(0)'); await pg.wait_for_timeout(400)
     # Play on an older song slide: the artist shuffle from that song
     ti = await pg.evaluate('__h.titles()'); pi = ti.index('Prince')
     await pg.evaluate(f'__h.go({pi})'); await pg.wait_for_timeout(600)
@@ -263,6 +284,22 @@ async def run(theme, b):
     await pg.reload(); await pg.wait_for_timeout(3000)
     await pg.evaluate('__d.home()'); await pg.wait_for_timeout(800)
     check(await pg.evaluate('__h.n()') == n_before and (await pg.evaluate('__h.titles()'))[0] == 'Prince', f'[{theme}] the slides come back after a restart')
+    check(await pg.evaluate("__h.slideLine('Jazz 24')") == 'Blue Rondo \u00b7 Dave Brubeck', f'[{theme}] with each station\'s last song')
+    # build 223: a music file opened from another app
+    libn = await pg.evaluate('__h.inLib()')
+    await pg.evaluate('__h.stub()')
+    await pg.evaluate(f"""__fireOpen({{ url: 'http://127.0.0.1:{PORT}/Music/001.mp3', name: 'My Download.mp3', title: 'Opened Song', artist: 'Some Band', album: 'Loose Files', duration: 1, size: 9999, seq: 1, art: '/data/user/0/x/cache/opened/a1.img' }})""")
+    await pg.wait_for_timeout(1500)
+    check(await pg.evaluate('__h.cur()') == 'Opened Song' and await pg.evaluate('__h.npOpen()'), f'[{theme}] an opened music file plays with its own tags, Now Playing open ({await pg.evaluate("__h.cur()")})')
+    check(await pg.evaluate('__h.inLib()') == libn, f'[{theme}] without joining the library')
+    check('a1.img' in await pg.evaluate('__h.curArt()'), f'[{theme}] its embedded cover is used')
+    await pg.evaluate("__d.closeNp()")
+    await pg.evaluate(f"""__fireOpen({{ url: 'http://127.0.0.1:{PORT}/Music/002.mp3', name: 'Artist Two - Untagged Tune.mp3', size: 8888, seq: 2 }})""")
+    await pg.wait_for_timeout(1500)
+    check(await pg.evaluate('__h.cur()') == 'Untagged Tune', f'[{theme}] an untagged file is named from its file name ({await pg.evaluate("__h.cur()")})')
+    await pg.evaluate("__fireOpen({ error: \"Couldn't open that file.\", name: 'bad.mp3' })"); await pg.wait_for_timeout(400)
+    check(await pg.evaluate('__h.cur()') == 'Untagged Tune', f'[{theme}] a file that couldn\'t be read leaves playback alone')
+    await pg.evaluate("__d.closeNp()"); await pg.evaluate('__d.home()'); await pg.wait_for_timeout(500)
     # bigger text at 360 wide still fits
     await pg.set_viewport_size({'width': 360, 'height': 800})
     await pg.evaluate(f"__h.meta('Prince', {json.dumps(BIO)})")

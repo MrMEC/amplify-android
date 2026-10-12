@@ -1,6 +1,7 @@
 package com.markcoleman.amplify;
 
 import android.app.PictureInPictureParams;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,6 +25,18 @@ public class MainActivity extends BridgeActivity {
     }
     ActivityCompat.requestPermissions(
         this, new String[] {"android.permission.POST_NOTIFICATIONS"}, 7);
+  }
+
+  /**
+   * Build 223: opened as the player for a music file. BridgeActivity also calls this with the
+   * launch intent while it starts up, so a cold start arrives here too; OpenedFile marks each
+   * intent it takes, so a recreated activity never starts the same file over.
+   */
+  @Override
+  protected void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    if (intent != getIntent()) setIntent(intent);
+    OpenedFile.handle(this, intent);
   }
 
   @Nullable
