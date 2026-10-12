@@ -1503,6 +1503,11 @@
   .yt-title{ margin-top:8px; font-size:13.5px; font-weight:600; line-height:1.3; color:var(--text);
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .yt-date{ margin-top:3px; font-size:12px; color:var(--text-dim); }
+  /* Build 219: Home's Artist Videos row, 16:9 tiles as wide as Continue Watching's. */
+  body.home-stacked .home-row > .daily-videos-grid > .yt-tile{ flex:0 0 calc(150px * 16 / 9); }
+  @media (max-width: 900px){
+    body.home-stacked .home-row > .daily-videos-grid > .yt-tile{ flex:0 0 calc(min(132px, calc((100vw - 46px - 32px) / 2.35)) * 16 / 9); }
+  }
   .yt-tile.yt-skel .yt-thumb{ animation:yt-skel 1.2s ease-in-out infinite alternate; }
   .yt-tile.yt-skel .yt-title{ height:12px; width:70%; border-radius:6px; background:rgba(255,255,255,.08); }
   @keyframes yt-skel{ from{ opacity:.55; } to{ opacity:1; } }
@@ -5784,6 +5789,9 @@
         </div>
         <div class="tile-grid" id="top100HomeGrid"></div>
       </div>
+      <!-- Build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos, each a row made
+           fresh every day (see "Daily mixes" in the script). Filled in by renderDailyHome. -->
+      <div id="dailyHomeSections" style="display:none;"></div>
       <div class="home-section made-for-you-section" id="madeForYouSection" style="display:none;">
         <div class="home-section-head">
           <h2 class="home-heading-link" id="madeForYouHeading" role="button" tabindex="0">Made for You<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
@@ -7584,6 +7592,7 @@
   var madeForYouSection = document.getElementById('madeForYouSection');
   var top100Section = document.getElementById('top100Section');   // Top 100 (build 211)
   var top100HomeGrid = document.getElementById('top100HomeGrid');
+  var dailyHomeSections = document.getElementById('dailyHomeSections');   // build 219
   var hot100Shown = false;
   var madeForYouGrid = document.getElementById('madeForYouGrid');
   var madeForYouShown = false;
@@ -12263,7 +12272,7 @@
   }
   function recordArtistPlay(item){
     if(!item || isBlacklisted(item)) return;
-    if(isLocalTrack(item)) noteAlbumPlayed(item);
+    if(isLocalTrack(item)){ noteAlbumPlayed(item); noteSongPlay(item); }
     var name = artistNameForPlay(item);
     var key = name ? artistMatchKey(name) : '';
     if(!key) return;
@@ -12280,6 +12289,28 @@
       keys.slice(0, keys.length - ARTIST_PLAYS_LIMIT).forEach(function(k){ delete plays[k]; });
     }
     saveArtistPlays(plays);
+  }
+  // Plays per library song (build 219), for Discover and Hear It Again: { localId: [count, last] },
+  // counted by the same 20-second rule as the artist counts (phone and car alike).
+  var SONG_PLAYS_KEY = 'radioPlayerSongPlays';
+  var SONG_PLAYS_LIMIT = 20000;
+  function loadSongPlays(){
+    try{ var v = JSON.parse(localStorage.getItem(SONG_PLAYS_KEY) || '{}'); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }catch(e){ return {}; }
+  }
+  function noteSongPlay(track){
+    var id = favKey(track);
+    if(!id) return;
+    try{
+      var m = loadSongPlays();
+      var r = m[id] || [0, 0];
+      m[id] = [(r[0] || 0) + 1, Date.now()];
+      var keys = Object.keys(m);
+      if(keys.length > SONG_PLAYS_LIMIT){
+        keys.sort(function(a, b){ return (m[a][0] - m[b][0]) || (m[a][1] - m[b][1]); });
+        keys.slice(0, keys.length - SONG_PLAYS_LIMIT).forEach(function(k){ delete m[k]; });
+      }
+      localStorage.setItem(SONG_PLAYS_KEY, JSON.stringify(m));
+    }catch(e){}
   }
   // A play counts once it has actually been listened to: 20 seconds of playing (pauses
   // don't count), or nearly all of a song shorter than that -- the same 20 seconds the
@@ -12325,7 +12356,7 @@
   // just run out), and the new item starts its own count.
   function startPlayCount(item){
     playCountTick();
-    pendingPlay = (item && artistNameForPlay(item))
+    pendingPlay = (item && (isLocalTrack(item) || artistNameForPlay(item)))
       ? { item: item, key: favKey(item), need: playCountNeed(item), heard: 0, t: Date.now(), station: !isLocalTrack(item) }
       : null;
   }
@@ -14789,6 +14820,7 @@
       topArtistsSection.style.display = topArtistsShown ? '' : 'none';
       madeForYouSection.style.display = madeForYouShown ? '' : 'none';
       top100Section.style.display = hot100Shown ? '' : 'none';
+      dailyHomeSections.style.display = '';
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
       playlistsHomeSection.style.display = playlistsHomeShown ? '' : 'none';
       recentSection.style.display = '';
@@ -14811,6 +14843,7 @@
       madeForYouSection.style.display = 'none';
     top100Section.style.display = 'none';
       top100Section.style.display = 'none';
+      dailyHomeSections.style.display = 'none';
       latestPodcastsSection.style.display = 'none';
       playlistsHomeSection.style.display = 'none';
       forYouSection.style.display = 'none';
@@ -14833,6 +14866,7 @@
     topArtistsSection.style.display = 'none';
     madeForYouSection.style.display = 'none';
     top100Section.style.display = 'none';
+    dailyHomeSections.style.display = 'none';
     latestPodcastsSection.style.display = 'none';
     playlistsHomeSection.style.display = 'none';
     forYouSection.style.display = 'none';
@@ -15065,6 +15099,7 @@
     renderTopArtistsSection();
     renderMadeForYouSection();
     if(typeof renderTop100HomeSection === 'function') renderTop100HomeSection();
+    renderDailyHome();
     renderLatestPodcastsSection();
     renderPlaylistsHomeSection();
     renderForYouHomeSection();
@@ -25638,7 +25673,7 @@
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
     if(section) return entry(sectionLabel(section), function(){ runLibrarySection(section); });
-    if(homeSection) return entry(HOME_SECTION_TITLES[homeSection] || 'Back', function(){ openHomeSectionPage(homeSection); });
+    if(homeSection) return entry(homeSectionTitle(homeSection) || 'Back', function(){ openHomeSectionPage(homeSection); });
     if(query && String(query).trim()){
       var q = String(query);
       // Back to the same results tab (a podcast opened from the Podcasts tab comes back there).
@@ -25772,7 +25807,7 @@
 
   function renderHomeSectionPage(){
     var section = activeHomeSection;
-    stationsHeading.textContent = HOME_SECTION_TITLES[section] || '';
+    stationsHeading.textContent = homeSectionTitle(section);
     clearHistoryBtn.style.display = (section === 'recentStations' || section === 'recentSongs') ? '' : 'none';
     if(section !== 'favorites') favPageEditing = false;
     syncFavPageEditBtn();
@@ -25786,6 +25821,7 @@
     if(section === 'topStations'){ renderTopStationsPage(); return; }
     if(section === 'madeForYou'){ libraryShuffleBtn.style.display = 'none'; renderMadeForYouPage(); return; }
     if(section === 'top100'){ renderTop100Page(); return; }
+    if(dailyMixFor(section)){ renderDailyMixPage(section); return; }
     if(section === 'topArtists'){
       document.getElementById('allArtistsLink').style.display = '';
       sectionHeadingRow.classList.add('has-side-link');
@@ -26772,6 +26808,376 @@
       paintArtistVideos(entry, r, false);
     });
   }
+
+  // ---------- Daily mixes (build 219) ----------
+  // Under Top 100 on Home, each a sideways row and remade once a day:
+  // - Daily Mix 1-5: one each for five of the ten most-played artists (picked fresh each day),
+  //   mostly that artist's songs with songs by similar artists in the library mixed in. Similar
+  //   means Deezer's related artists that are in the library and share the artist's genre tag;
+  //   when Deezer names too few (or isn't known yet), library artists with the same genre fill in.
+  // - Discover: 100 library songs with the fewest plays. - Hear It Again: 100 with the most
+  //   (song plays are counted since build 219; until there are enough, songs by the most-played
+  //   artists fill it). - Artist Videos: one artist's music videos (YouTube and the phone's own),
+  //   a different artist with videos each day; the heading is the artist's name.
+  // The day's lists are kept (radioPlayerDailyMixes) so they don't change during the day; songs
+  // that leave the library drop out. A row shows 20; its heading opens the whole list.
+  var DAILY_KEY = 'radioPlayerDailyMixes';
+  var DAILY_VERSION = 1;
+  var DAILY_SIZE = 100, DAILY_ROW = 20, DAILY_MIXES = 5, DAILY_TOP = 10;
+  var DAILY_FEATURED_SHARE = 0.6;      // of a Daily Mix, the featured artist's songs
+  var DAILY_MIN_SONGS = 10;            // fewer than this and a list isn't shown
+  var SIMILAR_KEY = 'radioPlayerSimilarArtists';
+  var SIMILAR_TTL_MS = 30 * 24 * 3600 * 1000, SIMILAR_MISS_MS = 3 * 24 * 3600 * 1000;
+  var dailyState = null, dailySimilarPending = {}, dailyReady = false;
+
+  function dailyLoad(){
+    try{ var v = JSON.parse(localStorage.getItem(DAILY_KEY) || 'null'); return v && v.v === DAILY_VERSION ? v : null; }catch(e){ return null; }
+  }
+  function dailySave(){ try{ localStorage.setItem(DAILY_KEY, JSON.stringify(dailyState)); }catch(e){} }
+  function similarStore(){
+    try{ var v = JSON.parse(localStorage.getItem(SIMILAR_KEY) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
+  }
+  function similarKnown(key){
+    var r = similarStore()[key];
+    return !!r && Date.now() - (r.ts || 0) < (r.names && r.names.length ? SIMILAR_TTL_MS : SIMILAR_MISS_MS);
+  }
+  // Deezer's related artists for one artist (names), kept a month. Resolves to the list, or null
+  // when Deezer couldn't be reached (asked again next time).
+  function fetchSimilarArtists(entry){
+    var k = entry.key;
+    if(similarKnown(k)) return Promise.resolve(similarStore()[k].names);
+    if(dailySimilarPending[k]) return dailySimilarPending[k];
+    var p = deezerAsk('https://api.deezer.com/search/artist?limit=5&q=' + encodeURIComponent(entry.name)).then(function(d){
+      var list = (d && d.data) || [];
+      var hit = list.filter(function(a){ return artistMatchKey(a.name || '') === k; })[0] || null;
+      if(!hit) return [];
+      return deezerAsk('https://api.deezer.com/artist/' + hit.id + '/related?limit=60').then(function(r){
+        return ((r && r.data) || []).map(function(a){ return a.name; }).filter(Boolean);
+      });
+    }).then(function(names){
+      var m = similarStore();
+      m[k] = { ts: Date.now(), names: names };
+      var keys = Object.keys(m);
+      if(keys.length > 300){ keys.sort(function(a, b){ return m[a].ts - m[b].ts; }); keys.slice(0, keys.length - 300).forEach(function(x){ delete m[x]; }); }
+      try{ localStorage.setItem(SIMILAR_KEY, JSON.stringify(m)); }catch(e){}
+      return names;
+    })['catch'](function(){ return null; });
+    dailySimilarPending[k] = p;
+    p.then(function(){ delete dailySimilarPending[k]; });
+    return p;
+  }
+  function dailyPool(){
+    return libraryTracks.filter(function(t){ return isLocalTrack(t) && !isBlacklisted(t); });
+  }
+  function dailyGenres(tracks){
+    var n = {};
+    tracks.forEach(function(t){ mfyGenreParts(t.genre).forEach(function(g){ n[g] = (n[g] || 0) + 1; }); });
+    return n;
+  }
+  // Puts the same artist next to itself as little as it can, keeping the shuffled order otherwise.
+  function dailySpread(list){
+    var out = [], rest = list.slice();
+    while(rest.length){
+      var last = out.length ? out[out.length - 1].artist : null;
+      var i = 0;
+      while(i < rest.length && rest[i].artist === last && i < 8) i++;
+      if(i >= rest.length) i = 0;
+      out.push(rest.splice(i, 1)[0]);
+    }
+    return out;
+  }
+  // The five featured artists: of the ten most played that have songs in the library, five
+  // picked for the day (in play order). Short of ten played, artists with the most songs fill in.
+  function dailyTopArtists(){
+    var plays = loadArtistPlays();
+    var seen = {}, top = [];
+    Object.keys(plays).sort(function(a, b){ return (plays[b].count - plays[a].count) || ((plays[b].last || 0) - (plays[a].last || 0)); }).forEach(function(k){
+      if(top.length >= DAILY_TOP) return;
+      var e = findArtistEntry(k);
+      if(e && e.tracks.filter(function(t){ return !isBlacklisted(t); }).length >= 3 && !seen[e.key]){ seen[e.key] = true; top.push(e); }
+    });
+    if(top.length < DAILY_TOP){
+      buildArtistIndex().filter(function(e){ return !seen[e.key] && e.tracks.length >= 3; })
+        .sort(function(a, b){ return b.tracks.length - a.tracks.length; })
+        .slice(0, DAILY_TOP - top.length).forEach(function(e){ seen[e.key] = true; top.push(e); });
+    }
+    return top;
+  }
+  function buildOneDailyMix(entry, n, day, similarNames){
+    var own = entry.tracks.filter(function(t){ return isLocalTrack(t) && !isBlacklisted(t); });
+    var g = dailyGenres(own), gk = Object.keys(g);
+    function sharesGenre(e){
+      if(!gk.length) return false;
+      return Object.keys(dailyGenres(e.tracks)).some(function(x){ return g[x]; });
+    }
+    var similar = [], seen = {}; seen[entry.key] = true;
+    (similarNames || []).forEach(function(name){
+      var e = findArtistEntry(artistMatchKey(name));
+      if(!e || seen[e.key] || !e.tracks.length) return;
+      // Related and in the library; with genre tags on both, they have to share one.
+      var eg = Object.keys(dailyGenres(e.tracks));
+      if(gk.length && eg.length && !sharesGenre(e)) return;
+      seen[e.key] = true; similar.push(e);
+    });
+    if(similar.length < 4 && gk.length){
+      // Same-genre artists from the library, most in common first.
+      var plays = loadArtistPlays();
+      buildArtistIndex().filter(function(e){ return !seen[e.key] && e.tracks.length; }).map(function(e){
+        var eg = dailyGenres(e.tracks), score = 0;
+        Object.keys(eg).forEach(function(x){ if(g[x]) score += Math.min(eg[x], 20) * g[x]; });
+        return { e: e, score: score ? score + (plays[e.key] ? Math.min(plays[e.key].count, 50) : 0) : 0 };
+      }).filter(function(x){ return x.score > 0; }).sort(function(a, b){ return b.score - a.score; })
+        .slice(0, 12 - similar.length).forEach(function(x){ seen[x.e.key] = true; similar.push(x.e); });
+    }
+    var seed = 'dm|' + day + '|' + entry.key;
+    var mine = mfySeeded(own, seed);
+    var want = similar.length ? Math.min(mine.length, Math.round(DAILY_SIZE * DAILY_FEATURED_SHARE)) : Math.min(mine.length, DAILY_SIZE);
+    var picks = mine.slice(0, want);
+    // The others take turns, a song each, until the mix is full.
+    var queues = similar.map(function(e){ return mfySeeded(e.tracks.filter(function(t){ return isLocalTrack(t) && !isBlacklisted(t); }), seed + '|' + e.key); });
+    var used = {};
+    picks.forEach(function(t){ used[favKey(t)] = true; });
+    // The featured artist stays the larger part even when they have few songs.
+    var total = similar.length ? Math.min(DAILY_SIZE, Math.round(want / DAILY_FEATURED_SHARE)) : DAILY_SIZE;
+    var more = true;
+    while(picks.length < total && more){
+      more = false;
+      for(var i = 0; i < queues.length && picks.length < total; i++){
+        var t = queues[i].shift();
+        if(t){ more = true; if(!used[favKey(t)]){ used[favKey(t)] = true; picks.push(t); } }
+      }
+    }
+    // Room left (few similar songs): more of the featured artist's own.
+    for(var j = want; j < mine.length && picks.length < DAILY_SIZE; j++){
+      if(!used[favKey(mine[j])]){ used[favKey(mine[j])] = true; picks.push(mine[j]); }
+    }
+    var songs = dailySpread(mfySeeded(picks, seed + '|order'));
+    return { id: 'mix:dm' + n, title: 'Daily Mix: ' + entry.name, artistKey: entry.key, rel: similarNames != null,
+      songs: songs.map(favKey) };
+  }
+  function buildDiscoverAndAgain(day){
+    var pool = dailyPool();
+    var plays = loadSongPlays();
+    function c(t){ var r = plays[favKey(t)]; return r ? r[0] || 0 : 0; }
+    // Discover: from the least-played part of the library, a random hundred.
+    var low = mfySeeded(pool, 'disc|' + day).sort(function(a, b){ return c(a) - c(b); });
+    // The least-played 40% (60% of a small library), and never fewer than the list needs.
+    var cut = low.length > 250 ? Math.max(DAILY_SIZE, Math.round(low.length * 0.4)) : Math.max(DAILY_MIN_SONGS, Math.round(low.length * 0.6));
+    var discover = mfySeeded(low.slice(0, cut), 'disc2|' + day).slice(0, DAILY_SIZE);
+    // Hear It Again: songs played 2+ times, most played first, a random hundred of the top part.
+    var hi = pool.filter(function(t){ return c(t) >= 2; }).sort(function(a, b){ return c(b) - c(a); });
+    var again = mfySeeded(hi.slice(0, DAILY_SIZE * 2), 'again|' + day).slice(0, DAILY_SIZE);
+    if(again.length < DAILY_SIZE){
+      // Until enough songs have counts: songs by the most-played artists, theirs first.
+      var aplays = loadArtistPlays(), have = {};
+      again.forEach(function(t){ have[favKey(t)] = true; });
+      var byArtist = pool.filter(function(t){
+        var r = aplays[artistMatchKey(t.artist || '')];
+        return !have[favKey(t)] && r && r.count >= 2;
+      });
+      byArtist = mfySeeded(byArtist, 'again2|' + day).sort(function(a, b){
+        return (aplays[artistMatchKey(b.artist || '')].count) - (aplays[artistMatchKey(a.artist || '')].count);
+      });
+      again = again.concat(mfySeeded(byArtist.slice(0, (DAILY_SIZE - again.length) * 2), 'again3|' + day).slice(0, DAILY_SIZE - again.length));
+    }
+    return [
+      { id: 'mix:discover', title: 'Discover', songs: dailySpread(discover).map(favKey) },
+      { id: 'mix:again', title: 'Hear It Again', songs: dailySpread(mfySeeded(again, 'again4|' + day)).map(favKey) }
+    ];
+  }
+  // An artist with music videos for the day: YouTube videos already looked up (favourite
+  // artists) or video files of theirs on the phone.
+  function dailyVideoArtistKeys(){
+    var out = [];
+    buildArtistIndex().forEach(function(e){
+      var rec = ytStore && ytStore[e.key];
+      if((rec && rec.videos && rec.videos.length) || musicVideosFor(e.key).length) out.push(e.key);
+    });
+    return out;
+  }
+  function pickDailyVideoArtist(day){
+    var keys = dailyVideoArtistKeys();
+    if(dailyState && dailyState.videoKey && keys.indexOf(dailyState.videoKey) !== -1) return dailyState.videoKey;
+    return keys.length ? mfySeeded(keys, 'vid|' + day)[0] : null;
+  }
+  function buildDailyLists(){
+    var day = mfyDay();
+    var top = dailyTopArtists();
+    var sim = similarStore();
+    function simFor(e){ return similarKnown(e.key) ? sim[e.key].names : null; }
+    // Five for the day, skipping any whose mix would come out too short to show.
+    var featured = [];
+    mfySeeded(top, 'top|' + day).forEach(function(e){
+      if(featured.length < DAILY_MIXES && buildOneDailyMix(e, 0, day, simFor(e)).songs.length >= DAILY_MIN_SONGS) featured.push(e);
+    });
+    featured.sort(function(a, b){ return top.indexOf(a) - top.indexOf(b); });
+    var mixes = featured.map(function(e, i){ return buildOneDailyMix(e, i + 1, day, simFor(e)); });
+    dailyState = { v: DAILY_VERSION, day: day, lib: libraryTracks.length, mixes: mixes.concat(buildDiscoverAndAgain(day)), videoKey: null };
+    dailyState.videoKey = pickDailyVideoArtist(day);
+    dailySave();
+    // Related artists not known yet: asked now, and that mix made again (once) with them.
+    featured.forEach(function(e, i){
+      if(similarKnown(e.key)) return;
+      fetchSimilarArtists(e).then(function(names){
+        if(names == null || !dailyState || dailyState.day !== day) return;
+        var m = buildOneDailyMix(e, i + 1, day, names);
+        dailyState.mixes = dailyState.mixes.map(function(x){ return x.id === m.id ? m : x; });
+        dailySave();
+        renderDailyHome();
+        if(activeHomeSection === m.id && stationsHeading.textContent === m.title) renderDailyMixPage(m.id);
+      });
+    });
+    // The rest of the top ten in the background, so the next days' mixes are ready.
+    setTimeout(function(){ top.forEach(function(e){ if(!similarKnown(e.key)) fetchSimilarArtists(e); }); }, 20000);
+  }
+  function ensureDailyLists(){
+    if(!libraryLoaded || libraryStorageError || !libraryTracks.length) return false;
+    if(!dailyState) dailyState = dailyLoad();
+    // A new day, or a library that has grown a lot since (music added for the first time).
+    if(!dailyState || dailyState.day !== mfyDay() || libraryTracks.length > (dailyState.lib || 0) * 1.5 + 20) buildDailyLists();
+    else if(!dailyState.videoKey){
+      var vk = pickDailyVideoArtist(dailyState.day);
+      if(vk){ dailyState.videoKey = vk; dailySave(); }
+    }
+    return true;
+  }
+  function dailyMixFor(section){
+    if(!section || String(section).indexOf('mix:') !== 0 || !dailyReady) return null;
+    if(!ensureDailyLists()) return null;
+    return dailyState.mixes.filter(function(m){ return m.id === section; })[0] || null;
+  }
+  // The songs still in the library, in the mix's order.
+  function dailyMixSongs(mix){
+    return (mix.songs || []).map(function(id){ return libraryById[id]; }).filter(function(t){ return t && !isBlacklisted(t); });
+  }
+  function homeSectionTitle(section){
+    if(HOME_SECTION_TITLES[section]) return HOME_SECTION_TITLES[section];
+    var m = dailyMixFor(section);
+    return m ? m.title : '';
+  }
+  window.__amplifyDaily = function(){ ensureDailyLists(); return dailyState; };
+
+  // ---- Home rows ----
+  var dailySectionEls = {};
+  function dailySection(id, title, onHeading){
+    var sec = dailySectionEls[id];
+    if(!sec){
+      sec = document.createElement('div');
+      sec.className = 'home-section daily-home-section';
+      sec.dataset.daily = id;
+      var head = document.createElement('div');
+      head.className = 'home-section-head';
+      var h = document.createElement('h2');
+      h.className = 'home-heading-link';
+      h.setAttribute('role', 'button');
+      h.tabIndex = 0;
+      h.innerHTML = '<span class="daily-heading-text"></span><i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i>';
+      h.addEventListener('click', function(){ sec._onHeading && sec._onHeading(); });
+      h.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); sec._onHeading && sec._onHeading(); }
+      });
+      head.appendChild(h);
+      sec.appendChild(head);
+      var grid = document.createElement('div');
+      grid.className = 'tile-grid' + (id === 'videos' ? ' daily-videos-grid' : '');
+      sec.appendChild(grid);
+      dailyHomeSections.appendChild(sec);
+      makeHomeRow(grid);
+      sec._grid = grid;
+      dailySectionEls[id] = sec;
+    }
+    sec.querySelector('.daily-heading-text').textContent = title;
+    sec._onHeading = onHeading;
+    return sec;
+  }
+  function renderDailyHome(){
+    if(!dailyReady || !dailyHomeSections) return;
+    var order = [];
+    if(ensureDailyLists()){
+      dailyState.mixes.forEach(function(mix){
+        var songs = dailyMixSongs(mix);
+        if(songs.length < DAILY_MIN_SONGS) return;
+        var sec = dailySection(mix.id, mix.title, function(){ openHomeSectionPage(mix.id); });
+        var grid = sec._grid, sig = mix.title + '|' + songs.slice(0, DAILY_ROW).map(favKey).join();
+        if(grid._sig !== sig){
+          grid._sig = sig;
+          grid.innerHTML = '';
+          grid.scrollLeft = 0;
+          songs.slice(0, DAILY_ROW).forEach(function(t){
+            grid.appendChild(buildEntityTile({
+              key: favKey(t), entity: 'song', name: t.name || '', sub: t.artist || '', artFrom: t, favTarget: t,
+              onClick: function(){ playTrackInList(dailyMixSongs(mix), t, mix.title); }
+            }));
+          });
+        }
+        order.push(sec);
+      });
+      var vsec = renderDailyVideos();
+      if(vsec) order.push(vsec);
+    }
+    Object.keys(dailySectionEls).forEach(function(id){
+      var sec = dailySectionEls[id];
+      var i = order.indexOf(sec);
+      sec.style.display = i === -1 ? 'none' : '';
+    });
+    order.forEach(function(sec){ dailyHomeSections.appendChild(sec); });
+    if(document.body.classList.contains('home-stacked')) syncHomeRows();
+  }
+  function renderDailyVideos(){
+    var key = dailyState && dailyState.videoKey;
+    var entry = key ? findArtistEntry(key) : null;
+    if(!entry) return null;
+    var rec = ytStore && ytStore[key];
+    var yt = (rec && rec.videos) || [];
+    var locals = musicVideosFor(key);
+    if(!yt.length && !locals.length) return null;
+    var sec = dailySection('videos', entry.name, function(){ openArtistPage(entry.key); });
+    var grid = sec._grid;
+    var sig = key + '|' + yt.map(function(v){ return v.id; }).join() + '|' + locals.map(function(v){ return v.uri; }).join();
+    if(grid._sig !== sig){
+      grid._sig = sig;
+      grid.innerHTML = '';
+      grid.scrollLeft = 0;
+      yt.forEach(function(v){ var t = buildYtTile(v, entry.name); t._ytList = yt; grid.appendChild(t); });
+      var tiles = {};
+      locals.forEach(function(v){ var tile = buildMusicVideoTile(v, locals); tiles[v.uri] = tile; grid.appendChild(tile); });
+      ensureMusicVideoStills(locals, function(v){
+        var tile = tiles[v.uri];
+        if(tile && tile.isConnected){ tile._paintStill(); tile._paintDur(); }
+      });
+    }
+    // A favourite artist's YouTube list is refreshed as it would be on their page.
+    if(rec && !ytFresh(rec) && isFavorite(artistFavRecord(entry)) && !renderDailyVideos._asked){
+      renderDailyVideos._asked = true;
+      loadArtistVideos(entry).then(function(){ renderDailyVideos._asked = false; renderDailyHome(); });
+    }
+    return sec;
+  }
+
+  // ---- the page: the whole list as song rows; the heading's Shuffle shuffles it ----
+  function renderDailyMixPage(section){
+    var mix = dailyMixFor(section);
+    if(!mix) return;
+    stationsHeading.textContent = mix.title;
+    var songs = dailyMixSongs(mix);
+    resetStationsGrid();
+    stationsGrid.classList.add('grid-songs');
+    libraryShuffleBtn.style.display = songs.length > 1 ? '' : 'none';
+    setResultCount(null);
+    if(!songs.length){
+      stationsGrid.innerHTML = '<div class="empty-state">Nothing here today.</div>';
+      return;
+    }
+    songs.forEach(function(t){ stationsGrid.appendChild(buildSongRow(t, { queueList: songs, queueLabel: mix.title })); });
+  }
+  // A new day while the app stays open: checked every few minutes and on return to the app.
+  function dailyDayCheck(){
+    if(dailyState && dailyState.day !== mfyDay()){ dailyState = null; renderDailyHome(); }
+  }
+  setInterval(dailyDayCheck, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) dailyDayCheck(); });
+  dailyReady = true;
+  try{ renderDailyHome(); }catch(e){}
 
   // ---------- the video page ----------
   var ytOverlay = null, ytResumeAfter = false;
@@ -28632,6 +29038,8 @@
     if(activeHomeSection === 'favorites'){ playShuffledMixed(favorites, 'Favorites'); return; }
     if(activeHomeSection === 'recentStations'){ playShuffledMixed(recentStations, 'Continue Listening'); return; }
     if(activeHomeSection === 'recentSongs'){ playShuffledMixed(recentSongsOnly(), 'Recent Songs'); return; }
+    var shuffleMix = dailyMixFor(activeHomeSection);
+    if(shuffleMix){ playShuffled(dailyMixSongs(shuffleMix), shuffleMix.title); return; }
     // A playlist shuffles its own entries, songs and stations alike.
     var shufflePl = activeStationPlaylistId ? findStationPlaylistById(activeStationPlaylistId) : null;
     if(shufflePl){ playShuffledMixed(shufflePl.stations, shufflePl.label); return; }
