@@ -13494,6 +13494,7 @@
       if(!ytCtx || ytCtx.chart !== c || c.job !== job) return;
       if(!v){ playChartAudio(c.items, i, c.label); return; }
       ytCtx.current = v;
+      noteChartVideo(item, v);
       frame.innerHTML = '';
       var f = document.createElement('iframe');
       f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
@@ -15191,6 +15192,14 @@
   // it's by. A song is a row everywhere else (buildTile), which broke the row up, so here it
   // is a cover tile like the stations and episodes beside it.
   function continueTile(s){
+    // A Top 100 song (build 225): plays again the way the chart does (its video, else preview).
+    if(isChartSong(s)){
+      var ct = buildEntityTile({
+        key: favKey(s), entity: 'chartsong', name: s.name || '', sub: s.artist || '', artFrom: s,
+        onClick: function(){ openChartSong([s], 0, 'Top 100', ct.querySelector('.tile-art')); }
+      });
+      return ct;
+    }
     if(isPodcastTrack(s)){
       // An episode's "by" line is its show.
       var t = buildTile(s);
@@ -15231,6 +15240,8 @@
     var key = favKey(station);
     recentStations = recentStations.filter(function(r){ return favKey(r) !== key; });
     saveRecent();
+    // Build 225: gone from the Home hero's slides too.
+    if(typeof forgetHeroPlayed === 'function') forgetHeroPlayed(function(it, ref){ return ref.k === key; });
     renderRecentList();
     renderRecentSection();
     if(activeHomeSection === 'recentStations') renderHomeSectionPage();
@@ -18761,8 +18772,26 @@
     vsave(CHANNEL_HISTORY_KEY, channelHistory);
     refreshContinueWatching();
   }
+  // Top 100 songs watched as music videos (build 225), for Continue Watching and the hero:
+  // radioPlayerChartVideos [{ item, vid, at }], newest first, 20 kept.
+  var CHART_VIDEO_KEY = 'radioPlayerChartVideos';
+  var chartVideoHistory = vload(CHART_VIDEO_KEY, []);
+  if(!Array.isArray(chartVideoHistory)) chartVideoHistory = [];
+  function noteChartVideo(item, video){
+    if(!item) return;
+    var k = favKey(item);
+    chartVideoHistory = chartVideoHistory.filter(function(h){ return favKey(h.item) !== k; });
+    var it = {};
+    Object.keys(item).forEach(function(x){ if(x.charAt(0) !== '_' && typeof item[x] !== 'function') it[x] = item[x]; });
+    chartVideoHistory.unshift({ item: it, vid: (video && video.id) || '', at: Date.now() });
+    if(chartVideoHistory.length > 20) chartVideoHistory.length = 20;
+    vsave(CHART_VIDEO_KEY, chartVideoHistory);
+    if(typeof noteHeroPlayed === 'function'){ noteHeroPlayed(it); renderNpHero(); }
+    refreshContinueWatching();
+  }
   function cwKey(e){
     if(e.kind === 'channel') return 'channel:' + e.ch.url;
+    if(e.kind === 'chart') return 'chart:' + favKey(e.item);
     return e.v.kind === 'episode' ? 'show:' + e.v.showKey : 'video:' + e.v.id;
   }
   function continueWatchingEntries(){
@@ -18779,6 +18808,7 @@
       } else if(isInProgress(v)) out.push({ kind: 'video', v: v, at: at });
     });
     channelHistory.forEach(function(h){ out.push({ kind: 'channel', ch: h, at: h.at || 0 }); });
+    chartVideoHistory.forEach(function(h){ if(h && h.item) out.push({ kind: 'chart', item: h.item, vid: h.vid, at: h.at || 0 }); });
     out = out.filter(function(e){ var hid = cwHidden[cwKey(e)]; return !(hid && hid >= e.at); });
     out.sort(function(a, b){ return b.at - a.at; });
     return out.slice(0, 20);
@@ -18789,7 +18819,18 @@
   function removeFromContinueWatching(e){
     cwHidden[cwKey(e)] = Date.now();
     vsave(CW_HIDDEN_KEY, cwHidden);
+    if(e.kind === 'chart'){
+      chartVideoHistory = chartVideoHistory.filter(function(h){ return favKey(h.item) !== favKey(e.item); });
+      vsave(CHART_VIDEO_KEY, chartVideoHistory);
+    }
     refreshContinueWatching();
+    // Build 225: gone from the Home hero's slides too (a show: every episode of it).
+    if(typeof forgetHeroPlayed === 'function') forgetHeroPlayed(function(it, ref){
+      if(e.kind === 'channel') return !!it && ((it.urlToResolve || it.url || '') === e.ch.url || ref.k === favKey(channelToStation(e.ch)));
+      if(e.kind === 'chart') return ref.k === favKey(e.item);
+      if(e.v.kind === 'episode') return !!it && isLocalVideo(it) && it.showKey === e.v.showKey;
+      return ref.k === favKey(e.v) || (!!it && isLocalVideo(it) && it.id === e.v.id);
+    });
   }
   // Both places the list shows: the Video page and Home.
   function refreshContinueWatching(){
@@ -19038,7 +19079,7 @@
   // One Continue Watching tile: a video (its still or poster, how far along) or a channel
   // (its logo), with the three-dot menu in the top right corner like Continue Listening's.
   function buildContinueEntryTile(e){
-    var tile = e.kind === 'channel' ? buildContinueChannelTile(e.ch) : buildContinueTile(e.v);
+    var tile = e.kind === 'channel' ? buildContinueChannelTile(e.ch) : e.kind === 'chart' ? buildContinueChartTile(e) : buildContinueTile(e.v);
     var more = document.createElement('button');
     more.type = 'button';
     more.className = 'tile-fav tile-more vw-more';
@@ -19116,6 +19157,28 @@
     img.onerror = function(){ img.remove(); };
     img.src = url;
     return img;
+  }
+  // A Top 100 song watched as a music video: its video still, the song and artist. Tapping it
+  // plays it again the way the chart does (the video; the preview when there is none).
+  function buildContinueChartTile(e){
+    var item = e.item;
+    var tile = document.createElement('div');
+    tile.className = 'vw-tile vw-chart';
+    tile.dataset.key = favKey(item);
+    var art = document.createElement('div');
+    art.className = 'vw-thumb';
+    if(e.vid) art.appendChild(vImg('https://i.ytimg.com/vi/' + e.vid + '/mqdefault.jpg'));
+    tile.appendChild(art);
+    var n = document.createElement('div');
+    n.className = 'tile-name';
+    n.textContent = item.name || '';
+    tile.appendChild(n);
+    var sub = document.createElement('div');
+    sub.className = 'tile-sub';
+    sub.textContent = item.artist || '';
+    tile.appendChild(sub);
+    tile.addEventListener('click', function(){ openChartSong([item], 0, 'Top 100', art); });
+    return tile;
   }
   function buildContinueTile(v){
     var tile = document.createElement('div');
@@ -26183,7 +26246,16 @@
       setResultCount(null); /* build 210: no count (Mark) */
       return;
     }
-    list.forEach(function(s){ stationsGrid.appendChild(withRecentDismiss(buildRow(s, false), s)); });
+    list.forEach(function(s){
+      var row = withRecentDismiss(buildRow(s, false), s);
+      // A Top 100 song plays the chart's way (build 225); the More button still works.
+      if(isChartSong(s)) row.addEventListener('click', function(ev){
+        if(ev.target.closest && ev.target.closest('button')) return;
+        ev.stopPropagation(); ev.preventDefault();
+        openChartSong([s], 0, 'Top 100', row.querySelector('.row-thumb, .tile-art'));
+      }, true);
+      stationsGrid.appendChild(row);
+    });
     setResultCount(null); /* build 210: no count (Mark) */
   }
 
@@ -33201,7 +33273,9 @@
     // A video of your own, or a TV channel, goes to Continue Watching, not Continue Listening.
     if(isLocalVideo(station)){ refreshContinueWatching(); return; }
     if(isNpChannel(station)){ recordChannelWatch(station); return; }
-    if(isChartSong(station)) return;   // a preview: not a station played, nor a song in the library
+    // A preview (build 225): kept in Continue Listening (and the hero) like anything played; it
+    // still isn't a station or a library song, so it adds no play counts.
+    if(isChartSong(station)){ recordRecent(station); return; }
     startPlayCount(station);
     recordRecent(station);
   }
@@ -33607,7 +33681,7 @@
   // - A podcast episode or a video: its cover, the show/video name (the episode title for a
   //   podcast) and two lines of details; Play resumes it.
   // What has been played, for the slides: radioPlayerPlayedHistory, newest first, max 50,
-  // every kind (songs, stations, channels, podcasts, videos; not Top 100 previews). Library
+  // every kind (songs, stations, channels, podcasts, videos, Top 100 songs since build 225). Library
   // songs and videos are kept by id and looked up again, so a removed one drops out.
   var HERO_MAX = 50;
   var HERO_HIST_KEY = 'radioPlayerPlayedHistory';
@@ -33623,7 +33697,7 @@
     return heroHist;
   }
   function heroRefOf(st){
-    if(!st || isChartSong(st)) return null;
+    if(!st) return null;
     if(isLocalTrack(st)) return { k: favKey(st), r: 'song', id: favKey(st) };
     if(isLocalVideo(st)) return { k: favKey(st), r: 'video', id: st.id };
     var it = {};
@@ -33640,6 +33714,16 @@
     if(h.length > HERO_MAX) h.length = HERO_MAX;
     heroHist = h;
     try{ localStorage.setItem(HERO_HIST_KEY, JSON.stringify(h)); }catch(e){}
+  }
+  // Build 225: removing something from Continue Listening or Continue Watching takes it off the
+  // slides as well. pred(item, ref) picks what goes; the slide for what is playing now stays.
+  function forgetHeroPlayed(pred){
+    var h = heroHistLoad();
+    var keep = h.filter(function(ref){ var it = heroResolve(ref); return !pred(it, ref); });
+    if(keep.length === h.length) return;
+    heroHist = keep;
+    try{ localStorage.setItem(HERO_HIST_KEY, JSON.stringify(keep)); }catch(e){}
+    renderNpHero();
   }
   function heroResolve(ref){
     try{
@@ -33901,6 +33985,8 @@
     if(slideIsPlaying(slide)){ togglePlayPause(); return; }
     if(slide._entry){ playHeroArtistShuffle(slide._entry, item); return; }
     if(currentStation && favKey(currentStation) === favKey(item)){ togglePlayPause(); return; }
+    // A Top 100 song plays the way the chart plays it: its video, else its preview.
+    if(isChartSong(item)){ openChartSong([item], 0, 'Top 100', slide.querySelector('.nph-art')); return; }
     startNpTarget(item);
   }
   if(npHeroTrack){

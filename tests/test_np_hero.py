@@ -1,4 +1,4 @@
-"""Builds 220-223: the Home hero (222: swipeable through the last 50 played; 223: progress bar, station tap plays, last song line, opened files) follows playback (artist portrait + bio for a library song with a
+"""Builds 220-225: the Home hero (225: removals from Continue Listening/Watching leave the slides; Top 100 plays recorded) (222: swipeable through the last 50 played; 223: progress bar, station tap plays, last song line, opened files) follows playback (artist portrait + bio for a library song with a
 shuffle Play and a tap to the artist page; a channel logo; a podcast or video cover with details).
 (Harness from build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos rows on Home, under Top 100.
 Each mix row shows 20 songs and its heading opens the whole list; Daily Mix features one of the most
@@ -22,6 +22,13 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         " playing: function(v){ setPlayingUI(v); },"
         " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroProgress').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
         " titles: function(){ return heroSlides.map(function(x){ return x.querySelector('.nph-title').textContent; }); },"
+        " rmRecent: function(name){ var r = recentStations.filter(function(x){ return x.name === name; })[0]; removeFromRecent(r || { name: name, url: 'https://radio.example/kiss', urlToResolve: 'https://radio.example/kiss', stationuuid: 'kiss-1' }); },"
+        " rmChannel: function(url){ removeFromContinueWatching({ kind: 'channel', ch: { url: url } }); },"
+        " chartPreview: function(it){ __h.stub(); audio.play(); currentStation = it; onPlaybackSuccess(it); },"
+        " chartVideo: function(it, id){ noteChartVideo(it, { id: id }); },"
+        " recents: function(){ return recentStations.map(function(x){ return x.name; }); },"
+        " cw: function(){ return Array.from(document.querySelectorAll('#continueWatchingHomeGrid .vw-tile')).map(function(t){ var i = t.querySelector('img'); return [t.querySelector('.tile-name').textContent, i ? (i.getAttribute('src') || i.dataset.src || '') : '']; }); },"
+        " rmChart: function(it){ removeFromContinueWatching({ kind: 'chart', item: it }); },"
         " clearStatus: function(){ setStatus('', false); },"
         " bar: function(){ var b = document.getElementById('npHeroProgress'), f = b.firstChild, r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), fill: f.getBoundingClientRect().width / r.width, shown: getComputedStyle(b).display !== 'none', knobs: b.querySelectorAll('*').length, bg: getComputedStyle(b).backgroundColor, fc: getComputedStyle(f).backgroundColor }; },"
         " onair: function(t, a){ window.dispatchEvent(new CustomEvent('amplify-onair', { detail: { id: 'x', title: t, artist: a } })); },"
@@ -146,6 +153,8 @@ MOVIE = {'type': 'video', 'videoKind': 'movie', 'id': 'v:heat', 'name': 'Heat', 
 async def files_route(route):
     u = urlparse(route.request.url)
     if u.hostname == '127.0.0.1': return await route.continue_()
+    if u.hostname == 'i.ytimg.com':
+        return await route.fulfill(path=root + '/cover.jpg', headers={'Access-Control-Allow-Origin': '*'})
     if u.hostname == 'covers.example':
         f = root + u.path
         if os.path.exists(f):
@@ -304,6 +313,34 @@ async def run(theme, b):
     await pg.evaluate("__fireOpen({ error: \"Couldn't open that file.\", name: 'bad.mp3' })"); await pg.wait_for_timeout(400)
     check(await pg.evaluate('__h.cur()') == 'Untagged Tune', f'[{theme}] a file that couldn\'t be read leaves playback alone')
     await pg.evaluate("__d.closeNp()"); await pg.evaluate('__d.home()'); await pg.wait_for_timeout(500)
+    # build 225: removing from Continue Listening / Continue Watching takes it off the slides
+    t0 = await pg.evaluate('__h.titles()'); print(t0)
+    check('KISS FM' in t0 and 'Ray TV News' in t0, f'[{theme}] (KISS FM and Ray TV News are slides)')
+    await pg.evaluate("__h.rmRecent('KISS FM')"); await pg.wait_for_timeout(300)
+    check('KISS FM' not in await pg.evaluate('__h.titles()'), f'[{theme}] removed from Continue Listening: gone from the slides')
+    await pg.evaluate("__h.rmChannel('https://tv.example/ray.m3u8')"); await pg.wait_for_timeout(300)
+    check('Ray TV News' not in await pg.evaluate('__h.titles()'), f'[{theme}] removed from Continue Watching: gone from the slides')
+    await pg.reload(); await pg.wait_for_timeout(3000); await pg.evaluate('__d.home()'); await pg.wait_for_timeout(600)
+    tr = await pg.evaluate('__h.titles()')
+    check('KISS FM' not in tr and 'Ray TV News' not in tr, f'[{theme}] and they stay gone after a restart')
+    # Top 100: a preview goes to Continue Listening and the slides; a music video to Continue Watching and the slides
+    CH1 = {'type': 'chartsong', 'name': 'Golden Hour', 'artist': 'JVKE', 'songKey': 'jvke|golden hour', 'rank': 7, 'chartDate': '2026-10-10', 'favicon': 'https://covers.example/cover.jpg'}
+    CH2 = {'type': 'chartsong', 'name': 'Flowers', 'artist': 'Miley Cyrus', 'songKey': 'miley cyrus|flowers', 'rank': 3, 'chartDate': '2026-10-10'}
+    await pg.evaluate(f"__h.chartPreview({json.dumps(CH1)})"); await pg.wait_for_timeout(700)
+    h = await pg.evaluate('__h.hero()')
+    check('Golden Hour' in await pg.evaluate('__h.recents()'), f'[{theme}] a Top 100 preview is kept in Continue Listening')
+    check(h['title'] == 'Golden Hour' and h['kicker'] == 'Top 100' and h['line'] == 'JVKE', f'[{theme}] and is the first slide {h["kicker"]} {h["title"]}')
+    await pg.evaluate(f"__h.chartVideo({json.dumps(CH2)}, 'flwrsVid001')"); await pg.wait_for_timeout(500)
+    cw = await pg.evaluate('__h.cw()'); print(cw)
+    await pg.evaluate("document.getElementById('continueWatchingHomeSection').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(500)
+    await pg.screenshot(path=f'{shots}/cw-chart-{theme}.png')
+    check(any(n == 'Flowers' and 'flwrsVid001' in src for n, src in cw), f'[{theme}] a Top 100 music video is kept in Continue Watching with its video still')
+    check('Flowers' in await pg.evaluate('__h.titles()'), f'[{theme}] and among the slides')
+    await pg.evaluate(f"__h.rmChart({json.dumps(CH2)})"); await pg.wait_for_timeout(300)
+    check(not any(n == 'Flowers' for n, _ in await pg.evaluate('__h.cw()')) and 'Flowers' not in await pg.evaluate('__h.titles()'), f'[{theme}] removing it from Continue Watching takes it off both')
+    await pg.evaluate("__h.rmRecent('Golden Hour')"); await pg.wait_for_timeout(300)
+    check('Golden Hour' not in await pg.evaluate('__h.recents()') and (await pg.evaluate('__h.titles()')).count('Golden Hour') <= 1,
+          f'[{theme}] removing the preview from Continue Listening leaves only the now-playing slide')
     # bigger text at 360 wide still fits
     await pg.set_viewport_size({'width': 360, 'height': 800})
     await pg.evaluate(f"__h.meta('Prince', {json.dumps(BIO)})")
