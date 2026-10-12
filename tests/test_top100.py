@@ -95,7 +95,7 @@ def check(c, m):
 
 async def run(theme, b):
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, locale='en-US')
-    counts = {'itunes': 0, 'mb': 0, 'wiki': [], 'embeds': [], 'charts': []}
+    counts = {'itunes': 0, 'mb': 0, 'wiki': [], 'embeds': [], 'charts': [], 'ytapi': []}
     async def route(r):
         u = r.request.url
         p = urlparse(u)
@@ -134,6 +134,17 @@ async def run(theme, b):
             if p.path.endswith('/front-500'):
                 return await r.fulfill(status=200, content_type='image/svg+xml', body=art_svg(11))
             return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body='{"images":[{"front":true}]}')
+        if p.netloc == 'www.googleapis.com' and p.path == '/youtube/v3/search':
+            q = parse_qs(p.query); key = q.get('key', [''])[0]; term = q.get('q', [''])[0]
+            counts['ytapi'].append(term)
+            if key != 'AIzaGoodKey000000000000000000000000000':
+                return await r.fulfill(status=400, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'},
+                    body=json.dumps({'error': {'code': 400, 'message': 'API key not valid. Please pass a valid API key.', 'errors': [{'reason': 'keyInvalid'}]}}))
+            items = []
+            if 'Song 003' in term:
+                items = [{'id': {'videoId': 'lyrSong0031'}, 'snippet': {'title': 'Morgan Wallen - Song 003 (Lyrics)', 'channelTitle': 'Lyric Vault'}},
+                         {'id': {'videoId': 'mwSong003vi'}, 'snippet': {'title': 'Morgan Wallen - Song 003 (Official Music Video)', 'channelTitle': 'MorganWallenVEVO'}}]
+            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps({'items': items}))
         if p.netloc == 'www.wikidata.org':
             q = parse_qs(p.query); act = q.get('action', [''])[0]
             counts['wiki'].append(u)
@@ -284,7 +295,7 @@ async def run(theme, b):
     # no video found
     await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][2].click()"); await pg.wait_for_timeout(1800)
     note3 = await pg.evaluate("(document.querySelector('#ytOvFrame .chart-v-note')||{}).innerText || ''")
-    check('No official video found' in note3 and 'Find on YouTube' in note3, f'{theme}: a song with no video found offers a YouTube search {note3!r}')
+    check('No official video found' in note3 and 'Find on YouTube' in note3 and 'Add Key' in note3, f'{theme}: a song with no video found offers a YouTube search and adding a key {note3!r}')
     await pg.screenshot(path=f'{OUT}/top100-novideo-{theme}.png')
     await pg.evaluate("document.querySelector('.chart-v-actions button:last-child').click()"); await pg.wait_for_timeout(1500)
     check(await pg.evaluate("document.querySelector('.chart-vrow.on .chart-vrow-title').textContent") == 'Song 004', f'{theme}: Next Song moves down the chart')
@@ -300,6 +311,22 @@ async def run(theme, b):
     # Back closes the video page; Home's row opens it too
     await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(400)
     check(not await pg.evaluate("document.getElementById('ytOverlay').classList.contains('open')") and not await pg.evaluate("!!document.querySelector('#ytOvFrame iframe')"), f'{theme}: Back closes it and stops the video')
+    # ---- a YouTube key: Settings checks it, then songs are searched on YouTube itself
+    await pg.evaluate("__h.ev('openSettings()')"); await pg.wait_for_timeout(400)
+    ytrow = await pg.query_selector('#youtubeSettingsRow')
+    await ytrow.scroll_into_view_if_needed()
+    await ytrow.screenshot(path=f'{OUT}/top100-ytkey-{theme}.png')
+    await pg.fill('#youtubeKeyInput', 'AIzaBadKey0000000000000000000000000000'); await pg.click('#youtubeKeySaveBtn'); await pg.wait_for_timeout(800)
+    t1 = await pg.evaluate("document.getElementById('youtubeSettingsBody').innerText")
+    check('Not saved' in t1 and 'not valid' in t1, f'{theme}: a key YouTube refuses isn\'t kept, and says why')
+    await pg.fill('#youtubeKeyInput', 'AIzaGoodKey000000000000000000000000000'); await pg.click('#youtubeKeySaveBtn'); await pg.wait_for_timeout(800)
+    check(await pg.evaluate("document.getElementById('youtubeStatus').textContent") == 'Connected', f'{theme}: a good key is kept (Connected)')
+    await pg.evaluate("document.getElementById('settingsCloseBtn').click()"); await pg.wait_for_timeout(300)
+    await pg.evaluate("document.querySelectorAll('.chart-row')[2].click()"); await pg.wait_for_timeout(1800)
+    src3 = await pg.evaluate("(document.querySelector('#ytOvFrame iframe')||{}).src || ''")
+    check('/embed/mwSong003vi' in src3, f'{theme}: with the key, a song not found before is found by YouTube search: the official video, not the lyric one {src3[:60]}')
+    check(any('Morgan Wallen Song 003 official video' == t for t in counts['ytapi']), f'{theme}: searched as "artist title official video" {counts["ytapi"][-1:]}')
+    await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(300)
     check(not errs, f'{theme}: no page errors {errs[:2]}')
     await ctx.close()
 
