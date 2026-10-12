@@ -1558,7 +1558,6 @@
   .chart-vrow.on{ background:rgba(255,255,255,.10); border-radius:8px; margin:0 -8px; padding:6px 8px; width:calc(100% + 16px); }
   .chart-vrow.on .chart-vrow-title, .chart-vrow.on .chart-rank{ color:#fff; }
   .chart-v-note{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:16px; text-align:center; color:rgba(255,255,255,.82); font-size:14px; }
-  .chart-v-hint{ font-size:12.5px; color:rgba(255,255,255,.62); max-width:300px; margin-top:-6px; }
   .chart-v-actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
   .chart-v-actions button{ border:0; border-radius:999px; padding:9px 16px; background:rgba(255,255,255,.16); color:#fff; font:inherit; font-weight:700; font-size:13.5px; cursor:pointer; }
   .yt-ov-list-head{ font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); margin:8px 0 12px; }
@@ -4417,8 +4416,6 @@
     text-align:center; padding:8px; border-radius:10px; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
   }
   #settingsPanel .plex-server-select{ width:100%; }
-  #settingsPanel .yt-key-input{ width:100%; box-sizing:border-box; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
-  #settingsPanel .yt-steps{ margin:0; padding-left:20px; font-size:12.5px; line-height:1.5; color:var(--text-dim); }
   /* Movies & TV search rows (build 134): posters keep their 2:3 shape, episodes 16:9 */
   .song-row .song-row-art.video-result-art{ width:38px; height:56px; margin:0 9px; border-radius:3.5px; overflow:hidden; background:var(--art-bg); flex-shrink:0; }
   .song-row .song-row-art.video-result-art.wide{ width:72px; height:41px; margin:7px 0 8px; }
@@ -6426,14 +6423,6 @@
     <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
          and TV shows on its server join Video's Movies and TV Shows next to the phone's own
          folders. Filled in by renderPlexSettings. -->
-    <!-- YouTube (build 216): an optional key so Top 100 can search YouTube for each song's video. -->
-    <div class="settings-row settings-row--stack" id="youtubeSettingsRow">
-      <div class="settings-row-head">
-        <span class="settings-label">YouTube</span>
-        <span class="plex-status" id="youtubeStatus"></span>
-      </div>
-      <div class="plex-body" id="youtubeSettingsBody"></div>
-    </div>
     <div class="settings-row settings-row--stack" id="plexSettingsRow">
       <div class="settings-row-head">
         <span class="settings-label">Plex</span>
@@ -8216,8 +8205,7 @@
           + ', saved ' + Object.keys(songArt).length + ', waiting ' + songArtQueue.length
           + (songArtStats.last ? ' (last problem: ' + escapeHtml(songArtStats.last) + ')' : '')) : '') +
         (typeof chartVideoStats !== 'undefined' ? line('Top 100 videos this session',
-          'found ' + chartVideoStats.found + ', not found ' + chartVideoStats.none + ', YouTube searches ' + chartVideoStats.api
-          + (youTubeKey() ? '' : ' (no YouTube key)') + (chartVideoStats.last ? ' (last problem: ' + escapeHtml(chartVideoStats.last) + ')' : '')) : '') +
+          'found ' + chartVideoStats.found + ', not found ' + chartVideoStats.none) : '') +
         (dbDown && (libraryBlockedByTab || anotherInstanceOpen())
           ? '<div><b class="diag-bad">Another Amplify tab is holding the database.</b> '
             + 'Close every other Amplify tab or window, including older copies of the file. '
@@ -8286,7 +8274,7 @@
   }
   if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', renderDiagnostics);
 
-  function openSettings(){ if(typeof renderPlexSettings === 'function') renderPlexSettings(); if(typeof renderYouTubeSettings === 'function') renderYouTubeSettings(); settingsOverlay.classList.add('open'); }
+  function openSettings(){ if(typeof renderPlexSettings === 'function') renderPlexSettings(); settingsOverlay.classList.add('open'); }
   function closeSettings(){ settingsOverlay.classList.remove('open'); }
   settingsFab.addEventListener('click', openSettings);
   settingsCloseBtn.addEventListener('click', closeSettings);
@@ -13081,116 +13069,17 @@
       });
     })['catch'](function(){ return null; });
   }
-  // ---- YouTube's own search (build 216), with the listener's free YouTube Data API key ----
-  // Without a key the app can only look through each artist's latest and most popular uploads
-  // (and Wikidata), which misses many official videos. With one, YouTube is asked directly:
-  // embeddable videos only, the artist's own channel / VEVO and "Official Video" titles first,
-  // lyric/live/cover uploads last. Each search costs 100 of the key's 10,000 free daily units
-  // (about 100 songs a day); every answer is remembered, so a song is only ever searched once.
-  var YT_KEY_STORE = 'radioPlayerYouTubeKey';
-  var chartVideoStats = { api: 0, found: 0, none: 0, last: '' };
-  function youTubeKey(){ try{ return (localStorage.getItem(YT_KEY_STORE) || '').trim(); }catch(e){ return ''; } }
-  function videoFromYouTubeSearch(item, key){
-    var main = mainArtistOf(item.artist), title = plainTitle(item.name);
-    var url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=10'
-      + '&q=' + encodeURIComponent(main + ' ' + title + ' official video') + '&key=' + encodeURIComponent(key);
-    return fetchWithTimeout(url, {}, 12000).then(function(res){
-      return res.json().then(function(d){
-        if(!res.ok){
-          var why = (d && d.error && (d.error.errors && d.error.errors[0] && d.error.errors[0].reason || d.error.message)) || ('HTTP ' + res.status);
-          chartVideoStats.last = 'YouTube: ' + why;
-          if(/keyInvalid|API key not valid|badRequest/i.test(why)) youTubeKeyBad = true;
-          throw new Error(why);
-        }
-        chartVideoStats.api++;
-        var want = normTitle(title), artistN = normTitle(main);
-        var best = null, bestScore = -99;
-        ((d && d.items) || []).forEach(function(it, i){
-          var id = it && it.id && it.id.videoId, sn = (it && it.snippet) || {};
-          if(!id) return;
-          var t = decodeEntities(sn.title || ''), ch = decodeEntities(sn.channelTitle || '');
-          var tn = normTitle(t.replace(/[\(\[][^\)\]]*[\)\]]/g, ' '));
-          if(want.length < 2 || tn.indexOf(want) < 0) return;
-          var chn = normTitle(ch), score = 0;
-          if(chn.indexOf(artistN) === 0 || chn === artistN + 'vevo' || chn.indexOf(artistN) >= 0) score += 4;
-          if(/vevo/i.test(ch)) score += 2;
-          if(/official\s+(music\s+)?video|\(video\)|\[video\]/i.test(t)) score += 3;
-          if(/\b(lyric|lyrics|live|cover|karaoke|reaction|remix|sped|slowed|8d|nightcore|instrumental|tutorial|lesson|piano)\b/i.test(t)
-            && !/\b(live|remix)\b/i.test(item.name)) score -= 6;
-          if(normTitle(t).indexOf(artistN) >= 0) score += 1;
-          score -= i * 0.1;
-          if(score > bestScore){ bestScore = score; best = { id: id, title: t }; }
-        });
-        return best;
-      });
-    });
-  }
-  function decodeEntities(t){ var e = document.createElement('textarea'); e.innerHTML = t; return e.value; }
-  var youTubeKeyBad = false, youTubeNote = '';
-  function renderYouTubeSettings(){
-    var box = document.getElementById('youtubeSettingsBody'), status = document.getElementById('youtubeStatus');
-    if(!box || !status) return;
-    box.innerHTML = '';
-    status.classList.remove('on');
-    function line(text, cls){ var d = document.createElement('div'); d.className = cls || 'plex-line'; d.textContent = text; box.appendChild(d); return d; }
-    var key = youTubeKey();
-    if(key && !youTubeKeyBad){
-      status.textContent = 'Connected'; status.classList.add('on');
-      line('Top 100 finds each song\u2019s video with YouTube\u2019s own search.', 'plex-line dim');
-      var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'settings-data-btn settings-wide-btn'; rm.id = 'youtubeKeyRemoveBtn';
-      rm.textContent = 'Remove Key';
-      rm.addEventListener('click', function(){ try{ localStorage.removeItem(YT_KEY_STORE); }catch(e){} youTubeNote = ''; renderYouTubeSettings(); });
-      box.appendChild(rm);
-    } else {
-      status.textContent = key ? 'Key not accepted' : 'Optional';
-      line('Add a free YouTube key so Top 100 can search YouTube for every song\u2019s official video (without one, many aren\u2019t found).', 'plex-line dim');
-      var ol = document.createElement('ol'); ol.className = 'yt-steps';
-      ol.innerHTML = '<li>Open console.cloud.google.com and create a project (any name).</li>'
-        + '<li>APIs &amp; Services \u203A Library: find \u201CYouTube Data API v3\u201D and tap Enable.</li>'
-        + '<li>APIs &amp; Services \u203A Credentials \u203A Create credentials \u203A API key. Copy it.</li>'
-        + '<li>Paste it here and tap Save.</li>';
-      box.appendChild(ol);
-      var inp = document.createElement('input');
-      inp.type = 'text'; inp.className = 'cs-field-input yt-key-input'; inp.id = 'youtubeKeyInput';
-      inp.placeholder = 'API key'; inp.autocomplete = 'off'; inp.spellcheck = false;
-      box.appendChild(inp);
-      var save = document.createElement('button'); save.type = 'button'; save.className = 'settings-data-btn settings-wide-btn'; save.id = 'youtubeKeySaveBtn';
-      save.textContent = 'Save';
-      save.addEventListener('click', function(){
-        var v = inp.value.trim();
-        if(!/^[\w-]{30,60}$/.test(v)){ youTubeNote = 'That doesn\u2019t look like an API key (it starts with \u201CAIza\u201D).'; renderYouTubeSettings(); return; }
-        youTubeNote = 'Checking the key\u2026'; renderYouTubeSettings();
-        // A one-result search proves the key works before it's kept.
-        fetchWithTimeout('https://www.googleapis.com/youtube/v3/search?part=id&type=video&maxResults=1&q=test&key=' + encodeURIComponent(v), {}, 12000)
-          .then(function(res){ return res.json().then(function(d){ return { ok: res.ok, d: d }; }); })
-          .then(function(r){
-            if(!r.ok){
-              var why = (r.d && r.d.error && r.d.error.message) || 'YouTube didn\u2019t accept it';
-              youTubeNote = 'Not saved: ' + why; renderYouTubeSettings(); return;
-            }
-            try{ localStorage.setItem(YT_KEY_STORE, v); }catch(e){}
-            youTubeKeyBad = false;
-            youTubeNote = 'Saved. Songs without a video are looked for again.';
-            renderYouTubeSettings();
-          }, function(){ youTubeNote = 'Couldn\u2019t reach YouTube to check the key. Try again.'; renderYouTubeSettings(); });
-      });
-      box.appendChild(save);
-    }
-    if(youTubeNote) line(youTubeNote, 'plex-note');
-  }
+  var chartVideoStats = { found: 0, none: 0 };
+  try{ localStorage.removeItem('radioPlayerYouTubeKey'); }catch(e){}   // build 217: the key option is gone
   function findChartVideo(item){
     var k = item.songKey || songKeyOf(item.artist, item.name);
     var known = chartVideos[k];
-    var key = youTubeKey();
     if(known && known.id) return Promise.resolve(known);
-    if(known && known.none && Date.now() - known.none < CHART_VIDEO_MISS_MS && (!key || known.api)) return Promise.resolve(null);
+    if(known && known.none && Date.now() - known.none < CHART_VIDEO_MISS_MS) return Promise.resolve(null);
     if(chartVideoPending[k]) return chartVideoPending[k];
-    var apiTried = false;
-    var p = (key ? videoFromYouTubeSearch(item, key).then(function(v){ apiTried = true; return v; }, function(){ return null; }) : Promise.resolve(null))
-      .then(function(v){ return v || videoFromChannels(item); })
-      .then(function(v){ return v || videoFromWikidata(item); }).then(function(v){
+    var p = videoFromChannels(item).then(function(v){ return v || videoFromWikidata(item); }).then(function(v){
       if(v) chartVideoStats.found++; else chartVideoStats.none++;
-      chartVideos[k] = v || { none: Date.now(), api: apiTried };
+      chartVideos[k] = v || { none: Date.now() };
       saveChartVideos();
       delete chartVideoPending[k];
       return v;
@@ -13290,14 +13179,6 @@
     var yt = document.createElement('button'); yt.type = 'button'; yt.textContent = 'Find on YouTube';
     yt.onclick = function(){ try{ window.open(youTubeSearchUrl(item), '_blank'); }catch(e){} };
     row.appendChild(yt);
-    if(!youTubeKey() && /No official video/.test(text)){
-      var k = document.createElement('div'); k.className = 'chart-v-hint';
-      k.textContent = 'A free YouTube key in Settings lets Amplify search YouTube for it.';
-      box.appendChild(k);
-      var add = document.createElement('button'); add.type = 'button'; add.textContent = 'Add Key';
-      add.onclick = function(){ closeYtPlayer(); openSettings(); setTimeout(function(){ var r = document.getElementById('youtubeSettingsRow'); if(r && r.scrollIntoView) r.scrollIntoView({ block: 'center' }); }, 80); };
-      row.appendChild(add);
-    }
     var c = ytCtx && ytCtx.chart;
     if(c && c.items[c.index + 1]){
       var nx = document.createElement('button'); nx.type = 'button'; nx.textContent = 'Next Song';
