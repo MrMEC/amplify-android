@@ -226,7 +226,7 @@
   /* Drawer tabs (build 41), phone only: the desktop sidebar has no close button to sit
      beside and no room problem to solve. The tabs are a segmented pair right-aligned against
      the close button; "Shortcuts" hides the navigation and shows favorites as covers. */
-  .drawer-head, .drawer-shortcuts{ display:none; }
+  .drawer-head, .drawer-shortcuts, .drawer-settings{ display:none; }
   @media (max-width: 900px){
     /* Tabs on the left, the close button on the right (build 42). */
     /* Pinned while the drawer scrolls (build 43). The header takes over the drawer's 16px top
@@ -252,6 +252,21 @@
     .drawer-tab[aria-selected="true"]{ background:color-mix(in srgb, var(--accent) 20%, transparent); color:var(--accent); }
     .sidebar-scroll.shortcuts-on > :not(.drawer-head):not(.drawer-shortcuts){ display:none !important; }
     .sidebar-scroll.shortcuts-on > .drawer-shortcuts{ display:block; }
+    /* Build 226: Settings in the panel. The tabs give way to a back arrow (the same arrow as
+       every other Back, no label) and the title; everything else in the panel steps aside. */
+    .drawer-settings-head{ display:none; align-items:center; gap:6px; min-width:0; }
+    .sidebar-scroll.settings-on .drawer-tabs{ display:none; }
+    .sidebar-scroll.settings-on .drawer-settings-head{ display:flex; }
+    .drawer-back-btn{ width:36px; height:36px; margin-left:-8px; border:0; border-radius:50%; background:none;
+      color:var(--text); font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .drawer-back-btn:active{ background:var(--panel-2); }
+    .drawer-settings-title{ font-size:18px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .sidebar-scroll.settings-on > :not(.drawer-head):not(.drawer-settings){ display:none !important; }
+    .sidebar-scroll.settings-on > .drawer-settings{ display:block; }
+    .drawer-settings #settingsPanel{ width:auto; max-height:none; overflow:visible; padding:0; margin:0;
+      background:none; border:0; border-radius:0; box-shadow:none; }
+    .drawer-settings #settingsPanel .settings-header{ display:none; }
+    .drawer-settings #settingsPanel .settings-header + .settings-row{ border-top:none; padding-top:4px; }
     /* Four covers a row at the narrowest drawer (minmax(0,1fr) so the tracks can shrink);
        cover art only, the name carried as the button's label for screen readers. */
     .drawer-shortcuts-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; }
@@ -1289,7 +1304,9 @@
      the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
      the page colour, so the title, details and Play button sit on plain page colour and read
      in either theme. Logos (channels, stations) sit whole in the middle over their own blur. */
-  .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 44px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
+  /* Build 226: the room under it is padding, not margin, so a tap there belongs to the hero
+     (it goes back to the first slide). */
+  .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 0; padding-bottom:44px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
   /* Build 222: a strip of full-width slides that swipes sideways and snaps one at a time. */
   .nph-track{ display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
     scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain; outline:none; }
@@ -1595,6 +1612,8 @@
   /* The drawer opens over the video page. */
   body.yt-open .sidebar-backdrop{ z-index:3005; }
   body.yt-open .sidebar-scroll{ z-index:3010; }
+  /* Build 226: dialogs Settings opens (accent colour, backup) stay above the panel there too. */
+  body.yt-open .settings-overlay{ z-index:3020; }
   @media (min-width: 901px){ .yt-ov-menu{ display:none; } }
   .yt-ov-stage{ flex:0 0 auto; display:flex; justify-content:center; background:#000; }
   .yt-ov-frame{ position:relative; width:min(100vw, 960px); aspect-ratio:16/9; background:#000; }
@@ -5633,8 +5652,15 @@
         <button type="button" role="tab" class="drawer-tab" id="drawerTabMenu" aria-selected="true">Menu</button>
         <button type="button" role="tab" class="drawer-tab" id="drawerTabShortcuts" aria-selected="false" aria-controls="drawerShortcuts">Shortcuts</button>
       </div>
+      <!-- Build 226: in place of the tabs while Settings is showing in the panel. -->
+      <div class="drawer-settings-head">
+        <button type="button" class="drawer-back-btn" id="drawerSettingsBack" aria-label="Back to the menu" title="Back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+        <span class="drawer-settings-title">Settings</span>
+      </div>
       <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close menu" title="Close menu"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    <!-- Build 226: Settings opens here, in the panel, on a phone (the card moves in). -->
+    <div class="drawer-settings" id="drawerSettings"></div>
     <div class="drawer-shortcuts" id="drawerShortcuts" role="tabpanel" aria-labelledby="drawerTabShortcuts">
       <h3 class="drawer-sub">Favorites</h3>
       <div class="drawer-shortcuts-grid" id="drawerShortcutsGrid"></div>
@@ -8358,8 +8384,38 @@
   }
   if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', renderDiagnostics);
 
-  function openSettings(){ if(typeof renderPlexSettings === 'function') renderPlexSettings(); settingsOverlay.classList.add('open'); }
-  function closeSettings(){ settingsOverlay.classList.remove('open'); }
+  // Build 226: on a phone Settings opens inside the menu panel (the card itself moves in, so
+  // everything wired to it keeps working); on a wider screen it is still the dialog.
+  var settingsPanelEl = document.getElementById('settingsPanel');
+  var drawerSettingsHost = document.getElementById('drawerSettings');
+  function settingsInDrawer(){ return !!sidebarScroll && sidebarScroll.classList.contains('settings-on'); }
+  function openSettings(){
+    if(typeof renderPlexSettings === 'function') renderPlexSettings();
+    if(isMobileLayout() && drawerSettingsHost){
+      if(settingsPanelEl.parentNode !== drawerSettingsHost) drawerSettingsHost.appendChild(settingsPanelEl);
+      settingsOverlay.classList.remove('open');
+      sidebarScroll.classList.add('settings-on');
+      sidebarScroll.scrollTop = 0;
+      if(!sidebarScroll.classList.contains('open')) openDrawer();
+      return;
+    }
+    if(settingsPanelEl.parentNode !== settingsOverlay) settingsOverlay.appendChild(settingsPanelEl);
+    sidebarScroll.classList.remove('settings-on');
+    settingsOverlay.classList.add('open');
+  }
+  // Back from Settings to the menu, the panel staying open.
+  function showDrawerMenu(){
+    sidebarScroll.classList.remove('settings-on');
+    sidebarScroll.scrollTop = 0;
+    var dh = document.querySelector('.drawer-head');
+    if(dh) dh.classList.remove('scrolled');
+  }
+  // Settings closed for good (Escape, a dialog it opened): the panel closes too.
+  function closeSettings(){
+    settingsOverlay.classList.remove('open');
+    if(settingsInDrawer()) closeDrawer();
+  }
+  document.getElementById('drawerSettingsBack').addEventListener('click', showDrawerMenu);
   settingsFab.addEventListener('click', openSettings);
   settingsCloseBtn.addEventListener('click', closeSettings);
   settingsOverlay.addEventListener('click', function(e){
@@ -8469,6 +8525,10 @@
     hamburgerBtn.setAttribute('aria-expanded', 'true');
   }
   function closeDrawer(){
+    // Settings gives way to the menu once the panel has slid away, so it opens on the menu.
+    if(sidebarScroll.classList.contains('settings-on')){
+      setTimeout(function(){ if(!sidebarScroll.classList.contains('open')) showDrawerMenu(); }, 350);
+    }
     sidebarScroll.classList.remove('open');
     sidebarBackdrop.classList.remove('open');
     document.body.classList.remove('drawer-open');
@@ -32192,7 +32252,8 @@
   syncPlayerBarHeight();
 
   document.getElementById('drawerSettingsBtn').addEventListener('click', function(){
-    closeDrawer();
+    // Build 226: the panel stays open and shows Settings (a dialog on wider screens).
+    if(!isMobileLayout()) closeDrawer();
     openSettings();
   });
 
@@ -33989,6 +34050,12 @@
     if(isChartSong(item)){ openChartSong([item], 0, 'Top 100', slide.querySelector('.nph-art')); return; }
     startNpTarget(item);
   }
+  // Build 226: a tap in the space under the slides (the progress bar and the gap down to the
+  // next heading) goes back to the first slide.
+  if(npHero) npHero.addEventListener('click', function(e){
+    if(npHeroTrack && npHeroTrack.contains(e.target)) return;
+    if(heroIndex() !== 0) heroScrollTo(0, true);
+  });
   if(npHeroTrack){
     var heroScrollRaf = 0;
     npHeroTrack.addEventListener('scroll', function(){

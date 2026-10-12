@@ -1,4 +1,4 @@
-"""Builds 220-225: the Home hero (225: removals from Continue Listening/Watching leave the slides; Top 100 plays recorded) (222: swipeable through the last 50 played; 223: progress bar, station tap plays, last song line, opened files) follows playback (artist portrait + bio for a library song with a
+"""Builds 220-226: the Home hero (226: a tap under the slides goes back to the first; Settings in the menu panel) (225: removals from Continue Listening/Watching leave the slides; Top 100 plays recorded) (222: swipeable through the last 50 played; 223: progress bar, station tap plays, last song line, opened files) follows playback (artist portrait + bio for a library song with a
 shuffle Play and a tap to the artist page; a channel logo; a podcast or video cover with details).
 (Harness from build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos rows on Home, under Top 100.
 Each mix row shows 20 songs and its heading opens the whole list; Daily Mix features one of the most
@@ -20,7 +20,12 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         " play: function(name){ __h.stub(); var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; playTrackInList([t], t, 'Test'); },"
         " fake: function(st){ __h.stub(); audio.play(); currentStation = st; noteHeroPlayed(st); updatePlayerMeta(st, ''); setPlayingUI(true); },"
         " playing: function(v){ setPlayingUI(v); },"
-        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroProgress').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
+        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gapBelow: function(){ var b = document.getElementById('npHeroProgress').getBoundingClientRect(), h = document.getElementById('npHero').getBoundingClientRect(); var n = document.getElementById('npHero').nextElementSibling; while(n && (getComputedStyle(n).display === 'none' || !n.getBoundingClientRect().height)) n = n.nextElementSibling; var hd = n.querySelector('h2') || n; return { bar: Math.round(b.bottom), heroBottom: Math.round(h.bottom), head: Math.round(hd.getBoundingClientRect().top) }; },"
+        " drawer: function(){ var sc = document.querySelector('.sidebar-scroll'); var sp = document.getElementById('settingsPanel'); var back = document.getElementById('drawerSettingsBack'); var tabs = document.querySelector('.drawer-tabs');"
+        "   return { open: sc.classList.contains('open'), settings: sc.classList.contains('settings-on'), inDrawer: !!sp.closest('#drawerSettings'), overlay: document.getElementById('settingsOverlay').classList.contains('open'),"
+        "     backShown: back.offsetParent !== null, tabsShown: tabs.offsetParent !== null, themeShown: document.getElementById('themeSwitch').offsetParent !== null, menuShown: document.getElementById('homeHeading').offsetParent !== null,"
+        "     backTop: Math.round(back.getBoundingClientRect().top), theme: document.documentElement.getAttribute('data-theme') }; },"
+        " gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroProgress').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
         " titles: function(){ return heroSlides.map(function(x){ return x.querySelector('.nph-title').textContent; }); },"
         " rmRecent: function(name){ var r = recentStations.filter(function(x){ return x.name === name; })[0]; removeFromRecent(r || { name: name, url: 'https://radio.example/kiss', urlToResolve: 'https://radio.example/kiss', stationuuid: 'kiss-1' }); },"
         " rmChannel: function(url){ removeFromContinueWatching({ kind: 'channel', ch: { url: url } }); },"
@@ -194,7 +199,8 @@ async def run(theme, b):
     check('portrait.jpg' in h['img'], f'[{theme}] and the song\'s own cover (build 221) {h["img"][:60]}')
     check(h['imgW'] == h['vw'] and h['imgTop'] == 0 and h['objPos'].endswith('0%'), f'[{theme}] the cover runs full width from the top {h["imgW"]} {h["imgTop"]} {h["objPos"]}')
     check(h['mediaH'] <= 330, f'[{theme}] half the old height ({h["mediaH"]}px; was {round(min(412 * 1.12, 500))})')
-    check(h['gap'] is not None and h['gap'] >= 40, f'[{theme}] with room below it ({h["gap"]}px)')
+    gb = await pg.evaluate('__h.gapBelow()')
+    check(gb['head'] - gb['bar'] >= 40 and gb['heroBottom'] >= gb['head'] - 30, f'[{theme}] with room below it, the room part of the hero {gb}')
     check(h['headFs'] == 19 and h['titleFs'] >= 32, f'[{theme}] Home headings are smaller ({h["headFs"]}px) than the hero title ({h["titleFs"]}px)')
     check(h['playRight'] > h['vw'] - 60 and h['bottom'] - h['playBottom'] < 40, f'[{theme}] the Play button sits at the bottom right')
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
@@ -255,6 +261,11 @@ async def run(theme, b):
     check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and abs((await pg.evaluate('__h.bar()'))['fill'] - 3 / n) < .02,
           f'[{theme}] swiping shows the next one, picture and all {h["title"]}')
     await pg.screenshot(path=f'{shots}/hero-swipe-{theme}.png')
+    # build 226: a tap in the space under the slides goes back to the first slide
+    gb = await pg.evaluate('__h.gapBelow()')
+    await pg.mouse.click(200, (gb['bar'] + gb['head']) / 2); await pg.wait_for_timeout(900)
+    check(await pg.evaluate('__h.idx()') == 0, f'[{theme}] a tap in the gap under the carousel goes back to the first slide')
+    await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(600)
     gaps = await pg.evaluate("__h.gaps()")
     check(max(gaps) - min(gaps) <= 2 and max(gaps) < 40, f'[{theme}] every slide\'s Play button sits the same short way above the bar {gaps}')
     # a drag (mouse) pages one slide on
@@ -341,6 +352,27 @@ async def run(theme, b):
     await pg.evaluate("__h.rmRecent('Golden Hour')"); await pg.wait_for_timeout(300)
     check('Golden Hour' not in await pg.evaluate('__h.recents()') and (await pg.evaluate('__h.titles()')).count('Golden Hour') <= 1,
           f'[{theme}] removing the preview from Continue Listening leaves only the now-playing slide')
+    # build 226: Settings opens in the menu panel, with a back arrow where the tabs are
+    await pg.evaluate("window.scrollTo(0,0)")
+    await pg.evaluate("document.getElementById('hamburgerBtn') ? document.getElementById('hamburgerBtn').click() : document.querySelector('.hamburger-btn').click()"); await pg.wait_for_timeout(500)
+    d0 = await pg.evaluate('__h.drawer()')
+    await pg.evaluate("document.getElementById('drawerSettingsBtn').click()"); await pg.wait_for_timeout(500)
+    d = await pg.evaluate('__h.drawer()'); print(d)
+    check(d['open'] and d['settings'] and d['inDrawer'] and not d['overlay'], f'[{theme}] Settings opens inside the menu panel, which stays open (no dialog)')
+    check(d['backShown'] and not d['tabsShown'] and d['themeShown'] and not d['menuShown'], f'[{theme}] the tabs give way to a back arrow; the menu gives way to Settings')
+    check(abs(d['backTop'] - d0['backTop']) <= 40 or d['backTop'] < 80, f'[{theme}] the back arrow sits where the tabs are ({d["backTop"]})')
+    await pg.screenshot(path=f'{shots}/drawer-settings-{theme}.png')
+    other = 'light' if theme == 'dark' else 'dark'
+    await pg.evaluate(f"document.querySelector('[data-theme-opt=\"{other}\"]').click()"); await pg.wait_for_timeout(400)
+    check((await pg.evaluate('__h.drawer()'))['theme'] == other, f'[{theme}] Settings work from the panel (theme switched to {other})')
+    await pg.evaluate(f"document.querySelector('[data-theme-opt=\"{theme}\"]').click()"); await pg.wait_for_timeout(300)
+    await pg.evaluate("document.getElementById('drawerSettingsBack').click()"); await pg.wait_for_timeout(400)
+    d = await pg.evaluate('__h.drawer()')
+    check(d['open'] and not d['settings'] and d['tabsShown'] and d['menuShown'], f'[{theme}] the back arrow returns to the menu, the panel still open')
+    await pg.evaluate("document.getElementById('drawerSettingsBtn').click()"); await pg.wait_for_timeout(300)
+    await pg.keyboard.press('Escape'); await pg.wait_for_timeout(700)
+    d = await pg.evaluate('__h.drawer()')
+    check(not d['open'] and not d['settings'], f'[{theme}] closing the panel from Settings, it reopens on the menu')
     # bigger text at 360 wide still fits
     await pg.set_viewport_size({'width': 360, 'height': 800})
     await pg.evaluate(f"__h.meta('Prince', {json.dumps(BIO)})")

@@ -354,7 +354,14 @@ async def main():
         await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[0].click()"); await pg.wait_for_timeout(500)
         await pg.evaluate("document.getElementById('ytMenuBtn').click()"); await pg.wait_for_timeout(400)
         await pg.evaluate("document.getElementById('drawerSettingsBtn').click()"); await pg.wait_for_timeout(600)
-        check(await pg.evaluate("!document.getElementById('ytOverlay').classList.contains('open') && !document.body.classList.contains('drawer-open')"), 'choosing Settings from the menu closes the video page')
+        # Build 226: Settings opens inside the menu panel, so nothing is left: the panel stays open
+        # (showing Settings) over the video page, and closing the panel returns to the video.
+        check(await pg.evaluate("document.getElementById('ytOverlay').classList.contains('open') && document.body.classList.contains('drawer-open') && document.querySelector('.sidebar-scroll').classList.contains('settings-on')"), 'choosing Settings from the menu shows Settings in the panel over the video')
+        await pg.evaluate("document.getElementById('drawerCloseBtn').click()"); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("document.getElementById('ytOverlay').classList.contains('open') && !document.body.classList.contains('drawer-open')"), 'closing the panel leaves the video page as it was')
+        await pg.evaluate("document.getElementById('ytMenuBtn').click()"); await pg.wait_for_timeout(400)
+        await pg.evaluate("document.getElementById('homeHeading').click()"); await pg.wait_for_timeout(600)
+        check(await pg.evaluate("!document.getElementById('ytOverlay').classList.contains('open') && !document.body.classList.contains('drawer-open')"), 'choosing a page from the menu still closes the video page')
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
         await pg.evaluate("(()=>{ var b = document.querySelector('.settings-overlay.open .settings-close, #settingsCloseBtn'); if(b) b.click(); })()"); await pg.wait_for_timeout(400)
 
