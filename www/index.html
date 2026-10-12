@@ -8199,6 +8199,11 @@
         line('Settings storage', lsOk ? 'working' : 'not persisting', !lsOk) +
         line('File storage (database)', dbDown ? 'unavailable' : 'working', dbDown) +
         line('Other Amplify tabs open', anotherInstanceOpen() ? 'yes' : 'no', anotherInstanceOpen()) +
+        (typeof songArtStats !== 'undefined' ? line('Top 100 covers this session',
+          'library ' + songArtStats.library + ', Deezer ' + songArtStats.deezer + ', Apple ' + songArtStats.itunes
+          + ', MusicBrainz ' + songArtStats.musicbrainz + ', none ' + songArtStats.none
+          + ', saved ' + Object.keys(songArt).length + ', waiting ' + songArtQueue.length
+          + (songArtStats.last ? ' (last problem: ' + escapeHtml(songArtStats.last) + ')' : '')) : '') +
         (dbDown && (libraryBlockedByTab || anotherInstanceOpen())
           ? '<div><b class="diag-bad">Another Amplify tab is holding the database.</b> '
             + 'Close every other Amplify tab or window, including older copies of the file. '
@@ -12692,15 +12697,25 @@
     try{ window.scrollTo(0, 0); }catch(e){}
   }
 
-  // ---------- covers ----------
-  var SONG_ART_KEY = 'songArt';               // lsGet: { songKey: url | '' }
-  var SONG_ART_MAX = 3000;
+  // ---------- covers (build 214) ----------
+  // Every chart row asks for its cover as soon as the chart is drawn; the rows on screen go
+  // first. In order: the song in your own library (its picture, no network), then Deezer's
+  // public search, Apple's iTunes search, and MusicBrainz's Cover Art Archive. Each service is
+  // paced under its own limit (Deezer ~8 a second, Apple one every 3.5 seconds, MusicBrainz one a
+  // second), so none refuses or locks the app out. A service that's busy or unreachable passes
+  // the song to the next; one that answers "no such song" too. Found covers and songs with none
+  // anywhere are remembered (the misses for a week). Tallies: Settings > Check storage.
+  var SONG_ART_KEY = 'songArt';               // lsGet: { songKey: url | '' (none, with songArtNone time) }
+  var SONG_ART_NONE_KEY = 'songArtNone';      // lsGet: { songKey: ts }
+  var SONG_ART_NONE_MS = 7 * 24 * 60 * 60 * 1000;
+  var SONG_ART_MAX = 4000;
   var songArt = lsGet(SONG_ART_KEY) || {};
+  var songArtNone = lsGet(SONG_ART_NONE_KEY) || {};
+  var songArtLocal = {};                      // songKey -> blob url from the library (this session)
   var songArtWaiting = {};                    // songKey -> [callbacks]
-  var songArtQueue = [], songArtBusy = 0, SONG_ART_PARALLEL = 3;
-  var songArtMiss = {};                       // songKey -> true: no cover anywhere (this session)
-  var songArtTries = {};                      // songKey -> failed attempts (network, busy service)
-  var SONG_ART_RETRIES = 4;
+  var songArtQueue = [];                      // [{ item, el }]
+  var songArtBusy = 0, SONG_ART_PARALLEL = 4;
+  var songArtStats = { library: 0, deezer: 0, itunes: 0, musicbrainz: 0, none: 0, errors: {}, last: '' };
   var songArtSaveTimer = null;
   function saveSongArtSoon(){
     if(songArtSaveTimer) return;
@@ -12709,62 +12724,148 @@
       var keys = Object.keys(songArt);
       if(keys.length > SONG_ART_MAX) keys.slice(0, keys.length - SONG_ART_MAX).forEach(function(k){ delete songArt[k]; });
       lsPut(SONG_ART_KEY, songArt);
+      lsPut(SONG_ART_NONE_KEY, songArtNone);
     }, 1500);
   }
-  var songArtObserver = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries){
-    entries.forEach(function(en){
-      if(!en.isIntersecting) return;
-      songArtObserver.unobserve(en.target);
-      var job = en.target._songArtJob;
-      en.target._songArtJob = null;
-      if(job) requestSongArt(job.item, job.done);
-    });
-  }, { rootMargin: '200px 200px' }) : null;
-  // Paints the cover now if it's known; otherwise asks for it once the box is on screen.
+  function songArtKnown(k){
+    if(songArtLocal[k]) return songArtLocal[k];
+    if(songArt[k]) return songArt[k];
+    return null;
+  }
+  function songArtIsNone(k){ return !!songArtNone[k] && Date.now() - songArtNone[k] < SONG_ART_NONE_MS; }
   // paintNow: a cover already known, painted while the box is being built (it may not be on the
   // page yet); paintLater: one that arrives later, painted only if the box is still showing it.
   function songArtInto(container, item, paintNow, paintLater){
     var k = item.songKey || songKeyOf(item.artist, item.name);
-    if(songArt[k] !== undefined){ if(songArt[k]) paintNow(songArt[k]); return; }
+    if(songArtLocal[k]){ paintNow(songArtLocal[k]); return; }
+    // In your library: its own cover comes first, even over one found online before.
+    if(libraryTrackForSong(item)){
+      Promise.resolve(librarySongArt(item)).then(function(u){
+        if(u){ songArtLocal[k] = u; songArtStats.library++; paintLater(u); }
+        else if(songArt[k]) paintLater(songArt[k]);
+        else requestSongArt(item, paintLater, container);
+      });
+      return;
+    }
+    var known = songArtKnown(k);
+    if(known){ paintNow(known); return; }
     if(item.favicon){ paintNow(item.favicon); return; }
-    if(!songArtObserver){ requestSongArt(item, paintLater); return; }
-    container._songArtJob = { item: item, done: paintLater };
-    songArtObserver.observe(container);
+    if(songArtIsNone(k)) return;
+    requestSongArt(item, paintLater, container);
   }
-  function requestSongArt(item, done){
+  function requestSongArt(item, done, el){
     var k = item.songKey || songKeyOf(item.artist, item.name);
-    if(songArt[k] !== undefined){ if(songArt[k]) done(songArt[k]); return; }
-    if(songArtMiss[k]) return;
-    if(songArtWaiting[k]){ songArtWaiting[k].push(done); return; }
+    var known = songArtKnown(k);
+    if(known){ done(known); return; }
+    if(songArtWaiting[k]){ songArtWaiting[k].push(done); songArtQueue.forEach(function(j){ if(j.k === k && el) j.el = el; }); return; }
     songArtWaiting[k] = [done];
-    songArtQueue.push(item);
-    pumpSongArt();
+    songArtQueue.push({ item: item, el: el || null, k: k });
+    pumpSongArtSoon();
+  }
+  var songArtPumpTimer = null;
+  function pumpSongArtSoon(){
+    if(songArtPumpTimer) return;
+    // After the rows are on the page, so "on screen" can be told.
+    songArtPumpTimer = setTimeout(function(){ songArtPumpTimer = null; pumpSongArt(); }, 30);
+  }
+  function onScreen(el){
+    if(!el || !el.isConnected) return false;
+    var r = el.getBoundingClientRect();
+    return r.bottom > -100 && r.top < (window.innerHeight || 800) + 100 && r.right > -100 && r.left < (window.innerWidth || 400) + 100 && r.width > 0;
+  }
+  function nextSongArtJob(){
+    var i, best = -1;
+    for(i = 0; i < songArtQueue.length; i++){ if(onScreen(songArtQueue[i].el)){ best = i; break; } }
+    if(best < 0) for(i = 0; i < songArtQueue.length; i++){ if(songArtQueue[i].el && songArtQueue[i].el.isConnected){ best = i; break; } }
+    if(best < 0) best = 0;
+    return songArtQueue.splice(best, 1)[0];
   }
   function pumpSongArt(){
     while(songArtBusy < SONG_ART_PARALLEL && songArtQueue.length){
-      var item = songArtQueue.shift();
+      var job = nextSongArtJob();
       songArtBusy++;
-      (function(item){
-        var k = item.songKey || songKeyOf(item.artist, item.name);
-        lookUpSongArt(item).then(function(url){ finish(url); }, function(){
-          // Couldn't ask (offline, or the services busy): tried again shortly, a few times.
+      (function(job){
+        var k = job.k;
+        findSongArt(job.item).then(function(r){
           songArtBusy--;
-          var n = songArtTries[k] = (songArtTries[k] || 0) + 1;
-          if(n < SONG_ART_RETRIES) setTimeout(function(){ songArtQueue.push(item); pumpSongArt(); }, 4000 * n);
-          else delete songArtWaiting[k];
-          pumpSongArt();
-        });
-        function finish(url){
-          songArtBusy--;
-          if(url){ songArt[k] = url; saveSongArtSoon(); }
-          else songArtMiss[k] = true;
+          var url = r && r.url;
+          if(url){
+            if(r.src === 'library') songArtLocal[k] = url;
+            else { songArt[k] = url; delete songArtNone[k]; saveSongArtSoon(); }
+            songArtStats[r.src] = (songArtStats[r.src] || 0) + 1;
+          } else if(r && r.error){
+            // A service couldn't be asked: not "no cover", just not yet. Again in a little while.
+            var n = job.tries = (job.tries || 0) + 1;
+            if(n < 4){ setTimeout(function(){ songArtQueue.push(job); pumpSongArt(); }, 15000 * n); pumpSongArt(); return; }
+          } else {
+            songArtNone[k] = Date.now(); saveSongArtSoon();
+            songArtStats.none++;
+          }
           var cbs = songArtWaiting[k] || [];
           delete songArtWaiting[k];
           if(url) cbs.forEach(function(cb){ try{ cb(url); }catch(e){} });
           pumpSongArt();
-        }
-      })(item);
+        });
+      })(job);
     }
+    // (Rows scrolled onto the screen meanwhile go next: nextSongArtJob picks on-screen ones first.)
+  }
+  // Each service in turn. Resolves { src, url } or null (none of them has it); never rejects.
+  function findSongArt(item){
+    var hadError = false;
+    var steps = [
+      ['library', librarySongArt],
+      ['deezer', deezerSongArt],
+      ['itunes', itunesSongArt],
+      ['musicbrainz', musicbrainzSongArt]
+    ];
+    return (function next(i){
+      if(i >= steps.length) return Promise.resolve(hadError ? { error: true } : null);
+      return Promise.resolve().then(function(){ return steps[i][1](item); }).then(function(url){
+        return url ? { src: steps[i][0], url: url } : next(i + 1);
+      }, function(e){
+        var name = steps[i][0];
+        hadError = true;
+        songArtStats.errors[name] = (songArtStats.errors[name] || 0) + 1;
+        songArtStats.last = name + ': ' + ((e && e.message) || e);
+        return next(i + 1);
+      });
+    })(0);
+  }
+  // ---- pacing: each service gets its own line, spaced under its limit
+  function pacer(gapMs){
+    var nextAt = 0;
+    return function(fn){
+      var now = Date.now(), at = Math.max(now, nextAt);
+      nextAt = at + gapMs;
+      return new Promise(function(r){ setTimeout(r, at - now); }).then(fn);
+    };
+  }
+  var deezerPace = pacer(130), itunesPace = pacer(3500);
+  var deezerPausedUntil = 0;
+  // ---- your library
+  var libSongIndex = null, libSongIndexFor = -1;
+  function libraryTrackForSong(item){
+    var tracks = (typeof libraryTracks !== 'undefined' && libraryTracks) || [];
+    if(!tracks.length) return null;
+    if(libSongIndexFor !== tracks.length){
+      libSongIndex = {};
+      tracks.forEach(function(t){
+        if(!t || !t.name) return;
+        var title = normTitle(plainTitle(t.name));
+        [t.artist, mainArtistOf(t.artist || '')].forEach(function(a){ if(a) libSongIndex[normTitle(a) + '|' + title] = libSongIndex[normTitle(a) + '|' + title] || t; });
+      });
+      libSongIndexFor = tracks.length;
+    }
+    var title = normTitle(plainTitle(item.name));
+    return libSongIndex[normTitle(item.artist) + '|' + title] || libSongIndex[normTitle(mainArtistOf(item.artist)) + '|' + title] || null;
+  }
+  function librarySongArt(item){
+    var t = libraryTrackForSong(item);
+    if(!t) return null;
+    var custom = customArtFor(t);
+    if(custom) return custom;
+    return Promise.resolve(localArtUrl(t)).then(function(u){ return u || albumMateArtUrl(t); })['catch'](function(){ return null; });
   }
   function mainArtistOf(artist){
     return String(artist || '').split(/\s+(?:featuring|feat\.?|ft\.?|with|x|&|and|\+|,)\s+|,\s*|\s*\/\s*/i)[0].trim();
@@ -12772,15 +12873,6 @@
   function looseMatch(a, b){
     var x = songKeyOf('', a).slice(1), y = songKeyOf('', b).slice(1);
     return !!x && !!y && (x === y || x.indexOf(y) === 0 || y.indexOf(x) === 0);
-  }
-  // Build 213: Deezer's public search first (no key; about 50 asks per 5 seconds, so a whole
-  // chart's covers come at once), then Apple's iTunes search (about 20 a minute, which ran out
-  // after Home's 20 covers). Resolves to a picture, null when neither has one, or rejects when
-  // neither could be asked (then it's tried again).
-  function lookUpSongArt(item){
-    return deezerSongArt(item).then(function(url){
-      return url || itunesSongArt(item)['catch'](function(){ return null; });
-    }, function(){ return itunesSongArt(item); });
   }
   // The best result for a chart song: same artist; the exact title ahead of one that merely starts
   // with it; never a live, remixed, acoustic, sped-up or karaoke version when the original is there.
@@ -12802,22 +12894,50 @@
   function deezerSongArt(item){
     var main = mainArtistOf(item.artist);
     var q = 'artist:"' + main.replace(/"/g, '') + '" track:"' + plainTitle(item.name).replace(/"/g, '') + '"';
-    return ytFetchText('https://api.deezer.com/search?limit=10&q=' + encodeURIComponent(q)).then(function(t){
-      if(t == null) throw new Error('deezer unreachable');
-      var d = JSON.parse(t);
-      if(d && d.error) throw new Error('deezer busy');
+    var url = 'https://api.deezer.com/search?limit=10&q=' + encodeURIComponent(q);
+    function ask(){
+      // While Deezer rests (it said it was busy), wait for the rest to end rather than skip it.
+      var wait = Math.max(0, deezerPausedUntil - Date.now());
+      return new Promise(function(r){ setTimeout(r, wait); }).then(function(){ return deezerPace(function(){ return ytFetchText(url); }); }).then(function(t){
+        if(t == null) throw new Error('unreachable');
+        var d = JSON.parse(t);
+        if(d && d.error) throw new Error('busy (' + (d.error.code || d.error.message || '') + ')');
+        return d;
+      });
+    }
+    // Busy: a short rest and one more try before handing over to the next service.
+    return ask()['catch'](function(e){
+      if(!/busy/.test(e.message)) throw e;
+      deezerPausedUntil = Date.now() + 5500;
+      return new Promise(function(r){ setTimeout(r, 5600); }).then(ask);
+    }).then(function(d){
       var best = bestSongMatch((d && d.data) || [], item, function(r){ return r.title; }, function(r){ return r.artist && r.artist.name; });
       var al = best && best.album;
       return al ? (al.cover_big || al.cover_xl || al.cover_medium || null) : null;
     });
   }
   function itunesSongArt(item){
-    var term = mainArtistOf(item.artist) + ' ' + item.name;
+    var term = mainArtistOf(item.artist) + ' ' + plainTitle(item.name);
     var url = ITUNES_BASE + '/search?media=music&entity=song&limit=8&country=US&term=' + encodeURIComponent(term);
-    return itunesJsonp(url, 12000, { background: true }).then(function(d){
+    return itunesPace(function(){ return itunesJsonpNow(url, 12000); }).then(function(d){
       var best = bestSongMatch((d && d.results) || [], item, function(r){ return r.trackName; }, function(r){ return r.artistName; });
       var art = best && best.artworkUrl100;
       return art ? art.replace(/\/\d+x\d+bb\./, '/600x600bb.') : null;
+    });
+  }
+  // MusicBrainz (paced by mbGet, one a second): the song's single or album, and its front cover
+  // from the Cover Art Archive. Good for older hits the others miss.
+  function musicbrainzSongArt(item){
+    var q = 'releasegroup:' + luceneQuote(plainTitle(item.name)) + ' AND artist:' + luceneQuote(mainArtistOf(item.artist));
+    return mbGet('release-group/?limit=8&query=' + encodeURIComponent(q)).then(function(d){
+      var groups = ((d && d['release-groups']) || []).filter(function(g){ return (g.score || 0) >= 85 && normTitle(plainTitle(g.title)) === normTitle(plainTitle(item.name)); });
+      groups.sort(function(a, b){ return (a['primary-type'] === 'Single' ? 0 : 1) - (b['primary-type'] === 'Single' ? 0 : 1); });
+      if(!groups.length) return null;
+      var id = groups[0].id;
+      // The archive answers a missing cover with 404; checked first so a dead picture isn't kept.
+      return fetchWithTimeout(CAA_BASE + 'release-group/' + id, {}, 10000).then(function(res){
+        return res && res.ok ? CAA_BASE + 'release-group/' + id + '/front-500' : null;
+      }, function(){ return CAA_BASE + 'release-group/' + id + '/front-500'; });
     });
   }
 

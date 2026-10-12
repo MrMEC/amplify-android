@@ -62,7 +62,10 @@ MOCK = r"""(function(){
       __nat.deezer.push(o.url);
       var q = decodeURIComponent((/[?&]q=([^&]*)/.exec(o.url) || [])[1] || '');
       var m = /Song (\d+)|Patient Zero/.exec(q), n = m && m[1] ? +m[1] : 1;
+      var now = Date.now(); __nat.dzTimes = (__nat.dzTimes || []).filter(function(t){ return now - t < 5000; }); __nat.dzTimes.push(now);
+      if(__nat.dzTimes.length > 50){ __nat.dzQuota = (__nat.dzQuota || 0) + 1; return Promise.resolve({ text: JSON.stringify({ error: { type: 'Exception', message: 'Quota limit exceeded', code: 4 } }) }); }
       if(n === 50 && !__nat.failed50){ __nat.failed50 = true; return Promise.resolve({ text: JSON.stringify({ error: { type: 'Exception', message: 'Quota limit exceeded', code: 4 } }) }); }
+      if(n === 7 || n === 11) return Promise.resolve({ text: JSON.stringify({ data: [] }) });
       var title = n === 1 ? 'Patient Zero' : 'Song ' + String(n).padStart(3, '0');
       var artist = ['Taylor Swift', 'Ella Langley', 'Morgan Wallen', 'Sabrina Carpenter', 'Alex Warren'][(n - 1) % 5];
       return Promise.resolve({ text: JSON.stringify({ data: [{ title: title + ' (Live)', artist: { name: artist }, album: { cover_big: 'https://art.example/999/500.jpg' } },
@@ -89,7 +92,7 @@ def check(c, m):
 
 async def run(theme, b):
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, locale='en-US')
-    counts = {'itunes': 0, 'wiki': [], 'embeds': [], 'charts': []}
+    counts = {'itunes': 0, 'mb': 0, 'wiki': [], 'embeds': [], 'charts': []}
     async def route(r):
         u = r.request.url
         p = urlparse(u)
@@ -113,11 +116,20 @@ async def run(theme, b):
             n = int(m.group(1)) if m and m.group(1) else 1
             title = 'Patient Zero' if n == 1 else f'Song {n:03d}'
             artist = ARTISTS[(n - 1) % 5].split(' Featuring ')[0]
-            res = {'resultCount': 1, 'results': [{'trackName': title, 'artistName': artist, 'artworkUrl100': f'https://art.example/{n}/100x100bb.jpg'}]}
+            res = {'resultCount': 1, 'results': [{'trackName': title, 'artistName': artist, 'artworkUrl100': f'https://art.example/{n}/100x100bb.jpg'}]} if n == 7 else {'resultCount': 0, 'results': []}
             return await r.fulfill(status=200, content_type='text/javascript', body=f'{cb}({json.dumps(res)});')
         if p.netloc == 'art.example':
             n = int(p.path.split('/')[1])
             return await r.fulfill(status=200, content_type='image/svg+xml', body=art_svg(n))
+        if p.netloc == 'musicbrainz.org':
+            counts['mb'] += 1
+            q = parse_qs(p.query).get('query', [''])[0]
+            groups = [{'id': 'rg-011', 'title': 'Song 011', 'score': 100, 'primary-type': 'Single'}] if 'Song 011' in q else []
+            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps({'release-groups': groups}))
+        if p.netloc == 'coverartarchive.org':
+            if p.path.endswith('/front-500'):
+                return await r.fulfill(status=200, content_type='image/svg+xml', body=art_svg(11))
+            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body='{"images":[{"front":true}]}')
         if p.netloc == 'www.wikidata.org':
             q = parse_qs(p.query); act = q.get('action', [''])[0]
             counts['wiki'].append(u)
@@ -163,8 +175,12 @@ async def run(theme, b):
     check(len(imgs) >= 2 and all(u.endswith('/500.jpg') and '/999/' not in u for u in imgs), f'{theme}: covers come from Deezer (the studio version, not a live one) {imgs[:2]}')
     await el.screenshot(path=f'{OUT}/top100-home-{theme}.png')
 
+    # ---- a chart song that's in the library: its own cover
+    await pg.evaluate("""__h.ev("libraryTracks.push({ type: 'local', localId: 'lib-song-009', name: 'Song 009', artist: 'Sabrina Carpenter', album: '' }); setCustomArtUrl('lib-song-009', 'https://art.example/9/library.jpg')")""")
     # ---- the page
-    await pg.evaluate("document.getElementById('top100Heading').click()"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("document.getElementById('top100Heading').click()"); await pg.wait_for_timeout(1500)
+    quick = await pg.evaluate("[...document.querySelectorAll('.chart-row')].slice(0, 7).map(r => { const i = r.querySelector('.tile-art img'); return !i ? 0 : (i.src.indexOf('coverartarchive') >= 0 ? 11 : +i.src.split('/')[3]); })")
+    check(quick == [1, 2, 3, 4, 5, 6, 7], f'{theme}: the rows on screen get their covers within a moment {quick}')
     page = await pg.evaluate("""(()=>({ head: document.getElementById('stationsHeading').textContent,
       week: (()=>{ const x = document.querySelector('.chart-week-label'); const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })(), rows: document.querySelectorAll('.chart-row').length,
       prev: document.querySelectorAll('.chart-week-btn')[0].disabled, next: document.querySelectorAll('.chart-week-btn')[1].disabled,
@@ -191,11 +207,17 @@ async def run(theme, b):
     await pg.screenshot(path=f'{OUT}/top100-page-{theme}.png')
     for y in range(0, 9000, 600):
         await pg.evaluate(f"window.scrollTo(0, {y})"); await pg.wait_for_timeout(250)
-    await pg.wait_for_timeout(9000)   # Song 050's first ask failed: asked again a few seconds later
-    allp = await pg.evaluate("[...document.querySelectorAll('.chart-row')].map(r => { const i = r.querySelector('.tile-art img'); return i ? +i.src.split('/')[3] : 0; })")
+    await pg.wait_for_timeout(12000)   # Song 050's first ask was refused: Deezer rests 5.6s and asks again
+    allp = await pg.evaluate("[...document.querySelectorAll('.chart-row')].map(r => { const i = r.querySelector('.tile-art img'); return !i ? 0 : (i.src.indexOf('coverartarchive') >= 0 ? 11 : +i.src.split('/')[3]); })")
     missing = [i + 1 for i, v in enumerate(allp) if v != i + 1]
     check(not missing, f'{theme}: all 100 rows get their covers, past the first 20 (one that failed is asked again) missing={missing[:8]}')
-    check(counts['itunes'] <= 1, f'{theme}: Apple\'s search (about 20 a minute) only as a fallback, once, when Deezer was busy ({counts["itunes"]} asks)')
+    lib9 = await pg.evaluate("document.querySelectorAll('.chart-row')[8].querySelector('.tile-art img').src")
+    check(lib9.endswith('/9/library.jpg'), f'{theme}: a chart song in the library shows the library\'s cover ({lib9})')
+    check(counts['itunes'] == 2 and counts['mb'] >= 1, f'{theme}: Apple only for what Deezer lacks (2 asks: Song 007 found, Song 011 not), then MusicBrainz ({counts["itunes"]}, {counts["mb"]})')
+    check(not await pg.evaluate("__nat.dzQuota || 0"), f'{theme}: Deezer paced under its limit (no quota refusals)')
+    diag = await pg.evaluate("__h.ev('songArtStats')")
+    print(theme, 'stats', diag)
+    check(diag['library'] >= 1 and diag['deezer'] >= 90 and diag['itunes'] == 1 and diag['musicbrainz'] == 1, f'{theme}: the tally adds up {diag}')
     await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
     hdr = await pg.query_selector('.chart-week')
     await hdr.screenshot(path=f'{OUT}/top100-week-{theme}.png')
