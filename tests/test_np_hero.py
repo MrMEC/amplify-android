@@ -1,4 +1,4 @@
-"""Build 220: the Home hero follows playback (artist portrait + bio for a library song with a
+"""Builds 220-221: the Home hero follows playback (artist portrait + bio for a library song with a
 shuffle Play and a tap to the artist page; a channel logo; a podcast or video cover with details).
 (Harness from build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos rows on Home, under Top 100.
 Each mix row shows 20 songs and its heading opens the whole list; Daily Mix features one of the most
@@ -15,6 +15,7 @@ os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
 HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProperty(audio, 'paused', { configurable: true, get: function(){ return !on; } }); }catch(e){} audio.play = function(){ on = true; return Promise.resolve(); }; audio.pause = function(){ on = false; window.__tp = (window.__tp || 0) + 1; }; },"
+        " cover: function(name, url){ var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; setCustomArtUrl('album:' + albumKeyFor(t), url); },"
         " meta: function(n, bio){ var e = findArtistEntry(artistMatchKey(n)); artistMeta[e.key] = { key: e.key, query: n, ok: true, manual: true, name: n, bio: bio, photoUrl: 'https://covers.example/portrait.jpg', description: 'American musician', ts: Date.now() }; delete artistArtResolved[e.key]; },"
         " play: function(name){ __h.stub(); var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; playTrackInList([t], t, 'Test'); },"
         " fake: function(st){ __h.stub(); audio.play(); currentStation = st; updatePlayerMeta(st, ''); setPlayingUI(true); },"
@@ -23,7 +24,7 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         "   var img = document.querySelector('#npHeroArt img'); var lh = parseFloat(getComputedStyle(d).lineHeight);"
         "   return { shown: getComputedStyle(h).display !== 'none' && r.height > 0, top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth,"
         "     kicker: document.getElementById('npHeroKicker').textContent, title: document.getElementById('npHeroTitle').textContent, line: document.getElementById('npHeroLine').textContent,"
-        "     desc: d.textContent, descLines: d.textContent ? Math.round(d.getBoundingClientRect().height / lh) : 0, img: img ? img.src : '', logo: h.classList.contains('nph-logo'),"
+        "     desc: d.textContent, descLines: d.textContent ? Math.round(d.getBoundingClientRect().height / lh) : 0, img: img ? img.src : '', imgW: img ? Math.round(img.getBoundingClientRect().width) : 0, imgTop: img ? Math.round(img.getBoundingClientRect().top - h.getBoundingClientRect().top) : -1, objPos: img ? getComputedStyle(img).objectPosition : '', mediaH: Math.round(h.querySelector('.nph-media').getBoundingClientRect().height), gap: (function(){ var n = h.nextElementSibling; while(n && (getComputedStyle(n).display === 'none' || !n.getBoundingClientRect().height)) n = n.nextElementSibling; return n ? Math.round(n.getBoundingClientRect().top - r.bottom) : null; })(), headFs: (function(){ var x = document.querySelector('#favoritesSection .home-section-head h2'); return x ? parseFloat(getComputedStyle(x).fontSize) : 0; })(), titleFs: parseFloat(getComputedStyle(document.getElementById('npHeroTitle')).fontSize), logo: h.classList.contains('nph-logo'),"
         "     play: document.getElementById('npHeroPlay').dataset.state, first: (function(){ var n = h.nextElementSibling; while(n && getComputedStyle(n).display === 'none') n = n.nextElementSibling; return n ? n.id || n.className : ''; })(),"
         "     playRight: Math.round(document.getElementById('npHeroPlay').getBoundingClientRect().right), playBottom: Math.round(document.getElementById('npHeroPlay').getBoundingClientRect().bottom), bottom: Math.round(r.bottom) }; } };"
         "window.__d = { n: function(){ return libraryTracks.length; }, home: function(){ loadTopStations(); }, st: function(){ return window.__amplifyDaily(); },"
@@ -158,6 +159,7 @@ async def run(theme, b):
     check(not h['shown'], f'[{theme}] nothing ever played: no hero')
     # a library song
     await pg.evaluate(f"__h.meta('Prince', {json.dumps(BIO)})")
+    await pg.evaluate("__h.cover('Prince 03', 'https://covers.example/portrait.jpg')")
     await pg.evaluate("__h.play('Prince 03')"); await pg.wait_for_timeout(1500)
     await pg.evaluate('__d.home()'); await pg.wait_for_timeout(1200)
     h = await pg.evaluate('__h.hero()'); print(h)
@@ -165,7 +167,11 @@ async def run(theme, b):
     check(h['first'] in ('favoritesSection', 'recentSection') or 'section' in h['first'], f'[{theme}] above the Home rows (next: {h["first"]})')
     check(h['kicker'] == 'Artist' and h['title'] == 'Prince', f'[{theme}] a library song shows the artist ({h["kicker"]} / {h["title"]})')
     check(h['desc'].startswith('Prince Rogers Nelson') and h['descLines'] == 2, f'[{theme}] with two lines of the bio ({h["descLines"]} lines)')
-    check('portrait.jpg' in h['img'] or h['img'].startswith('blob:'), f'[{theme}] and the artist\'s picture {h["img"][:60]}')
+    check('portrait.jpg' in h['img'], f'[{theme}] and the song\'s own cover (build 221) {h["img"][:60]}')
+    check(h['imgW'] == h['vw'] and h['imgTop'] == 0 and h['objPos'].endswith('0%'), f'[{theme}] the cover runs full width from the top {h["imgW"]} {h["imgTop"]} {h["objPos"]}')
+    check(h['mediaH'] <= 250, f'[{theme}] half the old height ({h["mediaH"]}px; was {round(min(412 * 1.12, 500))})')
+    check(h['gap'] is not None and h['gap'] >= 40, f'[{theme}] with room below it ({h["gap"]}px)')
+    check(h['headFs'] == 19 and h['titleFs'] >= 32, f'[{theme}] Home headings are smaller ({h["headFs"]}px) than the hero title ({h["titleFs"]}px)')
     check(h['playRight'] > h['vw'] - 60 and h['bottom'] - h['playBottom'] < 40, f'[{theme}] the Play button sits at the bottom right')
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{shots}/hero-artist-{theme}.png')
@@ -188,7 +194,7 @@ async def run(theme, b):
     # follows playback: a channel
     await pg.evaluate(f"__h.fake({json.dumps(CHANNEL)})"); await pg.wait_for_timeout(1200)
     h = await pg.evaluate('__h.hero()'); print(h)
-    check(h['kicker'] == 'Live TV' and h['title'] == 'Ray TV News' and h['logo'] and 'logo.png' in h['img'], f'[{theme}] a channel shows its logo and name')
+    check(h['kicker'] == 'Live TV' and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and h['imgW'] == h['vw'], f'[{theme}] a channel shows its logo, full width, and name')
     check(h['play'] == 'pause', f'[{theme}] its button follows playback')
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{shots}/hero-channel-{theme}.png')
@@ -198,7 +204,7 @@ async def run(theme, b):
     await pg.evaluate(f"__h.fake({json.dumps(PODCAST)})"); await pg.wait_for_timeout(1200)
     h = await pg.evaluate('__h.hero()'); print(h)
     check(h['kicker'] == 'Podcast' and h['title'] == 'Funk History Hour' and h['line'] == 'Episode 12: The Purple Years', f'[{theme}] a podcast shows the show and the episode')
-    check(h['desc'].startswith('We look back at 1984') and '<' not in h['desc'] and h['descLines'] == 2 and not h['logo'], f'[{theme}] with two lines of its notes, tags removed')
+    check(h['desc'].startswith('We look back at 1984') and '<' not in h['desc'] and h['descLines'] == 2, f'[{theme}] with two lines of its notes, tags removed')
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{shots}/hero-podcast-{theme}.png')
     # Play on a playing podcast pauses (resume = the same item, togglePlayPause)

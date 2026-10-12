@@ -1286,25 +1286,23 @@
      the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
      the page colour, so the title, details and Play button sit on plain page colour and read
      in either theme. Logos (channels, stations) sit whole in the middle over their own blur. */
-  .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 22px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
+  .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 44px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
   .home-hero.nph-tap{ cursor:pointer; }
-  .nph-media{ position:relative; height:min(56vh, 520px); overflow:hidden; background:var(--main-bg); }
-  @media (max-width: 900px){ .nph-media{ height:min(112vw, 500px); } }
+  /* Build 221: half the height it was (Mark). */
+  .nph-media{ position:relative; height:min(28vh, 260px); overflow:hidden; background:var(--main-bg); }
+  @media (max-width: 900px){ .nph-media{ height:min(56vw, 250px); } }
   .nph-bg, .nph-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; }
-  .nph-bg img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:var(--portrait-crop, 50% 28%); display:block; }
+  .nph-bg img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
   .nph-bg{ filter:blur(40px) saturate(1.4); transform:scale(1.2); opacity:.85;
     -webkit-mask-image:linear-gradient(to bottom, #000 40%, transparent 96%); mask-image:linear-gradient(to bottom, #000 40%, transparent 96%); }
-  .nph-art{ -webkit-mask-image:linear-gradient(to bottom, #000 44%, rgba(0,0,0,.5) 68%, transparent 90%);
-    mask-image:linear-gradient(to bottom, #000 44%, rgba(0,0,0,.5) 68%, transparent 90%); }
+  .nph-art{ -webkit-mask-image:linear-gradient(to bottom, #000 30%, rgba(0,0,0,.55) 62%, transparent 96%);
+    mask-image:linear-gradient(to bottom, #000 30%, rgba(0,0,0,.55) 62%, transparent 96%); }
   /* The text's own floor: page colour rising from the bottom, whatever the picture is. */
-  .nph-scrim{ position:absolute; inset:0; background:linear-gradient(to bottom, transparent 42%,
-    color-mix(in srgb, var(--main-bg) 55%, transparent) 66%, var(--main-bg) 97%); }
-  .home-hero.nph-logo .nph-art{ display:flex; align-items:center; justify-content:center; padding:12% 24% 36%;
-    background:none !important; -webkit-mask-image:none; mask-image:none; }
-  .home-hero.nph-logo .nph-art img{ width:auto; height:auto; max-width:100%; max-height:100%; object-fit:contain;
-    border-radius:12px; filter:drop-shadow(0 8px 28px rgba(0,0,0,.45)); }
-  .home-hero.nph-logo .nph-bg{ opacity:.7; }
-  .nph-body{ position:absolute; left:var(--main-pad); right:var(--main-pad); bottom:4px; z-index:2;
+  .nph-scrim{ position:absolute; inset:0; background:linear-gradient(to bottom, transparent 22%,
+    color-mix(in srgb, var(--main-bg) 60%, transparent) 58%, var(--main-bg) 96%); }
+  /* The text overlaps the faded lower part of the picture and carries on below it, so a long
+     title or a podcast's episode line never climbs over the top of the cover. */
+  .nph-body{ position:relative; z-index:2; margin:-92px var(--main-pad) 0;
     display:flex; align-items:flex-end; gap:16px; }
   .nph-text{ flex:1; min-width:0; }
   .nph-kicker{ font-size:11.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
@@ -5358,6 +5356,11 @@
     /* A page title stays on one line (Mark: "My Library" wrapped beside its three buttons). */
     .section-heading-row:not(.is-search) .section-heading{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     body.home-stacked #homeTopHeading .section-heading, body.home-stacked .section-heading-row .section-heading{ font-size:24px; }
+  }
+  /* Build 221: Home's section headings are smaller, so the hero's title stands out above them. */
+  body.home-stacked .home-section-head h2, body.home-stacked .recent-col-heading{ font-size:17px; }
+  @media (max-width: 900px){
+    body.home-stacked .home-section-head h2, body.home-stacked .recent-col-heading{ font-size:19px; }
   }
   /* ---------- Google Cast button (build 194) ---------- */
   .top-actions{ display:flex; align-items:center; gap:10px; }
@@ -33571,25 +33574,19 @@
     var entry = heroArtistEntry(item);
     heroItem = item; heroEntry = entry;
     if(!item){ heroKey = ''; syncNpHeroShown(); return; }
-    var key = entry ? 'artist:' + entry.key : favKey(item);
+    var key = favKey(item);
     if(key !== heroKey){
       heroKey = key;
-      var logo = !entry && !isPodcastTrack(item) && !isLocalVideo(item) && !isLocalTrack(item) && !isChartSong(item);
-      npHero.classList.toggle('nph-logo', logo);
       npHero.classList.toggle('nph-tap', !!entry);
+      // Every kind shows its own cover, full width from the top (build 221: a song's cover,
+      // not the artist's portrait).
+      renderStationArt(npHeroArt, item);
+      renderStationArt(npHeroBg, item);
       if(entry){
-        renderArtistArt(npHeroArt, entry);
-        renderArtistArt(npHeroBg, entry);
-        // The bio (and a portrait) for an artist not looked up yet.
+        // The bio, for an artist not looked up yet.
         Promise.resolve(ensureArtistMeta(entry)).then(function(){
-          if(heroKey !== key) return;
-          npHeroDesc.textContent = heroArtistBio(entry);
-          renderArtistArt(npHeroArt, entry);
-          renderArtistArt(npHeroBg, entry);
+          if(heroKey === key) npHeroDesc.textContent = heroArtistBio(entry);
         })['catch'](function(){});
-      } else {
-        renderStationArt(npHeroArt, item);
-        renderStationArt(npHeroBg, item);
       }
     }
     var kicker = '', title = '', line = '', desc = '';
