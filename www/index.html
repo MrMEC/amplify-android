@@ -1281,6 +1281,46 @@
     font-size:11px; font-weight:600; letter-spacing:0; color:var(--text-faint);
     text-transform:none; font-variant-numeric:tabular-nums;
   }
+  /* ---------- Home hero (build 220) ---------- */
+  /* What's playing, as a full-width picture at the top of Home that dissolves into the page:
+     the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
+     the page colour, so the title, details and Play button sit on plain page colour and read
+     in either theme. Logos (channels, stations) sit whole in the middle over their own blur. */
+  .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 22px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
+  .home-hero.nph-tap{ cursor:pointer; }
+  .nph-media{ position:relative; height:min(56vh, 520px); overflow:hidden; background:var(--main-bg); }
+  @media (max-width: 900px){ .nph-media{ height:min(112vw, 500px); } }
+  .nph-bg, .nph-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; }
+  .nph-bg img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:var(--portrait-crop, 50% 28%); display:block; }
+  .nph-bg{ filter:blur(40px) saturate(1.4); transform:scale(1.2); opacity:.85;
+    -webkit-mask-image:linear-gradient(to bottom, #000 40%, transparent 96%); mask-image:linear-gradient(to bottom, #000 40%, transparent 96%); }
+  .nph-art{ -webkit-mask-image:linear-gradient(to bottom, #000 44%, rgba(0,0,0,.5) 68%, transparent 90%);
+    mask-image:linear-gradient(to bottom, #000 44%, rgba(0,0,0,.5) 68%, transparent 90%); }
+  /* The text's own floor: page colour rising from the bottom, whatever the picture is. */
+  .nph-scrim{ position:absolute; inset:0; background:linear-gradient(to bottom, transparent 42%,
+    color-mix(in srgb, var(--main-bg) 55%, transparent) 66%, var(--main-bg) 97%); }
+  .home-hero.nph-logo .nph-art{ display:flex; align-items:center; justify-content:center; padding:12% 24% 36%;
+    background:none !important; -webkit-mask-image:none; mask-image:none; }
+  .home-hero.nph-logo .nph-art img{ width:auto; height:auto; max-width:100%; max-height:100%; object-fit:contain;
+    border-radius:12px; filter:drop-shadow(0 8px 28px rgba(0,0,0,.45)); }
+  .home-hero.nph-logo .nph-bg{ opacity:.7; }
+  .nph-body{ position:absolute; left:var(--main-pad); right:var(--main-pad); bottom:4px; z-index:2;
+    display:flex; align-items:flex-end; gap:16px; }
+  .nph-text{ flex:1; min-width:0; }
+  .nph-kicker{ font-size:11.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+  .nph-kicker:empty{ display:none; }
+  .nph-title{ margin:0; font-size:clamp(28px, 8vw, 40px); font-weight:800; line-height:1.08; letter-spacing:-.01em; color:var(--text);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+  .nph-line{ margin-top:6px; font-size:15px; font-weight:700; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nph-desc{ margin-top:5px; font-size:14px; line-height:1.4; color:var(--text-dim);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .nph-line:empty, .nph-desc:empty{ display:none; }
+  .nph-play{ flex:0 0 auto; width:58px; height:58px; border-radius:50%; border:0; margin-bottom:2px;
+    background:var(--accent); color:var(--accent-text); display:flex; align-items:center; justify-content:center;
+    font-size:22px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+  .nph-play .fa-play{ margin-left:3px; }
+  .nph-play:active{ transform:scale(.95); }
   /* ---------- Artist page hero ---------- */
   /* The same page as an album's: one picture at size, centred, on a colour read out of it,
      with the identity and controls stacked under it. The art sizing and the control styling
@@ -5678,6 +5718,25 @@
         <button type="button" class="import-cancel-btn" id="importCancelBtn" style="display:none;">Stop</button>
         <button type="button" class="status-line-dismiss" id="statusLineDismiss" aria-label="Dismiss message" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
       </div>
+      <!-- Build 220: the hero at the top of Home, about what is playing (or was last played):
+           an artist's portrait and bio for a library song, a channel's or station's logo, a
+           podcast's or video's cover with its details. See "Home hero" in the script. -->
+      <section class="home-hero" id="npHero" style="display:none;" aria-label="Now playing">
+        <div class="nph-media" aria-hidden="true">
+          <div class="nph-bg" id="npHeroBg"></div>
+          <div class="nph-art" id="npHeroArt"></div>
+          <div class="nph-scrim"></div>
+        </div>
+        <div class="nph-body">
+          <div class="nph-text">
+            <div class="nph-kicker" id="npHeroKicker"></div>
+            <h2 class="nph-title" id="npHeroTitle"></h2>
+            <div class="nph-line" id="npHeroLine"></div>
+            <div class="nph-desc" id="npHeroDesc"></div>
+          </div>
+          <button type="button" class="nph-play" id="npHeroPlay" aria-label="Play"><i class="fa-solid fa-play" aria-hidden="true"></i></button>
+        </div>
+      </section>
       <div class="home-tabs" id="homeTabs" style="display:none;" role="tablist">
         <button type="button" class="home-tab" id="tabTop" role="tab">
           <span class="tab-label-full">Top Stations</span><span class="tab-label-short">Top</span>
@@ -14821,6 +14880,7 @@
       madeForYouSection.style.display = madeForYouShown ? '' : 'none';
       top100Section.style.display = hot100Shown ? '' : 'none';
       dailyHomeSections.style.display = '';
+      if(typeof renderNpHero === 'function') renderNpHero();
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
       playlistsHomeSection.style.display = playlistsHomeShown ? '' : 'none';
       recentSection.style.display = '';
@@ -14833,6 +14893,7 @@
       return;
     }
     homeTopHeading.style.display = 'none';
+    if(npHero) npHero.style.display = 'none';
     if(!onHomeView){
       // Genre / search / playlist views keep the old single-heading layout.
       homeTabs.style.display = 'none';
@@ -33399,6 +33460,7 @@
     updateMediaSession(station);
     syncSeekBar();
     updateStepButtons();
+    renderNpHero();
     if(queuePanelOpen) renderQueuePanel();
     if(renderLandFavs) renderLandFavs();
     if(nowPlayingScreen.style.display === 'flex'){
@@ -33438,8 +33500,175 @@
     playerSub.classList.remove('err');
     renderStationArt(playerIcon, st);
     playPauseBtn.disabled = false;
+    renderNpHero();
   }
 
+  // ---------- Home hero (build 220) ----------
+  // The top of Home follows playback: whatever is playing, or, with nothing loaded, what was
+  // played last. Redrawn on every track change (updatePlayerMeta / renderIdlePlayerBar); the
+  // Play button follows play/pause (setPlayingUI).
+  // - A library song: the artist's portrait, name and the start of their bio. Play starts a
+  //   shuffle of all their songs that begins with this song; the rest of the hero opens the
+  //   artist's page.
+  // - A channel or station: its logo and name; Play plays it (pauses it while it plays).
+  // - A podcast episode or a video: its cover, the show/video name (the episode title for a
+  //   podcast) and two lines of details; Play resumes it.
+  var npHero = document.getElementById('npHero');
+  var npHeroBg = document.getElementById('npHeroBg');
+  var npHeroArt = document.getElementById('npHeroArt');
+  var npHeroKicker = document.getElementById('npHeroKicker');
+  var npHeroTitle = document.getElementById('npHeroTitle');
+  var npHeroLine = document.getElementById('npHeroLine');
+  var npHeroDesc = document.getElementById('npHeroDesc');
+  var npHeroPlay = document.getElementById('npHeroPlay');
+  var heroItem = null, heroEntry = null, heroKey = '';
+  function heroText(html){
+    var s = String(html || '');
+    if(!/[<&]/.test(s)) return s.replace(/\s+/g, ' ').trim();
+    try{
+      var doc = new DOMParser().parseFromString('<body>' + s.replace(/<(br|\/p|\/div|\/li)\b[^>]*>/gi, ' $&') + '</body>', 'text/html');
+      return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+    }catch(e){ return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); }
+  }
+  function heroArtistEntry(t){
+    if(!t || !isLocalTrack(t)) return null;
+    var name = (t.artist || '').trim();
+    if(!name || name === UNKNOWN_ARTIST) return null;
+    try{ return findArtistEntry(artistMatchKey(name)) || null; }catch(e){ return null; }
+  }
+  function heroShuffleLabel(entry){ return entry.name + ' Shuffle'; }
+  function heroVideoInfo(t){
+    var info = { kicker: 'Movie', title: t.name || t.title || '', line: '', desc: '' };
+    try{
+      if(t.videoKind === 'music'){
+        info.kicker = 'Music Video';
+        info.line = t.artist || '';
+        return info;
+      }
+      if(t.videoKind === 'episode'){
+        info.kicker = 'TV Show';
+        var show = vlib().showsByKey[t.showKey];
+        info.title = t.show || (show && show.title) || info.title;
+        info.line = subtitleForVideo(t);
+        var w = show ? wikiRecord(show, 'show') : null;
+        info.desc = heroText(t.summary || (w && w.extract) || '');
+        return info;
+      }
+      info.line = [t.year, formatRuntime(t.duration)].filter(Boolean).join(' · ');
+      var wm = wikiRecord(t, 'movie');
+      info.desc = heroText((wm && wm.extract) || t.summary || '');
+    }catch(e){}
+    return info;
+  }
+  function heroArtistBio(entry){
+    var rec = null;
+    try{ rec = showableMeta(entry.key); }catch(e){}
+    return rec ? heroText(rec.bio || rec.description || '') : '';
+  }
+  function renderNpHero(){
+    if(!npHero) return;
+    var item = currentStation || lastPlayedStation();
+    var entry = heroArtistEntry(item);
+    heroItem = item; heroEntry = entry;
+    if(!item){ heroKey = ''; syncNpHeroShown(); return; }
+    var key = entry ? 'artist:' + entry.key : favKey(item);
+    if(key !== heroKey){
+      heroKey = key;
+      var logo = !entry && !isPodcastTrack(item) && !isLocalVideo(item) && !isLocalTrack(item) && !isChartSong(item);
+      npHero.classList.toggle('nph-logo', logo);
+      npHero.classList.toggle('nph-tap', !!entry);
+      if(entry){
+        renderArtistArt(npHeroArt, entry);
+        renderArtistArt(npHeroBg, entry);
+        // The bio (and a portrait) for an artist not looked up yet.
+        Promise.resolve(ensureArtistMeta(entry)).then(function(){
+          if(heroKey !== key) return;
+          npHeroDesc.textContent = heroArtistBio(entry);
+          renderArtistArt(npHeroArt, entry);
+          renderArtistArt(npHeroBg, entry);
+        })['catch'](function(){});
+      } else {
+        renderStationArt(npHeroArt, item);
+        renderStationArt(npHeroBg, item);
+      }
+    }
+    var kicker = '', title = '', line = '', desc = '';
+    if(entry){
+      kicker = 'Artist';
+      title = entry.name;
+      desc = heroArtistBio(entry);
+    } else if(isPodcastTrack(item)){
+      kicker = 'Podcast';
+      title = item.collectionName || item.artistName || item.name || '';
+      line = item.collectionName ? (item.name || '') : '';
+      desc = heroText(item.description || '');
+    } else if(isLocalVideo(item)){
+      var v = heroVideoInfo(item);
+      kicker = v.kicker; title = v.title; line = v.line; desc = v.desc;
+    } else if(isLocalTrack(item)){
+      title = item.name || ''; line = item.artist || '';
+    } else if(isChartSong(item)){
+      kicker = 'Top 100'; title = item.name || ''; line = item.artist || '';
+    } else {
+      kicker = isChannelEntry(item) ? 'Live TV' : 'Station';
+      title = stripExclusively((item.channel && item.channel.name) || item.name || '');
+    }
+    npHeroKicker.textContent = kicker;
+    npHeroTitle.textContent = title;
+    npHeroLine.textContent = line;
+    npHeroDesc.textContent = desc;
+    syncNpHeroPlay();
+    syncNpHeroShown();
+  }
+  function heroIsPlaying(){
+    if(!heroItem || !uiIsPlaying || !currentStation) return false;
+    if(heroEntry){
+      return isLocalTrack(currentStation) && queueLabel === heroShuffleLabel(heroEntry)
+        && artistMatchKey(currentStation.artist || '') === heroEntry.key;
+    }
+    return favKey(currentStation) === favKey(heroItem);
+  }
+  function syncNpHeroPlay(){
+    if(!npHeroPlay) return;
+    var pause = heroIsPlaying();
+    var want = pause ? 'pause' : 'play';
+    if(npHeroPlay.dataset.state === want) return;
+    npHeroPlay.dataset.state = want;
+    npHeroPlay.innerHTML = '<i class="fa-solid fa-' + want + '" aria-hidden="true"></i>';
+    npHeroPlay.setAttribute('aria-label', pause ? 'Pause' : (heroEntry ? 'Shuffle ' + heroEntry.name : 'Play'));
+  }
+  function syncNpHeroShown(){
+    if(!npHero) return;
+    npHero.style.display = (heroItem && document.body.classList.contains('home-stacked') && onHomeView) ? '' : 'none';
+  }
+  // Every song by the artist, shuffled, starting with this one. A song already playing keeps
+  // playing where it is; only what follows it changes.
+  function playHeroArtistShuffle(entry, track){
+    var songs = (entry.tracks || []).filter(function(t){ return isLocalTrack(t) && !isBlacklisted(t); });
+    if(!songs.length) return;
+    var first = track && indexOfTrack(songs, track) !== -1 ? track : songs[0];
+    var order = [first].concat(shuffled(songs.filter(function(t){ return favKey(t) !== favKey(first); })));
+    var label = heroShuffleLabel(entry);
+    setQueue(order, first, label);
+    if(currentStation && favKey(currentStation) === favKey(first) && audio.getAttribute('src')){
+      if(!uiIsPlaying) togglePlayPause();
+      syncNpHeroPlay();
+      return;
+    }
+    playStation(first);
+  }
+  if(npHeroPlay) npHeroPlay.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(!heroItem) return;
+    if(heroIsPlaying()){ togglePlayPause(); return; }
+    if(heroEntry){ playHeroArtistShuffle(heroEntry, heroItem); return; }
+    if(currentStation && favKey(currentStation) === favKey(heroItem)){ togglePlayPause(); return; }
+    startNpTarget(heroItem);
+  });
+  // A library song: the rest of the hero opens the artist's page.
+  if(npHero) npHero.addEventListener('click', function(){
+    if(heroEntry) openArtistPage(heroEntry.key);
+  });
   // There used to be two hearts, one in the bar tracking what was playing and one on the Now
   // Playing screen tracking whatever that screen was showing. The bar's has gone: the bar is
   // four controls and a title now, and favouriting belongs on the screen that is actually
@@ -33484,6 +33713,7 @@
     playPauseBtn.innerHTML = isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
     updateNpPlayBtn();
     syncHeroPlayPills();
+    if(typeof syncNpHeroPlay === 'function') syncNpHeroPlay();
     updateMediaSessionState();
   }
   // Pause only when the screen is showing the station that's actually playing; for any
