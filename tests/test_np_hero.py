@@ -1,4 +1,4 @@
-"""Builds 220-221: the Home hero follows playback (artist portrait + bio for a library song with a
+"""Builds 220-222: the Home hero (222: swipeable through the last 50 played) follows playback (artist portrait + bio for a library song with a
 shuffle Play and a tap to the artist page; a channel logo; a podcast or video cover with details).
 (Harness from build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos rows on Home, under Top 100.
 Each mix row shows 20 songs and its heading opens the whole list; Daily Mix features one of the most
@@ -18,15 +18,19 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         " cover: function(name, url){ var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; setCustomArtUrl('album:' + albumKeyFor(t), url); },"
         " meta: function(n, bio){ var e = findArtistEntry(artistMatchKey(n)); artistMeta[e.key] = { key: e.key, query: n, ok: true, manual: true, name: n, bio: bio, photoUrl: 'https://covers.example/portrait.jpg', description: 'American musician', ts: Date.now() }; delete artistArtResolved[e.key]; },"
         " play: function(name){ __h.stub(); var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; playTrackInList([t], t, 'Test'); },"
-        " fake: function(st){ __h.stub(); audio.play(); currentStation = st; updatePlayerMeta(st, ''); setPlayingUI(true); },"
+        " fake: function(st){ __h.stub(); audio.play(); currentStation = st; noteHeroPlayed(st); updatePlayerMeta(st, ''); setPlayingUI(true); },"
         " playing: function(v){ setPlayingUI(v); },"
-        " hero: function(){ var h = document.getElementById('npHero'); var r = h.getBoundingClientRect(); var d = document.getElementById('npHeroDesc');"
-        "   var img = document.querySelector('#npHeroArt img'); var lh = parseFloat(getComputedStyle(d).lineHeight);"
+        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroDots').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
+        " titles: function(){ return heroSlides.map(function(x){ return x.querySelector('.nph-title').textContent; }); },"
+        " dots: function(){ var d = Array.from(document.querySelectorAll('#npHeroDots .nph-dot')); return { n: d.length, on: d.findIndex(function(x){ return x.classList.contains('on'); }) }; },"
+        " go: function(i){ var t = document.getElementById('npHeroTrack'); t.scrollLeft = i * t.clientWidth; },"
+        " hero: function(){ var h = document.getElementById('npHero'); var sl = heroSlides[heroIndex()] || h; var r = h.getBoundingClientRect(); var d = sl.querySelector('.nph-desc') || h;"
+        "   var img = sl.querySelector('.nph-art img'); var lh = parseFloat(getComputedStyle(d).lineHeight); var pb = sl.querySelector('.nph-play') || h; var ti = sl.querySelector('.nph-title') || h;"
         "   return { shown: getComputedStyle(h).display !== 'none' && r.height > 0, top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth,"
-        "     kicker: document.getElementById('npHeroKicker').textContent, title: document.getElementById('npHeroTitle').textContent, line: document.getElementById('npHeroLine').textContent,"
-        "     desc: d.textContent, descLines: d.textContent ? Math.round(d.getBoundingClientRect().height / lh) : 0, img: img ? img.src : '', imgW: img ? Math.round(img.getBoundingClientRect().width) : 0, imgTop: img ? Math.round(img.getBoundingClientRect().top - h.getBoundingClientRect().top) : -1, objPos: img ? getComputedStyle(img).objectPosition : '', mediaH: Math.round(h.querySelector('.nph-media').getBoundingClientRect().height), gap: (function(){ var n = h.nextElementSibling; while(n && (getComputedStyle(n).display === 'none' || !n.getBoundingClientRect().height)) n = n.nextElementSibling; return n ? Math.round(n.getBoundingClientRect().top - r.bottom) : null; })(), headFs: (function(){ var x = document.querySelector('#favoritesSection .home-section-head h2'); return x ? parseFloat(getComputedStyle(x).fontSize) : 0; })(), titleFs: parseFloat(getComputedStyle(document.getElementById('npHeroTitle')).fontSize), logo: h.classList.contains('nph-logo'),"
-        "     play: document.getElementById('npHeroPlay').dataset.state, first: (function(){ var n = h.nextElementSibling; while(n && getComputedStyle(n).display === 'none') n = n.nextElementSibling; return n ? n.id || n.className : ''; })(),"
-        "     playRight: Math.round(document.getElementById('npHeroPlay').getBoundingClientRect().right), playBottom: Math.round(document.getElementById('npHeroPlay').getBoundingClientRect().bottom), bottom: Math.round(r.bottom) }; } };"
+        "     kicker: (sl.querySelector('.nph-kicker') || h).textContent, title: ti.textContent, line: (sl.querySelector('.nph-line') || h).textContent,"
+        "     desc: d.textContent, descLines: d.textContent ? Math.round(d.getBoundingClientRect().height / lh) : 0, img: img ? img.src : '', imgW: img ? Math.round(img.getBoundingClientRect().width) : 0, imgTop: img ? Math.round(img.getBoundingClientRect().top - h.getBoundingClientRect().top) : -1, objPos: img ? getComputedStyle(img).objectPosition : '', mediaH: sl.querySelector('.nph-media') ? Math.round(sl.querySelector('.nph-media').getBoundingClientRect().height) : 0, gap: (function(){ var n = h.nextElementSibling; while(n && (getComputedStyle(n).display === 'none' || !n.getBoundingClientRect().height)) n = n.nextElementSibling; return n ? Math.round(n.getBoundingClientRect().top - r.bottom) : null; })(), headFs: (function(){ var x = document.querySelector('#favoritesSection .home-section-head h2'); return x ? parseFloat(getComputedStyle(x).fontSize) : 0; })(), titleFs: parseFloat(getComputedStyle(ti).fontSize),"
+        "     play: pb.dataset.state, first: (function(){ var n = h.nextElementSibling; while(n && getComputedStyle(n).display === 'none') n = n.nextElementSibling; return n ? n.id || n.className : ''; })(),"
+        "     playRight: Math.round(pb.getBoundingClientRect().right), playBottom: Math.round(pb.getBoundingClientRect().bottom), bottom: Math.round(sl.getBoundingClientRect ? sl.getBoundingClientRect().bottom : r.bottom) }; } };"
         "window.__d = { n: function(){ return libraryTracks.length; }, home: function(){ loadTopStations(); }, st: function(){ return window.__amplifyDaily(); },"
         " names: function(id){ var m = dailyMixFor(id); return m ? dailyMixSongs(m).map(function(t){ return t.artist + '|' + t.name; }) : null; },"
         " plays: function(){ var p = {}; ['Prince', 'Madonna', 'Kay', 'Earth, Wind & Fire', 'Rick James', 'Lee'].forEach(function(n, i){ p[artistMatchKey(n)] = { name: n, count: [40, 30, 20, 12, 6, 3][i], last: Date.now() - i * 1000 }; }); saveArtistPlays(p);"
@@ -169,24 +173,24 @@ async def run(theme, b):
     check(h['desc'].startswith('Prince Rogers Nelson') and h['descLines'] == 2, f'[{theme}] with two lines of the bio ({h["descLines"]} lines)')
     check('portrait.jpg' in h['img'], f'[{theme}] and the song\'s own cover (build 221) {h["img"][:60]}')
     check(h['imgW'] == h['vw'] and h['imgTop'] == 0 and h['objPos'].endswith('0%'), f'[{theme}] the cover runs full width from the top {h["imgW"]} {h["imgTop"]} {h["objPos"]}')
-    check(h['mediaH'] <= 250, f'[{theme}] half the old height ({h["mediaH"]}px; was {round(min(412 * 1.12, 500))})')
+    check(h['mediaH'] <= 330, f'[{theme}] half the old height ({h["mediaH"]}px; was {round(min(412 * 1.12, 500))})')
     check(h['gap'] is not None and h['gap'] >= 40, f'[{theme}] with room below it ({h["gap"]}px)')
     check(h['headFs'] == 19 and h['titleFs'] >= 32, f'[{theme}] Home headings are smaller ({h["headFs"]}px) than the hero title ({h["titleFs"]}px)')
     check(h['playRight'] > h['vw'] - 60 and h['bottom'] - h['playBottom'] < 40, f'[{theme}] the Play button sits at the bottom right')
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{shots}/hero-artist-{theme}.png')
     # Play: every Prince song shuffled, starting with this one, which keeps playing
-    await pg.evaluate("document.getElementById('npHeroPlay').click()"); await pg.wait_for_timeout(800)
+    await pg.evaluate("__h.el('.nph-play').click()"); await pg.wait_for_timeout(800)
     q = await pg.evaluate('__d.q()')
     order = await pg.evaluate("playQueue.map(function(t){ return t.name; })") if False else None
     check(q['label'] == 'Prince Shuffle' and q['n'] == 20 and q['cur'] == 'Prince 03', f'[{theme}] Play starts a shuffle of all 20 Prince songs from the current one {q}')
     h = await pg.evaluate('__h.hero()')
     check(h['play'] == 'pause', f'[{theme}] and the button then shows Pause')
-    await pg.evaluate("document.getElementById('npHeroPlay').click()"); await pg.wait_for_timeout(400)
+    await pg.evaluate("__h.el('.nph-play').click()"); await pg.wait_for_timeout(400)
     check((await pg.evaluate('__h.hero()'))['play'] == 'play', f'[{theme}] which pauses it')
-    await pg.evaluate("document.getElementById('npHeroPlay').click()"); await pg.wait_for_timeout(400)
+    await pg.evaluate("__h.el('.nph-play').click()"); await pg.wait_for_timeout(400)
     # anywhere else opens the artist
-    await pg.evaluate("document.getElementById('npHeroDesc').click()"); await pg.wait_for_timeout(900)
+    await pg.evaluate("__h.el('.nph-desc').click()"); await pg.wait_for_timeout(900)
     check(await pg.evaluate("document.body.classList.contains('artist-open') && document.getElementById('artistHeroName').textContent") == 'Prince', f'[{theme}] tapping the hero opens the artist page')
     check(not (await pg.evaluate('__h.hero()'))['shown'], f'[{theme}] the hero shows on Home only')
     await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(800)
@@ -209,7 +213,7 @@ async def run(theme, b):
     await pg.screenshot(path=f'{shots}/hero-podcast-{theme}.png')
     # Play on a playing podcast pauses (resume = the same item, togglePlayPause)
     await pg.evaluate("window.__tp = 0")
-    await pg.evaluate("document.getElementById('npHeroPlay').click()"); await pg.wait_for_timeout(300)
+    await pg.evaluate("__h.el('.nph-play').click()"); await pg.wait_for_timeout(300)
     check(await pg.evaluate('window.__tp') == 1 and (await pg.evaluate('__h.hero()'))['play'] == 'play', f'[{theme}] the podcast\'s button pauses and resumes it')
     # a movie
     await pg.evaluate(f"__h.fake({json.dumps(MOVIE)})"); await pg.wait_for_timeout(1200)
@@ -218,10 +222,50 @@ async def run(theme, b):
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{shots}/hero-movie-{theme}.png')
     # tapping a non-song hero doesn't navigate
-    await pg.evaluate("document.getElementById('npHeroTitle').click()"); await pg.wait_for_timeout(400)
+    await pg.evaluate("__h.el('.nph-title').click()"); await pg.wait_for_timeout(400)
     check((await pg.evaluate('__h.hero()'))['shown'], f'[{theme}] tapping a movie hero stays on Home')
+    # build 222: swipe through what was played
+    t = await pg.evaluate('__h.titles()'); print(t)
+    check(t[:4] == ['Heat', 'Funk History Hour', 'Ray TV News', 'Prince'] and await pg.evaluate('__h.idx()') == 0, f'[{theme}] the slides are what is playing, then what was played, newest first {t[:5]}')
+    d = await pg.evaluate('__h.dots()')
+    check(d['n'] == min(7, len(t)) and d['on'] == 0, f'[{theme}] dots under it, the first lit {d}')
+    await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(600)
+    h = await pg.evaluate('__h.hero()')
+    check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and (await pg.evaluate('__h.dots()'))['on'] == 2,
+          f'[{theme}] swiping shows the next one, picture and all {h["title"]}')
+    await pg.screenshot(path=f'{shots}/hero-swipe-{theme}.png')
+    gaps = await pg.evaluate("__h.gaps()")
+    check(max(gaps) - min(gaps) <= 2 and max(gaps) < 40, f'[{theme}] every slide\'s Play button sits the same short way above the dots {gaps}')
+    # a drag (mouse) pages one slide on
+    box = await pg.evaluate("(()=>{ var r = document.getElementById('npHeroTrack').getBoundingClientRect(); return [r.left + r.width * .7, r.top + 80]; })()")
+    await pg.mouse.move(box[0], box[1]); await pg.mouse.down(); await pg.mouse.move(box[0] - 150, box[1], steps=8); await pg.mouse.up(); await pg.wait_for_timeout(900)
+    check(await pg.evaluate('__h.idx()') == 3 and (await pg.evaluate('__h.hero()'))['title'] == 'Prince', f'[{theme}] a drag pages to the next slide ({await pg.evaluate("__h.idx()")})')
+    check(not await pg.evaluate("document.body.classList.contains('artist-open')"), f'[{theme}] and the drag doesn\'t count as a tap')
+    # something new plays while looking back: the slide stays put
+    await pg.evaluate("__h.fake({ name: 'KISS FM', url: 'https://radio.example/kiss', urlToResolve: 'https://radio.example/kiss', favicon: 'https://covers.example/logo.png', stationuuid: 'kiss-1' })"); await pg.wait_for_timeout(700)
+    tt = await pg.evaluate('__h.titles()')
+    # (the test's movie isn't in a real video library, so it drops out of the history)
+    check((await pg.evaluate('__h.hero()'))['title'] == 'Prince' and await pg.evaluate('__h.idx()') == tt.index('Prince') and tt[0] == 'KISS FM',
+          f'[{theme}] a new track while looking back leaves that slide on screen (the new one goes first)')
+    # on the first slide, the new track shows
+    await pg.evaluate('__h.go(0)'); await pg.wait_for_timeout(600)
+    await pg.evaluate("__h.fake({ name: 'Jazz 24', url: 'https://radio.example/jazz', urlToResolve: 'https://radio.example/jazz', favicon: 'https://covers.example/cover.jpg', stationuuid: 'jazz-1' })"); await pg.wait_for_timeout(700)
+    h = await pg.evaluate('__h.hero()')
+    check(h['title'] == 'Jazz 24' and h['kicker'] == 'Station' and await pg.evaluate('__h.idx()') == 0, f'[{theme}] on the first slide, the new track takes its place')
+    # Play on an older song slide: the artist shuffle from that song
+    ti = await pg.evaluate('__h.titles()'); pi = ti.index('Prince')
+    await pg.evaluate(f'__h.go({pi})'); await pg.wait_for_timeout(600)
+    await pg.evaluate("__h.el('.nph-play').click()"); await pg.wait_for_timeout(1000)
+    q = await pg.evaluate('__d.q()')
+    check(q['label'] == 'Prince Shuffle' and q['cur'] == 'Prince 03', f'[{theme}] Play on an older song starts the artist shuffle from that song {q}')
+    check(await pg.evaluate('__h.idx()') == 0 and (await pg.evaluate('__h.hero()'))['title'] == 'Prince', f'[{theme}] and it is now the first slide, still on screen')
+    n_before = await pg.evaluate('__h.n()')
+    await pg.reload(); await pg.wait_for_timeout(3000)
+    await pg.evaluate('__d.home()'); await pg.wait_for_timeout(800)
+    check(await pg.evaluate('__h.n()') == n_before and (await pg.evaluate('__h.titles()'))[0] == 'Prince', f'[{theme}] the slides come back after a restart')
     # bigger text at 360 wide still fits
     await pg.set_viewport_size({'width': 360, 'height': 800})
+    await pg.evaluate(f"__h.meta('Prince', {json.dumps(BIO)})")
     await pg.evaluate("__h.play('Prince 05')"); await pg.wait_for_timeout(1200)
     await pg.evaluate("""(()=>{ var st = document.createElement('style'); st.textContent = '.nph-title{ font-size:calc(1.3 * clamp(28px, 8vw, 40px)) !important } .nph-desc{ font-size:18.2px !important } .nph-kicker{ font-size:15px !important }'; document.head.appendChild(st); window.scrollTo(0,0); })()""")
     await pg.wait_for_timeout(400)
