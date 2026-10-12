@@ -121,214 +121,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         @Override public void onCastStatus() { castSafe("status", AmplifyPlayerPlugin.this::onCastStatus); }
       };
 
-  // ---- Spotify (build 211): Top 100 songs play in the Spotify app, driven from here ----
-  private SpotifyBridge spotify;
-  private boolean spotifyActive;
-  private final SpotifyBridge.Listener spotifyListener =
-      new SpotifyBridge.Listener() {
-        @Override
-        public void onSpotifyState() {
-          if (!spotifyActive || currentId == null) return;
-          emitState(true);
-          main.removeCallbacks(progressTick);
-          if (spotify.isPlaying()) main.postDelayed(progressTick, 500L);
-          syncKeepAlive();
-        }
-
-        @Override
-        public void onSpotifyAuth(boolean ok, String error) {
-          JSObject o = spotifyStatusObj();
-          o.put("event", "auth");
-          o.put("ok", ok);
-          if (error != null) o.put("error", error);
-          notifyListeners("spotify", o);
-        }
-
-        @Override
-        public void onSpotifyError(String message) {
-          if (!spotifyActive || currentId == null) return;
-          JSObject o = new JSObject();
-          o.put("id", currentId);
-          // Not a network code (2xxx): the page mustn't keep retrying what Spotify refused.
-          o.put("code", 4006);
-          o.put("name", message);
-          o.put("message", message);
-          o.put("spotify", true);
-          notifyListeners("error", o);
-        }
-
-        @Override
-        public void onSpotifyAdvance(String key) {
-          if (!spotifyActive || currentId == null) return;
-          JSObject o = new JSObject();
-          o.put("id", currentId);
-          o.put("key", key);
-          notifyListeners("spotifyadvance", o);
-        }
-      };
-
-  private SpotifyBridge spotify() {
-    if (spotify == null) {
-      spotify = new SpotifyBridge(getContext());
-      spotify.setListener(spotifyListener);
-    }
-    spotify.setUiContext(getActivity());
-    return spotify;
-  }
-
-  private void leaveSpotify() {
-    if (!spotifyActive) return;
-    spotifyActive = false;
-    if (spotify != null) spotify.stop();
-    syncKeepAlive();
-  }
-
-  // Amplify stays running while the chart plays (SpotifyKeepAlive); paused, it lets go after a while.
-  private static final long KEEPALIVE_PAUSED_MS = 10 * 60 * 1000L;
-  private String keepAliveTitle;
-  private final Runnable keepAliveOff =
-      () -> {
-        keepAliveTitle = null;
-        SpotifyKeepAlive.stop(getContext());
-      };
-
-  private void syncKeepAlive() {
-    boolean hold = spotifyActive && spotify != null && spotify.holdsPlayback();
-    if (!hold) {
-      main.removeCallbacks(keepAliveOff);
-      keepAliveOff.run();
-      return;
-    }
-    if (spotify.isPlaying() || spotify.playWhenReady()) {
-      main.removeCallbacks(keepAliveOff);
-      String title = spotify.trackName();
-      if (keepAliveTitle == null || (!title.isEmpty() && !title.equals(keepAliveTitle))) {
-        keepAliveTitle = title;
-        SpotifyKeepAlive.update(getContext(), title);
-      }
-    } else {
-      main.removeCallbacks(keepAliveOff);
-      main.postDelayed(keepAliveOff, KEEPALIVE_PAUSED_MS);
-    }
-  }
-
-  private JSObject spotifyStatusObj() {
-    SpotifyBridge b = spotify();
-    JSObject o = new JSObject();
-    o.put("clientId", b.clientId());
-    o.put("signedIn", b.signedIn());
-    o.put("installed", b.installed());
-    o.put("connected", b.connected());
-    o.put("redirectUri", SpotifyBridge.REDIRECT);
-    return o;
-  }
-
-  private JSObject spotifySnapshot() {
-    SpotifyBridge b = spotify();
-    JSObject o = new JSObject();
-    o.put("id", currentId);
-    o.put("position", b.positionMs() / 1000.0d);
-    long d = b.durationMs();
-    o.put("duration", d <= 0 ? -1.0d : d / 1000.0d);
-    o.put("live", false);
-    o.put("isPlaying", b.isPlaying());
-    o.put("playWhenReady", b.playWhenReady());
-    o.put("state", b.stateName());
-    o.put("at", System.currentTimeMillis());
-    o.put("spotify", true);
-    return o;
-  }
-
-  /** The browser came back from Spotify's sign-in (MainActivity hands the address over). */
-  public void handleSpotifyRedirect(android.net.Uri uri) {
-    main.post(() -> spotify().handleRedirect(uri));
-  }
-
-  @PluginMethod
-  public void spotifyStatus(PluginCall call) {
-    main.post(() -> call.resolve(spotifyStatusObj()));
-  }
-
-  @PluginMethod
-  public void spotifySetClientId(PluginCall call) {
-    String id = call.getString("clientId", "");
-    main.post(
-        () -> {
-          spotify().setClientId(id);
-          call.resolve(spotifyStatusObj());
-        });
-  }
-
-  @PluginMethod
-  public void spotifySignIn(PluginCall call) {
-    main.post(
-        () -> {
-          try {
-            if (spotify().clientId().isEmpty()) {
-              call.reject("Add your Spotify Client ID first");
-              return;
-            }
-            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(spotify().authUrl()));
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(i);
-            call.resolve();
-          } catch (Exception e) {
-            call.reject(String.valueOf(e.getMessage()));
-          }
-        });
-  }
-
-  @PluginMethod
-  public void spotifySignOut(PluginCall call) {
-    main.post(
-        () -> {
-          if (spotifyActive) leaveSpotify();
-          spotify().signOut();
-          call.resolve(spotifyStatusObj());
-        });
-  }
-
-  /** The songs after this one, already found on Spotify: {items: [{uri, key}]}. */
-  @PluginMethod
-  public void spotifySetNext(PluginCall call) {
-    final List<String[]> list = new ArrayList<>();
-    try {
-      JSArray arr = call.getArray("items");
-      if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-          org.json.JSONObject it = arr.getJSONObject(i);
-          String uri = it.optString("uri", "");
-          if (uri.startsWith("spotify:")) list.add(new String[] {uri, it.optString("key", "")});
-        }
-      }
-    } catch (Exception e) {
-      call.reject(String.valueOf(e.getMessage()));
-      return;
-    }
-    main.post(
-        () -> {
-          if (spotifyActive) spotify().setNext(list);
-          call.resolve();
-        });
-  }
-
-  /** A current Web API access token for the page's searches: {token}. */
-  @PluginMethod
-  public void spotifyToken(PluginCall call) {
-    final SpotifyBridge b = spotify();
-    new Thread(
-            () -> {
-              try {
-                JSObject o = new JSObject();
-                o.put("token", b.token());
-                call.resolve(o);
-              } catch (Exception e) {
-                call.reject(String.valueOf(e.getMessage()), "SPOTIFY_AUTH");
-              }
-            })
-        .start();
-  }
-
   @Override // com.getcapacitor.Plugin
   public void load() {
     this.main.post(
@@ -425,7 +217,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   /** Plays url on the Chromecast as the current item (the phone's player stops). */
   private void startCast(String url, String id, boolean play, long startMs, boolean live, boolean isVideo) {
-    leaveSpotify();
     leaveVlc();
     SkipAwarePlayer sp = sessionPlayer();
     if (sp != null) {
@@ -545,7 +336,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   /** A session started: what the phone is playing (a stream) moves to the Chromecast. */
   private void castTakeOver() {
-    if (castActive || spotifyActive || cast == null || currentId == null || VlcEngine.isActive()) return;
+    if (castActive || cast == null || currentId == null || VlcEngine.isActive()) return;
     SkipAwarePlayer sp = sessionPlayer();
     if (sp != null && sp.isNativeMode()) return; // Android Auto's own queue stays in the car
     ExoPlayer e = exo();
@@ -686,7 +477,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             playbackService.exo.removeListener(this.exoListener);
           }
           if (VlcEngine.getListener() == this.vlcListener) VlcEngine.setListener(null);
-          if (spotify != null) spotify.disconnect();
           this.attached = false;
           this.main.removeCallbacks(this.progressTick);
           if (this.video != null) {
@@ -767,8 +557,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private void nativePauseNow() {
     onMain(
         () -> {
-          if (spotifyActive) spotify().pause();
-          else if (castActive && cast != null) {
+          if (castActive && cast != null) {
             castPlay = false;
             cast.pause();
           } else if (VlcEngine.isActive()) VlcEngine.pause();
@@ -786,10 +575,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private void nativePlayNow() {
     onMain(
         () -> {
-          if (spotifyActive) {
-            spotify().play();
-            return;
-          }
           if (VlcEngine.isActive()) {
             VlcEngine.play();
             return;
@@ -826,42 +611,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean vlcHw = !Boolean.FALSE.equals(pluginCall.getBoolean("hw", true));
     if (string == null || string.isEmpty()) {
       pluginCall.reject("No url");
-    } else if (string.startsWith("spotify:")) {
-      // Build 211: a Top 100 song, played by the Spotify app.
-      run(
-          pluginCall,
-          () -> {
-            leaveCast();
-            leaveVlc();
-            ExoPlayer e = exo();
-            if (e != null) {
-              e.stop();
-              e.clearMediaItems();
-            }
-            SkipAwarePlayer sp = sessionPlayer();
-            if (sp != null) {
-              sp.exitNativeMode();
-              sp.clearOnAir();
-            }
-            hasVideo = false;
-            videoW = videoH = 0;
-            if (this.video != null) this.video.hide();
-            currentId = string2;
-            spotifyActive = true;
-            spotify().loadFromPage(string, zEquals, (long) (dDoubleValue * 1000.0d));
-            // Started while the listener is in the app (allowed then); kept for the songs after.
-            if (zEquals) {
-              keepAliveTitle = "";
-              SpotifyKeepAlive.start(getContext(), "");
-            }
-            emitState(false);
-            pluginCall.resolve();
-          });
     } else if (useVlc) {
       run(
           pluginCall,
           () -> {
-            leaveSpotify();
             leaveCast();
             loadInVlc(string, string2, zEquals, dDoubleValue, d, d2, subs, textOff, vlcHw);
             pluginCall.resolve();
@@ -870,7 +623,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       run(
           pluginCall,
           () -> {
-            leaveSpotify();
             // Build 194: while casting, a stream goes to the Chromecast.
             if (cast != null && cast.connected() && CastBridge.castable(string)) {
               try {
@@ -930,11 +682,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          if (spotifyActive) {
-            spotify().play();
-            call.resolve();
-            return;
-          }
           if (VlcEngine.isActive()) {
             VlcEngine.play();
             call.resolve();
@@ -965,8 +712,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          if (spotifyActive) spotify().pause();
-          else if (castActive && cast != null) {
+          if (castActive && cast != null) {
             castPlay = false;
             cast.pause();
           } else if (VlcEngine.isActive()) VlcEngine.pause();
@@ -981,7 +727,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         pluginCall,
         () -> {
           ExoPlayer exoPlayerExo = exo();
-          leaveSpotify();
           leaveCast();
           this.currentId = null;
           leaveVlc();
@@ -1004,8 +749,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     run(
         call,
         () -> {
-          if (spotifyActive) spotify().seek((long) (pos * 1000));
-          else if (castActive && cast != null) {
+          if (castActive && cast != null) {
             castStartMs = (long) (pos * 1000);
             cast.seek((long) (pos * 1000));
           } else if (VlcEngine.isActive()) VlcEngine.seekTo((long) (pos * 1000));
@@ -1658,7 +1402,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   public void onCarTookOver() {
-    leaveSpotify();
     leaveCast();
     if (this.currentId == null) {
       return;
@@ -2002,7 +1745,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   public JSObject snapshot() {
     String str;
-    if (spotifyActive) return spotifySnapshot();
     if (castActive) return castSnapshot();
     if (VlcEngine.isActive()) return vlcSnapshot();
     ExoPlayer exoPlayerExo = exo();
@@ -2102,12 +1844,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   public void progressTick() {
-    if (spotifyActive) {
-      if (spotify == null || this.currentId == null || !spotify.isPlaying()) return;
-      notifyListeners("progress", spotifySnapshot());
-      this.main.postDelayed(this.progressTick, 500L);
-      return;
-    }
     if (castActive) {
       if (cast == null || this.currentId == null
           || cast.playerState() != com.google.android.gms.cast.MediaStatus.PLAYER_STATE_PLAYING) return;
@@ -2846,19 +2582,19 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private final class ExoListener implements Player.Listener {
     @Override
     public void onTracksChanged(Tracks tracks) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       onTracks(tracks);
     }
 
     @Override
     public void onVideoSizeChanged(VideoSize videoSize) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       onVideoSize(videoSize);
     }
 
     @Override
     public void onCues(CueGroup cueGroup) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       AmplifyPlayerPlugin.this.onCues(cueGroup);
     }
 
@@ -2866,7 +2602,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onPlaybackStateChanged(int state) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       if (state == Player.STATE_ENDED) schedulePageTakeover();
       else main.removeCallbacks(pageTakeover);
       emitState(false);
@@ -2874,7 +2610,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override
     public void onIsPlayingChanged(boolean isPlaying) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       emitState(false);
       main.removeCallbacks(progressTick);
       if (isPlaying) main.postDelayed(progressTick, 500);
@@ -2882,7 +2618,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override // androidx.media3.common.Player.Listener
     public void onPlayWhenReadyChanged(boolean z, int i) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       SkipAwarePlayer skipAwarePlayerSessionPlayer = AmplifyPlayerPlugin.this.sessionPlayer();
       if (z
           && skipAwarePlayerSessionPlayer != null
@@ -2896,20 +2632,20 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
     @Override // androidx.media3.common.Player.Listener
     public void onMediaItemTransition(MediaItem mediaItem, int i) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       AmplifyPlayerPlugin.this.announceCar();
     }
 
     @Override
     public void onPositionDiscontinuity(
         Player.PositionInfo oldPosition, Player.PositionInfo newPosition, int reason) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       if (currentId != null) notifyListeners("progress", snapshot());
     }
 
     @Override
     public void onPlayerError(PlaybackException error) {
-      if (VlcEngine.isActive() || castActive || spotifyActive) return; // the phone's player is idle while VLC plays (or while casting)
+      if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       if (currentId == null) return;
       JSObject o = new JSObject();
       o.put("id", currentId);

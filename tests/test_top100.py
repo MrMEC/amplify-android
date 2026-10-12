@@ -1,7 +1,8 @@
-"""Build 211: Top 100. Home row of this week's Billboard Hot 100; the page week by week (previous/next,
-movement, the date picker); covers from iTunes; Spotify set-up in Settings; songs found with Spotify's
-search and played through the plugin's spotify: route, Next down the chart, the end of a song playing the
-next. The chart files, iTunes, Spotify's API and the native plugin are all mocked.
+"""Builds 211-212: Top 100. Home row of this week's Billboard Hot 100; the page week by week (previous/next,
+the date picker); rows: rank, cover, title/artist; covers from iTunes. Build 212: a song plays its music
+video in YouTube's player (the video page), found on the artist's channel or Wikidata, the week's chart
+listed under it, the next song at the end, a note with Find on YouTube when there's no video or YouTube
+won't play it. Chart files, iTunes, Wikidata, the channel feed, YouTube's player and the plugin are mocked.
 Run: python3 tests/test_top100.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, sys, re
 from urllib.parse import urlparse, parse_qs
@@ -40,7 +41,7 @@ def art_svg(i):
             '<text x="300" y="350" font-size="160" text-anchor="middle" fill="white" font-family="sans-serif">%d</text></svg>') % (COLORS[i % 5], i)
 
 MOCK = r"""(function(){
- var L = {}; window.__nat = { next: [], loads: [], signIns: 0, clientId: '', signedIn: false, plays: 0, pauses: 0 };
+ var L = {}; window.__nat = { feeds: [], loads: [], plays: 0, pauses: 0 };
  function emit(n, ev){ (L[n] || []).forEach(function(f){ f(ev); }); }
  window.__emit = emit;
  var cur = null;
@@ -55,12 +56,14 @@ MOCK = r"""(function(){
     return Promise.resolve({}); },
   play: function(){ __nat.plays++; if(cur) setTimeout(function(){ emit('state', { id: cur.id, state: 'ready', isPlaying: true, playWhenReady: true, duration: 200, position: 10, external: true }); }, 20); return Promise.resolve({}); },
   pause: function(){ __nat.pauses++; if(cur) setTimeout(function(){ emit('state', { id: cur.id, state: 'ready', isPlaying: false, playWhenReady: false, duration: 200, position: 10, external: true }); }, 20); return Promise.resolve({}); },
-  spotifyStatus: function(){ return Promise.resolve({ clientId: __nat.clientId, signedIn: __nat.signedIn, installed: true, connected: false, redirectUri: 'amplify-spotify://callback' }); },
-  spotifySetClientId: function(o){ __nat.clientId = o.clientId; __nat.signedIn = false; return impl.spotifyStatus(); },
-  spotifySignIn: function(){ __nat.signIns++; return Promise.resolve({}); },
-  spotifySignOut: function(){ __nat.signedIn = false; return impl.spotifyStatus(); },
-  spotifySetNext: function(o){ __nat.next = o.items; return Promise.resolve({}); },
-  spotifyToken: function(){ return __nat.signedIn ? Promise.resolve({ token: 'TOK123' }) : Promise.reject(new Error('Not signed in to Spotify')); }
+  fetchText: function(o){ __nat.feeds.push(o.url);
+    var m = /playlist_id=UULF(\w+)|channel_id=UC(\w+)/.exec(o.url || '');
+    var ch = m ? (m[1] || m[2]) : '';
+    if(ch === 'tsTaylorChannel0000001') return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">'
+      + '<entry><yt:videoId>tsLyric0001</yt:videoId><title>Taylor Swift - Patient Zero (Lyric Video)</title><link href="https://www.youtube.com/watch?v=tsLyric0001"/><published>2026-10-09T00:00:00Z</published></entry>'
+      + '<entry><yt:videoId>tsPatient01</yt:videoId><title>Taylor Swift - Patient Zero (Official Music Video)</title><link href="https://www.youtube.com/watch?v=tsPatient01"/><published>2026-10-08T00:00:00Z</published></entry>'
+      + '</feed>' });
+    return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>' }); }
  };
  window.__endSong = function(){ if(cur) emit('state', { id: cur.id, state: 'ended', isPlaying: false, playWhenReady: true, duration: 200, position: 200, external: true }); };
  var P = new Proxy({}, { get: function(t, k){ if(k === 'then') return undefined; if(k === 'setCarLibraryPart') return undefined; if(impl[k]) return impl[k]; return function(){ return Promise.resolve({}); }; } });
@@ -74,12 +77,12 @@ def check(c, m):
 
 async def run(theme, b):
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, locale='en-US')
-    counts = {'itunes': 0, 'spotify': [], 'charts': []}
+    counts = {'itunes': 0, 'wiki': [], 'embeds': [], 'charts': []}
     async def route(r):
         u = r.request.url
-        if '127.0.0.1' in u or u.startswith('data:'):
-            return await r.continue_()
         p = urlparse(u)
+        if p.netloc.startswith('127.0.0.1') or u.startswith('data:'):
+            return await r.continue_()
         if p.netloc == 'raw.githubusercontent.com':
             counts['charts'].append(p.path)
             if p.path.endswith('/recent.json'): body = json.dumps(CHARTS['2026-10-10'])
@@ -101,16 +104,28 @@ async def run(theme, b):
         if p.netloc == 'art.example':
             n = int(p.path.split('/')[1])
             return await r.fulfill(status=200, content_type='image/svg+xml', body=art_svg(n))
-        if p.netloc == 'api.spotify.com':
-            counts['spotify'].append((parse_qs(p.query).get('q', [''])[0], r.request.headers.get('authorization')))
-            q = parse_qs(p.query)['q'][0]
-            m = re.search(r'Song (\d+)|Patient Zero', q)
-            n = int(m.group(1)) if m and m.group(1) else 1
-            title = 'Patient Zero' if n == 1 else f'Song {n:03d}'
-            artist = ARTISTS[(n - 1) % 5].split(' Featuring ')[0]
-            items = [{'name': title + ' - Remix', 'uri': f'spotify:track:remix{n}', 'artists': [{'name': artist}], 'album': {'images': []}},
-                     {'name': title, 'uri': f'spotify:track:t{n}', 'artists': [{'name': artist}], 'album': {'images': [{'url': f'https://art.example/{n}/640.jpg'}]}}]
-            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps({'tracks': {'items': items}}))
+        if p.netloc == 'www.wikidata.org':
+            q = parse_qs(p.query); act = q.get('action', [''])[0]
+            counts['wiki'].append(u)
+            if act == 'wbsearchentities':
+                term = q.get('search', [''])[0]
+                hits = []
+                if term == 'Taylor Swift': hits = [{'id': 'Q26876', 'label': 'Taylor Swift', 'description': 'American singer-songwriter (born 1989)'}]
+                elif term == 'Song 002': hits = [{'id': 'Q900002', 'label': 'Song 002', 'description': '2026 single by Ella Langley'}, {'id': 'Q900099', 'label': 'Song 002', 'description': 'song by someone else'}]
+                body = json.dumps({'search': hits})
+            elif act == 'wbgetentities':
+                ids = q.get('ids', [''])[0].split('|')
+                ents = {}
+                for i in ids:
+                    if i == 'Q26876': ents[i] = {'claims': {'P2397': [{'rank': 'preferred', 'mainsnak': {'datavalue': {'value': 'UCtsTaylorChannel0000001'}}}]}}
+                    elif i == 'Q900002': ents[i] = {'claims': {'P1651': [{'rank': 'normal', 'mainsnak': {'datavalue': {'value': 'ellaSong002'}}}]}}
+                    else: ents[i] = {'claims': {}}
+                body = json.dumps({'entities': ents})
+            else: body = '{}'
+            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=body)
+        if p.netloc == 'www.youtube.com' and p.path.startswith('/embed/'):
+            counts['embeds'].append(p.path.split('/')[2])
+            return await r.fulfill(status=200, content_type='text/html', body='<!doctype html><body style="background:#111;color:#fff;font:20px sans-serif">VIDEO ' + p.path.split('/')[2] + '</body>')
         return await r.abort()
     await ctx.route('**/*', route)
     await ctx.add_init_script(MOCK)
@@ -124,7 +139,7 @@ async def run(theme, b):
       const t = [...g.querySelectorAll('.tile')]; return { shown: s && getComputedStyle(s).display !== 'none', n: t.length,
       first: t[0] ? t[0].querySelector('.tile-name').textContent + ' / ' + (t[0].querySelector('.tile-sub')||{}).textContent : '',
       row: g.classList.contains('home-row') || (g.parentElement && g.parentElement.classList.contains('home-row')),
-      before: !!(s && s.compareDocumentPosition(document.getElementById('madeForYouSection')) & 4) && s.nextElementSibling && s.nextElementSibling.id === 'madeForYouSection' }; })()""")
+      before: !!(s && s.nextElementSibling && s.nextElementSibling.id === 'madeForYouSection') }; })()""")
     print(theme, home)
     check(home['shown'] and home['n'] == 20 and home['first'] == '1. Patient Zero / Taylor Swift', f'{theme}: Home shows a Top 100 row of this week\'s top 20 {home}')
     check(home['before'], f'{theme}: Top 100 sits right above Made for You (which stays right above Top Stations)')
@@ -139,26 +154,25 @@ async def run(theme, b):
     page = await pg.evaluate("""(()=>({ head: document.getElementById('stationsHeading').textContent,
       week: (document.querySelector('.chart-week-label')||{}).innerText, rows: document.querySelectorAll('.chart-row').length,
       prev: document.querySelectorAll('.chart-week-btn')[0].disabled, next: document.querySelectorAll('.chart-week-btn')[1].disabled,
-      moves: [...document.querySelectorAll('.chart-move')].slice(0, 6).map(m => m.textContent),
-      notice: (document.querySelector('.chart-notice')||{}).innerText || '' }))()""")
+      moves: document.querySelectorAll('.chart-move').length, more: document.querySelectorAll('.chart-row .row-more-btn, .chart-row button').length }))()""")
     print(theme, page)
     check(page['head'] == 'Top 100' and page['rows'] == 100, f'{theme}: the page lists all 100 {page["head"]} {page["rows"]}')
     check(page['week'].startswith('Week of October 10, 2026') and 'this week' in page['week'], f'{theme}: headed with the week {page["week"]!r}')
     check(not page['prev'] and page['next'], f'{theme}: previous week offered, no next week on the newest chart')
-    check(page['moves'][0] in ('NEW', 'RE') and any(m.startswith('▲') for m in page['moves']) and any(m.startswith('▼') for m in page['moves']) and '–' in page['moves'],
-          f'{theme}: movement shown (new, up, down, same) {page["moves"]}')
-    check('Set up Spotify' in page['notice'], f'{theme}: says to set up Spotify {page["notice"]!r}')
+    check(page['moves'] == 0 and page['more'] == 0, f'{theme}: no chart-movement column and no More button (build 212)')
+    geo = await pg.evaluate("""(()=>{ const r = [...document.querySelectorAll('.chart-row')].slice(0, 12), x = r[11] || r[0];
+      const k = x.querySelector('.chart-rank').getBoundingClientRect(), a = x.querySelector('.tile-art').getBoundingClientRect(),
+            b = x.querySelector('.song-row-body').getBoundingClientRect(), row = x.getBoundingClientRect(), h = document.getElementById('stationsHeading').getBoundingClientRect();
+      return { rankLeft: Math.round(k.left), head: Math.round(h.left), rankBeforeArt: k.right <= a.left, gapRankArt: Math.round(a.left - k.right),
+               gapArtText: Math.round(b.left - a.right), textW: Math.round(b.width), rowW: Math.round(row.width), textRight: Math.round(row.right - b.right) }; })()""")
+    print(theme, geo)
+    check(geo['rankBeforeArt'] and abs(geo['rankLeft'] - geo['head']) <= 1, f'{theme}: the rank comes first, on the page edge, then the cover {geo}')
+    check(geo['gapRankArt'] <= 12 and geo['gapArtText'] <= 11, f'{theme}: tight gaps between rank, cover and text {geo}')
+    check(geo['textRight'] <= 2 and geo['textW'] >= geo['rowW'] - 120, f'{theme}: title and artist get the rest of the row {geo}')
     await pg.wait_for_timeout(1500)
     painted = await pg.evaluate("[...document.querySelectorAll('.chart-row')].slice(0, 6).map(r => { const i = r.querySelector('.tile-art img'); return i ? i.src.split('/')[3] : null; })")
-    edge = await pg.evaluate("""(()=>{ const a = document.querySelector('.chart-row .tile-art').getBoundingClientRect(), n = document.querySelector('.chart-row .song-row-num').getBoundingClientRect(),
-       m = document.querySelector('#playerBar .player-icon, #playerIcon').getBoundingClientRect(), h = document.getElementById('stationsHeading').getBoundingClientRect();
-       return { art: Math.round(a.left), mini: Math.round(m.left), head: Math.round(h.left), rankAfter: n.left >= a.right }; })()""")
-    check(abs(edge['art'] - edge['mini']) <= 1 and abs(edge['head'] - edge['mini']) <= 1 and edge['rankAfter'], f'{theme}: covers on the left margin (mini player art, heading), rank after the cover {edge}')
     check(painted == ['1', '2', '3', '4', '5', '6'], f'{theme}: every row on screen has its cover, including ones found on Home {painted}')
     await pg.screenshot(path=f'{OUT}/top100-page-{theme}.png')
-    await pg.evaluate("document.querySelectorAll('.chart-row')[1].click()"); await pg.wait_for_timeout(600)
-    sub = await pg.evaluate("document.getElementById('playerSub') ? document.getElementById('playerSub').textContent : ''")
-    check('Set up Spotify' in sub and not await pg.evaluate("__nat.loads.length"), f'{theme}: without Spotify a tap explains, nothing loads ({sub!r})')
     # previous week, then the date picker
     await pg.evaluate("document.querySelectorAll('.chart-week-btn')[0].click()"); await pg.wait_for_timeout(900)
     w2 = await pg.evaluate("document.querySelector('.chart-week-label').innerText")
@@ -170,71 +184,46 @@ async def run(theme, b):
     await pg.evaluate("document.querySelectorAll('.chart-week-btn')[1].click()"); await pg.wait_for_timeout(500)
     await pg.evaluate("document.querySelectorAll('.chart-week-btn')[1].click()"); await pg.wait_for_timeout(700)
 
-    # ---- Settings: set up and sign in
-    await pg.evaluate("__h.ev('openSettings()')"); await pg.wait_for_timeout(500)
-    st = await pg.evaluate("document.getElementById('spotifySettingsBody').innerText")
-    check('amplify-spotify://callback' in st and 'com.markcoleman.amplify' in st and '7E:C7:97' in st, f'{theme}: Settings gives the Spotify app set-up details')
-    row = await pg.query_selector('#spotifySettingsRow')
-    await row.scroll_into_view_if_needed(); await pg.wait_for_timeout(200)
-    await row.screenshot(path=f'{OUT}/top100-settings-{theme}.png')
-    await pg.fill('#spotifyClientIdInput', 'abc'); await pg.click('#spotifySaveBtn'); await pg.wait_for_timeout(200)
-    check('32 letters' in await pg.evaluate("document.getElementById('spotifySettingsBody').innerText"), f'{theme}: a wrong ID is explained')
-    await pg.fill('#spotifyClientIdInput', '0123456789abcdef0123456789abcdef'); await pg.click('#spotifySaveBtn'); await pg.wait_for_timeout(300)
-    check(await pg.evaluate("__nat.clientId") == '0123456789abcdef0123456789abcdef' and await pg.evaluate("__nat.signIns") == 1, f'{theme}: Save stores the ID and opens Spotify sign-in')
-    await pg.evaluate("__nat.signedIn = true; __emit('spotify', { event: 'auth', ok: true, signedIn: true, clientId: __nat.clientId })"); await pg.wait_for_timeout(300)
-    check(await pg.evaluate("document.getElementById('spotifyStatus').textContent") == 'Connected', f'{theme}: signed in shows Connected')
-    await row.screenshot(path=f'{OUT}/top100-settings-on-{theme}.png')
-    await pg.evaluate("document.getElementById('settingsCloseBtn').click()"); await pg.wait_for_timeout(300)
-    check(not await pg.evaluate("!!document.querySelector('.chart-notice')"), f'{theme}: the set-up note leaves the page once signed in')
-
-    # ---- play #2: found on Spotify, played through the spotify: route
-    await pg.evaluate("document.querySelectorAll('.chart-row')[1].click()"); await pg.wait_for_timeout(1200)
-    loads = await pg.evaluate("__nat.loads")
-    q = next((x for x in counts['spotify'] if 'Song 002' in x[0]), ('', ''))
-    pre = any('Song 003' in x[0] for x in counts['spotify'])
-    check(loads[-1:] == ['spotify:track:t2'], f'{theme}: #2 plays its Spotify song (not the remix) {loads}')
-    check(q[1] == 'Bearer TOK123' and 'track:Song 002' in q[0] and 'artist:Ella Langley' in q[0], f'{theme}: found with Spotify search, signed in {q}')
-    check(pre, f'{theme}: the next song down the chart is looked up ahead')
-    np = await pg.evaluate("""(()=>({ title: document.getElementById('playerName') ? document.getElementById('playerName').textContent : '',
-       sub: document.getElementById('playerSub').textContent, playing: document.body.classList.contains('ui-playing'),
-       rowPlaying: document.querySelectorAll('.chart-row')[1].classList.contains('playing') }))()""")
-    print(theme, np)
-    check(np['playing'] and np['rowPlaying'] and 'Ella Langley' in np['sub'], f'{theme}: player bar shows it playing, the row marked {np}')
-    await pg.evaluate("__h.ev('openNowPlaying()')"); await pg.wait_for_timeout(900)
-    npsub = await pg.evaluate("document.getElementById('npSub').textContent")
-    check('No. 2 on the Hot 100' in npsub, f'{theme}: Now Playing says where it charts ({npsub!r})')
-    await pg.screenshot(path=f'{OUT}/top100-np-{theme}.png')
-    # Next goes down the chart; the end of a song plays the next
-    await pg.evaluate("__h.ev('playNextInLine()')"); await pg.wait_for_timeout(1000)
-    loads = await pg.evaluate("__nat.loads")
-    check(loads[-1:] == ['spotify:track:t3'], f'{theme}: Next plays #3 {loads[-2:]}')
-    await pg.evaluate("__endSong()"); await pg.wait_for_timeout(1200)
-    loads = await pg.evaluate("__nat.loads")
-    check(loads[-1:] == ['spotify:track:t4'], f'{theme}: the end of #3 plays #4 {loads[-2:]}')
-    nsearch = len(counts['spotify'])
-    await pg.evaluate("__h.ev('playNextInLine()')"); await pg.wait_for_timeout(800)
-    check(await pg.evaluate("__nat.loads.slice(-1)[0]") == 'spotify:track:t5', f'{theme}: Next again plays #5')
-    # the next few are handed to the native side, which can carry on by itself (locked phone)
-    await pg.wait_for_timeout(600)
-    nx = await pg.evaluate("__nat.next")
-    check([x['uri'] for x in nx] == ['spotify:track:t6', 'spotify:track:t7', 'spotify:track:t8', 'spotify:track:t9'] and nx[0]['key'].startswith('song:'),
-          f'{theme}: the next four are handed to the native side {[x["uri"] for x in nx]}')
-    nloads = await pg.evaluate("__nat.loads.length")
-    await pg.evaluate("__emit('spotifyadvance', { id: __h.ev('audio._id'), key: __nat.next[0].key })"); await pg.wait_for_timeout(800)
-    adv = await pg.evaluate("""(()=>({ name: document.getElementById('playerName').textContent, loads: __nat.loads.length,
-       row: document.querySelectorAll('.chart-row')[5].classList.contains('playing'), next: __nat.next.map(x => x.uri) }))()""")
-    check(adv['name'] == 'Song 006' and adv['loads'] == nloads and adv['row'], f'{theme}: when the native side moves on by itself the page follows, without loading again {adv}')
-    check(adv['next'][:1] == ['spotify:track:t7'], f'{theme}: and hands over the following ones {adv["next"]}')
-    # pause / resume go to the plugin
-    await pg.evaluate("__h.ev('togglePlayPause()')"); await pg.wait_for_timeout(300)
-    check(await pg.evaluate("__nat.pauses") >= 1 and not await pg.evaluate("document.body.classList.contains('ui-playing')"), f'{theme}: Pause pauses it')
-    await pg.evaluate("__h.ev('togglePlayPause()')"); await pg.wait_for_timeout(300)
-    check(await pg.evaluate("__nat.plays") >= 1 and await pg.evaluate("document.body.classList.contains('ui-playing')"), f'{theme}: Play resumes it')
-    # a song played before is not searched again
-    await pg.evaluate("__h.ev('closeNowPlaying()')"); await pg.wait_for_timeout(400)
-    before = len(counts['spotify'])
-    await pg.evaluate("document.querySelectorAll('.chart-row')[1].click()"); await pg.wait_for_timeout(800)
-    check(len(counts['spotify']) == before and await pg.evaluate("__nat.loads.slice(-1)[0]") == 'spotify:track:t2', f'{theme}: a song found before plays without searching again')
+    # ---- a song plays its music video (artist's channel), with the chart under it
+    await pg.evaluate("document.querySelectorAll('.chart-row')[0].click()"); await pg.wait_for_timeout(1800)
+    ov = await pg.evaluate("""(()=>{ const o = document.getElementById('ytOverlay'), f = document.querySelector('#ytOvFrame iframe');
+      return { open: !!o && o.classList.contains('open'), src: f ? f.src : '', title: document.getElementById('ytOvTitle').textContent,
+        sub: document.getElementById('ytOvSub').textContent, head: (document.querySelector('.yt-ov-list-head')||{}).textContent,
+        rows: document.querySelectorAll('.chart-vrow').length, on: (document.querySelector('.chart-vrow.on .chart-vrow-title')||{}).textContent,
+        loads: __nat.loads.length }; })()""")
+    print(theme, ov)
+    check(ov['open'] and '/embed/tsPatient01' in ov['src'] and 'enablejsapi=1' in ov['src'], f'{theme}: #1 plays its official video from the artist\'s channel (not the lyric video) {ov["src"][:70]}')
+    check(ov['title'] == 'Patient Zero' and ov['sub'] == 'Taylor Swift \u00b7 No. 1', f'{theme}: titled with the song, artist and rank {ov["title"]!r} {ov["sub"]!r}')
+    check(ov['head'] == 'Top 100 \u00b7 Week of October 10, 2026' and ov['rows'] == 100 and ov['on'] == 'Patient Zero', f'{theme}: the week\'s chart under it, this song marked')
+    check(ov['loads'] == 0, f'{theme}: nothing goes to the audio player')
+    await pg.wait_for_timeout(1200)
+    await pg.screenshot(path=f'{OUT}/top100-video-{theme}.png')
+    # ended -> next song; #2 found through Wikidata (P1651)
+    fr = [f for f in pg.frames if '/embed/tsPatient01' in f.url][0]
+    await fr.evaluate("parent.postMessage(JSON.stringify({ event: 'onStateChange', info: 0 }), '*')"); await pg.wait_for_timeout(1500)
+    src2 = await pg.evaluate("(document.querySelector('#ytOvFrame iframe')||{}).src || ''")
+    on2 = await pg.evaluate("document.querySelector('.chart-vrow.on .chart-vrow-title').textContent")
+    check('/embed/ellaSong002' in src2 and on2 == 'Song 002', f'{theme}: at the end the next song plays (its video from Wikidata) {src2[:60]} {on2}')
+    # a video YouTube won't play outside YouTube
+    fr2 = [f for f in pg.frames if '/embed/ellaSong002' in f.url][0]
+    await fr2.evaluate("parent.postMessage(JSON.stringify({ event: 'onError', info: 150 }), '*')"); await pg.wait_for_timeout(500)
+    note = await pg.evaluate("(document.querySelector('#ytOvFrame .chart-v-note')||{}).innerText || ''")
+    check('only plays on YouTube' in note and 'Find on YouTube' in note and 'Next Song' in note, f'{theme}: a video blocked outside YouTube says so, with Find on YouTube and Next Song {note!r}')
+    # no video found
+    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][2].click()"); await pg.wait_for_timeout(1800)
+    note3 = await pg.evaluate("(document.querySelector('#ytOvFrame .chart-v-note')||{}).innerText || ''")
+    check('No official video found' in note3 and 'Find on YouTube' in note3, f'{theme}: a song with no video found offers a YouTube search {note3!r}')
+    await pg.screenshot(path=f'{OUT}/top100-novideo-{theme}.png')
+    await pg.evaluate("document.querySelector('.chart-v-actions button:last-child').click()"); await pg.wait_for_timeout(1500)
+    check(await pg.evaluate("document.querySelector('.chart-vrow.on .chart-vrow-title').textContent") == 'Song 004', f'{theme}: Next Song moves down the chart')
+    # found videos are remembered: reopening #1 asks nothing new
+    nwiki, nfeeds = len(counts['wiki']), await pg.evaluate("__nat.feeds.length")
+    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][0].click()"); await pg.wait_for_timeout(800)
+    check(len(counts['wiki']) == nwiki and await pg.evaluate("__nat.feeds.length") == nfeeds and '/embed/tsPatient01' in await pg.evaluate("document.querySelector('#ytOvFrame iframe').src"),
+          f'{theme}: a video found before plays without looking it up again')
+    # Back closes the video page; Home's row opens it too
+    await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(400)
+    check(not await pg.evaluate("document.getElementById('ytOverlay').classList.contains('open')") and not await pg.evaluate("!!document.querySelector('#ytOvFrame iframe')"), f'{theme}: Back closes it and stops the video')
     check(not errs, f'{theme}: no page errors {errs[:2]}')
     await ctx.close()
 

@@ -1546,6 +1546,20 @@
   .yt-ov-list{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
     padding:10px 16px calc(env(safe-area-inset-bottom, 0px) + 20px); }
   .yt-ov-list[hidden]{ display:none; }
+  /* Top 100 videos (build 212): the week's chart under the video, the song playing marked. */
+  .chart-vrow{ display:flex; align-items:center; gap:10px; width:100%; padding:6px 0; margin:0; border:0; background:none; color:var(--text); text-align:left; cursor:pointer; font:inherit; }
+  .chart-vrow .chart-rank{ color:var(--text-dim); }
+  .chart-vrow-art{ flex:0 0 auto; width:44px; height:44px; border-radius:5px; overflow:hidden; font-size:16px; }
+  .chart-vrow-text{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .chart-vrow-title{ font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chart-vrow-artist{ font-size:13px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* The video page is always dark, so the song playing is marked with a light band rather than
+     the theme colour (the light theme's is dark and would vanish here). */
+  .chart-vrow.on{ background:rgba(255,255,255,.10); border-radius:8px; margin:0 -8px; padding:6px 8px; width:calc(100% + 16px); }
+  .chart-vrow.on .chart-vrow-title, .chart-vrow.on .chart-rank{ color:#fff; }
+  .chart-v-note{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:16px; text-align:center; color:rgba(255,255,255,.82); font-size:14px; }
+  .chart-v-actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .chart-v-actions button{ border:0; border-radius:999px; padding:9px 16px; background:rgba(255,255,255,.16); color:#fff; font:inherit; font-weight:700; font-size:13.5px; cursor:pointer; }
   .yt-ov-list-head{ font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); margin:8px 0 12px; }
   .yt-row{ display:flex; align-items:flex-start; gap:12px; width:100%; padding:0; margin:0 0 14px;
     background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
@@ -1682,11 +1696,11 @@
     display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; line-height:1.3;
   }
   /* Top 100 (build 211): rank, cover, title and artist, then the week's movement. */
-  .chart-row .song-row-num{ width:34px; margin:0 2px 0 4px; font-size:15px; font-weight:700; color:var(--text-dim); }
-  .chart-move{ flex-shrink:0; min-width:34px; text-align:right; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text-faint); margin-left:8px; }
-  .chart-move.up{ color:#34c759; }
-  .chart-move.down{ color:#ff5a52; }
-  .chart-move.new{ color:var(--accent); }
+  /* Top 100 (build 212): rank, cover, then the title and artist with the rest of the row; tight gaps. */
+  .chart-row{ gap:10px; padding-left:0; padding-right:0; }
+  .chart-rank{ flex:0 0 auto; min-width:22px; text-align:left; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text-dim); }
+  .chart-row .song-row-art{ width:52px; height:52px; }
+  .chart-row .song-row-title{ font-size:15px; }
   .chart-week{ grid-column:1/-1; display:flex; align-items:center; gap:6px; margin:-4px 0 6px; }
   .chart-week-label{ flex:1; min-width:0; text-align:center; font-size:14px; font-weight:600; color:var(--text); position:relative; }
   .chart-week-label small{ display:block; font-size:12px; font-weight:500; color:var(--text-dim); margin-top:1px; }
@@ -1694,9 +1708,6 @@
   .chart-week-btn:disabled{ opacity:.35; cursor:default; }
   .chart-week-btn svg{ width:18px; height:18px; }
   .chart-date-input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; border:0; padding:0; }
-  .chart-notice{ grid-column:1/-1; display:flex; align-items:center; gap:12px; padding:12px 14px; margin:0 0 8px; border-radius:12px; background:var(--panel-2); font-size:13px; line-height:1.4; color:var(--text-dim); }
-  .chart-notice span{ flex:1; min-width:0; }
-  .chart-notice button{ flex-shrink:0; border:none; border-radius:999px; padding:8px 14px; background:var(--accent); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
   .song-row-num{
     width:30px; flex-shrink:0; text-align:center;
     font-size:15px; font-variant-numeric:tabular-nums; color:var(--text-faint);
@@ -4410,10 +4421,6 @@
   .v-info-k{ flex:0 0 76px; color:var(--text-dim); }
   .v-info-v{ flex:1; min-width:0; overflow-wrap:anywhere; color:var(--text); }
   .v-info-action{ margin-top:6px; border-top:1px solid var(--border); color:var(--accent) !important; font-weight:600; }
-  /* Spotify (build 211) */
-  #settingsPanel .spotify-id-input{ width:100%; box-sizing:border-box; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13.5px; }
-  #settingsPanel .spotify-steps{ margin:0; padding-left:20px; font-size:12.5px; line-height:1.5; color:var(--text-dim); }
-  #settingsPanel .spotify-steps code{ font-size:12px; color:var(--text); overflow-wrap:anywhere; }
   /* Libraries (build 131): a switch per Plex library */
   #settingsPanel .plex-libs-head{ font-size:12px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin-top:4px; }
   #settingsPanel .plex-libs{ display:flex; flex-direction:column; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
@@ -5759,7 +5766,7 @@
            favourites, as stacked rows (each says why it's there). Sits right above Top Stations.
            The heading opens a page with every pick. Hidden until there is enough. -->
       <!-- Top 100 (build 211): this week's Billboard Hot 100 as a row of covers; the heading
-           opens the whole chart, week by week. Songs play through Spotify. -->
+           opens the whole chart, week by week. Songs play as music videos (build 212). -->
       <div class="home-section top100-home-section" id="top100Section" style="display:none;">
         <div class="home-section-head">
           <h2 class="home-heading-link" id="top100Heading" role="button" tabindex="0">Top 100<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
@@ -6417,14 +6424,6 @@
         <span class="plex-status" id="plexStatus"></span>
       </div>
       <div class="plex-body" id="plexSettingsBody"></div>
-    </div>
-    <!-- Spotify (build 211): Top 100 songs play through the Spotify app. -->
-    <div class="settings-row settings-row--stack" id="spotifySettingsRow">
-      <div class="settings-row-head">
-        <span class="settings-label">Spotify</span>
-        <span class="plex-status" id="spotifyStatus"></span>
-      </div>
-      <div class="plex-body" id="spotifySettingsBody"></div>
     </div>
     <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
          re-downloaded and opened from several places, and without this there is no way to
@@ -8263,7 +8262,7 @@
   }
   if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', renderDiagnostics);
 
-  function openSettings(){ if(typeof renderPlexSettings === 'function') renderPlexSettings(); if(typeof refreshSpotifyStatus === 'function') refreshSpotifyStatus(); settingsOverlay.classList.add('open'); }
+  function openSettings(){ if(typeof renderPlexSettings === 'function') renderPlexSettings(); settingsOverlay.classList.add('open'); }
   function closeSettings(){ settingsOverlay.classList.remove('open'); }
   settingsFab.addEventListener('click', openSettings);
   settingsCloseBtn.addEventListener('click', closeSettings);
@@ -11348,13 +11347,12 @@
     if(t && t.type === 'video') return 'video';
     if(t && t.type === 'local') return 'local';
     if(t && t.type === 'podcast') return 'podcast';
-    if(t && t.type === 'spotify') return 'spotify';
     return 'stream';
   }
   function isLocalTrack(t){ return trackType(t) === 'local'; }
   function isPodcastTrack(t){ return trackType(t) === 'podcast'; }
-  // A Top 100 song (build 211): played through the Spotify app, identified by artist and title.
-  function isSpotifyTrack(t){ return trackType(t) === 'spotify'; }
+  // A Top 100 chart song (build 212): shown with its cover; tapping plays its music video.
+  function isChartSong(t){ return !!t && t.type === 'chartsong'; }
 
   // favKey is the identity of a track everywhere: tile/row dataset.key, the "playing"
   // highlight, Favorites dedup, the custom-art map, the blacklist and playlist membership.
@@ -11379,7 +11377,7 @@
     if(s && s.type === 'album') return 'album:' + (s.albumKey || '');
     // An artist's Radio (build 150): their own songs, shuffled, played like a station.
     if(s && s.type === 'artistRadio') return 'artistradio:' + (s.artistKey || '');
-    if(s && s.type === 'spotify') return 'song:' + (s.songKey || songKeyOf(s.artist, s.name));
+    if(s && s.type === 'chartsong') return 'song:' + (s.songKey || songKeyOf(s.artist, s.name));
     return s.stationuuid || s.urlToResolve || s.name;
   }
   // The favourite record for an album. Kept to the same three-field shape as the artist one
@@ -12018,7 +12016,7 @@
       return;
     }
     // A Top 100 song (build 211): its single/album cover, looked up when it comes on screen.
-    if(isSpotifyTrack(station)){
+    if(isChartSong(station)){
       songArtInto(container, station, function(url){ paint(url); }, function(url){ paint(url, true); });
       return;
     }
@@ -12396,16 +12394,17 @@
 
 
   // ================================================================
-  // Top 100 (build 211)
+  // Top 100 (build 211; music videos since build 212)
   // ================================================================
   // The Billboard Hot 100, week by week. The charts come from the public billboard-hot-100
   // dataset on GitHub (every chart since August 1958, updated as each new one is published;
-  // the files allow any site to read them). Each song is a 'spotify' track: it plays through
-  // the Spotify app (Spotify's App Remote, driven by the native plugin like a Chromecast), so
-  // Now Playing, Previous/Next and the queue work as for anything else. The Spotify song for
-  // each chart entry is found with Spotify's own search (Web API, after signing in once).
+  // the files allow any site to read them). Tapping a song plays its official music video in
+  // YouTube's own player (the video page the artist Music Videos row uses), with the rest of
+  // the week's chart under it; at the end of a video the next song down the chart plays.
+  // Videos are found without any account: the artist's official YouTube channels (Wikidata,
+  // as for Music Videos) and the song's own YouTube video on Wikidata; else a YouTube search.
   // Covers come from Apple's iTunes search (the directory the app already uses for podcasts),
-  // asked only for songs on screen and remembered, then Spotify's album picture as a fallback.
+  // asked only for songs on screen and remembered.
   var HOT100_BASE = 'https://raw.githubusercontent.com/mhollingshead/billboard-hot-100/main/';
   var HOT100_KEY = 'hot100Latest';          // lsGet: { chart, at }
   var HOT100_DATES_KEY = 'hot100Dates';     // lsGet: { list, at }
@@ -12423,7 +12422,7 @@
   }
   function hot100Item(row, date){
     return {
-      type: 'spotify', name: row.song, artist: row.artist, songKey: songKeyOf(row.artist, row.song),
+      type: 'chartsong', name: row.song, artist: row.artist, songKey: songKeyOf(row.artist, row.song),
       rank: row.this_week, lastWeek: row.last_week, peak: row.peak_position, weeks: row.weeks_on_chart, chartDate: date
     };
   }
@@ -12498,11 +12497,7 @@
     return { text: '–', cls: '', label: 'No change' };
   }
   function hot100QueueLabel(date){ return 'Top 100 · ' + hot100WeekLabel(date).replace(/^Week of /, ''); }
-  // Tapping a song plays the chart from there: Next goes down the chart.
-  function playHot100(item, items){
-    setQueue(items, item, hot100QueueLabel(item.chartDate));
-    playStation(item);
-  }
+  function hot100Label(date){ return 'Top 100 \u00B7 ' + hot100WeekLabel(date); }
 
   // ---------- Home row ----------
   function renderTop100HomeSection(){
@@ -12510,18 +12505,15 @@
     var items = hot100Latest ? hot100Items(hot100Latest) : [];
     hot100Shown = items.length > 0;
     top100HomeGrid.innerHTML = '';
-    items.slice(0, HOT100_HOME_MAX).forEach(function(item){
+    items.slice(0, HOT100_HOME_MAX).forEach(function(item, i){
       var tile = buildEntityTile({
         key: favKey(item),
-        entity: 'song',
+        entity: 'chartsong',
         name: item.rank + '. ' + item.name,
         sub: item.artist,
         artFrom: item,
-        favTarget: null,
-        onClick: function(){ playHot100(item, items); }
+        onClick: function(){ openChartVideos(items, i, hot100Label(item.chartDate)); }
       });
-      tile._ctxItem = item;
-      if(currentStation && favKey(currentStation) === favKey(item)) tile.classList.add('playing');
       top100HomeGrid.appendChild(tile);
     });
     if(top100Section && document.body.classList.contains('home-stacked')) top100Section.style.display = hot100Shown ? '' : 'none';
@@ -12530,59 +12522,27 @@
   // ---------- the page ----------
   var CHART_PREV_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var CHART_NEXT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5 L16 12 L9 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  function buildChartRow(item, items){
+  // Rank, cover, then the title and artist with the rest of the row to themselves.
+  function buildChartRow(item, items, index){
     var row = document.createElement('div');
     row.className = 'tile song-row chart-row';
     row.dataset.key = favKey(item);
-    row._ctxItem = item;
-    if(currentStation && favKey(currentStation) === favKey(item)) row.classList.add('playing');
     var num = document.createElement('div');
-    num.className = 'song-row-num';
-    num.innerHTML = '<span class="song-row-pos">' + item.rank + '</span>'
-      + '<span class="song-row-bars" aria-hidden="true"><span></span><span></span><span></span></span>';
-    // The cover on the page's left edge (like every list), then the rank.
+    num.className = 'chart-rank';
+    num.textContent = item.rank;
+    row.appendChild(num);
     var art = document.createElement('div');
     art.className = 'tile-art song-row-art';
     renderStationArt(art, item);
     row.appendChild(art);
-    row.appendChild(num);
     var body = document.createElement('div');
     body.className = 'song-row-body';
     var t = document.createElement('div'); t.className = 'tile-name song-row-title'; t.textContent = item.name;
     var a = document.createElement('div'); a.className = 'song-row-sub'; a.textContent = item.artist;
     body.appendChild(t); body.appendChild(a);
     row.appendChild(body);
-    var mv = hot100Move(item);
-    var move = document.createElement('div');
-    move.className = 'chart-move' + (mv.cls ? ' ' + mv.cls : '');
-    move.textContent = mv.text;
-    move.title = mv.label + (item.weeks ? ' · ' + item.weeks + (item.weeks === 1 ? ' week' : ' weeks') + ' on chart' : '');
-    move.setAttribute('aria-label', move.title);
-    row.appendChild(move);
-    row.appendChild(buildRowMoreBtn(item, { fav: true }));
-    row.addEventListener('click', function(){ playHot100(item, items); });
+    row.addEventListener('click', function(){ openChartVideos(items, index, hot100Label(item.chartDate)); });
     return row;
-  }
-  function spotifyNoticeText(){
-    if(!spotifyNative()) return 'Top 100 songs play through Spotify in the Amplify app on your phone.';
-    if(!spotifyState.clientId) return 'Set up Spotify in Settings to play these songs.';
-    if(!spotifyState.signedIn) return 'Sign in to Spotify in Settings to play these songs.';
-    if(spotifyState.installed === false) return 'Install the Spotify app to play these songs.';
-    return '';
-  }
-  function buildSpotifyNotice(){
-    var text = spotifyNoticeText();
-    if(!text) return null;
-    var n = document.createElement('div');
-    n.className = 'chart-notice';
-    var sp = document.createElement('span'); sp.textContent = text; n.appendChild(sp);
-    if(spotifyNative()){
-      var b = document.createElement('button');
-      b.type = 'button'; b.textContent = 'Set Up';
-      b.addEventListener('click', function(){ openSettings(); setTimeout(function(){ var r = document.getElementById('spotifySettingsRow'); if(r && r.scrollIntoView) r.scrollIntoView({ block: 'center' }); }, 60); });
-      n.appendChild(b);
-    }
-    return n;
   }
   var hot100Render = 0;
   function renderTop100Page(){
@@ -12590,7 +12550,7 @@
     setResultCount(null);
     var job = ++hot100Render;
     var want = hot100Week;
-    stationsGrid.innerHTML = '<div class="empty-state">Loading the chart…</div>';
+    stationsGrid.innerHTML = '<div class="empty-state">Loading the chart\u2026</div>';
     Promise.all([loadHot100Chart(want), loadHot100Dates()]).then(function(r){
       if(job !== hot100Render || activeHomeSection !== 'top100') return;
       var chart = r[0], dates = r[1] || [];
@@ -12612,10 +12572,9 @@
       }
       var label = document.createElement('div');
       label.className = 'chart-week-label';
-      label.innerHTML = '';
       label.appendChild(document.createTextNode(hot100WeekLabel(chart.date)));
       var small = document.createElement('small');
-      small.textContent = 'Billboard Hot 100' + (hot100Latest && chart.date === hot100Latest.date ? ' · this week' : '');
+      small.textContent = 'Billboard Hot 100' + (hot100Latest && chart.date === hot100Latest.date ? ' \u00B7 this week' : '');
       label.appendChild(small);
       if(dates.length){
         var pick = document.createElement('input');
@@ -12635,12 +12594,10 @@
       bar.appendChild(label);
       bar.appendChild(weekBtn(CHART_NEXT_SVG, 'Next week', nextDate));
       stationsGrid.appendChild(bar);
-      var notice = buildSpotifyNotice();
-      if(notice) stationsGrid.appendChild(notice);
-      items.forEach(function(item){ stationsGrid.appendChild(buildChartRow(item, items)); });
+      items.forEach(function(item, n){ stationsGrid.appendChild(buildChartRow(item, items, n)); });
     })['catch'](function(){
       if(job !== hot100Render || activeHomeSection !== 'top100') return;
-      stationsGrid.innerHTML = '<div class="empty-state">The chart couldn’t be loaded. Check the connection and try again.</div>';
+      stationsGrid.innerHTML = '<div class="empty-state">The chart couldn\u2019t be loaded. Check the connection and try again.</div>';
     });
   }
   function showHot100Week(date){
@@ -12726,272 +12683,218 @@
       var best = res.filter(function(r){ return looseMatch(r.trackName, item.name) && looseMatch(r.artistName, mainArtistOf(item.artist)); })[0]
         || res.filter(function(r){ return looseMatch(r.trackName, item.name); })[0];
       var art = best && best.artworkUrl100;
-      if(art) return art.replace(/\/\d+x\d+bb\./, '/600x600bb.');
-      return spotifyArtFallback(item);
-    }, function(){ return spotifyArtFallback(item); });
-  }
-  function spotifyArtFallback(item){
-    if(!spotifyReady()) return null;
-    return spotifyFind(item).then(function(r){ return r && r.art; }, function(){ return null; });
+      return art ? art.replace(/\/\d+x\d+bb\./, '/600x600bb.') : null;
+    }, function(){ return null; });
   }
 
-  // ---------- Spotify ----------
-  var spotifyState = { clientId: '', signedIn: false, installed: null, connected: false, redirectUri: 'amplify-spotify://callback' };
-  var spotifyNote = '';
-  var SPOTIFY_FOUND_KEY = 'spotifyFound';     // lsGet: { songKey: { uri, art } | { none: ts } }
-  var spotifyFound = lsGet(SPOTIFY_FOUND_KEY) || {};
-  var SPOTIFY_MISS_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-  function spotifyNative(){
-    var C = window.Capacitor;
-    var P = C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && C.Plugins && C.Plugins.AmplifyPlayer;
-    return (P && typeof P.spotifyStatus === 'function') ? P : null;
+  // ---------- finding each song's music video ----------
+  var CHART_VIDEO_KEY = 'chartVideos';        // lsGet: { songKey: { id, title } | { none: ts } }
+  var CHART_VIDEO_MISS_MS = 2 * 24 * 60 * 60 * 1000;
+  var CHART_VIDEO_MAX = 3000;
+  var chartVideos = lsGet(CHART_VIDEO_KEY) || {};
+  var chartVideoPending = {};
+  function saveChartVideos(){
+    var keys = Object.keys(chartVideos);
+    if(keys.length > CHART_VIDEO_MAX) keys.slice(0, keys.length - CHART_VIDEO_MAX).forEach(function(k){ delete chartVideos[k]; });
+    lsPut(CHART_VIDEO_KEY, chartVideos);
   }
-  function spotifyReady(){ return !!spotifyNative() && !!spotifyState.clientId && !!spotifyState.signedIn; }
-  function refreshSpotifyStatus(){
-    var P = spotifyNative();
-    if(!P){ renderSpotifySettings(); return Promise.resolve(spotifyState); }
-    return Promise.resolve(P.spotifyStatus()).then(function(st){
-      if(st) spotifyState = Object.assign({}, spotifyState, st);
-      renderSpotifySettings();
-      syncTop100Notice();
-      return spotifyState;
-    })['catch'](function(){ return spotifyState; });
+  function plainTitle(t){ return String(t || '').replace(/\s*[\(\[](?:feat|ft|with|from)[^\)\]]*[\)\]]/ig, '').trim(); }
+  function normTitle(t){ return String(t || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ''); }
+  // An upload is this song's video: its title holds the song's title, and it isn't a live or
+  // lyric version (looksLikeMusicVideo, the Music Videos row's rule).
+  function videoIsSong(v, item){
+    var t = normTitle(plainTitle(item.name));
+    if(t.length < 2) return false;
+    var vt = normTitle(String(v.title || '').replace(/[\(\[][^\)\]]*[\)\]]/g, ' '));
+    if(vt.indexOf(t) < 0) return false;
+    return looksLikeMusicVideo(v.title) && !/\blive\b|acoustic|remix|sped up|slowed/i.test(v.title);
   }
-  function syncTop100Notice(){
-    if(activeHomeSection !== 'top100') return;
-    var old = stationsGrid.querySelector('.chart-notice');
-    var fresh = buildSpotifyNotice();
-    if(old && !fresh) old.remove();
-    else if(old && fresh) old.replaceWith(fresh);
-    else if(!old && fresh){ var bar = stationsGrid.querySelector('.chart-week'); if(bar) bar.after(fresh); }
-  }
-  function renderSpotifySettings(){
-    var box = document.getElementById('spotifySettingsBody'), status = document.getElementById('spotifyStatus');
-    if(!box || !status) return;
-    box.innerHTML = '';
-    status.classList.remove('on');
-    function line(text, cls){ var d = document.createElement('div'); d.className = cls || 'plex-line'; d.textContent = text; box.appendChild(d); return d; }
-    function button(label, id, fn){
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'settings-data-btn'; b.id = id; b.textContent = label;
-      b.addEventListener('click', fn); return b;
-    }
-    var P = spotifyNative();
-    if(!P){
-      status.textContent = '';
-      line('Top 100 songs play through the Spotify app, in Amplify on your phone.', 'plex-line dim');
-      return;
-    }
-    if(!spotifyState.clientId){
-      status.textContent = 'Not set up';
-      line('Top 100 songs play through the Spotify app (Spotify Premium). Amplify needs its own free Spotify app ID:', 'plex-line dim');
-      var ol = document.createElement('ol');
-      ol.className = 'spotify-steps';
-      ol.innerHTML = '<li>On developer.spotify.com, open the Dashboard and Create app.</li>'
-        + '<li>Redirect URI: <code>amplify-spotify://callback</code></li>'
-        + '<li>APIs used: Web API and Android.</li>'
-        + '<li>Android package: <code>com.markcoleman.amplify</code>, SHA1: <code>7E:C7:97:D5:CB:E9:7F:D6:52:85:FE:0F:A8:2F:35:47:A3:FC:29:F9</code></li>'
-        + '<li>Save, then copy the Client ID here.</li>';
-      box.appendChild(ol);
-      var inp = document.createElement('input');
-      inp.type = 'text'; inp.className = 'cs-field-input spotify-id-input'; inp.id = 'spotifyClientIdInput';
-      inp.placeholder = 'Client ID'; inp.autocomplete = 'off'; inp.spellcheck = false;
-      box.appendChild(inp);
-      var save = button('Save and Sign In', 'spotifySaveBtn', function(){
-        var v = inp.value.trim();
-        if(!/^[0-9a-f]{32}$/i.test(v)){ spotifyNote = 'A Client ID is 32 letters and numbers, as shown on the app’s page.'; renderSpotifySettings(); return; }
-        spotifyNote = '';
-        Promise.resolve(P.spotifySetClientId({ clientId: v })).then(function(st){
-          spotifyState = Object.assign({}, spotifyState, st || {}, { clientId: v });
-          startSpotifySignIn();
-        })['catch'](function(e){ spotifyNote = (e && e.message) || 'Couldn’t save it'; renderSpotifySettings(); });
-      });
-      save.classList.add('settings-wide-btn');
-      box.appendChild(save);
-    } else if(!spotifyState.signedIn){
-      status.textContent = 'Not signed in';
-      line('Sign in to Spotify so Amplify can find the Top 100 songs there.', 'plex-line dim');
-      var row = document.createElement('div');
-      row.className = 'settings-data-actions settings-actions-pair';
-      row.appendChild(button('Sign In with Spotify', 'spotifySignInBtn', startSpotifySignIn));
-      row.appendChild(button('Change App ID', 'spotifyResetBtn', function(){
-        Promise.resolve(P.spotifySetClientId({ clientId: '' })).then(function(st){ spotifyState = Object.assign({}, spotifyState, st || {}, { clientId: '', signedIn: false }); renderSpotifySettings(); });
-      }));
-      box.appendChild(row);
-    } else {
-      status.textContent = 'Connected';
-      status.classList.add('on');
-      line('Top 100 songs play through the Spotify app' + (spotifyState.installed === false ? ', which isn’t installed on this phone.' : '.'), 'plex-line' + (spotifyState.installed === false ? '' : ' dim'));
-      var out = button('Sign Out', 'spotifySignOutBtn', function(){
-        Promise.resolve(P.spotifySignOut()).then(function(st){ spotifyState = Object.assign({}, spotifyState, st || {}, { signedIn: false }); renderSpotifySettings(); syncTop100Notice(); });
-      });
-      out.classList.add('settings-wide-btn');
-      box.appendChild(out);
-    }
-    if(spotifyNote) line(spotifyNote, 'plex-note');
-  }
-  function startSpotifySignIn(){
-    var P = spotifyNative();
-    if(!P) return;
-    spotifyNote = 'Finish signing in on the Spotify page that opened; you’ll come straight back here.';
-    renderSpotifySettings();
-    Promise.resolve(P.spotifySignIn())['catch'](function(e){ spotifyNote = (e && e.message) || 'Couldn’t open Spotify’s sign-in page'; renderSpotifySettings(); });
-  }
-  (function(){
-    var P = spotifyNative();
-    if(!P || typeof P.addListener !== 'function') return;
-    P.addListener('spotify', function(ev){
-      if(!ev) return;
-      spotifyState = Object.assign({}, spotifyState, ev);
-      if(ev.event === 'auth') spotifyNote = ev.ok ? 'Signed in. Top 100 songs now play through Spotify.' : (ev.error || 'Spotify sign-in didn’t finish.');
-      renderSpotifySettings();
-      syncTop100Notice();
-    });
-  })();
-
-  function spotifyToken(){
-    var P = spotifyNative();
-    if(!P) return Promise.reject(new Error('Spotify plays in the Amplify app on your phone'));
-    return Promise.resolve(P.spotifyToken()).then(function(r){
-      if(!r || !r.token) throw new Error('Not signed in to Spotify');
-      return r.token;
-    }, function(e){
-      // Spotify no longer accepts the saved sign-in: show it as signed out.
-      if(/expired|not signed in/i.test((e && e.message) || '')){ spotifyState.signedIn = false; renderSpotifySettings(); syncTop100Notice(); }
-      throw e;
+  function chartArtistEntries(item){
+    // The lead artist first; a duet's other names too ("A & B", "A Featuring B").
+    var names = String(item.artist || '').split(/\s+(?:featuring|feat\.?|ft\.?|with|x|&|and|\+)\s+|,\s*|\s*\/\s*/i)
+      .map(function(n){ return n.trim(); }).filter(Boolean).slice(0, 3);
+    return names.map(function(n){
+      var key = artistMatchKey(n);
+      return findArtistEntry(key) || { key: key, name: n, tracks: [], stations: [] };
     });
   }
-  function spotifySearch(q, token){
-    return fetchWithTimeout('https://api.spotify.com/v1/search?type=track&limit=10&market=from_token&q=' + encodeURIComponent(q),
-      { headers: { Authorization: 'Bearer ' + token } }, 12000).then(function(res){
-      if(res.status === 401) throw new Error('Spotify sign-in expired');
-      if(!res.ok) throw new Error('Spotify search failed (' + res.status + ')');
-      return res.json();
-    }).then(function(d){ return (d && d.tracks && d.tracks.items) || []; });
-  }
-  function pickSpotifyTrack(list, item){
-    var main = mainArtistOf(item.artist);
-    function artistOk(t){ return (t.artists || []).some(function(a){ return looseMatch(a.name, main) || songKeyOf(item.artist, '').indexOf(songKeyOf(a.name, '')) === 0 && songKeyOf(a.name, '').length > 2; }); }
-    var good = list.filter(function(t){ return t && t.uri && looseMatch(t.name, item.name) && artistOk(t); });
-    if(!good.length) good = list.filter(function(t){ return t && t.uri && artistOk(t) && songKeyOf('', t.name).indexOf(songKeyOf('', item.name).slice(1, 8)) >= 0; });
-    if(!good.length) return null;
-    // The plain version ahead of remixes and live takes, then Spotify's own order.
-    good.sort(function(a, b){
-      function odd(t){ return /remix|live|acoustic|sped up|slowed|instrumental|karaoke/i.test(t.name) ? 1 : 0; }
-      return odd(a) - odd(b);
-    });
-    var t = good[0];
-    var imgs = (t.album && t.album.images) || [];
-    return { uri: t.uri, art: (imgs[1] || imgs[0] || {}).url || '' };
-  }
-  // The Spotify song for a chart entry, remembered once found.
-  function spotifyFind(item){
-    var k = item.songKey || songKeyOf(item.artist, item.name);
-    var known = spotifyFound[k];
-    if(known && known.uri) return Promise.resolve(known);
-    if(known && known.none && Date.now() - known.none < SPOTIFY_MISS_TTL_MS) return Promise.resolve(null);
-    var title = item.name.replace(/\s*\((?:feat|with)[^)]*\)/i, '');
-    return spotifyToken().then(function(tok){
-      return spotifySearch('track:' + title + ' artist:' + mainArtistOf(item.artist), tok).then(function(list){
-        var hit = pickSpotifyTrack(list, item);
-        if(hit) return hit;
-        return spotifySearch(title + ' ' + mainArtistOf(item.artist), tok).then(function(l2){ return pickSpotifyTrack(l2, item); });
-      });
-    }).then(function(hit){
-      spotifyFound[k] = hit || { none: Date.now() };
-      lsPut(SPOTIFY_FOUND_KEY, spotifyFound);
-      return hit;
-    });
-  }
-  // The next few chart songs, found on Spotify and handed to the native side, so it can carry on
-  // by itself while the page is asleep (a locked phone): see SpotifyBridge. Not while Up Next
-  // has something lined up (the page plays that when it wakes).
-  var SPOTIFY_NEXT_COUNT = 4;
-  function sendSpotifyNext(item){
-    var P = spotifyNative();
-    if(!P || typeof P.spotifySetNext !== 'function') return;
-    var list = [];
-    if(!upNext.length && isQueueCurrent(item)){
-      for(var i = queueIndex + 1; i < playQueue.length && list.length < SPOTIFY_NEXT_COUNT; i++){
-        if(!isSpotifyTrack(playQueue[i])) break;
-        list.push(playQueue[i]);
-      }
-    }
-    var out = [];
-    (function step(i){
-      if(currentStation !== item) return;
-      if(i >= list.length){ Promise.resolve(P.spotifySetNext({ items: out }))['catch'](function(){}); return; }
-      spotifyFind(list[i]).then(function(hit){
-        if(!hit) return Promise.resolve(P.spotifySetNext({ items: out }))['catch'](function(){});   // stops at a gap
-        out.push({ uri: hit.uri, key: favKey(list[i]) });
-        step(i + 1);
-      }, function(){ Promise.resolve(P.spotifySetNext({ items: out }))['catch'](function(){}); });
+  function videoFromChannels(item){
+    var entries = chartArtistEntries(item);
+    return (function next(i){
+      if(i >= entries.length) return Promise.resolve(null);
+      return Promise.resolve(loadArtistVideos(entries[i])).then(function(rec){
+        var hit = rec && (rec.videos || []).filter(function(v){ return videoIsSong(v, item); })[0];
+        return hit ? { id: hit.id, title: hit.title } : next(i + 1);
+      }, function(){ return next(i + 1); });
     })(0);
   }
-  // The native side moved on to the next song by itself: the page follows (no new load).
-  (function(){
-    var P = spotifyNative();
-    if(!P || typeof P.addListener !== 'function') return;
-    P.addListener('spotifyadvance', function(ev){
-      if(!ev || !ev.key || !currentStation || !isSpotifyTrack(currentStation)) return;
-      if(audio._id && ev.id && audio._id !== ev.id) return;
-      var idx = -1;
-      for(var i = 0; i < playQueue.length; i++){ if(favKey(playQueue[i]) === ev.key){ idx = i; break; } }
-      if(idx < 0) return;
-      var item = playQueue[idx];
-      queueIndex = idx;
-      currentStation = item;
-      document.querySelectorAll('.tile, .row-item, .song-row').forEach(function(el){
-        el.classList.toggle('playing', el.dataset.key === favKey(item));
+  // The song's own item on Wikidata (a "song"/"single" by the artist) and its YouTube video ID (P1651).
+  function videoFromWikidata(item){
+    var title = plainTitle(item.name);
+    var url = WIKIDATA_API + '?action=wbsearchentities&search=' + encodeURIComponent(title) + '&language=en&format=json&origin=*&limit=10&type=item';
+    var main = normTitle(mainArtistOf(item.artist));
+    return wikiFetch(url).then(function(res){ return res && res.ok ? res.json() : null; }).then(function(d){
+      var hits = ((d && d.search) || []).filter(function(h){
+        return h && h.id && /\b(song|single)\b/i.test(h.description || '') && normTitle(h.label) === normTitle(title);
       });
-      onPlaybackSuccess(item);
-      onQueueContextChanged();
-      try{ if(nowPlayingScreen.style.display === 'flex') renderNowPlayingScreen(); }catch(e){}
-      sendSpotifyNext(item);
-    });
-  })();
-  function playSpotifyTrack(item){
-    if(!isQueueCurrent(item)) clearQueue();
-    currentStation = item;
-    attemptInProgress = true;
-    updatePlayerMeta(item, 'Loading…');
-    document.querySelectorAll('.tile, .row-item, .song-row').forEach(function(el){
-      el.classList.toggle('playing', el.dataset.key === favKey(item));
-    });
-    function stillWanted(){ return currentStation === item; }
-    function fail(msg){
-      if(!stillWanted()) return;
-      attemptInProgress = false;
+      // Ones that name the artist first.
+      hits.sort(function(a, b){ return (normTitle(b.description).indexOf(main) >= 0 ? 1 : 0) - (normTitle(a.description).indexOf(main) >= 0 ? 1 : 0); });
+      hits = hits.filter(function(h){ return !main || normTitle(h.description).indexOf(main) >= 0 || hits.length === 1; }).slice(0, 4);
+      if(!hits.length) return null;
+      return ytEntities('ids=' + hits.map(function(h){ return h.id; }).join('%7C')).then(function(e){
+        var ents = (e && e.entities) || {};
+        for(var i = 0; i < hits.length; i++){
+          var claims = (ents[hits[i].id] && ents[hits[i].id].claims && ents[hits[i].id].claims.P1651) || [];
+          for(var j = 0; j < claims.length; j++){
+            var v = claims[j].mainsnak && claims[j].mainsnak.datavalue && claims[j].mainsnak.datavalue.value;
+            if(typeof v === 'string' && /^[\w-]{11}$/.test(v) && claims[j].rank !== 'deprecated') return { id: v, title: item.name };
+          }
+        }
+        return null;
+      });
+    })['catch'](function(){ return null; });
+  }
+  function findChartVideo(item){
+    var k = item.songKey || songKeyOf(item.artist, item.name);
+    var known = chartVideos[k];
+    if(known && known.id) return Promise.resolve(known);
+    if(known && known.none && Date.now() - known.none < CHART_VIDEO_MISS_MS) return Promise.resolve(null);
+    if(chartVideoPending[k]) return chartVideoPending[k];
+    var p = videoFromChannels(item).then(function(v){ return v || videoFromWikidata(item); }).then(function(v){
+      chartVideos[k] = v || { none: Date.now() };
+      saveChartVideos();
+      delete chartVideoPending[k];
+      return v;
+    }, function(){ delete chartVideoPending[k]; return null; });
+    chartVideoPending[k] = p;
+    return p;
+  }
+  function youTubeSearchUrl(item){
+    return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(mainArtistOf(item.artist) + ' ' + plainTitle(item.name) + ' official video');
+  }
+
+  // ---------- the video page for the chart ----------
+  // The artist Music Videos page (ensureYtOverlay) with the week's chart listed under the video.
+  // At the end of a video the next song plays (YouTube's player says so through its message
+  // channel, enablejsapi). A video YouTube won't play outside YouTube offers to open it there.
+  function openChartVideos(items, index, label){
+    var ov = ensureYtOverlay();
+    ytResumeAfter = false;
+    if(currentStation && uiIsPlaying){
+      ytResumeAfter = true;
+      if(reconnectState) cancelReconnect();
       try{ audio.pause(); }catch(e){}
       setPlayingUI(false);
-      updatePlayerMeta(item, msg, true);
+      saveCurrentPodcastProgress();
     }
-    var notice = spotifyNoticeText();
-    if(notice){ fail(notice); return; }
-    spotifyFind(item).then(function(hit){
-      if(!stillWanted()) return;
-      if(!hit){ fail('Not found on Spotify'); return; }
-      if(hit.art && songArt[item.songKey] === undefined){ songArt[item.songKey] = hit.art; saveSongArtSoon(); }
-      return tryPlayUrl(hit.uri).then(function(){
-        if(!stillWanted()) return;
-        onPlaybackSuccess(item);
-        sendSpotifyNext(item);
-      });
-    })['catch'](function(err){
-      var m = (audio.error && audio.error.message) || (err && err.message) || '';
-      if(m === 'load-error') m = '';
-      fail(m || 'Spotify couldn’t play it');
+    ytCtx = { list: [], artist: '', current: null, chart: { items: items, index: index, label: label, job: 0 } };
+    buildChartVideoList();
+    showChartVideo(index);
+    ov.classList.add('open');
+    document.body.classList.add('yt-open');
+  }
+  function buildChartVideoList(){
+    var c = ytCtx.chart;
+    var list = document.getElementById('ytOvList');
+    list.innerHTML = '';
+    list.hidden = false;
+    var h = document.createElement('div');
+    h.className = 'yt-ov-list-head';
+    h.textContent = c.label;
+    list.appendChild(h);
+    c.items.forEach(function(item, i){
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'chart-vrow';
+      row.dataset.index = i;
+      row.innerHTML = '<span class="chart-rank"></span><span class="chart-vrow-art tile-art"></span>'
+        + '<span class="chart-vrow-text"><span class="chart-vrow-title"></span><span class="chart-vrow-artist"></span></span>';
+      row.querySelector('.chart-rank').textContent = item.rank;
+      row.querySelector('.chart-vrow-title').textContent = item.name;
+      row.querySelector('.chart-vrow-artist').textContent = item.artist;
+      list.appendChild(row);
+      renderStationArt(row.querySelector('.chart-vrow-art'), item);
+      row.onclick = function(){ showChartVideo(i); };
     });
   }
+  function showChartVideo(i){
+    var c = ytCtx && ytCtx.chart;
+    if(!c || i < 0 || i >= c.items.length) return;
+    var item = c.items[i];
+    c.index = i;
+    var job = ++c.job;
+    document.getElementById('ytOvTitle').textContent = item.name;
+    document.getElementById('ytOvSub').textContent = item.artist + ' \u00B7 No. ' + item.rank;
+    var list = document.getElementById('ytOvList');
+    Array.prototype.forEach.call(list.querySelectorAll('.chart-vrow'), function(r){ r.classList.toggle('on', +r.dataset.index === i); });
+    var on = list.querySelector('.chart-vrow.on');
+    if(on && on.scrollIntoView) try{ on.scrollIntoView({ block: 'nearest' }); }catch(e){}
+    var frame = document.getElementById('ytOvFrame');
+    frame.innerHTML = '<div class="chart-v-note">Finding the video\u2026</div>';
+    findChartVideo(item).then(function(v){
+      if(!ytCtx || ytCtx.chart !== c || c.job !== job) return;
+      if(!v){ chartVideoNote(item, 'No official video found.'); return; }
+      ytCtx.current = v;
+      frame.innerHTML = '';
+      var f = document.createElement('iframe');
+      f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+      f.setAttribute('title', item.name);
+      f.src = 'https://www.youtube.com/embed/' + v.id + '?autoplay=1&playsinline=1&rel=0&fs=0&modestbranding=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+      f.addEventListener('load', function(){
+        // Asks the player to report its state (playing, ended, errors) to this page.
+        try{ f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'chart' + job, channel: 'widget' }), '*'); }catch(e){}
+      });
+      frame.appendChild(f);
+      c.frame = f;
+      // The next song's video is looked up meanwhile, so it starts at once.
+      if(c.items[i + 1]) findChartVideo(c.items[i + 1]);
+    });
+  }
+  function chartVideoNote(item, text){
+    var frame = document.getElementById('ytOvFrame');
+    frame.innerHTML = '';
+    var box = document.createElement('div');
+    box.className = 'chart-v-note';
+    var p = document.createElement('div'); p.textContent = text; box.appendChild(p);
+    var row = document.createElement('div'); row.className = 'chart-v-actions';
+    var yt = document.createElement('button'); yt.type = 'button'; yt.textContent = 'Find on YouTube';
+    yt.onclick = function(){ try{ window.open(youTubeSearchUrl(item), '_blank'); }catch(e){} };
+    row.appendChild(yt);
+    var c = ytCtx && ytCtx.chart;
+    if(c && c.items[c.index + 1]){
+      var nx = document.createElement('button'); nx.type = 'button'; nx.textContent = 'Next Song';
+      nx.onclick = function(){ showChartVideo(c.index + 1); };
+      row.appendChild(nx);
+    }
+    box.appendChild(row);
+    frame.appendChild(box);
+  }
+  window.addEventListener('message', function(e){
+    var c = ytCtx && ytCtx.chart;
+    if(!c || !c.frame || e.source !== c.frame.contentWindow) return;
+    if(!/youtube(-nocookie)?\.com$/.test(String(e.origin || '').replace(/^https?:\/\/(www\.)?/, ''))) return;
+    var d;
+    try{ d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; }catch(err){ return; }
+    if(!d) return;
+    var state = d.event === 'onStateChange' ? d.info : (d.event === 'infoDelivery' && d.info ? d.info.playerState : undefined);
+    if(state === 0){
+      // Ended: the next song down the chart.
+      if(c.items[c.index + 1]) showChartVideo(c.index + 1);
+    } else if(d.event === 'onError'){
+      // 101/150: the owner doesn't allow it outside YouTube; 100: gone; 2/5: can't be played here.
+      var item = c.items[c.index];
+      chartVideoNote(item, (d.info === 101 || d.info === 150) ? 'This video only plays on YouTube.' : 'This video can\u2019t be played here.');
+    }
+  });
 
   setTimeout(function(){
     loadHot100Latest().then(function(){
       renderTop100HomeSection();
     })['catch'](function(){ renderTop100HomeSection(); });
-    refreshSpotifyStatus();
   }, 0);
   document.addEventListener('visibilitychange', function(){
     if(document.visibilityState !== 'visible') return;
-    refreshSpotifyStatus();
     var saved = lsGet(HOT100_KEY);
     if(!saved || Date.now() - (saved.at || 0) >= HOT100_TTL_MS){
       loadHot100Latest(true).then(function(){ renderTop100HomeSection(); })['catch'](function(){});
@@ -23722,14 +23625,6 @@
       updateMediaSessionState();
       return;
     }
-    // A Top 100 song (build 211): the next one down the chart.
-    if(currentStation && isSpotifyTrack(currentStation)){
-      if(playNextInLine()) return;
-      setPlayingUI(false);
-      syncSeekBar();
-      updateMediaSessionState();
-      return;
-    }
     // A live stream has no end; when one arrives anyway the station closed the connection.
     if(isLiveStream(currentStation)){ if(uiIsPlaying) streamDropped(); return; }
     if(!currentStation || !isLocalTrack(currentStation)) return;
@@ -23767,7 +23662,7 @@
       try{
         navigator.mediaSession.metadata = new window.MediaMetadata({
           title: stripExclusively(track.name) || 'Unknown',
-          artist: (isLocal || isSpotifyTrack(track)) ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
+          artist: isLocal ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
           album: isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify'),
           artwork: art ? [{ src: secureUrl(art), sizes: '512x512', type: '' }] : []
         });
@@ -23784,7 +23679,7 @@
     // Seeking is meaningful for a file or a podcast episode and meaningless for a live
     // stream, so the handlers are registered and unregistered as the playing track type
     // changes rather than left on.
-    var seekable = isLocal || isPodcast || isSpotifyTrack(currentStation);
+    var seekable = isLocal || isPodcast;
     // Read by the Android app's media session (it swaps Previous/Next for the skip buttons);
     // a plain flag that a browser's own media session simply ignores.
     try{ navigator.mediaSession.amplifyPodcast = !!isPodcast; }catch(e){}
@@ -27272,14 +27167,6 @@
           npSub.appendChild(document.createTextNode(' · ' + relDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })));
         }
       }
-      return;
-    }
-    if(isSpotifyTrack(st)){
-      // A Top 100 song: its artist (a link when they're in the library) and where it charts.
-      var ae = st.artist ? findArtistEntry(artistMatchKey(st.artist)) : null;
-      if(ae){ npSub.classList.add('np-sub-linked'); npSub.appendChild(npLink(st.artist, function(){ openArtistPage(ae.key); })); }
-      else npSub.appendChild(document.createTextNode(st.artist || ''));
-      if(st.rank) npSub.appendChild(document.createTextNode(' · No. ' + st.rank + ' on the Hot 100'));
       return;
     }
     if(!isLocalTrack(st)){
@@ -32064,7 +31951,6 @@
     cancelNextUp();
     if(isLocalTrack(track)) return playLocalTrack(track);
     if(isPodcastTrack(track)) return playPodcastEpisode(track);
-    if(isSpotifyTrack(track)) return playSpotifyTrack(track);
     if(isLocalVideo(track)) return playLocalVideo(track);
     return playStreamStation(track);
   }
@@ -32235,7 +32121,7 @@
   var reconnectState = null;   // { station, attempt, timer, waitingForNetwork }
   var streamGaveUp = false;    // the attempts ran out; Play starts the station again
   var stallTimer = null;
-  function isLiveStream(t){ return !!t && !isLocalTrack(t) && !isPodcastTrack(t) && !isSpotifyTrack(t) && t.type !== 'video'; }
+  function isLiveStream(t){ return !!t && !isLocalTrack(t) && !isPodcastTrack(t) && t.type !== 'video'; }
   function cancelReconnect(){
     if(reconnectState && reconnectState.timer) clearTimeout(reconnectState.timer);
     reconnectState = null;
@@ -32419,7 +32305,6 @@
     if(isLocalVideo(station)) return subtitleForVideo(station);
     if(isLocalTrack(station)) return subtitleForLocal(station);
     if(isPodcastTrack(station)) return subtitleForPodcast(station);
-    if(isSpotifyTrack(station)) return station.artist || 'Spotify';
     var bits = [];
     if(station.codec) bits.push(station.codec);
     if(station.bitrate) bits.push(station.bitrate + 'kbps');

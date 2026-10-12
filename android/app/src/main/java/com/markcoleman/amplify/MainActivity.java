@@ -1,8 +1,6 @@
 package com.markcoleman.amplify;
 
 import android.app.PictureInPictureParams;
-import android.content.Intent;
-import android.net.Uri;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
@@ -20,32 +18,12 @@ public class MainActivity extends BridgeActivity {
     CrashLog.install(this);
     registerPlugin(AmplifyPlayerPlugin.class);
     super.onCreate(bundle);
-    handleSpotifyIntent(getIntent());
     if (Build.VERSION.SDK_INT < 33
         || ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS") == 0) {
       return;
     }
     ActivityCompat.requestPermissions(
         this, new String[] {"android.permission.POST_NOTIFICATIONS"}, 7);
-  }
-
-  @Override
-  protected void onNewIntent(Intent intent) {
-    super.onNewIntent(intent);
-    handleSpotifyIntent(intent);
-  }
-
-  /** Build 211: Spotify's sign-in page sends the browser back to amplify-spotify://callback. */
-  private void handleSpotifyIntent(Intent intent) {
-    Uri data = intent == null ? null : intent.getData();
-    if (!SpotifyBridge.isRedirect(data)) return;
-    intent.setData(null);
-    AmplifyPlayerPlugin p = player();
-    if (p != null) p.handleSpotifyRedirect(data);
-    else getWindow().getDecorView().postDelayed(() -> {
-      AmplifyPlayerPlugin q = player();
-      if (q != null) q.handleSpotifyRedirect(data);
-    }, 1500);
   }
 
   @Nullable

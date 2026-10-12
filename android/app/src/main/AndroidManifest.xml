@@ -25,14 +25,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Build 211: Spotify sign-in comes back here (amplify-spotify://callback). -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="amplify-spotify" android:host="callback" />
-            </intent-filter>
-
         </activity>
 
         <service
@@ -45,12 +37,6 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
-
-        <!-- Build 211: keeps Amplify running while a Top 100 song plays through Spotify. -->
-        <service
-            android:name=".SpotifyKeepAlive"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="false" />
 
         <!-- Home-screen widget: what is playing, with Previous / Play / Next. -->
         <receiver
