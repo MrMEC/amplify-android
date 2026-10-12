@@ -3028,6 +3028,12 @@
     color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer;
   }
   .np-video-toggle[hidden]{ display:none; }
+  .np-yt-btn svg{ width:24px; height:17px; }
+  /* Build 218: a chart song's cover while its video is looked up; and the video page's frame. */
+  .chart-art-loading{ position:absolute; inset:0; z-index:3; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.42); border-radius:inherit; }
+  .chart-art-loading .spinner{ width:24px; height:24px; border-width:3px; border-color:rgba(255,255,255,.3); border-top-color:#fff; }
+  .chart-v-loading{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .chart-v-loading .spinner{ border-color:rgba(255,255,255,.22); border-top-color:#fff; }
   .np-video-toggle svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   /* The video takes the artwork's place: full width near the top of the hero, over the
      artwork's blurred wash (the crisp cover is hidden while it plays). */
@@ -6125,6 +6131,8 @@
                  stream has neither, so the seek block is hidden for stream tracks. -->
             <!-- Video on/off for an episode that has video; directly above the play controls. -->
             <button type="button" class="np-video-toggle" id="npVideoToggle" hidden aria-pressed="false"><span class="np-video-toggle-icon"></span><span id="npVideoToggleLabel">Turn On Video</span></button>
+            <!-- Build 218: a Top 100 song playing its preview: its video, searched for on YouTube. -->
+            <button type="button" class="np-video-toggle np-yt-btn" id="npYouTubeBtn" hidden><svg viewBox="0 0 28 20" aria-hidden="true" focusable="false"><rect x="0.5" y="0.5" width="27" height="19" rx="5.5" fill="#FF0000" stroke="none"/><path d="M11.2 5.6v8.8l7.4-4.4z" fill="#fff" stroke="none"/></svg><span>Watch on YouTube</span></button>
             <div class="np-controls">
               <button class="np-fav-btn" id="npFavBtn" title="Toggle favorite"><i class="fa-regular fa-heart"></i></button>
               <button class="np-step-btn" id="npPrevBtn" title="Previous track" aria-label="Previous track">
@@ -10097,7 +10105,7 @@
 
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
-    if(isNpChannel(station) || isLocalVideo(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
+    if(isNpChannel(station) || isLocalVideo(station) || isChartSong(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
     if(isLocalTrack(station)){
       renderNpLibraryRelated(station);
       return;
@@ -10623,6 +10631,7 @@
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
+    npYouTubeBtn.hidden = !isChartSong(st);
     vctlSync();
     updateNowPlayingFavState();
     updateNpPlayBtn();
@@ -10657,6 +10666,13 @@
     }
   }
   npBackBtn.addEventListener('click', function(){ closeNowPlaying(true, true); });
+  var npYouTubeBtn = document.getElementById('npYouTubeBtn');
+  npYouTubeBtn.addEventListener('click', function(){
+    var st = npTarget();
+    if(!isChartSong(st)) return;
+    if(uiIsPlaying && currentStation === st) togglePlayPause();   // the video has the sound now
+    try{ window.open(youTubeSearchUrl(st), '_blank'); }catch(e){}
+  });
   npFavBtn.addEventListener('click', function(){
     var st = npTarget();
     if(st) toggleFavorite(st);
@@ -12549,7 +12565,7 @@
         name: item.rank + '. ' + item.name,
         sub: item.artist,
         artFrom: item,
-        onClick: function(){ openChartVideos(items, i, hot100Label(item.chartDate)); }
+        onClick: function(){ openChartSong(items, i, hot100Label(item.chartDate), tile.querySelector('.tile-art')); }
       });
       top100HomeGrid.appendChild(tile);
     });
@@ -12589,7 +12605,7 @@
     var a = document.createElement('div'); a.className = 'song-row-sub'; a.textContent = item.artist;
     body.appendChild(t); body.appendChild(a);
     row.appendChild(body);
-    row.addEventListener('click', function(){ openChartVideos(items, index, hot100Label(item.chartDate)); });
+    row.addEventListener('click', function(){ openChartSong(items, index, hot100Label(item.chartDate), art); });
     return row;
   }
   var hot100Render = 0;
@@ -12922,6 +12938,7 @@
     var strict = 'https://api.deezer.com/search?limit=25&q=' + encodeURIComponent('artist:"' + main.replace(/"/g, '') + '" track:"' + plainTitle(item.name).replace(/"/g, '') + '"');
     function pick(d){
       var best = bestSongMatch((d && d.data) || [], item, function(r){ return r.title; }, function(r){ return r.artist && r.artist.name; }, function(r){ return r.album && r.album.title; });
+      if(best && best.preview) notePreview(item, best.preview);
       var al = best && best.album;
       return al ? (al.cover_big || al.cover_xl || al.cover_medium || null) : null;
     }
@@ -12971,7 +12988,9 @@
   }
 
   // ---------- finding each song's music video ----------
-  var CHART_VIDEO_KEY = 'chartVideos2';     // build 215: fresh (popular uploads now searched too)        // lsGet: { songKey: { id, title } | { none: ts } }
+  // Build 218: a fresh store (MusicBrainz is searched too now, so earlier misses are asked again).
+  var CHART_VIDEO_KEY = 'chartVideos3';     // lsGet: { songKey: { id, title } | { none: ts } }
+  try{ localStorage.removeItem('amplifyFallback:chartVideos2'); }catch(e){}
   var CHART_VIDEO_MISS_MS = 2 * 24 * 60 * 60 * 1000;
   var CHART_VIDEO_MAX = 3000;
   var chartVideos = lsGet(CHART_VIDEO_KEY) || {};
@@ -12994,11 +13013,27 @@
   }
   function chartArtistEntries(item){
     // The lead artist first; a duet's other names too ("A & B", "A Featuring B").
-    var names = String(item.artist || '').split(/\s+(?:featuring|feat\.?|ft\.?|with|x|&|and|\+)\s+|,\s*|\s*\/\s*/i)
-      .map(function(n){ return n.trim(); }).filter(Boolean).slice(0, 3);
+    var names = chartArtistNames(item);
     return names.map(function(n){
       var key = artistMatchKey(n);
       return findArtistEntry(key) || { key: key, name: n, tracks: [], stations: [] };
+    });
+  }
+  function chartArtistNames(item){
+    return String(item.artist || '').split(/\s+(?:featuring|feat\.?|ft\.?|with|x|&|and|\+)\s+|,\s*|\s*\/\s*/i)
+      .map(function(n){ return n.trim(); }).filter(Boolean).slice(0, 3);
+  }
+  // The first video in a channel's latest uploads, then its most popular ones, that is this song.
+  function videoInChannel(ch, item, latest){
+    return Promise.resolve(latest || ytChannelVideos(ch)['catch'](function(){ return null; })).then(function(list){
+      var hit = (list || []).filter(function(v){ return videoIsSong(v, item); })[0];
+      if(hit) return { id: hit.id, title: hit.title };
+      // Build 215: the uploads feed holds only the latest 15, so a hit from years ago ("A View To
+      // A Kill") was never in it; it is among the channel's most watched.
+      return channelPopular(ch).then(function(pop){
+        var h = (pop || []).filter(function(v){ return videoIsSong(v, item); })[0];
+        return h ? { id: h.id, title: h.title } : null;
+      });
     });
   }
   function videoFromChannels(item){
@@ -13006,18 +13041,15 @@
     return (function next(i){
       if(i >= entries.length) return Promise.resolve(null);
       return Promise.resolve(loadArtistVideos(entries[i])).then(function(rec){
-        var hit = rec && (rec.videos || []).filter(function(v){ return videoIsSong(v, item); })[0];
-        if(hit) return { id: hit.id, title: hit.title };
-        // Build 215: the channel's most popular videos too. The uploads feed holds only the latest
-        // 15, so a hit from years ago ("A View To A Kill") was never in it; it is among the most
-        // watched.
         var chs = (rec && rec.channels) || [];
+        if(!chs.length){
+          var hit = ((rec && rec.videos) || []).filter(function(v){ return videoIsSong(v, item); })[0];
+          if(hit) return { id: hit.id, title: hit.title };
+        }
         return (function nextCh(j){
           if(j >= chs.length) return next(i + 1);
-          return channelPopular(chs[j]).then(function(list){
-            var h = (list || []).filter(function(v){ return videoIsSong(v, item); })[0];
-            return h ? { id: h.id, title: h.title } : nextCh(j + 1);
-          });
+          // (The artist's latest uploads, from all their channels, are already in rec.videos.)
+          return videoInChannel(chs[j], item, j === 0 ? (rec.videos || []) : []).then(function(v){ return v || nextCh(j + 1); });
         })(0);
       }, function(){ return next(i + 1); });
     })(0);
@@ -13069,21 +13101,113 @@
       });
     })['catch'](function(){ return null; });
   }
-  var chartVideoStats = { found: 0, none: 0 };
+  // ---- MusicBrainz (build 218)
+  // A YouTube address to its video ID, or null.
+  function youTubeVideoId(u){
+    var m = /(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/i.exec(String(u || ''));
+    return m ? m[1] : null;
+  }
+  function mbCreditMatches(rec, item){
+    var credit = (rec && rec['artist-credit']) || [];
+    var names = credit.map(function(c){ return (c && (c.name || (c.artist && c.artist.name))) || ''; }).join(' ');
+    var want = chartArtistNames(item);
+    return want.some(function(n){ var a = normTitle(n); return a && normTitle(names).indexOf(a) >= 0; });
+  }
+  // 1) The song's music video as MusicBrainz lists it: a video recording of the song, by the
+  // artist, linked to its YouTube page.
+  function videoFromMusicBrainz(item){
+    var title = plainTitle(item.name);
+    var q = 'recording:' + luceneQuote(title) + ' AND artist:' + luceneQuote(mainArtistOf(item.artist)) + ' AND video:true';
+    return mbGet('recording/?limit=10&query=' + encodeURIComponent(q)).then(function(d){
+      var recs = ((d && d.recordings) || []).filter(function(r){
+        return r && r.id && (r.score || 0) >= 70 && (r.video === true || r.video == null)
+          && (looseMatch(plainTitle(r.title), title) || normTitle(plainTitle(r.title)) === normTitle(title))
+          && (!ALT_VERSION_RE.test(r.title) || ALT_VERSION_RE.test(item.name)) && !/\blive\b/i.test(r.disambiguation || '')
+          && mbCreditMatches(r, item);
+      }).slice(0, 3);
+      return (function next(i){
+        if(i >= recs.length) return null;
+        return mbGet('recording/' + recs[i].id + '?inc=url-rels').then(function(full){
+          var rels = (full && full.relations) || [];
+          for(var j = 0; j < rels.length; j++){
+            var id = youTubeVideoId(rels[j].url && rels[j].url.resource);
+            if(id && !rels[j].ended) return { id: id, title: item.name };
+          }
+          return next(i + 1);
+        }, function(){ return next(i + 1); });
+      })(0);
+    })['catch'](function(){ return null; });
+  }
+  // 2) The artist's own YouTube channels as MusicBrainz lists them (often their VEVO channel,
+  // which Wikidata doesn't name), searched like the others. Kept 2 weeks.
+  var MB_CH_KEY = 'chartMbChannels', MB_CH_TTL = 14 * 24 * 60 * 60 * 1000;
+  var mbChannels = lsGet(MB_CH_KEY) || {};
+  function mbArtistChannels(name){
+    var k = normTitle(name);
+    var rec = mbChannels[k];
+    if(rec && Date.now() - (rec.ts || 0) < MB_CH_TTL) return Promise.resolve(rec.chs || []);
+    return mbGet('artist/?limit=5&query=' + encodeURIComponent('artist:' + luceneQuote(name))).then(function(d){
+      var a = ((d && d.artists) || []).filter(function(x){ return (x.score || 0) >= 90 && normTitle(x.name) === k; })[0];
+      if(!a) return [];
+      return mbGet('artist/' + a.id + '?inc=url-rels').then(function(full){
+        var chs = [];
+        ((full && full.relations) || []).forEach(function(r){
+          var m = /youtube\.com\/channel\/(UC[\w-]{22})/i.exec((r.url && r.url.resource) || '');
+          if(m && !r.ended && chs.indexOf(m[1]) < 0) chs.push(m[1]);
+        });
+        return chs;
+      });
+    }).then(function(chs){
+      mbChannels[k] = { ts: Date.now(), chs: chs };
+      lsPut(MB_CH_KEY, mbChannels);
+      return chs;
+    }, function(){ return []; });
+  }
+  function videoFromMbChannels(item, skip){
+    var names = chartArtistNames(item).slice(0, 2);
+    return (function nextName(i){
+      if(i >= names.length) return Promise.resolve(null);
+      return mbArtistChannels(names[i]).then(function(chs){
+        chs = chs.filter(function(c){ return !skip || skip.indexOf(c) < 0; });
+        return (function nextCh(j){
+          if(j >= chs.length) return nextName(i + 1);
+          return videoInChannel(chs[j], item).then(function(v){ return v || nextCh(j + 1); });
+        })(0);
+      });
+    })(0);
+  }
+  function knownChannels(item){
+    var out = [];
+    chartArtistEntries(item).forEach(function(e){ var r = ytStore[e.key]; ((r && r.channels) || []).forEach(function(c){ out.push(c); }); });
+    return out;
+  }
+  var chartVideoStats = { found: 0, none: 0, by: {} };
   try{ localStorage.removeItem('radioPlayerYouTubeKey'); }catch(e){}   // build 217: the key option is gone
+  // Every source at once (MusicBrainz waits its turn, one request a second); the first in this
+  // order that has it wins: the artist's channels, MusicBrainz's video, the artist's channels on
+  // MusicBrainz, Wikidata's video.
   function findChartVideo(item){
     var k = item.songKey || songKeyOf(item.artist, item.name);
     var known = chartVideos[k];
     if(known && known.id) return Promise.resolve(known);
     if(known && known.none && Date.now() - known.none < CHART_VIDEO_MISS_MS) return Promise.resolve(null);
     if(chartVideoPending[k]) return chartVideoPending[k];
-    var p = videoFromChannels(item).then(function(v){ return v || videoFromWikidata(item); }).then(function(v){
-      if(v) chartVideoStats.found++; else chartVideoStats.none++;
-      chartVideos[k] = v || { none: Date.now() };
-      saveChartVideos();
-      delete chartVideoPending[k];
-      return v;
-    }, function(){ delete chartVideoPending[k]; return null; });
+    function safe(p){ return Promise.resolve(p).then(function(v){ return v || null; }, function(){ return null; }); }
+    var pCh = safe(videoFromChannels(item));
+    var pMb = safe(videoFromMusicBrainz(item));
+    var pWd = safe(videoFromWikidata(item));
+    var pMbCh = null;
+    function mbCh(){ return pMbCh || (pMbCh = pCh.then(function(){ return safe(videoFromMbChannels(item, knownChannels(item))); })); }
+    var p = pCh.then(function(v){ return v ? tag(v, 'channels') : pMb.then(function(v2){ return v2 ? tag(v2, 'musicbrainz') : mbCh().then(function(v3){ return v3 ? tag(v3, 'mbchannels') : pWd.then(function(v4){ return v4 ? tag(v4, 'wikidata') : null; }); }); }); })
+      .then(function(v){
+        if(v){ chartVideoStats.found++; chartVideoStats.by[v.src] = (chartVideoStats.by[v.src] || 0) + 1; }
+        else chartVideoStats.none++;
+        chartVideos[k] = v ? { id: v.id, title: v.title } : { none: Date.now() };
+        saveChartVideos();
+        delete chartVideoPending[k];
+        return chartVideos[k].id ? chartVideos[k] : null;
+      }, function(){ delete chartVideoPending[k]; return null; });
+    function tag(v, src){ v.src = src; return v; }
     chartVideoPending[k] = p;
     return p;
   }
@@ -13091,15 +13215,129 @@
     return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(mainArtistOf(item.artist) + ' ' + plainTitle(item.name) + ' official video');
   }
 
+  // ---------- the song's 30-second preview (build 218) ----------
+  // What plays in Now Playing when a song is neither in the library nor has a video to show:
+  // Deezer's preview of it (picked up while its cover was being looked up, or asked for now), or
+  // iTunes'. Deezer's addresses expire within hours, so they are kept only for a while.
+  var songPreviews = {};      // songKey -> { url, at }
+  var PREVIEW_TTL_MS = 30 * 60 * 1000;
+  function notePreview(item, url){
+    if(item && url) songPreviews[item.songKey || songKeyOf(item.artist, item.name)] = { url: secureUrl(url), at: Date.now() };
+  }
+  function findSongPreview(item, fresh){
+    var k = item.songKey || songKeyOf(item.artist, item.name);
+    var known = songPreviews[k];
+    if(!fresh && known && Date.now() - known.at < PREVIEW_TTL_MS) return Promise.resolve(known.url);
+    var main = mainArtistOf(item.artist);
+    function deezer(url){
+      // Not through the covers' queue: someone is waiting for this one.
+      return ytFetchText(url).then(function(t){
+        var d = t ? JSON.parse(t) : null;
+        var best = bestSongMatch((d && d.data) || [], item, function(r){ return r.title; }, function(r){ return r.artist && r.artist.name; }, function(r){ return r.album && r.album.title; });
+        return (best && best.preview) || null;
+      })['catch'](function(){ return null; });
+    }
+    function itunes(){
+      var url = ITUNES_BASE + '/search?media=music&entity=song&limit=8&country=US&term=' + encodeURIComponent(main + ' ' + plainTitle(item.name));
+      return itunesJsonpNow(url, 10000).then(function(d){
+        var best = bestSongMatch((d && d.results) || [], item, function(r){ return r.trackName; }, function(r){ return r.artistName; }, function(r){ return r.collectionName; });
+        return (best && best.previewUrl) || null;
+      })['catch'](function(){ return null; });
+    }
+    return deezer('https://api.deezer.com/search?limit=25&q=' + encodeURIComponent(main + ' ' + plainTitle(item.name)))
+      .then(function(u){ return u || deezer('https://api.deezer.com/search?limit=25&q=' + encodeURIComponent('artist:"' + main.replace(/"/g, '') + '" track:"' + plainTitle(item.name).replace(/"/g, '') + '"')); })
+      .then(function(u){ return u || itunes(); })
+      .then(function(u){ if(u) notePreview(item, u); return u ? secureUrl(u) : null; });
+  }
+  // Plays a chart song's preview through the normal player (playStation sends it here).
+  function playChartPreview(item){
+    if(!isQueueCurrent(item)) clearQueue();
+    currentStation = item;
+    attemptInProgress = true;
+    updatePlayerMeta(item, 'Loading…');
+    document.querySelectorAll('.tile, .row-item').forEach(function(el){
+      el.classList.toggle('playing', el.dataset.key === favKey(item));
+    });
+    function stillWanted(){ return currentStation === item; }
+    function attempt(fresh){
+      return findSongPreview(item, fresh).then(function(url){
+        if(!stillWanted()) return;
+        if(!url){
+          attemptInProgress = false;
+          setPlayingUI(false);
+          updatePlayerMeta(item, 'No preview of this song is available', true);
+          return;
+        }
+        return tryPlayUrl(url).then(function(){
+          if(stillWanted()) onPlaybackSuccess(item);
+        }, function(err){
+          if(!stillWanted()) return;
+          // An address kept from earlier may have expired: once more with a fresh one.
+          if(!fresh) return attempt(true);
+          attemptInProgress = false;
+          setPlayingUI(false);
+          updatePlayerMeta(item, 'This preview could not be played', true);
+        });
+      });
+    }
+    attempt(false);
+  }
+
+  // ---------- tapping a chart song (build 218) ----------
+  // In the library: the whole song, in Now Playing. Otherwise its music video when one is found,
+  // and its 30-second preview in Now Playing when not (with a YouTube search button there).
+  // While the video is looked up the cover shows a spinner.
+  var CHART_FIND_WAIT_MS = 10000;
+  var chartTapJob = 0;
+  function chartQueue(items){ return items.map(function(it){ return libraryTrackForSong(it) || it; }); }
+  function playChartAudio(items, index, label){
+    var q = chartQueue(items);
+    var t = q[index];
+    if(!t) return;
+    if(ytOverlay && ytOverlay.classList.contains('open')){ ytResumeAfter = false; closeYtPlayer(); }
+    setQueue(q, t, label);
+    playStation(t);
+    openNowPlaying(t, true);
+  }
+  // The video, or null when none turns up within CHART_FIND_WAIT_MS (the search goes on, and
+  // keeps what it finds for next time).
+  function chartVideoSoon(item){
+    return Promise.race([findChartVideo(item), new Promise(function(r){ setTimeout(function(){ r(null); }, CHART_FIND_WAIT_MS); })]);
+  }
+  function showChartSpinner(el){
+    if(!el) return null;
+    try{ if(getComputedStyle(el).position === 'static') el.style.position = 'relative'; }catch(e){}
+    var s = document.createElement('div');
+    s.className = 'chart-art-loading';
+    s.innerHTML = '<div class="spinner" role="status" aria-label="Loading"></div>';
+    el.appendChild(s);
+    return s;
+  }
+  function openChartSong(items, index, label, artEl){
+    var item = items[index];
+    if(!item) return;
+    var job = ++chartTapJob;
+    document.querySelectorAll('.chart-art-loading').forEach(function(n){ n.remove(); });
+    if(libraryTrackForSong(item)){ playChartAudio(items, index, label); return; }
+    var spin = showChartSpinner(artEl);
+    findSongPreview(item)['catch'](function(){});      // ready in case there's no video
+    chartVideoSoon(item).then(function(v){
+      if(spin) spin.remove();
+      if(job !== chartTapJob) return;
+      if(v) openChartVideos(items, index, label, v);
+      else playChartAudio(items, index, label);
+    });
+  }
+
   // ---------- the video page for the chart ----------
   // The artist Music Videos page (ensureYtOverlay) with the week's chart listed under the video.
   // At the end of a video the next song plays (YouTube's player says so through its message
-  // channel, enablejsapi). A video YouTube won't play outside YouTube offers to open it there.
-  function openChartVideos(items, index, label){
+  // channel, enablejsapi).
+  function openChartVideos(items, index, label, video){
     var ov = ensureYtOverlay();
     ytResumeAfter = false;
     if(currentStation && uiIsPlaying){
-      ytResumeAfter = true;
+      ytResumeAfter = !isChartSong(currentStation);
       if(reconnectState) cancelReconnect();
       try{ audio.pause(); }catch(e){}
       setPlayingUI(false);
@@ -13107,7 +13345,7 @@
     }
     ytCtx = { list: [], artist: '', current: null, chart: { items: items, index: index, label: label, job: 0 } };
     buildChartVideoList();
-    showChartVideo(index);
+    showChartVideo(index, video);
     ov.classList.add('open');
     document.body.classList.add('yt-open');
   }
@@ -13135,23 +13373,28 @@
       row.onclick = function(){ showChartVideo(i); };
     });
   }
-  function showChartVideo(i){
+  // A song on the video page: its video here; a song in the library, or one with no video, leaves
+  // for Now Playing (the whole song, or its preview).
+  function showChartVideo(i, video){
     var c = ytCtx && ytCtx.chart;
     if(!c || i < 0 || i >= c.items.length) return;
     var item = c.items[i];
+    if(!video && libraryTrackForSong(item)){ playChartAudio(c.items, i, c.label); return; }
     c.index = i;
     var job = ++c.job;
     document.getElementById('ytOvTitle').textContent = item.name;
-    document.getElementById('ytOvSub').textContent = item.artist + ' \u00B7 No. ' + item.rank;
+    document.getElementById('ytOvSub').textContent = item.artist + ' · No. ' + item.rank;
     var list = document.getElementById('ytOvList');
     Array.prototype.forEach.call(list.querySelectorAll('.chart-vrow'), function(r){ r.classList.toggle('on', +r.dataset.index === i); });
     var on = list.querySelector('.chart-vrow.on');
     if(on && on.scrollIntoView) try{ on.scrollIntoView({ block: 'nearest' }); }catch(e){}
     var frame = document.getElementById('ytOvFrame');
-    frame.innerHTML = '<div class="chart-v-note">Finding the video\u2026</div>';
-    findChartVideo(item).then(function(v){
+    c.frame = null;
+    frame.innerHTML = '<div class="chart-v-loading"><div class="spinner" role="status" aria-label="Loading"></div></div>';
+    if(!video) findSongPreview(item)['catch'](function(){});
+    (video ? Promise.resolve(video) : chartVideoSoon(item)).then(function(v){
       if(!ytCtx || ytCtx.chart !== c || c.job !== job) return;
-      if(!v){ chartVideoNote(item, 'No official video found.'); return; }
+      if(!v){ playChartAudio(c.items, i, c.label); return; }
       ytCtx.current = v;
       frame.innerHTML = '';
       var f = document.createElement('iframe');
@@ -13166,27 +13409,8 @@
       frame.appendChild(f);
       c.frame = f;
       // The next song's video is looked up meanwhile, so it starts at once.
-      if(c.items[i + 1]) findChartVideo(c.items[i + 1]);
+      if(c.items[i + 1] && !libraryTrackForSong(c.items[i + 1])) findChartVideo(c.items[i + 1]);
     });
-  }
-  function chartVideoNote(item, text){
-    var frame = document.getElementById('ytOvFrame');
-    frame.innerHTML = '';
-    var box = document.createElement('div');
-    box.className = 'chart-v-note';
-    var p = document.createElement('div'); p.textContent = text; box.appendChild(p);
-    var row = document.createElement('div'); row.className = 'chart-v-actions';
-    var yt = document.createElement('button'); yt.type = 'button'; yt.textContent = 'Find on YouTube';
-    yt.onclick = function(){ try{ window.open(youTubeSearchUrl(item), '_blank'); }catch(e){} };
-    row.appendChild(yt);
-    var c = ytCtx && ytCtx.chart;
-    if(c && c.items[c.index + 1]){
-      var nx = document.createElement('button'); nx.type = 'button'; nx.textContent = 'Next Song';
-      nx.onclick = function(){ showChartVideo(c.index + 1); };
-      row.appendChild(nx);
-    }
-    box.appendChild(row);
-    frame.appendChild(box);
   }
   window.addEventListener('message', function(e){
     var c = ytCtx && ytCtx.chart;
@@ -13201,8 +13425,13 @@
       if(c.items[c.index + 1]) showChartVideo(c.index + 1);
     } else if(d.event === 'onError'){
       // 101/150: the owner doesn't allow it outside YouTube; 100: gone; 2/5: can't be played here.
+      // Not kept as this song's video; its preview plays in Now Playing instead.
       var item = c.items[c.index];
-      chartVideoNote(item, (d.info === 101 || d.info === 150) ? 'This video only plays on YouTube.' : 'This video can\u2019t be played here.');
+      var k = item.songKey || songKeyOf(item.artist, item.name);
+      chartVideos[k] = { none: Date.now() };
+      saveChartVideos();
+      c.frame = null;
+      playChartAudio(c.items, c.index, c.label);
     }
   });
 
@@ -23848,7 +24077,7 @@
   var seekDragging = false;
   function npSeekApplies(){
     var st = npTarget();
-    return !!(st && (isLocalTrack(st) || isPodcastTrack(st) || isLocalVideo(st)));
+    return !!(st && (isLocalTrack(st) || isPodcastTrack(st) || isLocalVideo(st) || isChartSong(st)));
   }
   // Skip back/forward live inside .np-controls now, immediately either side of Play (see the
   // HTML), the same slot Previous/Next occupy for a local track -- so, like those, each is
@@ -23945,7 +24174,7 @@
     }
     // A live stream has no end; when one arrives anyway the station closed the connection.
     if(isLiveStream(currentStation)){ if(uiIsPlaying) streamDropped(); return; }
-    if(!currentStation || !isLocalTrack(currentStation)) return;
+    if(!currentStation || !(isLocalTrack(currentStation) || isChartSong(currentStation))) return;
     // Up Next first, then the rest of the album/playlist/library the song was started from.
     // The latter is the library in album order, so rolling off the end of one album lands
     // on the first track of the next without any special case for album boundaries.
@@ -23966,6 +24195,7 @@
     var custom = customArtFor(track);
     if(custom) return Promise.resolve(custom);
     if(isLocalTrack(track)) return localArtUrl(track);
+    if(isChartSong(track)) return Promise.resolve(songArt[track.songKey] || null);
     var cached = getArtCacheEntry(key);
     if(cached !== undefined && cached.url) return Promise.resolve(cached.url);
     return Promise.resolve(track.favicon || null);
@@ -23980,7 +24210,7 @@
       try{
         navigator.mediaSession.metadata = new window.MediaMetadata({
           title: stripExclusively(track.name) || 'Unknown',
-          artist: isLocal ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
+          artist: (isLocal || isChartSong(track)) ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
           album: isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify'),
           artwork: art ? [{ src: secureUrl(art), sizes: '512x512', type: '' }] : []
         });
@@ -23997,7 +24227,7 @@
     // Seeking is meaningful for a file or a podcast episode and meaningless for a live
     // stream, so the handlers are registered and unregistered as the playing track type
     // changes rather than left on.
-    var seekable = isLocal || isPodcast;
+    var seekable = isLocal || isPodcast || isChartSong(currentStation);
     // Read by the Android app's media session (it swaps Previous/Next for the skip buttons);
     // a plain flag that a browser's own media session simply ignores.
     try{ navigator.mediaSession.amplifyPodcast = !!isPodcast; }catch(e){}
@@ -24034,7 +24264,7 @@
   }
   function updateMediaPositionState(){
     if(!HAS_MEDIA_SESSION || !navigator.mediaSession.setPositionState) return;
-    if(!currentStation || !(isLocalTrack(currentStation) || isPodcastTrack(currentStation))) return;
+    if(!currentStation || !(isLocalTrack(currentStation) || isPodcastTrack(currentStation) || isChartSong(currentStation))) return;
     var dur = audio.duration;
     if(!isFinite(dur) || dur <= 0) return;
     try{
@@ -27454,7 +27684,7 @@
   // also the one thing you could not tap to reach them. It is the link now.
   function renderNpName(st){
     npName.innerHTML = '';
-    var artist = isLocalTrack(st) ? null : stationArtistLink(st);
+    var artist = (isLocalTrack(st) || isChartSong(st)) ? null : stationArtistLink(st);
     var label = isLocalTrack(st) ? (st.name || '') : stripExclusively(st.name);
     if(isPodcastTrack(st)) label = stripEpisodeNumber(label);
     npName.classList.toggle('np-name-linked', !!artist);
@@ -27467,6 +27697,16 @@
 
   function renderNpSub(st){
     npSub.innerHTML = '';
+    // A Top 100 song's preview: the artist (a way in, when they're in the library), and that
+    // it is a 30-second preview.
+    if(isChartSong(st)){
+      var ck = artistMatchKey(mainArtistOf(st.artist));
+      npSub.classList.toggle('np-sub-linked', !!(ck && findArtistEntry(ck)));
+      if(ck && findArtistEntry(ck)) npSub.appendChild(npLink(st.artist, function(){ openArtistPage(ck); }));
+      else npSub.appendChild(document.createTextNode(st.artist || ''));
+      npSub.appendChild(document.createTextNode((st.artist ? ' \u00b7 ' : '') + '30-Second Preview'));
+      return;
+    }
     if(isLocalVideo(st)){ npSub.classList.remove('np-sub-linked'); npSub.textContent = subtitleForVideo(st); return; }
     npSub.classList.toggle('np-sub-linked', isLocalTrack(st));
     // A podcast episode's subtitle names the show it belongs to -- the same way in as an
@@ -32270,6 +32510,7 @@
     if(isLocalTrack(track)) return playLocalTrack(track);
     if(isPodcastTrack(track)) return playPodcastEpisode(track);
     if(isLocalVideo(track)) return playLocalVideo(track);
+    if(isChartSong(track)) return playChartPreview(track);
     return playStreamStation(track);
   }
 
@@ -32425,6 +32666,7 @@
     // A video of your own, or a TV channel, goes to Continue Watching, not Continue Listening.
     if(isLocalVideo(station)){ refreshContinueWatching(); return; }
     if(isNpChannel(station)){ recordChannelWatch(station); return; }
+    if(isChartSong(station)) return;   // a preview: not a station played, nor a song in the library
     startPlayCount(station);
     recordRecent(station);
   }
@@ -32439,7 +32681,7 @@
   var reconnectState = null;   // { station, attempt, timer, waitingForNetwork }
   var streamGaveUp = false;    // the attempts ran out; Play starts the station again
   var stallTimer = null;
-  function isLiveStream(t){ return !!t && !isLocalTrack(t) && !isPodcastTrack(t) && t.type !== 'video'; }
+  function isLiveStream(t){ return !!t && !isLocalTrack(t) && !isPodcastTrack(t) && t.type !== 'video' && !isChartSong(t); }
   function cancelReconnect(){
     if(reconnectState && reconnectState.timer) clearTimeout(reconnectState.timer);
     reconnectState = null;
@@ -32623,6 +32865,7 @@
     if(isLocalVideo(station)) return subtitleForVideo(station);
     if(isLocalTrack(station)) return subtitleForLocal(station);
     if(isPodcastTrack(station)) return subtitleForPodcast(station);
+    if(isChartSong(station)) return (station.artist ? station.artist + ' \u00b7 ' : '') + 'Preview';
     var bits = [];
     if(station.codec) bits.push(station.codec);
     if(station.bitrate) bits.push(station.bitrate + 'kbps');

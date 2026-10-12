@@ -1,8 +1,9 @@
 """Builds 211-212: Top 100. Home row of this week's Billboard Hot 100; the page week by week (previous/next,
 the date picker); rows: rank, cover, title/artist; covers from iTunes. Build 212: a song plays its music
-video in YouTube's player (the video page), found on the artist's channel or Wikidata, the week's chart
-listed under it, the next song at the end, a note with Find on YouTube when there's no video or YouTube
-won't play it. Chart files, iTunes, Wikidata, the channel feed, YouTube's player and the plugin are mocked.
+video in YouTube's player (the video page), found on the artist's channel, MusicBrainz or Wikidata, the week's
+chart listed under it, the next song at the end. Build 218: a song in the library plays whole in Now Playing; one
+with no video (or one YouTube won't play here) plays its 30-second preview in Now Playing, with a YouTube search
+button; a spinner while the video is looked up; never a "No official video found" screen. Chart files, iTunes, Wikidata, the channel feed, YouTube's player and the plugin are mocked.
 Run: python3 tests/test_top100.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, json, threading, http.server, functools, shutil, sys, re
 from urllib.parse import urlparse, parse_qs
@@ -68,9 +69,9 @@ MOCK = r"""(function(){
       if(n === 7 || n === 11) return Promise.resolve({ text: JSON.stringify({ data: [] }) });
       var title = n === 1 ? 'Patient Zero' : 'Song ' + String(n).padStart(3, '0');
       var artist = ['Taylor Swift', 'Ella Langley', 'Morgan Wallen', 'Sabrina Carpenter', 'Alex Warren'][(n - 1) % 5];
-      return Promise.resolve({ text: JSON.stringify({ data: [{ title: title + ' (Live)', artist: { name: artist }, album: { title: 'Live', cover_big: 'https://art.example/999/500.jpg' } },
-        { title: title, artist: { name: artist }, album: { title: 'Eighties 100 Hits', cover_big: 'https://art.example/998/500.jpg' } },
-        { title: title, artist: { name: artist }, album: { title: n === 2 ? title : 'Album ' + n, cover_big: 'https://art.example/' + n + '/500.jpg' } }] }) });
+      return Promise.resolve({ text: JSON.stringify({ data: [{ title: title + ' (Live)', artist: { name: artist }, preview: 'https://preview.example/' + n + '-0.mp3', album: { title: 'Live', cover_big: 'https://art.example/999/500.jpg' } },
+        { title: title, artist: { name: artist }, preview: 'https://preview.example/' + n + '-1.mp3', album: { title: 'Eighties 100 Hits', cover_big: 'https://art.example/998/500.jpg' } },
+        { title: title, artist: { name: artist }, preview: 'https://preview.example/' + n + '-2.mp3', album: { title: n === 2 ? title : 'Album ' + n, cover_big: 'https://art.example/' + n + '/500.jpg' } }] }) });
     }
     __nat.feeds.push(o.url);
     var m = /playlist_id=UU(?:LF|LP)(\w+)|channel_id=UC(\w+)/.exec(o.url || '');
@@ -81,6 +82,8 @@ MOCK = r"""(function(){
       + '<entry><yt:videoId>tsLyric0001</yt:videoId><title>Taylor Swift - Patient Zero (Lyric Video)</title><link href="https://www.youtube.com/watch?v=tsLyric0001"/><published>2026-10-09T00:00:00Z</published></entry>'
       + '<entry><yt:videoId>tsPatient01</yt:videoId><title>Taylor Swift - Patient Zero (Official Music Video)</title><link href="https://www.youtube.com/watch?v=tsPatient01"/><published>2026-10-08T00:00:00Z</published></entry>'
       + '</feed>' });
+    if(ch === 'awAlexChannel000000001' && /UULP/.test(o.url)) return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">'
+      + '<entry><yt:videoId>awSong005vi</yt:videoId><title>Alex Warren - Song 005 (Official Video)</title><link href="https://www.youtube.com/watch?v=awSong005vi"/><published>2025-01-01T00:00:00Z</published></entry></feed>' });
     return Promise.resolve({ text: '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>' }); }
  };
  window.__endSong = function(){ if(cur) emit('state', { id: cur.id, state: 'ended', isPlaying: false, playWhenReady: true, duration: 200, position: 200, external: true }); };
@@ -128,8 +131,19 @@ async def run(theme, b):
         if p.netloc == 'musicbrainz.org':
             counts['mb'] += 1
             q = parse_qs(p.query).get('query', [''])[0]
-            groups = [{'id': 'rg-011', 'title': 'Song 011', 'score': 100, 'primary-type': 'Single'}] if 'Song 011' in q else []
-            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps({'release-groups': groups}))
+            counts.setdefault('mbq', []).append(p.path + ' ' + q)
+            if '/recording/rec-003v' in p.path:
+                body = {'id': 'rec-003v', 'relations': [{'type': 'free streaming', 'url': {'resource': 'https://www.youtube.com/watch?v=mwSong003vi'}}]}
+            elif p.path.rstrip('/').endswith('/recording'):
+                recs = [{'id': 'rec-003v', 'title': 'Song 003', 'score': 100, 'video': True, 'artist-credit': [{'name': 'Morgan Wallen'}]}] if 'Song 003' in q and 'video:true' in q else []
+                body = {'recordings': recs}
+            elif '/artist/art-aw' in p.path:
+                body = {'id': 'art-aw', 'relations': [{'type': 'youtube', 'url': {'resource': 'https://www.youtube.com/channel/UCawAlexChannel000000001'}}]}
+            elif p.path.rstrip('/').endswith('/artist'):
+                body = {'artists': [{'id': 'art-aw', 'name': 'Alex Warren', 'score': 100}] if 'Alex Warren' in q else []}
+            else:
+                body = {'release-groups': [{'id': 'rg-011', 'title': 'Song 011', 'score': 100, 'primary-type': 'Single'}] if 'Song 011' in q else []}
+            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps(body))
         if p.netloc == 'coverartarchive.org':
             if p.path.endswith('/front-500'):
                 return await r.fulfill(status=200, content_type='image/svg+xml', body=art_svg(11))
@@ -267,42 +281,69 @@ async def run(theme, b):
     await pick('cw-d', '2026-10-10'); await pg.wait_for_timeout(900)
     check((await pg.evaluate("""(()=>{ const x = document.querySelector('.chart-week-label'); if(!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('select').forEach(s => s.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()""")).endswith('this week'), f'{theme}: back on this week')
 
-    # ---- a song plays its music video (artist's channel), with the chart under it
-    await pg.evaluate("document.querySelectorAll('.chart-row')[0].click()"); await pg.wait_for_timeout(1800)
+    # ---- build 218: tapping a song. A spinner on its cover while the video is looked up (no "Finding the video")
+    spin = await pg.evaluate("""(()=>{ const r = document.querySelectorAll('.chart-row')[0]; r.click();
+      return { spinner: !!r.querySelector('.tile-art .chart-art-loading .spinner'), text: document.body.innerText.indexOf('Finding the video') >= 0 }; })()""")
+    check(spin['spinner'] and not spin['text'], f'{theme}: a loading spinner on the cover first, no "Finding the video" text {spin}')
+    r0 = await pg.query_selector('.chart-row'); await r0.screenshot(path=f'{OUT}/top100-spinner-{theme}.png')
+    await pg.wait_for_timeout(2500)
     ov = await pg.evaluate("""(()=>{ const o = document.getElementById('ytOverlay'), f = document.querySelector('#ytOvFrame iframe');
       return { open: !!o && o.classList.contains('open'), src: f ? f.src : '', title: document.getElementById('ytOvTitle').textContent,
         sub: document.getElementById('ytOvSub').textContent, head: (document.querySelector('.yt-ov-list-head')||{}).textContent,
         rows: document.querySelectorAll('.chart-vrow').length, on: (document.querySelector('.chart-vrow.on .chart-vrow-title')||{}).textContent,
-        loads: __nat.loads.length }; })()""")
+        loads: __nat.loads.length, spin: document.querySelectorAll('.chart-art-loading').length }; })()""")
     print(theme, ov)
     check(ov['open'] and '/embed/tsPatient01' in ov['src'] and 'enablejsapi=1' in ov['src'], f'{theme}: #1 plays its official video from the artist\'s channel (not the lyric video) {ov["src"][:70]}')
-    check(ov['title'] == 'Patient Zero' and ov['sub'] == 'Taylor Swift \u00b7 No. 1', f'{theme}: titled with the song, artist and rank {ov["title"]!r} {ov["sub"]!r}')
-    check(ov['head'] == 'Top 100 \u00b7 Week of October 10, 2026' and ov['rows'] == 100 and ov['on'] == 'Patient Zero', f'{theme}: the week\'s chart under it, this song marked')
-    check(ov['loads'] == 0, f'{theme}: nothing goes to the audio player')
+    check(ov['title'] == 'Patient Zero' and ov['sub'] == 'Taylor Swift · No. 1', f'{theme}: titled with the song, artist and rank {ov["title"]!r} {ov["sub"]!r}')
+    check(ov['head'] == 'Top 100 · Week of October 10, 2026' and ov['rows'] == 100 and ov['on'] == 'Patient Zero', f'{theme}: the week\'s chart under it, this song marked')
+    check(ov['loads'] == 0 and ov['spin'] == 0, f'{theme}: nothing goes to the audio player; the spinner is gone')
     await pg.wait_for_timeout(1200)
     await pg.screenshot(path=f'{OUT}/top100-video-{theme}.png')
     # ended -> next song; #2 found through Wikidata (P1651)
     fr = [f for f in pg.frames if '/embed/tsPatient01' in f.url][0]
-    await fr.evaluate("parent.postMessage(JSON.stringify({ event: 'onStateChange', info: 0 }), '*')"); await pg.wait_for_timeout(1500)
+    await fr.evaluate("parent.postMessage(JSON.stringify({ event: 'onStateChange', info: 0 }), '*')"); await pg.wait_for_timeout(2500)
     src2 = await pg.evaluate("(document.querySelector('#ytOvFrame iframe')||{}).src || ''")
     on2 = await pg.evaluate("document.querySelector('.chart-vrow.on .chart-vrow-title').textContent")
     check('/embed/ellaSong002' in src2 and on2 == 'Song 002', f'{theme}: at the end the next song plays (its video from Wikidata) {src2[:60]} {on2}')
-    # a video YouTube won't play outside YouTube
+    # a video YouTube won't play outside YouTube: the song's preview in Now Playing instead
     fr2 = [f for f in pg.frames if '/embed/ellaSong002' in f.url][0]
-    await fr2.evaluate("parent.postMessage(JSON.stringify({ event: 'onError', info: 150 }), '*')"); await pg.wait_for_timeout(500)
-    note = await pg.evaluate("(document.querySelector('#ytOvFrame .chart-v-note')||{}).innerText || ''")
-    check('only plays on YouTube' in note and 'Find on YouTube' in note and 'Next Song' in note, f'{theme}: a video blocked outside YouTube says so, with Find on YouTube and Next Song {note!r}')
-    # no video found
-    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][2].click()"); await pg.wait_for_timeout(1800)
-    note3 = await pg.evaluate("(document.querySelector('#ytOvFrame .chart-v-note')||{}).innerText || ''")
-    check('No official video found' in note3 and 'Find on YouTube' in note3 and 'Key' not in note3 and 'key' not in note3, f'{theme}: a song with no video found offers a YouTube search (nothing about keys) {note3!r}')
-    sett = await pg.evaluate("document.getElementById('settingsPanel') ? document.getElementById('settingsPanel').innerText : ''")
-    check('API key' not in sett and 'YouTube key' not in sett and not await pg.evaluate("!!document.getElementById('youtubeSettingsRow')"), f'{theme}: nothing in Settings about a YouTube key')
-    await pg.screenshot(path=f'{OUT}/top100-novideo-{theme}.png')
-    await pg.evaluate("document.querySelector('.chart-v-actions button:last-child').click()"); await pg.wait_for_timeout(1500)
-    check(await pg.evaluate("document.querySelector('.chart-vrow.on .chart-vrow-title').textContent") == 'Song 004', f'{theme}: Next Song moves down the chart')
+    await fr2.evaluate("parent.postMessage(JSON.stringify({ event: 'onError', info: 150 }), '*')"); await pg.wait_for_timeout(1500)
+    np = await pg.evaluate("""(()=>{ const s = document.getElementById('nowPlayingScreen'), y = document.getElementById('npYouTubeBtn');
+      return { ov: document.getElementById('ytOverlay').classList.contains('open'), np: getComputedStyle(s).display === 'flex',
+        name: document.getElementById('npName').textContent, sub: document.getElementById('npSub').textContent,
+        yt: !!y && !y.hidden && y.getBoundingClientRect().width > 0, load: __nat.loads[__nat.loads.length - 1] || '',
+        note: document.querySelectorAll('.chart-v-note').length, seek: getComputedStyle(document.getElementById('npSeek')).display !== 'none' }; })()""")
+    print(theme, np)
+    check(not np['ov'] and np['np'] and np['name'] == 'Song 002' and 'preview.example/2-2.mp3' in np['load'] and np['note'] == 0,
+          f'{theme}: a video YouTube won\'t play here gives way to the song\'s preview in Now Playing (the studio version) {np}')
+    check('Ella Langley' in np['sub'] and '30-Second Preview' in np['sub'] and np['yt'] and np['seek'], f'{theme}: Now Playing says it is a preview, with a seek bar and a YouTube button {np["sub"]!r}')
+    await pg.wait_for_timeout(800)
+    await pg.screenshot(path=f'{OUT}/top100-preview-{theme}.png')
+    await pg.evaluate("window.__opened = []; window.open = function(u, t){ __opened.push([u, t]); return null; }; 0")
+    await pg.evaluate("document.getElementById('npYouTubeBtn').click()"); await pg.wait_for_timeout(300)
+    opened = await pg.evaluate("__opened")
+    check(len(opened) == 1 and opened[0][0].startswith('https://www.youtube.com/results?search_query=') and 'Ella%20Langley%20Song%20002' in opened[0][0] and opened[0][1] == '_blank',
+          f'{theme}: the YouTube button searches YouTube for the song\'s video, in a new window {opened}')
+    # the preview's end: the next song down the chart, as audio
+    await pg.evaluate("__h.ev('togglePlayPause()')"); await pg.wait_for_timeout(400)
+    await pg.evaluate("__endSong()"); await pg.wait_for_timeout(1500)
+    nxt = await pg.evaluate("({ name: document.getElementById('npName').textContent, load: __nat.loads[__nat.loads.length - 1] || '' })")
+    check(nxt['name'] == 'Song 003' and 'preview.example/3-' in nxt['load'], f'{theme}: when the preview ends the next chart song\'s preview plays {nxt}')
+    await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
+
+    # ---- MusicBrainz: Song 003's video recording, linked to YouTube
+    await pg.evaluate("document.querySelectorAll('.chart-row')[2].click()"); await pg.wait_for_timeout(5000)
+    src3 = await pg.evaluate("(document.querySelector('#ytOverlay.open #ytOvFrame iframe')||{}).src || ''")
+    check('/embed/mwSong003vi' in src3, f'{theme}: a video MusicBrainz lists for the song is found {src3[:60]}')
+    # MusicBrainz: Song 005's artist's channel (only MusicBrainz names it), its popular uploads
+    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][4].click()"); await pg.wait_for_timeout(300)
+    fl = await pg.evaluate("({ spin: !!document.querySelector('#ytOvFrame .chart-v-loading .spinner'), text: document.getElementById('ytOvFrame').innerText })")
+    check(fl['spin'] and 'Finding' not in fl['text'], f'{theme}: on the video page, a spinner while the next video is looked up {fl}')
+    await pg.wait_for_timeout(6000)
+    src5 = await pg.evaluate("(document.querySelector('#ytOverlay.open #ytOvFrame iframe')||{}).src || ''")
+    check('/embed/awSong005vi' in src5, f'{theme}: the artist\'s channel as MusicBrainz lists it is searched {src5[:60]}')
     # an older hit: not among the latest uploads, found in the channel's popular uploads
-    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][5].click()"); await pg.wait_for_timeout(1800)
+    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][5].click()"); await pg.wait_for_timeout(2500)
     src6 = await pg.evaluate("(document.querySelector('#ytOvFrame iframe')||{}).src || ''")
     check('/embed/tsOld006vid' in src6, f'{theme}: an older hit is found among the channel\'s most popular videos {src6[:60]}')
     # found videos are remembered: reopening #1 asks nothing new
@@ -310,9 +351,30 @@ async def run(theme, b):
     await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][0].click()"); await pg.wait_for_timeout(800)
     check(len(counts['wiki']) == nwiki and await pg.evaluate("__nat.feeds.length") == nfeeds and '/embed/tsPatient01' in await pg.evaluate("document.querySelector('#ytOvFrame iframe').src"),
           f'{theme}: a video found before plays without looking it up again')
-    # Back closes the video page; Home's row opens it too
-    await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(400)
-    check(not await pg.evaluate("document.getElementById('ytOverlay').classList.contains('open')") and not await pg.evaluate("!!document.querySelector('#ytOvFrame iframe')"), f'{theme}: Back closes it and stops the video')
+    # no video anywhere (Song 004): never a "no video" screen -- its preview plays in Now Playing
+    await pg.evaluate("[...document.querySelectorAll('.chart-vrow')][3].click()"); await pg.wait_for_timeout(7000)
+    nv = await pg.evaluate("""({ ov: document.getElementById('ytOverlay').classList.contains('open'), np: getComputedStyle(document.getElementById('nowPlayingScreen')).display === 'flex',
+      name: document.getElementById('npName').textContent, load: __nat.loads[__nat.loads.length - 1] || '', text: document.body.innerText,
+      q: __h.ev('playQueue.length'), label: __h.ev('queueLabel') })""")
+    check(not nv['ov'] and nv['np'] and nv['name'] == 'Song 004' and 'preview.example/4-' in nv['load'], f'{theme}: a song with no video plays its preview in Now Playing {nv["name"]} {nv["load"]}')
+    check('No official video' not in nv['text'] and 'Find on YouTube' not in nv['text'] and not await pg.evaluate("document.querySelectorAll('.chart-v-note').length"),
+          f'{theme}: never a "No official video found" screen')
+    check(nv['q'] == 100 and nv['label'].startswith('Top 100'), f'{theme}: the week\'s chart is the queue {nv["q"]} {nv["label"]!r}')
+    sett = await pg.evaluate("document.getElementById('settingsPanel') ? document.getElementById('settingsPanel').innerText : ''")
+    check('API key' not in sett and 'YouTube key' not in sett and not await pg.evaluate("!!document.getElementById('youtubeSettingsRow')"), f'{theme}: nothing in Settings about a YouTube key')
+    await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
+    # ---- a song in the library: the whole song, in Now Playing
+    nl = await pg.evaluate("__nat.loads.length")
+    await pg.evaluate("document.querySelectorAll('.chart-row')[8].click()"); await pg.wait_for_timeout(1500)
+    lib = await pg.evaluate("""({ ov: document.getElementById('ytOverlay').classList.contains('open'), np: getComputedStyle(document.getElementById('nowPlayingScreen')).display === 'flex',
+      cur: __h.ev('currentStation && currentStation.type + ":" + currentStation.localId'), yt: !document.getElementById('npYouTubeBtn').hidden,
+      label: __h.ev('queueLabel'), qi: __h.ev('queueIndex'), embeds: document.querySelectorAll('#ytOvFrame iframe').length })""")
+    print(theme, lib)
+    check(not lib['ov'] and lib['np'] and lib['cur'] == 'local:lib-song-009' and not lib['yt'] and lib['qi'] == 8 and lib['label'].startswith('Top 100'),
+          f'{theme}: a chart song in the library plays the whole song from the library, in Now Playing {lib}')
+    await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
+    # Home's row: the spinner there too
+    await pg.evaluate("document.getElementById('homeBtn') && document.getElementById('homeBtn').click()")
     check(not errs, f'{theme}: no page errors {errs[:2]}')
     await ctx.close()
 
