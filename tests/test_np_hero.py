@@ -22,6 +22,7 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         " playing: function(v){ setPlayingUI(v); },"
         " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroProgress').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
         " titles: function(){ return heroSlides.map(function(x){ return x.querySelector('.nph-title').textContent; }); },"
+        " clearStatus: function(){ setStatus('', false); },"
         " bar: function(){ var b = document.getElementById('npHeroProgress'), f = b.firstChild, r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), fill: f.getBoundingClientRect().width / r.width, shown: getComputedStyle(b).display !== 'none', knobs: b.querySelectorAll('*').length, bg: getComputedStyle(b).backgroundColor, fc: getComputedStyle(f).backgroundColor }; },"
         " onair: function(t, a){ window.dispatchEvent(new CustomEvent('amplify-onair', { detail: { id: 'x', title: t, artist: a } })); },"
         " slideLine: function(title){ var sl = heroSlides.filter(function(x){ return x.querySelector('.nph-title').textContent === title; })[0]; return sl ? sl.querySelector('.nph-line').textContent : null; },"
@@ -175,6 +176,9 @@ async def run(theme, b):
     await pg.evaluate('__d.home()'); await pg.wait_for_timeout(1200)
     h = await pg.evaluate('__h.hero()'); print(h)
     check(h['shown'] and h['left'] == 0 and h['right'] == h['vw'], f'[{theme}] the hero runs edge to edge across the top of Home')
+    await pg.evaluate('__h.clearStatus()'); await pg.wait_for_timeout(600)
+    gap = await pg.evaluate("(()=>{ var s = document.getElementById('statusLine'); if(s.classList.contains('has-message')) return null; return Math.round(document.getElementById('npHero').getBoundingClientRect().top - document.querySelector('.sidebar-top').getBoundingClientRect().bottom); })()")
+    check(gap is None or gap == 0, f'[{theme}] and starts right under the header (gap {gap}px)')
     check(h['first'] in ('favoritesSection', 'recentSection') or 'section' in h['first'], f'[{theme}] above the Home rows (next: {h["first"]})')
     check(h['kicker'] == 'Artist' and h['title'] == 'Prince', f'[{theme}] a library song shows the artist ({h["kicker"]} / {h["title"]})')
     check(h['desc'].startswith('Prince Rogers Nelson') and h['descLines'] == 2, f'[{theme}] with two lines of the bio ({h["descLines"]} lines)')

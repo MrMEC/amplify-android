@@ -452,6 +452,9 @@
        until it is asked for. */
     .search-bar-wrap{ display:none; }
     .browse-view{ padding-top:76px; }
+    /* Build 224: the Home hero starts right under the header (Mark): the 16px the page keeps
+       below the header is taken back, unless a status message is showing above it. */
+    .status-line:not(.has-message) + .home-hero{ margin-top:-16px; }
     /* While a page slides in (slideInPage), the page is its own layer for the trip. */
     body.page-sliding .browse-view{ will-change:transform; }
   }
