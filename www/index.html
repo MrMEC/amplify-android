@@ -613,6 +613,7 @@
     color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px;
   }
   .section-heading-actions button:hover{ color:var(--text); border-color:var(--accent-dim); }
+  .section-heading-actions #playlistFavBtn.on{ color:var(--accent); }
   #deleteActiveCustomSearchBtn:hover{ color:var(--danger); border-color:var(--danger); }
   #playlistCoverBtn{ padding:0; overflow:hidden; }
   #playlistCoverBtn img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -6011,6 +6012,8 @@
             <!-- Only while a playlist is being edited: opens the cover image dialog (URL,
                  upload or search). Shows the current cover as its own thumbnail. -->
             <button type="button" id="playlistCoverBtn" style="display:none;" title="Cover image" aria-label="Cover image"></button>
+            <!-- Build 227: a playlist can be a favourite (it then plays shuffled from Favorites). -->
+            <button type="button" id="playlistFavBtn" style="display:none;" title="Add to Favorites" aria-label="Add to Favorites"><i class="fa-regular fa-heart"></i></button>
             <button type="button" id="editActiveCustomSearchBtn" title="Edit this search" aria-label="Edit this search"><i class="fa-solid fa-pen"></i></button>
             <button type="button" id="deleteActiveCustomSearchBtn" title="Delete this search" aria-label="Delete this search">
               <i class="fa-solid fa-trash"></i>
@@ -11396,7 +11399,12 @@
     }catch(e){ storageWorks = false; return []; }
   }
   function savePodcastSubs(){
-    try{ localStorage.setItem(PODCAST_SUBS_KEY, JSON.stringify(podcastSubs)); }catch(e){ storageWorks = false; }
+    // Build 227: recent episodes are kept in their own key (see savePodcastRecent), so the
+    // followed shows themselves never grow by them.
+    try{
+      localStorage.setItem(PODCAST_SUBS_KEY, JSON.stringify(podcastSubs, function(k, v){ return k === 'recentEpisodes' ? undefined : v; }));
+    }catch(e){ storageWorks = false; }
+    if(typeof savePodcastRecent === 'function') savePodcastRecent();
   }
   function loadPodcastCategories(){
     try{
@@ -11452,6 +11460,20 @@
   }
   function saveStationPlaylists(){
     try{ localStorage.setItem(STATION_PLAYLISTS_KEY, JSON.stringify(stationPlaylists)); }catch(e){ storageWorks = false; }
+    // Build 227: a favourite playlist follows renames, and goes when the playlist does.
+    try{
+      if(typeof favorites !== 'undefined' && favorites.some(function(f){ return f && f.type === 'playlistRadio'; })){
+        var favChanged = false;
+        favorites = favorites.filter(function(f){
+          if(!f || f.type !== 'playlistRadio') return true;
+          var pl = findStationPlaylistById(f.playlistId);
+          if(!pl){ favChanged = true; return false; }
+          if(f.name !== pl.label){ f.name = pl.label; favChanged = true; }
+          return true;
+        });
+        if(favChanged){ saveFavorites(); renderFavoritesList(); if(typeof renderFavoritesSection === 'function') renderFavoritesSection(); }
+      }
+    }catch(e){}
     if(typeof renderPlaylistsHomeSection === 'function') try{ renderPlaylistsHomeSection(); }catch(e){}
   }
   function makeStationPlaylistId(){
@@ -11541,6 +11563,7 @@
     if(s && s.type === 'album') return 'album:' + (s.albumKey || '');
     // An artist's Radio (build 150): their own songs, shuffled, played like a station.
     if(s && s.type === 'artistRadio') return 'artistradio:' + (s.artistKey || '');
+    if(s && s.type === 'playlistRadio') return 'playlistradio:' + (s.playlistId || '');
     if(s && s.type === 'chartsong') return 'song:' + (s.songKey || songKeyOf(s.artist, s.name));
     return s.stationuuid || s.urlToResolve || s.name;
   }
@@ -11584,6 +11607,15 @@
     return entry && artistRadioSongs(entry.key).length >= ARTIST_RADIO_MIN ? artistRadioRecord(entry) : null;
   }
   function artistRadioAvailable(s){ return artistRadioSongs(s && s.artistKey).length >= ARTIST_RADIO_MIN; }
+  // A playlist as a favourite (build 227): from Favorites it plays at once, shuffled, and never
+  // runs out (a fresh shuffle is added near the end), like an artist's Radio. Its name and
+  // cover follow the playlist's; deleting the playlist removes it.
+  function isPlaylistRadio(s){ return !!(s && s.type === 'playlistRadio'); }
+  function playlistRadioRecord(pl){ return { type: 'playlistRadio', playlistId: pl.id, name: pl.label || 'Playlist', stationuuid: 'playlistradio:' + pl.id }; }
+  function playlistRadioItems(id){
+    var pl = id ? findStationPlaylistById(id) : null;
+    return pl ? (pl.stations || []).filter(function(t){ return queueable(t); }) : [];
+  }
   // The index is built from the library plus the station directory, and neither is
   // guaranteed to be loaded -- or still to contain this artist -- when a stored favourite
   // is rendered. The stand-in carries enough for the art chain (a custom override, a
@@ -12141,6 +12173,13 @@
       paint(customUrl);
       return; // user-supplied art is authoritative -- never overridden by the lookup chain
     }
+    // A favourite playlist wears the playlist's own cover.
+    if(isPlaylistRadio(station)){
+      var ppl = findStationPlaylistById(station.playlistId);
+      container.innerHTML = '';
+      renderPlaylistCoverArt(container, ppl || { id: station.playlistId });
+      return;
+    }
     // An artist's Radio with no cover of its own wears the artist's picture.
     if(isArtistRadio(station)){
       var re = findArtistEntry(station.artistKey) || { key: station.artistKey, name: String(station.name || '').replace(/ Radio$/, ''), tracks: [], stations: [] };
@@ -12517,6 +12556,7 @@
       if(isAlbumFav(s)) return !albumEntryForFav(s).tracks.length;
       if(isArtistFav(s)) return known && !findArtistEntry(s.artistKey);
       if(isArtistRadio(s)) return !artistRadioAvailable(s);
+      if(isPlaylistRadio(s)) return !findStationPlaylistById(s.playlistId);
       return false;
     }
     var changed = {};
@@ -15129,6 +15169,7 @@
         name: item.label || 'Playlist',
         sub: plural((item.stations || []).length, 'item', 'items'),
         renderArt: function(art){ renderPlaylistCoverArt(art, item); },
+        favTarget: playlistRadioRecord(item),
         onClick: function(){ pushView(); runStationPlaylist(item); }
       }));
     });
@@ -15701,8 +15742,21 @@
   // that category, see renderPodcastsGrid) -- same date-grouped, newest-first stacked-row
   // layout either way, just over a different subset of podcastSubs.
   function renderPodcastsFollowingByDate(subs, emptyMessage){
-    var list = subs.filter(function(sub){ return sub.latestEpisode && sub.latestEpisode.releaseDate; });
-    function dateOf(sub){ return sub.latestEpisode.releaseDate; }
+    // Build 227: every recent episode of each show (sub.recentEpisodes), not one per show; a
+    // show not re-checked since still shows its newest (sub.latestEpisode).
+    var list = [], seen = {};
+    subs.forEach(function(sub){
+      var eps = (sub.recentEpisodes || []).slice();
+      if(sub.latestEpisode) eps.unshift(sub.latestEpisode);
+      eps.forEach(function(ep){
+        if(!ep || !ep.releaseDate || isNaN(new Date(ep.releaseDate).getTime())) return;
+        var k = ep.guid || ep.episodeUrl || (ep.collectionId + '|' + ep.name);
+        if(seen[k]) return;
+        seen[k] = true;
+        list.push(ep);
+      });
+    });
+    function dateOf(ep){ return ep.releaseDate; }
     list.sort(function(a, b){ return new Date(dateOf(b)).getTime() - new Date(dateOf(a)).getTime(); });
 
     if(!list.length){
@@ -15714,8 +15768,8 @@
     }
 
     var lastKey = null;
-    list.forEach(function(sub){
-      var iso = dateOf(sub);
+    list.forEach(function(ep){
+      var iso = dateOf(ep);
       var key = podcastDateKey(iso);
       if(key !== lastKey){
         lastKey = key;
@@ -15726,7 +15780,7 @@
       }
       // The Podcasts page: no menu, and titles get two lines (build 48). No date on the
       // row either (build 181): the heading above it already gives the date.
-      var row = buildPodcastEpisodeRow(sub.latestEpisode, { menu: false, noDate: true });
+      var row = buildPodcastEpisodeRow(ep, { menu: false, noDate: true });
       row.classList.add('podcast-date-row');
       stationsGrid.appendChild(row);
     });
@@ -20608,6 +20662,9 @@
       // iTunes' lookup already answers newest-first, but that's not documented behaviour --
       // sorting explicitly is what actually guarantees the latest episode leads the list.
       episodes.sort(function(a, b){ return new Date(b.releaseDate) - new Date(a.releaseDate); });
+      // Build 227: what this page found also updates the Podcasts list, so an episode seen here
+      // is always there too.
+      if(sub) mergeRecentEpisodes(sub, episodes);
       stationsGrid.classList.add('grid-songs');
       episodes.forEach(function(ep){ stationsGrid.appendChild(buildPodcastEpisodeRow(ep)); });
     })['catch'](function(err){
@@ -21071,7 +21128,28 @@
   function syncPlaylistShuffleBtn(pl){
     var n = pl ? pl.stations.filter(function(s){ return queueable(s); }).length : 0;
     libraryShuffleBtn.style.display = (pl && n > 1 && !stationPlaylistStationsEditing) ? '' : 'none';
+    syncPlaylistFavBtn(pl);
   }
+  // The heart on a playlist's page (build 227): adds it to Favorites, where it plays shuffled.
+  var playlistFavBtn = document.getElementById('playlistFavBtn');
+  function syncPlaylistFavBtn(pl){
+    if(!playlistFavBtn) return;
+    var show = !!pl && !stationPlaylistStationsEditing && activeStationPlaylistId === pl.id;
+    playlistFavBtn.style.display = show ? '' : 'none';
+    if(!show) return;
+    var on = isFavorite(playlistRadioRecord(pl));
+    playlistFavBtn.classList.toggle('on', on);
+    playlistFavBtn.innerHTML = on ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>';
+    playlistFavBtn.title = on ? 'Remove from Favorites' : 'Add to Favorites';
+    playlistFavBtn.setAttribute('aria-label', playlistFavBtn.title);
+  }
+  if(playlistFavBtn) playlistFavBtn.addEventListener('click', function(){
+    var pl = activeStationPlaylistId ? findStationPlaylistById(activeStationPlaylistId) : null;
+    if(!pl) return;
+    toggleFavorite(playlistRadioRecord(pl));
+    syncPlaylistFavBtn(pl);
+    if(typeof renderFavoritesSection === 'function') try{ renderFavoritesSection(); }catch(e){}
+  });
   function renderPlaylistStations(playlist, editing){
     resetStationsGrid();
     stationsGrid.classList.add('grid-songs');
@@ -21637,6 +21715,8 @@
     clearHistoryBtn.style.display = 'none';
     stationsHeadingActions.style.display = '';
     var isPlaylist = kind === 'playlist';
+    var pfb = document.getElementById('playlistFavBtn');
+    if(pfb && !isPlaylist) pfb.style.display = 'none';
     editActiveCustomSearchBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
     editActiveCustomSearchBtn.title = isPlaylist ? 'Edit this playlist' : 'Edit this search';
     editActiveCustomSearchBtn.setAttribute('aria-label', editActiveCustomSearchBtn.title);
@@ -22702,6 +22782,69 @@
   function lastPodcastRefreshAt(){
     try{ return parseInt(localStorage.getItem(PODCAST_REFRESHED_AT_KEY), 10) || 0; }catch(e){ return 0; }
   }
+  // Build 227: each show's recent episodes, not just its newest, so the Latest list shows every
+  // episode a show put out (Mark: WhatCulture posts several a day and only one appeared). Kept
+  // on the subscription as sub.recentEpisodes: the last PODCAST_RECENT_DAYS days, at most
+  // PODCAST_RECENT_MAX, notes shortened (they only need to fit a row).
+  // A show that posts several a day (WhatCulture: 4-5) still fits a week in 40.
+  var PODCAST_RECENT_MAX = 40, PODCAST_RECENT_DAYS = 7, PODCAST_RECENT_LOOKUP = 40;
+  // { collectionId: [episode, ...] }, slimmed (the show's name and artist come from the
+  // subscription when read back). If storage is short, fewer per show are kept, never none.
+  var PODCAST_RECENT_KEY = 'radioPlayerPodcastRecent';
+  function savePodcastRecent(){
+    var m = {};
+    podcastSubs.forEach(function(sub){
+      if(!sub.recentEpisodes) return;
+      m[sub.collectionId] = sub.recentEpisodes.map(function(e){
+        return { g: e.guid, n: e.name, d: e.releaseDate, t: e.duration || 0, u: e.episodeUrl, f: e.favicon,
+          s: (e.description || '').slice(0, 200), v: e.isVideo ? 1 : 0 };
+      });
+    });
+    for(var cap = PODCAST_RECENT_MAX; cap >= 5; cap = Math.floor(cap / 2)){
+      var mm = {};
+      Object.keys(m).forEach(function(k){ mm[k] = m[k].slice(0, cap); });
+      try{ localStorage.setItem(PODCAST_RECENT_KEY, JSON.stringify(mm)); return; }catch(e){}
+    }
+  }
+  function loadPodcastRecent(){
+    var m = null;
+    try{ m = JSON.parse(localStorage.getItem(PODCAST_RECENT_KEY) || 'null'); }catch(e){}
+    if(!m) return;
+    podcastSubs.forEach(function(sub){
+      var list = m[sub.collectionId];
+      if(!Array.isArray(list)) return;
+      sub.recentEpisodes = list.map(function(x){
+        return { type: 'podcast', guid: x.g, collectionId: sub.collectionId, collectionName: sub.collectionName || '',
+          artistName: sub.artistName || '', name: x.n || 'Untitled episode', favicon: x.f || sub.artworkUrl || '',
+          releaseDate: x.d || '', duration: x.t || 0, episodeUrl: x.u || '', description: x.s || '', isVideo: !!x.v };
+      });
+    });
+  }
+  try{ loadPodcastRecent(); }catch(e){}
+  function trimRecentEpisodes(eps){
+    var cutoff = Date.now() - PODCAST_RECENT_DAYS * 86400000;
+    return (eps || []).filter(function(e){
+      var t = e && e.releaseDate ? new Date(e.releaseDate).getTime() : 0;
+      return t && t >= cutoff;
+    }).slice(0, PODCAST_RECENT_MAX).map(function(e){
+      var c = Object.assign({}, e);
+      if(typeof c.description === 'string' && c.description.length > 300) c.description = c.description.slice(0, 300);
+      return c;
+    });
+  }
+  function mergeRecentEpisodes(sub, eps){
+    var recent = trimRecentEpisodes(eps);
+    var newest = eps[0] || null;
+    var changed = false;
+    if(newest && (!sub.latestEpisode || (newest.guid !== sub.latestEpisode.guid &&
+        (new Date(newest.releaseDate).getTime() || 0) >= (new Date(sub.latestEpisode.releaseDate).getTime() || 0)))){
+      sub.latestEpisode = newest; changed = true;
+    }
+    var was = (sub.recentEpisodes || []).map(function(e){ return e.guid; }).join('|');
+    if(recent.map(function(e){ return e.guid; }).join('|') !== was){ sub.recentEpisodes = recent; changed = true; }
+    if(changed){ savePodcastSubs(); scheduleLatestPodcastsRedraw(); }
+    return changed;
+  }
   function backfillPodcastShowMeta(mode){
     if(podcastRefreshInFlight) return;
     var force = mode === 'manual'
@@ -22722,23 +22865,34 @@
       }
     }
     podcastSubs.forEach(function(sub){
-      if(!force && sub.artworkUrl && sub.latestEpisode) return;
+      if(!force && sub.artworkUrl && sub.latestEpisode && sub.recentEpisodes) return;
       pending++;
       total++;
       enqueueArtTask(function(){
         // itunesLookupShow treats a falsy limit as "use the 40-episode default", so 1 (not
         // 0) is what actually keeps this lookup cheap -- the show record plus its newest
         // episode is all that is needed here.
-        return itunesLookupShow(sub.collectionId, 1, { background: true }).then(function(res){
+        // Build 227: the last few episodes (not just 1), for the Latest list.
+        return itunesLookupShow(sub.collectionId, PODCAST_RECENT_LOOKUP, { background: true }).then(function(res){
           var changed = false;
           if(!sub.artworkUrl && res.show){
             var url = itunesArtwork(res.show);
             if(url){ sub.artworkUrl = url; changed = true; }
           }
-          var fetched = res.episodes && res.episodes[0] ? episodeFromItunes(res.episodes[0]) : null;
+          var eps = (res.episodes || []).map(episodeFromItunes).filter(function(e){ return e && e.guid; });
+          eps.sort(function(a, b){ return (new Date(b.releaseDate).getTime() || 0) - (new Date(a.releaseDate).getTime() || 0); });
+          var fetched = eps[0] || null;
           if(fetched && (!sub.latestEpisode || fetched.guid !== sub.latestEpisode.guid)){
             sub.latestEpisode = fetched;
             changed = true;
+          }
+          if(res.episodes){
+            var recent = trimRecentEpisodes(eps);
+            var was = (sub.recentEpisodes || []).map(function(e){ return e.guid; }).join('|');
+            if(!sub.recentEpisodes || recent.map(function(e){ return e.guid; }).join('|') !== was){
+              sub.recentEpisodes = recent;
+              changed = true;
+            }
           }
           if(!changed) return;
           savePodcastSubs();
@@ -25662,6 +25816,9 @@
       favBtn.addEventListener('click', function(e){
         e.stopPropagation();
         toggleFavorite(o.favTarget);
+        var on = isFavorite(o.favTarget);
+        favBtn.classList.toggle('on', on);
+        favBtn.innerHTML = on ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>';
       });
       tile.appendChild(favBtn);
     }
@@ -28536,6 +28693,21 @@
     playStation(order[0]);
     onQueueContextChanged();
   }
+  function playPlaylistRadio(radio){
+    var pl = findStationPlaylistById(radio.playlistId);
+    var items = playlistRadioItems(radio.playlistId);
+    if(!pl || !items.length){
+      setStatus((radio.name || 'This playlist') + (pl ? ' has nothing to play yet.' : ' no longer exists.'), true);
+      return;
+    }
+    var rec = playlistRadioRecord(pl);
+    var order = shuffled(items);
+    setQueue(order, order[0], rec.name);
+    radioCtx = { key: pl.id, label: rec.name, kind: 'playlist' };
+    recordRecent(rec);
+    playStation(order[0]);
+    onQueueContextChanged();
+  }
   window.__amplifyPlayArtistRadio = function(key){ var e = findArtistEntry(key); var r = artistRadioFor(e); if(r) playStation(r); return !!r; };
   // Never runs out: nearing the end, another shuffle of the artist's songs (as they are in the
   // library now) is added, with the last few played moved to the back of it.
@@ -28544,7 +28716,7 @@
     // Kept a dozen songs ahead, so the queue the phone hands the player (and the car) is long
     // enough to carry on with by itself while the app is asleep (build 151).
     if(queueIndex < playQueue.length - 12) return;
-    var songs = artistRadioSongs(radioCtx.key);
+    var songs = radioCtx.kind === 'playlist' ? playlistRadioItems(radioCtx.key) : artistRadioSongs(radioCtx.key);
     if(songs.length < 2) return;
     var keep = Math.min(3, songs.length - 1);
     for(var round = 0; round < 12 && queueIndex >= playQueue.length - 12; round++){
@@ -28569,6 +28741,11 @@
           : (albumEntryForFav(f).tracks || []);
         tracks = tracks.filter(function(t){ return !isBlacklisted(t); });
         if(tracks.length) pool.push(tracks[Math.floor(Math.random() * tracks.length)]);
+        return;
+      }
+      if(isPlaylistRadio(f)){
+        var pitems = playlistRadioItems(f.playlistId);
+        if(pitems.length) pool.push(pitems[Math.floor(Math.random() * pitems.length)]);
         return;
       }
       if(queueable(f)) pool.push(f);
@@ -28672,7 +28849,7 @@
   // Songs, episodes and stations can all be lined up. A station never ends on its own, so
   // one reached in Up Next plays until Next moves on. Artists and albums are pages, not
   // things to play, so they are never queued themselves (an album queues its songs).
-  function queueable(t){ return !!t && t.type !== 'artist' && t.type !== 'album' && t.type !== 'artistRadio' && !isBlacklisted(t); }
+  function queueable(t){ return !!t && t.type !== 'artist' && t.type !== 'album' && t.type !== 'artistRadio' && t.type !== 'playlistRadio' && !isBlacklisted(t); }
   (function loadUpNext(){
     try{
       var raw = JSON.parse(localStorage.getItem(UP_NEXT_KEY) || '[]');
@@ -33172,6 +33349,7 @@
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
     if(isArtistRadio(track)) return playArtistRadio(track);
+    if(isPlaylistRadio(track)) return playPlaylistRadio(track);
     if(reconnectState && reconnectState.station !== track) cancelReconnect();
     cancelNextUp();
     if(isLocalTrack(track)) return playLocalTrack(track);
@@ -33871,7 +34049,7 @@
     } else if(isChartSong(item)){
       o.kicker = 'Top 100'; o.title = item.name || ''; o.line = item.artist || '';
     } else {
-      o.kicker = isChannelEntry(item) ? 'Live TV' : 'Station';
+      o.kicker = isChannelEntry(item) ? 'Live TV' : isPlaylistRadio(item) ? 'Playlist' : isArtistRadio(item) ? 'Artist Radio' : 'Station';
       o.title = stripExclusively((item.channel && item.channel.name) || item.name || '');
       o.line = stationLastSongText(item);
     }
@@ -33983,6 +34161,8 @@
   function slideIsPlaying(slide){
     var item = slide._item, entry = slide._entry;
     if(!item || !uiIsPlaying || !currentStation) return false;
+    // A favourite playlist or artist Radio is "playing" while its shuffle is the queue.
+    if(isPlaylistRadio(item) || isArtistRadio(item)) return !!radioCtx && radioCtx.label === item.name && queueLabel === item.name;
     if(entry){
       return isLocalTrack(currentStation) && queueLabel === heroShuffleLabel(entry)
         && artistMatchKey(currentStation.artist || '') === entry.key;
@@ -34349,8 +34529,16 @@
       var custom = getCustomArtUrl(favKey(s));
       return { t: 'radio', key: s.artistKey, title: entry ? artistRadioRecord(entry).name : (s.name || 'Radio'), art: custom ? carImage(favKey(s), custom) : '' };
     }
+    // A favourite playlist in the car (build 227): the same playable row, playing the playlist
+    // shuffled (CarLibrary's "radio" entry with a playlist id).
+    function carPlaylistRadio(s){
+      if(!isPlaylistRadio(s) || !playlistRadioItems(s.playlistId).length) return null;
+      var pl = findStationPlaylistById(s.playlistId);
+      var cover = getCustomArtUrl(playlistArtKey(s.playlistId));
+      return { t: 'radio', plid: s.playlistId, key: '', title: pl ? pl.label : (s.name || 'Playlist'), art: cover ? carImage(playlistArtKey(s.playlistId), cover) : '' };
+    }
     function carStation(s){
-      if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album') return null;
+      if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album' || s.type === 'playlistRadio') return null;
       if(!s.urlToResolve || isBlacklisted(s)) return null;
       var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
       // place: the location line the phone's Now Playing shows under a station, which the
@@ -34468,6 +34656,7 @@
           if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
           if(f && f.type === 'album') return { t: 'album', key: resolveAlbumKey(f.albumKey || ''), title: f.name || f.album || '' };
           if(isArtistRadio(f)) return carRadio(f);
+          if(isPlaylistRadio(f)) return carPlaylistRadio(f);
           return carStation(f);
         }));
         lists.recentSongs = compact(recentStations.filter(isLocalTrack).map(carSong));
@@ -34491,7 +34680,7 @@
           }));
         });
         lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
-          .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : carStation(s); }));
+          .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : isPlaylistRadio(s) ? carPlaylistRadio(s) : carStation(s); }));
         lists.topStations = compact((carNet.top || []).map(carStation));
         lists['continue'] = compact((r[1] || []).map(function(rec){ return carEpisode(podcastTrackFromProgress(rec), prog); }));
         lists.podLatest = latestOf(podcastSubs, prog);
