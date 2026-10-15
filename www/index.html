@@ -1328,6 +1328,28 @@
   .confirm-actions button{ flex:1; min-height:44px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
   .confirm-cancel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); }
   .confirm-ok{ background:var(--danger); color:#fff; border:1px solid var(--danger); }
+  /* ---------- Sleep timer (build 230) ---------- */
+  #npSleepBtn{ white-space:nowrap; }
+  /* The menu is a dark panel in both themes on Now Playing, so the time left follows its text. */
+  .np-sleep-left{ margin-left:auto; padding-left:14px; font-size:12.5px; font-weight:600; color:inherit; opacity:.62;
+    font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .np-sleep-left[hidden]{ display:none; }
+  .sleep-panel{ padding-bottom:16px; max-height:calc(100dvh - 32px); overflow-y:auto; overscroll-behavior:contain; }
+  @media (max-height:520px){ .sleep-overlay{ padding:16px; } }
+  .sleep-status{ margin:-2px 0 12px; font-size:14px; line-height:1.4; color:var(--accent); font-weight:600;
+    font-variant-numeric:tabular-nums; }
+  .sleep-status[hidden]{ display:none; }
+  .sleep-opts{ display:flex; flex-direction:column; margin:0 0 16px; border-top:1px solid var(--border); }
+  .sleep-opt{ display:flex; align-items:center; gap:12px; width:100%; min-height:48px; padding:0 4px;
+    background:none; border:0; border-bottom:1px solid var(--border); color:var(--text); font:inherit;
+    font-size:15px; font-weight:500; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .sleep-opt:active{ background:var(--panel-2); }
+  .sleep-opt span{ flex:1; min-width:0; }
+  .sleep-opt.on{ color:var(--accent); font-weight:700; }
+  .sleep-opt .sleep-tick{ width:18px; height:18px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.6;
+    stroke-linecap:round; stroke-linejoin:round; visibility:hidden; }
+  .sleep-opt.on .sleep-tick{ visibility:visible; }
+  .sleep-opt.off{ color:var(--danger); }
   /* ---------- Home hero (build 220) ---------- */
   /* What's playing, as a full-width picture at the top of Home that dissolves into the page:
      the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
@@ -6298,6 +6320,10 @@
                   <button type="button" class="np-menu-item" id="npQueueMenuBtn" role="menuitem">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h10"/><path class="fill" d="M16 14.2v5.6l4.6-2.8z"/></svg><span>View Queue</span>
                   </button>
+                  <!-- Build 230: stop playing after a while, or at the end of this song. -->
+                  <button type="button" class="np-menu-item" id="npSleepBtn" role="menuitem">
+                    <i class="fa-solid fa-moon"></i><span>Sleep Timer</span><span class="np-sleep-left" id="npSleepLeft" hidden></span>
+                  </button>
                   <button type="button" class="np-menu-item" id="npMoreLikeBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><circle class="fill" cx="8" cy="8" r="1.5"/></svg><span>More Like This</span>
                   </button>
@@ -6509,6 +6535,17 @@
     <div class="confirm-actions">
       <button type="button" class="confirm-cancel" id="confirmCancel">Cancel</button>
       <button type="button" class="confirm-ok" id="confirmOk">Delete</button>
+    </div>
+  </div>
+</div>
+<!-- Build 230: the sleep timer (Now Playing's menu). -->
+<div class="confirm-overlay sleep-overlay" id="sleepOverlay" role="dialog" aria-modal="true" aria-labelledby="sleepTitle">
+  <div class="confirm-panel sleep-panel">
+    <h2 class="confirm-title" id="sleepTitle">Sleep Timer</h2>
+    <p class="sleep-status" id="sleepStatus" hidden></p>
+    <div class="sleep-opts" id="sleepOpts" role="menu"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-cancel" id="sleepClose">Close</button>
     </div>
   </div>
 </div>
@@ -7374,6 +7411,8 @@
     } else if(!ev.isPlaying && a._playing){
       a._playing = false;
     }
+    // Build 230: the sleep timer stopped it at the end of this song or episode.
+    a._sleepHold = !!ev.sleepHold;
     if(ev.state === 'ended' && !a._ended){
       a._ended = true; a._playing = false;
       // Heard late (the page was asleep): the phone has already carried on with the queue by
@@ -7414,6 +7453,12 @@
   P.addListener('state', castItem);
   P.addListener('progress', castItem);
   if(typeof P.castInfo === 'function') P.castInfo().then(function(i){ if(i) castChanged(i); })['catch'](function(){});
+  // ---- sleep timer (build 230): counted by the native player (SleepTimer) ----
+  window.AmplifySleep = typeof P.setSleep === 'function' ? {
+    set: function(o){ return P.setSleep(o || {}); },
+    info: function(){ return P.sleepInfo(); },
+    on: function(fn){ P.addListener('sleep', fn); }
+  } : null;
   window.AmplifyCast = {
     pick: function(){ return typeof P.castPick === 'function' ? P.castPick() : Promise.reject(new Error('no cast')); },
     end: function(){ return typeof P.castEnd === 'function' ? P.castEnd() : Promise.resolve(); }
@@ -19929,15 +19974,16 @@
   audio.addEventListener('pause', function(){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); });
   window.addEventListener('pagehide', function(){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); });
   document.addEventListener('visibilitychange', function(){ if(document.hidden){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); } });
-  function onLocalVideoEnded(){
+  function onLocalVideoEnded(stopHere){
     var t = currentStation;
     var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
     setVideoProgress(t.id, dur, dur);
     vsave(VIDEO_PROGRESS_KEY, videoProgress);
     if(t.plex){ plexReport(t.id, true); plexStopSession(); }
-    if(typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
+    // stopHere: the sleep timer stopped it at its end (build 230), so nothing follows.
+    if(!stopHere && typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
     // A music video: on to the next of the artist's videos (build 152).
-    if(t.videoKind === 'music' && playNextInLine()) return;
+    if(!stopHere && t.videoKind === 'music' && playNextInLine()) return;
     setPlayingUI(false);
     syncSeekBar();
     updateMediaSessionState();
@@ -24687,6 +24733,19 @@
   // A local track runs out; a stream never does. Stopping cleanly beats leaving the UI
   // showing a paused track at its own end. A real next/previous queue is Phase 3.
   audio.addEventListener('ended', function(){
+    // Build 230: the sleep timer's "end of song": stop here instead of going on.
+    if(sleepTakeEnd()){
+      if(currentStation && isLocalVideo(currentStation)){ onLocalVideoEnded(true); return; }
+      if(currentStation && isPodcastTrack(currentStation)){
+        savePodcastProgress(currentStation, audio.duration || currentStation.duration || 0, audio.duration || currentStation.duration || 0);
+      } else if(currentStation && (isLocalTrack(currentStation) || isChartSong(currentStation))){
+        try{ audio.currentTime = 0; }catch(e){}
+      }
+      setPlayingUI(false);
+      syncSeekBar();
+      updateMediaSessionState();
+      return;
+    }
     if(currentStation && isLocalVideo(currentStation)){ onLocalVideoEnded(); return; }
     if(currentStation && isPodcastTrack(currentStation)){
       savePodcastProgress(currentStation, audio.duration || currentStation.duration || 0, audio.duration || currentStation.duration || 0);
@@ -29530,6 +29589,193 @@
     if(npMenu.contains(e.target) || npMenuBtn.contains(e.target)) return;
     closeNpMenu();
   });
+
+  // ---------- sleep timer (build 230) ----------
+  // Stop playing after a while (the last 12 seconds fade out), or at the end of the song,
+  // episode or video playing now. In the Android app the native player counts it down
+  // (SleepTimer in PlaybackService), so it works with the screen locked and in the car; this
+  // page only shows it and follows it. In a browser the page counts it itself.
+  var SLEEP_MINUTES = [15, 30, 45, 60, 90];
+  var SLEEP_FADE_MS = 12000;
+  var npSleepBtn = document.getElementById('npSleepBtn');
+  var npSleepLeft = document.getElementById('npSleepLeft');
+  var sleepOverlayEl = document.getElementById('sleepOverlay');
+  var sleepOptsEl = document.getElementById('sleepOpts');
+  var sleepStatusEl = document.getElementById('sleepStatus');
+  // until: when a timed sleep stops playback (this clock); minutes: the choice that set it.
+  var sleepState = { active: false, endOfItem: false, until: 0, minutes: 0 };
+  var sleepEndHoldUntil = 0; // the native timer just stopped a song at its end
+  var sleepUiTimer = null;
+  var sleepWeb = { timer: null, fade: null, from: -1 };
+  var SleepNative = window.AmplifySleep || null;
+
+  function sleepFiniteItem(st){ return !!st && (isLocalTrack(st) || isPodcastTrack(st) || isChartSong(st) || isLocalVideo(st)); }
+  function sleepEndWord(st){ return isPodcastTrack(st) ? 'episode' : (isLocalVideo(st) ? 'video' : 'song'); }
+  function sleepRemainingMs(){ return sleepState.until ? Math.max(0, sleepState.until - Date.now()) : 0; }
+  function sleepClock(ms){
+    var sec = Math.ceil(ms / 1000), h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (x < 10 ? '0' : '') + x;
+  }
+  function sleepMinutesLabel(n){ return n >= 60 && n % 60 === 0 ? (n / 60) + (n === 60 ? ' hour' : ' hours') : (n > 60 ? Math.floor(n / 60) + ' hr ' + (n % 60) + ' min' : n + ' minutes'); }
+  function sleepShortLeft(){
+    if(!sleepState.active) return '';
+    if(sleepState.endOfItem) return 'End of ' + sleepEndWord(currentStation);
+    var min = Math.ceil(sleepRemainingMs() / 60000);
+    return min <= 1 ? '1 min' : min + ' min';
+  }
+  function syncSleepUi(){
+    var left = sleepShortLeft();
+    if(npSleepLeft.textContent !== left) npSleepLeft.textContent = left;
+    npSleepLeft.hidden = !left;
+    npSleepBtn.classList.toggle('sleep-on', sleepState.active);
+    if(sleepOverlayEl.classList.contains('open')){
+      var txt = !sleepState.active ? '' : (sleepState.endOfItem
+        ? 'Stops at the end of this ' + sleepEndWord(currentStation)
+        : 'Stops in ' + sleepClock(sleepRemainingMs()));
+      if(sleepStatusEl.textContent !== txt) sleepStatusEl.textContent = txt;
+      sleepStatusEl.hidden = !txt;
+    }
+    // Counting down: the menu and the sheet keep up while the timer runs.
+    var want = sleepState.active && !sleepState.endOfItem;
+    if(want && !sleepUiTimer) sleepUiTimer = setInterval(syncSleepUi, 1000);
+    else if(!want && sleepUiTimer){ clearInterval(sleepUiTimer); sleepUiTimer = null; }
+  }
+  // What the native timer says (an answer to set/info, or its 'sleep' event).
+  function applySleepInfo(info){
+    if(!info) return;
+    var wasEnd = sleepState.active && sleepState.endOfItem;
+    var minutes = sleepState.minutes;
+    sleepState = {
+      active: !!info.active,
+      endOfItem: !!info.active && !!info.endOfItem,
+      until: info.active && !info.endOfItem ? Date.now() + (Number(info.remaining) || 0) : 0,
+      minutes: info.active && !info.endOfItem ? minutes : 0
+    };
+    if(info.fired){
+      if(wasEnd) sleepEndHoldUntil = Date.now() + 15000;
+      sleepStoppedPlayback();
+    }
+    syncSleepUi();
+  }
+  // The timer went off: playback stops, and the buttons say so.
+  function sleepStoppedPlayback(){
+    sleepState = { active: false, endOfItem: false, until: 0, minutes: 0 };
+    if(!currentStation) return;
+    if(reconnectState) cancelReconnect();
+    disarmStallWatch();
+    try{ audio.pause(); }catch(e){}
+    setPlayingUI(false);
+    saveCurrentPodcastProgress();
+    updateMediaSessionState();
+  }
+  // Called first thing when something ends: true when the sleep timer wants it to stop there.
+  function sleepTakeEnd(){
+    if(audio._sleepHold || Date.now() < sleepEndHoldUntil){
+      audio._sleepHold = false; sleepEndHoldUntil = 0;
+      return true;
+    }
+    if(sleepState.active && sleepState.endOfItem){
+      setSleepTimer(0, false);
+      return true;
+    }
+    return false;
+  }
+  audio.addEventListener('play', function(){ sleepEndHoldUntil = 0; });
+  audio.addEventListener('playing', function(){ sleepEndHoldUntil = 0; });
+
+  // The browser's own countdown (no native player).
+  function sleepWebClear(){
+    clearTimeout(sleepWeb.timer); clearInterval(sleepWeb.fade);
+    sleepWeb.timer = sleepWeb.fade = null;
+    if(sleepWeb.from >= 0){ try{ audio.volume = sleepWeb.from; }catch(e){} }
+    sleepWeb.from = -1;
+  }
+  function sleepWebSet(ms){
+    sleepWebClear();
+    if(!(ms > 0)) return;
+    var until = Date.now() + ms;
+    sleepWeb.timer = setTimeout(function fadeOut(){
+      sleepWeb.from = audio.volume;
+      sleepWeb.fade = setInterval(function(){
+        var left = until - Date.now();
+        if(left > 0){ var k = Math.min(1, left / SLEEP_FADE_MS); try{ audio.volume = sleepWeb.from * k * k; }catch(e){} return; }
+        var v = sleepWeb.from;
+        clearInterval(sleepWeb.fade); sleepWeb.fade = null; sleepWeb.from = -1;
+        sleepStoppedPlayback();
+        setTimeout(function(){ try{ audio.volume = v; }catch(e){} }, 400);
+        syncSleepUi();
+      }, 250);
+    }, Math.max(0, ms - SLEEP_FADE_MS));
+  }
+
+  // minutes > 0: stop after that long; endOfItem: at the end of what plays now; neither: off.
+  function setSleepTimer(minutes, endOfItem){
+    var ms = minutes > 0 ? minutes * 60000 : 0;
+    var on = ms > 0 || !!endOfItem;
+    sleepEndHoldUntil = 0;
+    sleepState = { active: on, endOfItem: !!endOfItem && on, until: ms ? Date.now() + ms : 0, minutes: ms ? minutes : 0 };
+    syncSleepUi();
+    if(SleepNative){
+      SleepNative.set({ ms: ms, endOfItem: !!endOfItem }).then(function(info){
+        var m = sleepState.minutes;
+        applySleepInfo(info);
+        if(sleepState.active && !sleepState.endOfItem) sleepState.minutes = m;
+        syncSleepUi();
+      })['catch'](function(err){
+        setStatus((err && err.message) || 'Couldn’t set the sleep timer', true);
+      });
+    } else {
+      sleepWebSet(ms);
+    }
+  }
+  if(SleepNative){
+    SleepNative.on(applySleepInfo);
+    var sleepRefresh = function(){ SleepNative.info().then(function(info){ if(!info.fired) applySleepInfo(info); })['catch'](function(){}); };
+    sleepRefresh();
+    // A page that was asleep catches up with the countdown when it is looked at again.
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden) sleepRefresh(); });
+  }
+
+  var SLEEP_TICK_SVG = '<svg class="sleep-tick" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function buildSleepOpt(label, on, cls, fn){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sleep-opt' + (on ? ' on' : '') + (cls ? ' ' + cls : '');
+    b.setAttribute('role', 'menuitemradio');
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+    b.innerHTML = '<span></span>' + SLEEP_TICK_SVG;
+    b.firstChild.textContent = label;
+    b.addEventListener('click', function(){ fn(); closeSleepSheet(); });
+    return b;
+  }
+  function renderSleepOpts(){
+    sleepOptsEl.innerHTML = '';
+    var timed = sleepState.active && !sleepState.endOfItem;
+    SLEEP_MINUTES.forEach(function(n){
+      sleepOptsEl.appendChild(buildSleepOpt(sleepMinutesLabel(n), timed && sleepState.minutes === n, '', function(){ setSleepTimer(n, false); }));
+    });
+    if(sleepFiniteItem(currentStation) || (sleepState.active && sleepState.endOfItem)){
+      var word = sleepEndWord(currentStation);
+      sleepOptsEl.appendChild(buildSleepOpt('End of ' + word, sleepState.active && sleepState.endOfItem, '', function(){ setSleepTimer(0, true); }));
+    }
+    if(sleepState.active){
+      sleepOptsEl.appendChild(buildSleepOpt('Turn Off', false, 'off', function(){ setSleepTimer(0, false); }));
+    }
+  }
+  function openSleepSheet(){
+    renderSleepOpts();
+    sleepOverlayEl.classList.add('open');
+    syncSleepUi();
+  }
+  function closeSleepSheet(){ sleepOverlayEl.classList.remove('open'); }
+  npSleepBtn.addEventListener('click', function(){ closeNpMenu(); openSleepSheet(); });
+  document.getElementById('sleepClose').addEventListener('click', closeSleepSheet);
+  sleepOverlayEl.addEventListener('click', function(e){ if(e.target === sleepOverlayEl) closeSleepSheet(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && sleepOverlayEl.classList.contains('open')){ e.stopImmediatePropagation(); closeSleepSheet(); }
+  }, true);
+  npMenuBtn.addEventListener('click', syncSleepUi);
+  window.__sleep = { state: function(){ return sleepState; }, set: setSleepTimer, apply: applySleepInfo };
 
   // ---------- the same menu on an artist page ----------
   // Its one item today is the cover art, which used to be a pencil floating in the top right

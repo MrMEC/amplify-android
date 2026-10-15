@@ -107,6 +107,34 @@ public class PlaybackService extends MediaLibraryService {
       };
   private final ArrayDeque<String> carLog = new ArrayDeque<>();
 
+  // ---- sleep timer (build 230) ----
+  // Kept here rather than in the page or the plugin, so it counts down with the screen locked,
+  // the page asleep, or the app closed while the car plays.
+  final SleepTimer sleep =
+      new SleepTimer(
+          new SleepTimer.Host() {
+            @Override public long now() { return System.currentTimeMillis(); }
+            @Override public void post(Runnable r, long delayMs) { main.removeCallbacks(r); main.postDelayed(r, delayMs); }
+            @Override public void cancel(Runnable r) { main.removeCallbacks(r); }
+            @Override public float volume() { return exo == null ? 1f : exo.getVolume(); }
+            @Override public void setVolume(float v) {
+              if (exo != null) exo.setVolume(v);
+              try {
+                if (com.markcoleman.amplify.vlc.VlcEngine.isActive()) com.markcoleman.amplify.vlc.VlcEngine.setVolume(v);
+              } catch (Throwable ignored) { }
+            }
+            @Override public void pause() {
+              AmplifyPlayerPlugin p = AmplifyPlayerPlugin.instance;
+              if (p != null) p.sleepPause();
+              else if (exo != null) exo.setPlayWhenReady(false);
+            }
+            @Override public void setPauseAtEnd(boolean on) { if (exo != null) exo.setPauseAtEndOfMediaItems(on); }
+            @Override public void changed(boolean fired) {
+              AmplifyPlayerPlugin p = AmplifyPlayerPlugin.instance;
+              if (p != null) p.sleepChanged(fired);
+            }
+          });
+
   static {
     SessionCommand sessionCommand = new SessionCommand("amplify.SKIP_BACK", Bundle.EMPTY);
     SKIP_BACK = sessionCommand;
@@ -799,6 +827,7 @@ public class PlaybackService extends MediaLibraryService {
   @Override // androidx.media3.session.MediaSessionService, android.app.Service
   public void onDestroy() {
     instance = null;
+    sleep.cancel();
     this.main.removeCallbacks(this.progressTick);
     this.main.removeCallbacks(this.historyTick);
     this.main.removeCallbacks(this.positionTick);
@@ -967,11 +996,26 @@ public class PlaybackService extends MediaLibraryService {
 
     @Override // androidx.media3.common.Player.Listener
     public void onIsPlayingChanged(boolean z) {
+      if (z) PlaybackService.this.sleep.playStarted();
       PlaybackService.this.saveCarProgress();
       if (!z) {
         PlaybackService.this.rememberPosition();
       } else {
         PlaybackService.this.main.postDelayed(PlaybackService.this.positionTick, 5000L);
+      }
+    }
+
+    // Sleep timer (build 230), "end of song": the player either pauses at the end of the item
+    // (another one follows in the car's queue) or simply ends (the last, or the page's one).
+    @Override // androidx.media3.common.Player.Listener
+    public void onPlaybackStateChanged(int state) {
+      if (state == Player.STATE_ENDED) PlaybackService.this.sleep.itemEnded();
+    }
+
+    @Override // androidx.media3.common.Player.Listener
+    public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+      if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
+        PlaybackService.this.sleep.itemEnded();
       }
     }
 
