@@ -261,6 +261,18 @@ async def run(theme, b):
     check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and abs((await pg.evaluate('__h.bar()'))['fill'] - 3 / n) < .02,
           f'[{theme}] swiping shows the next one, picture and all {h["title"]}')
     await pg.screenshot(path=f'{shots}/hero-swipe-{theme}.png')
+    # build 228: parallax: scrolling the page, the picture hardly moves; the text scrolls normally
+    await pg.evaluate('__h.go(0)'); await pg.wait_for_timeout(500)
+    await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
+    p0 = await pg.evaluate("(()=>{ var sl = heroSlides[heroIndex()]; return [sl.querySelector('.nph-art').getBoundingClientRect().top, sl.querySelector('.nph-title').getBoundingClientRect().top]; })()".replace('heroSlides[heroIndex()]', "document.querySelectorAll('#npHeroTrack .nph-slide')[0]"))
+    await pg.evaluate("window.scrollTo(0, 120)"); await pg.wait_for_timeout(400)
+    p1 = await pg.evaluate("(()=>{ var sl = document.querySelectorAll('#npHeroTrack .nph-slide')[0]; return [sl.querySelector('.nph-art').getBoundingClientRect().top, sl.querySelector('.nph-title').getBoundingClientRect().top, +getComputedStyle(sl.querySelector('.nph-media')).opacity]; })()")
+    print('parallax', p0, p1)
+    check(abs((p0[1] - p1[1]) - 120) <= 2 and (p0[0] - p1[0]) <= 25, f'[{theme}] scrolling 120px: the text moves 120px, the picture only {round(p0[0] - p1[0])}px')
+    check(p1[2] < 1, f'[{theme}] and the picture fades a little ({p1[2]:.2f})')
+    await pg.screenshot(path=f'{shots}/hero-parallax-{theme}.png')
+    await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
+    await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(500)
     # build 226: a tap in the space under the slides goes back to the first slide
     gb = await pg.evaluate('__h.gapBelow()')
     await pg.mouse.click(200, (gb['bar'] + gb['head']) / 2); await pg.wait_for_timeout(900)

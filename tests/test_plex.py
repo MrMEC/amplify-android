@@ -12,6 +12,7 @@ head = src[:src.index('async def names(pg, sel)')]
 head = head.replace("'/tmp/claude-0/t/srv-vlib'", "'/tmp/claude-0/t/srv-plex'").replace('8780', '8803')
 exec(head)
 from playwright.async_api import async_playwright
+import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from confirm_auto import AUTO_CONFIRM
 
 LOCAL = 'https://10-0-0-5.abc.plex.direct:32400'
 REMOTE = 'https://99-1-2-3.abc.plex.direct:32400'
@@ -145,6 +146,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
         await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(AUTO_CONFIRM)  # build 228: deletes ask first
         await ctx.add_init_script(EXT)
         await ctx.add_init_script(OPEN)
         await ctx.add_init_script(FAILLOAD)
@@ -400,7 +402,8 @@ async def main():
         # Sign Out
         await pg.evaluate("document.getElementById('plexSignOutBtn').click()"); await pg.wait_for_timeout(600)
         t = await plex_texts(pg)
-        check(t[-1] == 'Sign In with Plex' and any('Sign out of Plex' in d for d in dialogs), f'signed out after confirming {t}')
+        asked = await pg.evaluate("document.getElementById('confirmTitle').textContent")
+        check(t[-1] == 'Sign In with Plex' and asked == 'Sign out of Plex?', f'signed out after confirming (build 228: the app\'s own dialog asks) {t}')
         await close_settings(pg)
         await tab(pg, 'shows'); await tab(pg, 'movies')
         mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')

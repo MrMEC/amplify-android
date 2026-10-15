@@ -993,6 +993,21 @@
   }
   /* Build 185: with the header slid away, the tabs ride up to the top of the screen. */
   @media (max-width: 900px){ body.hdr-autohide.hdr-hidden.search-view #searchTabs{ top:0; } }
+  /* Build 228: the Podcasts page's date headings stay at the top while their episodes scroll
+     under them (phones), the next date pushing the last one away. They sit under the header,
+     and follow it up when it hides on the way down, like the search tabs. Full width, on the
+     page colour, so rows pass cleanly beneath. */
+  @media (max-width: 900px){
+    .tile-grid > .podcast-date-heading{
+      position:sticky; top:60px; z-index:6; background:var(--main-bg);
+      margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
+      padding:10px calc(var(--main-pad) + 2px) 7px; background-clip:padding-box;
+      transition:top .28s cubic-bezier(.4,0,.2,1);
+    }
+    .tile-grid > .podcast-date-heading::after{ content:''; position:absolute; left:var(--main-pad); right:var(--main-pad); bottom:-1px; border-bottom:1px solid var(--border); }
+    .tile-grid > .podcast-date-heading{ border-bottom:0; }
+    body.hdr-autohide.hdr-hidden .tile-grid > .podcast-date-heading{ top:0; }
+  }
   .clear-search-btn.search-save-btn{ padding:7px 14px; }
   .recent-searches-head{ grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; }
   .recent-searches-clear{ border:none; background:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; padding:4px 6px; }
@@ -1300,6 +1315,19 @@
     font-size:11px; font-weight:600; letter-spacing:0; color:var(--text-faint);
     text-transform:none; font-variant-numeric:tabular-nums;
   }
+  /* ---------- Delete confirmation (build 228) ---------- */
+  .confirm-overlay{ display:none; position:fixed; inset:0; z-index:5000; background:rgba(0,0,0,.55);
+    align-items:center; justify-content:center; padding:24px; }
+  .confirm-overlay.open{ display:flex; }
+  .confirm-panel{ width:min(340px, 100%); background:var(--panel); border:1px solid var(--border); border-radius:16px;
+    padding:22px 20px 16px; box-shadow:var(--shadow); }
+  .confirm-title{ margin:0 0 8px; font-size:18px; font-weight:700; color:var(--text); }
+  .confirm-msg{ margin:0 0 20px; font-size:14px; line-height:1.45; color:var(--text-dim); overflow-wrap:anywhere; }
+  .confirm-msg:empty{ display:none; }
+  .confirm-actions{ display:flex; gap:10px; }
+  .confirm-actions button{ flex:1; min-height:44px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .confirm-cancel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); }
+  .confirm-ok{ background:var(--danger); color:#fff; border:1px solid var(--danger); }
   /* ---------- Home hero (build 220) ---------- */
   /* What's playing, as a full-width picture at the top of Home that dissolves into the page:
      the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
@@ -1327,6 +1355,15 @@
   .nph-media{ position:relative; flex:1 0 auto; min-height:min(28vh, 260px); overflow:hidden; background:var(--main-bg); }
   @media (max-width: 900px){ .nph-media{ min-height:min(56vw, 250px); } }
   .nph-bg, .nph-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; }
+  /* Build 228: parallax. While the page scrolls the picture is held almost still (moved down
+     by most of the scroll, --nph-par) and fades a little (--nph-fade), so the text and the rest
+     of the page slide up over it. The slide strip clips it. */
+  .home-hero .nph-media{ transform:translate3d(0, calc(var(--nph-par, 0) * 1px), 0); opacity:calc(1 - var(--nph-fade, 0) * .75); }
+  .home-hero.nph-par-on .nph-media{ will-change:transform, opacity;
+    /* Dissolves before the strip's bottom edge cuts it (--nph-clip: that edge, in the
+       picture's own coordinates), so no hard line shows under the text. */
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(var(--nph-clip, 9999) * 1px - 110px), transparent calc(var(--nph-clip, 9999) * 1px - 10px));
+    mask-image:linear-gradient(to bottom, #000 calc(var(--nph-clip, 9999) * 1px - 110px), transparent calc(var(--nph-clip, 9999) * 1px - 10px)); }
   .nph-bg img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
   .nph-bg{ filter:blur(40px) saturate(1.4); transform:scale(1.2); opacity:.85;
     -webkit-mask-image:linear-gradient(to bottom, #000 40%, transparent 88%); mask-image:linear-gradient(to bottom, #000 40%, transparent 88%); }
@@ -6473,6 +6510,17 @@
   </button>
 </nav>
 
+<!-- Build 228: asked before anything is deleted (see confirmDelete). -->
+<div class="confirm-overlay" id="confirmOverlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
+  <div class="confirm-panel">
+    <h2 class="confirm-title" id="confirmTitle"></h2>
+    <p class="confirm-msg" id="confirmMsg"></p>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-cancel" id="confirmCancel">Cancel</button>
+      <button type="button" class="confirm-ok" id="confirmOk">Delete</button>
+    </div>
+  </div>
+</div>
 <div class="settings-overlay" id="settingsOverlay">
   <div class="settings-panel" id="settingsPanel">
     <div class="settings-header">
@@ -10908,20 +10956,13 @@
   npDeleteBtn.addEventListener('click', function(){
     var st = npTarget();
     if(!st) return;
-    if(!npDeleteBtn.classList.contains('confirming')){
-      npDeleteBtn.classList.add('confirming');
-      npDeleteConfirmKey = favKey(st);
-      clearTimeout(npDeleteBtn._confirmTimer);
-      npDeleteBtn._confirmTimer = setTimeout(function(){
-        npDeleteBtn.classList.remove('confirming');
-        npDeleteConfirmKey = null;
-      }, 4000);
-      return;
-    }
-    clearTimeout(npDeleteBtn._confirmTimer);
-    npDeleteBtn.classList.remove('confirming');
-    npDeleteConfirmKey = null;
-    deleteDeadStation(st);
+    // Build 228: the shared confirmation, in place of tapping twice.
+    if(typeof closeNpMenu === 'function') closeNpMenu();
+    var local = isLocalTrack(st);
+    confirmThen(local
+      ? { title: 'Remove ' + quoteName(st.name) + ' from your library?', message: 'The file stays on your phone.', ok: 'Remove' }
+      : { title: 'Delete ' + quoteName(stripExclusively(st.name || '')) + '?', message: 'It won’t be suggested again.' },
+      function(){ deleteDeadStation(st); });
   });
 
   // ---------- custom cover art dialog ----------
@@ -16211,7 +16252,7 @@
     remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
     remove.addEventListener('click', function(e){
       e.stopPropagation();
-      removeFavoriteArtist(entry.key);
+      confirmThen({ title: 'Remove ' + quoteName(entry.name) + '?', message: 'It comes off Favorite Artists.', ok: 'Remove' }, function(){ removeFavoriteArtist(entry.key); });
     });
     row.appendChild(remove);
     if(!dragging) return row;
@@ -18224,8 +18265,11 @@
       renderPlexSettings('Couldn’t finish signing in. Try again.');
     });
   }
-  function plexSignOut(){
-    if(!window.confirm('Sign out of Plex? Your Plex movies and shows leave Watch. What you watched stays on Plex.')) return;
+  function plexSignOut(confirmed){
+    if(confirmed !== true){
+      confirmThen({ title: 'Sign out of Plex?', message: 'Your Plex movies and shows leave Watch. What you watched stays on Plex.', ok: 'Sign Out' }, function(){ plexSignOut(true); });
+      return;
+    }
     if(plexAccount && plexAccount.token){
       // Tell plex.tv this device is gone; nothing waits on it.
       plexRequest('DELETE', 'https://plex.tv/api/v2/devices/' + encodeURIComponent(plexClientId), plexAccount.token)['catch'](function(){});
@@ -19021,9 +19065,13 @@
       fetchVideoInfoQueue();
     });
   }
-  function removeVideoFolder(tree){
+  function removeVideoFolder(tree, confirmed){
     var fo = videoFolders.filter(function(f){ return f.treeUri === tree; })[0];
-    if(!fo || !window.confirm('Take “' + fo.name + '” out of your videos? The files stay on your phone.')) return;
+    if(!fo) return;
+    if(!confirmed){
+      confirmThen({ title: 'Remove ' + quoteName(fo.name) + ' from your videos?', message: 'The files stay on your phone.', ok: 'Remove' }, function(){ removeVideoFolder(tree, true); });
+      return;
+    }
     videoFolders = videoFolders.filter(function(f){ return f.treeUri !== tree; });
     videoFiles = videoFiles.filter(function(f){ return f.tree !== tree; });
     vsave(VIDEO_FOLDERS_KEY, videoFolders);
@@ -19224,7 +19272,10 @@
       m.appendChild(b);
     }
     if(e.kind === 'video') item('Mark Watched', function(){ markVideoWatched(e.v, true); invalidateVideoLib(); refreshContinueWatching(); });
-    item('Remove from Continue Watching', function(){ removeFromContinueWatching(e); });
+    item('Remove from Continue Watching', function(){
+      var nm = e.kind === 'channel' ? e.ch.name : e.kind === 'chart' ? e.item.name : (e.v.kind === 'episode' ? e.v.show : e.v.title);
+      confirmThen({ title: 'Remove ' + quoteName(nm) + '?', message: 'It comes off Continue Watching.', ok: 'Remove' }, function(){ removeFromContinueWatching(e); });
+    });
     document.body.appendChild(m);
     var r = anchor.getBoundingClientRect();
     m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
@@ -21233,6 +21284,9 @@
     remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
     remove.addEventListener('click', function(e){
       e.stopPropagation();
+      confirmThen({ title: 'Remove ' + quoteName(stripExclusively(s.name || '')) + '?', message: 'It comes off ' + quoteName(pl.label) + '.', ok: 'Remove' }, function(){ removeFromPlaylistNow(); });
+    });
+    function removeFromPlaylistNow(){
       commitPlaylistEditOrder(pl);
       var k = favKey(s);
       pl.stations = pl.stations.filter(function(x){ return favKey(x) !== k; });
@@ -21241,7 +21295,7 @@
       var y = window.scrollY;
       renderPlaylistStations(pl, true);
       window.scrollTo(0, y);
-    });
+    }
     row.appendChild(remove);
     // Mouse: native drag and drop. Touch: the same finger-drag the other reorder lists use.
     row.draggable = true;
@@ -21385,9 +21439,11 @@
   playlistSaveBtn.addEventListener('click', saveStationPlaylistFromModal);
   playlistDeleteBtn.addEventListener('click', function(){
     if(!editingStationPlaylistId) return;
-    var id = editingStationPlaylistId;
-    closePlaylistModal();
-    deleteStationPlaylist(id);
+    var id = editingStationPlaylistId, pl = findStationPlaylistById(id);
+    confirmThen({ title: 'Delete playlist ' + quoteName(pl && pl.label) + '?', message: 'The songs and stations in it stay where they are.' }, function(){
+      closePlaylistModal();
+      deleteStationPlaylist(id);
+    });
   });
   playlistNameInput.addEventListener('keydown', function(e){
     if(e.key === 'Enter'){ e.preventDefault(); saveStationPlaylistFromModal(); }
@@ -21520,7 +21576,10 @@
   podcastCategorySaveBtn.addEventListener('click', savePodcastCategoryFromModal);
   podcastCategoryDeleteBtn.addEventListener('click', function(){
     if(!editingPodcastCategoryId) return;
-    var id = editingPodcastCategoryId;
+    var id = editingPodcastCategoryId, cat0 = findPodcastCategoryById(id);
+    confirmThen({ title: 'Delete category ' + quoteName(cat0 && cat0.name) + '?', message: 'You stay following its shows.' }, function(){ podcastCategoryDeleteNow(id); });
+  });
+  function podcastCategoryDeleteNow(id){
     closePodcastCategoryModal();
     deletePodcastCategory(id);
     if(onPodcastsView){
@@ -21528,7 +21587,7 @@
       renderPodcastsGrid();
     }
     if(manageCategoriesOverlay.classList.contains('open')) renderManageCategoriesList();
-  });
+  }
   podcastCategoryNameInput.addEventListener('keydown', function(e){
     if(e.key === 'Enter'){ e.preventDefault(); savePodcastCategoryFromModal(); }
   });
@@ -21603,12 +21662,14 @@
       deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
       deleteBtn.addEventListener('click', function(e){
         e.stopPropagation();
-        deletePodcastCategory(cat.id);
-        renderManageCategoriesList();
-        if(onPodcastsView){
-          renderPodcastTabsRow();
-          renderPodcastsGrid();
-        }
+        confirmThen({ title: 'Delete category ' + quoteName(cat.name) + '?', message: 'You stay following its shows.' }, function(){
+          deletePodcastCategory(cat.id);
+          renderManageCategoriesList();
+          if(onPodcastsView){
+            renderPodcastTabsRow();
+            renderPodcastsGrid();
+          }
+        });
       });
       row.appendChild(deleteBtn);
 
@@ -21925,9 +21986,11 @@
   customSearchSaveBtn.addEventListener('click', saveCustomSearchFromModal);
   customSearchDeleteBtn.addEventListener('click', function(){
     if(!editingCustomSearchId) return;
-    var id = editingCustomSearchId;
-    closeCustomSearchModal();
-    deleteCustomSearch(id);
+    var id = editingCustomSearchId, cs = findCustomSearchById(id);
+    confirmThen({ title: 'Delete ' + quoteName(cs && cs.label) + '?', message: 'It comes off My Stations.' }, function(){
+      closeCustomSearchModal();
+      deleteCustomSearch(id);
+    });
   });
   [customSearchLabelInput, customSearchQueryInput].forEach(function(input){
     input.addEventListener('keydown', function(e){
@@ -21935,6 +21998,34 @@
     });
   });
 
+  // ---------- delete confirmation (build 228) ----------
+  // Every delete or remove asks first. confirmDelete({ title, message, ok }) resolves true
+  // when the person confirms; Cancel, a tap outside or Escape resolve false.
+  var confirmOverlayEl = document.getElementById('confirmOverlay');
+  var confirmPending = null;
+  function confirmDelete(o){
+    o = o || {};
+    if(confirmPending) confirmPending(false);
+    document.getElementById('confirmTitle').textContent = o.title || 'Delete?';
+    document.getElementById('confirmMsg').textContent = o.message || '';
+    document.getElementById('confirmOk').textContent = o.ok || 'Delete';
+    confirmOverlayEl.classList.add('open');
+    // Keyboard users land on Cancel; on a touch screen nothing is focused (no ring).
+    var coarse = false;
+    try{ coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }catch(e){}
+    if(!coarse) setTimeout(function(){ try{ document.getElementById('confirmCancel').focus(); }catch(e){} }, 0);
+    return new Promise(function(resolve){
+      confirmPending = function(v){ confirmPending = null; confirmOverlayEl.classList.remove('open'); resolve(!!v); };
+    });
+  }
+  function confirmThen(o, fn){ confirmDelete(o).then(function(ok){ if(ok) fn(); }); }
+  function quoteName(n){ n = String(n || '').trim(); return n ? '“' + n + '”' : 'this'; }
+  document.getElementById('confirmCancel').addEventListener('click', function(){ if(confirmPending) confirmPending(false); });
+  document.getElementById('confirmOk').addEventListener('click', function(){ if(confirmPending) confirmPending(true); });
+  confirmOverlayEl.addEventListener('click', function(e){ if(e.target === confirmOverlayEl && confirmPending) confirmPending(false); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && confirmPending){ e.stopImmediatePropagation(); confirmPending(false); }
+  }, true);
   // ---------- import/export completion dialog ----------
   // Replaces the old inline status-line message for Export/Import specifically: those are
   // one-off confirmations the user should actually notice, not a line of text that can be
@@ -21963,8 +22054,13 @@
     }
   });
   deleteActiveCustomSearchBtn.addEventListener('click', function(){
-    if(activeCustomSearchId) deleteCustomSearch(activeCustomSearchId);
-    else if(activeStationPlaylistId) deleteStationPlaylist(activeStationPlaylistId);
+    if(activeCustomSearchId){
+      var csId = activeCustomSearchId, cs = findCustomSearchById(csId);
+      confirmThen({ title: 'Delete ' + quoteName(cs && cs.label) + '?', message: 'It comes off My Stations.' }, function(){ deleteCustomSearch(csId); });
+    } else if(activeStationPlaylistId){
+      var plId = activeStationPlaylistId, pl = findStationPlaylistById(plId);
+      confirmThen({ title: 'Delete playlist ' + quoteName(pl && pl.label) + '?', message: 'The songs and stations in it stay where they are.' }, function(){ deleteStationPlaylist(plId); });
+    }
   });
 
   // ================================================================
@@ -26333,6 +26429,9 @@
     remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
     remove.addEventListener('click', function(e){
       e.stopPropagation();
+      confirmThen({ title: 'Remove ' + quoteName(name.textContent) + '?', message: 'It comes off Favorites.', ok: 'Remove' }, function(){ removeFavNow(); });
+    });
+    function removeFavNow(){
       commitFavPageOrder();
       var k = favKey(s);
       favorites = favorites.filter(function(f){ return favKey(f) !== k; });
@@ -26341,7 +26440,7 @@
       if(!favorites.length) favPageEditing = false;
       syncFavPageEditBtn();
       renderFavoritesPage();
-    });
+    }
     row.appendChild(remove);
     if(!manual) return row;
     // Mouse: native drag and drop. Touch: the same finger-drag the other reorder lists use.
@@ -26525,8 +26624,7 @@
   function clearActiveHistory(){
     var section = activeHomeSection;
     if(section !== 'recentStations' && section !== 'recentSongs') return;
-    // No confirmation step, matching every other delete in the app (a custom search, a
-    // playlist): the action is immediate and undoable only by listening again.
+    // Build 228: asked first (see the Clear history button).
     var keepLocal = section === 'recentStations';   // stations page: keep the local tracks
     recentStations = recentStations.filter(function(s){ return isLocalTrack(s) === keepLocal; });
     saveRecent();
@@ -26534,7 +26632,10 @@
     renderRecentSection();
     renderHomeSectionPage();
   }
-  clearHistoryBtn.addEventListener('click', clearActiveHistory);
+  clearHistoryBtn.addEventListener('click', function(){
+    var songs = activeHomeSection === 'recentSongs';
+    confirmThen({ title: 'Clear history?', message: songs ? 'Every song comes off Recent Songs.' : 'Everything comes off Continue Listening.', ok: 'Clear' }, clearActiveHistory);
+  });
 
   // The four home-section headings (Favorites, Recent Stations, Recent Songs, Top Stations)
   // are role="button" tabindex="0" elements -- wire both a click and a keyboard (Enter/Space)
@@ -29352,7 +29453,7 @@
     e.stopPropagation();
     var fn = rowMenuOnRemove, t = rowMenuTracks && rowMenuTracks[0];
     closeRowMenu();
-    if(fn && t) fn(t);
+    if(fn && t) confirmThen({ title: 'Remove ' + quoteName(stripExclusively(t.name || '')) + '?', ok: 'Remove' }, function(){ fn(t); });
   });
   function syncRowMenuFav(track){
     var on = isFavorite(track);
@@ -32093,12 +32194,15 @@
       del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>';
       del.addEventListener('click', function(e){
         e.stopPropagation();
+        confirmThen({ title: 'Remove ' + quoteName(q) + '?', message: 'It comes off Recent Searches.', ok: 'Remove' }, function(){ removeRecentSearchNow(); });
+      });
+      function removeRecentSearchNow(){
         recentSearches = recentSearches.filter(function(x){ return x !== q; });
         saveRecentSearches();
         var y = window.scrollY;
         renderSearchHome();
         window.scrollTo(0, y);
-      });
+      }
       row.appendChild(del);
       stationsGrid.appendChild(row);
     });
@@ -34230,6 +34334,29 @@
     if(isChartSong(item)){ openChartSong([item], 0, 'Top 100', slide.querySelector('.nph-art')); return; }
     startNpTarget(item);
   }
+  // Build 228: parallax on the hero's picture. Its scroll offset (how far the hero has gone up
+  // under the header) moves the picture down by 85% of that, so it hardly moves on screen.
+  var HERO_PAR = 0.85, heroParRaf = 0;
+  function syncHeroParallax(){
+    heroParRaf = 0;
+    if(!npHero || npHero.style.display === 'none') return;
+    var reduce = false;
+    try{ reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    var y = Math.max(0, window.scrollY || window.pageYOffset || 0);
+    var h = npHero.offsetHeight || 1;
+    if(reduce || y <= 0){
+      npHero.style.removeProperty('--nph-par'); npHero.style.removeProperty('--nph-fade'); npHero.style.removeProperty('--nph-clip');
+      npHero.classList.remove('nph-par-on');
+      return;
+    }
+    y = Math.min(y, h);
+    npHero.classList.add('nph-par-on');
+    npHero.style.setProperty('--nph-par', (y * HERO_PAR).toFixed(1));
+    npHero.style.setProperty('--nph-fade', (y / h).toFixed(3));
+    var trackH = npHeroTrack ? npHeroTrack.clientHeight : h;
+    npHero.style.setProperty('--nph-clip', Math.max(0, trackH - y * HERO_PAR).toFixed(1));
+  }
+  window.addEventListener('scroll', function(){ if(!heroParRaf) heroParRaf = requestAnimationFrame(syncHeroParallax); }, { passive: true });
   // Build 226: a tap in the space under the slides (the progress bar and the gap down to the
   // next heading) goes back to the first slide.
   if(npHero) npHero.addEventListener('click', function(e){

@@ -9,6 +9,7 @@ head = src[:src.index('async def names(pg, sel)')]
 head = head.replace('8780', '8783')
 exec(head)
 from playwright.async_api import async_playwright
+import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from confirm_auto import AUTO_CONFIRM
 
 CH = [{'id': 'iptv:ABCNews.us', 'name': 'ABC News Live', 'url': 'https://abc.example/live1080.m3u8', 'logo': '', 'country': 'US', 'cats': ['news'], 'catNames': ['News'], 'src': 'iptv', 'addedAt': 1},
       {'id': 'freetv:pbs', 'name': 'PBS', 'url': 'https://pbs.example/live.m3u8', 'logo': '', 'country': 'USA', 'cats': [], 'catNames': [], 'src': 'freetv', 'addedAt': 2}]
@@ -30,6 +31,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
         await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(AUTO_CONFIRM)  # build 228: deletes ask first
         await ctx.add_init_script(EXT)
         await ctx.add_init_script("if(!localStorage.getItem('radioPlayerVideoChannels')){localStorage.setItem('radioPlayerVideoChannels', %s); localStorage.setItem('radioPlayerRecent', %s);}" % (repr(json.dumps(CH)), repr(json.dumps(RECENT))))
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e) + ' @ ' + (e.stack or '')[:300]))

@@ -83,6 +83,16 @@ async def main():
         heads = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .podcast-date-heading'), function(h){ return h.textContent; })")
         print(heads)
         await pg.screenshot(path=f'{SHOTS}/podcast-recent.png')
+        # build 228: the date headings stay put at the top while their episodes scroll under
+        await pg.evaluate("document.querySelector('#stationsGrid .podcast-date-heading').scrollIntoView()"); await pg.evaluate("window.scrollBy(0, 300)"); await pg.wait_for_timeout(700)
+        st1 = await pg.evaluate("""(()=>{ var hs = Array.from(document.querySelectorAll('#stationsGrid .podcast-date-heading')); var hb = document.querySelector('.sidebar-top').getBoundingClientRect().bottom;
+          var hidden = document.body.classList.contains('hdr-hidden'); var top = hidden ? 0 : Math.round(hb);
+          return { top: top, tops: hs.map(function(h){ return Math.round(h.getBoundingClientRect().top); }), pos: getComputedStyle(hs[0]).position, w: Math.round(hs[0].getBoundingClientRect().width), vw: innerWidth }; })()""")
+        print('sticky', st1)
+        check(st1['pos'] == 'sticky' and abs(st1['tops'][0] - st1['top']) <= 2, f'the date heading sticks at the top while scrolling {st1}')
+        check(st1['w'] == st1['vw'], 'full width, so rows pass cleanly under it')
+        await pg.screenshot(path=f'{SHOTS}/podcast-sticky.png')
+        await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
         st = await pg.evaluate("[localStorage.getItem('radioPlayerPodcastSubs'), localStorage.getItem('radioPlayerPodcastRecent')]")
         check('recentEpisodes' not in st[0] and st[1] and len(json.loads(st[1])['101']) == 9, 'recent episodes are stored on their own, not in the followed shows')
         check(len(st[1]) < 12000, f'and kept small ({len(st[1])} bytes for 13 episodes)')

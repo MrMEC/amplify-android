@@ -3,6 +3,7 @@ playing a channel, "Not working" marking, reorder and remove. Mocked sources and
 Run: python3 tests/test_video_channels.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools
 from playwright.async_api import async_playwright
+import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from confirm_auto import AUTO_CONFIRM
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = '/tmp/claude-0/t/srv-ch'; SHOTS = '/tmp/claude-0/t/shots'
 os.makedirs(ROOT, exist_ok=True); os.makedirs(SHOTS, exist_ok=True)
@@ -78,6 +79,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
         await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(AUTO_CONFIRM)  # build 228: deletes ask first
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route)
         await pg.goto('http://127.0.0.1:8777/index.html'); await pg.wait_for_timeout(2500)
