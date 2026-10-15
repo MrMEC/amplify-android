@@ -129,6 +129,69 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     try { notifyListeners("openfile", new JSObject()); } catch (Throwable ignored) { }
   }
 
+  // ---- sleep timer (build 230; the timer itself is SleepTimer, in PlaybackService) ----
+  private JSObject sleepObj(boolean fired) {
+    JSObject o = new JSObject();
+    PlaybackService s = PlaybackService.instance;
+    SleepTimer t = s == null ? null : s.sleep;
+    o.put("active", t != null && t.active());
+    o.put("endOfItem", t != null && t.isEndOfItem());
+    o.put("until", t == null ? 0 : t.until());
+    o.put("remaining", t == null ? 0 : t.remainingMs());
+    o.put("fired", fired);
+    o.put("at", System.currentTimeMillis());
+    return o;
+  }
+
+  /** {ms} stops playback after ms (fading out at the end); {endOfItem:true} at the end of what is playing; {ms:0} turns it off. */
+  @PluginMethod
+  public void setSleep(PluginCall call) {
+    long ms = Math.max(0L, (long) (double) call.getDouble("ms", 0.0));
+    boolean end = Boolean.TRUE.equals(call.getBoolean("endOfItem", false));
+    main.post(
+        () -> {
+          PlaybackService s = PlaybackService.instance;
+          if (s == null) {
+            call.reject("The player isn't running");
+            return;
+          }
+          if (ms > 0 || end) s.sleep.set(ms, end);
+          else s.sleep.cancel();
+          call.resolve(sleepObj(false));
+        });
+  }
+
+  @PluginMethod
+  public void sleepInfo(PluginCall call) {
+    main.post(() -> call.resolve(sleepObj(false)));
+  }
+
+  /** The timer went off: stop whatever is playing, and tell the page as a pause from outside. */
+  void sleepPause() {
+    try {
+      if (castActive && cast != null) {
+        castPlay = false;
+        cast.pause();
+      } else if (VlcEngine.isActive()) VlcEngine.pause();
+      else {
+        ExoPlayer p = exo();
+        if (p != null) p.setPlayWhenReady(false);
+      }
+      emitState(true);
+    } catch (Throwable t) {
+      CrashLog.note(getContext(), "sleep pause", t);
+    }
+  }
+
+  void sleepChanged(boolean fired) {
+    try { notifyListeners("sleep", sleepObj(fired)); } catch (Throwable ignored) { }
+  }
+
+  private static boolean sleepHold() {
+    PlaybackService s = PlaybackService.instance;
+    return s != null && s.sleep.endHold;
+  }
+
   @PluginMethod
   public void takeOpenedFile(PluginCall call) {
     JSObject o = OpenedFile.take();
@@ -1803,6 +1866,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     if (playbackState == 4) {
       jSObject.put("takeover", willTakeOverPageQueue());
     }
+    // Build 230: the sleep timer stopped it at the end of this item; the page doesn't go on.
+    if (sleepHold()) jSObject.put("sleepHold", true);
     return jSObject;
   }
 
@@ -1818,7 +1883,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   private boolean willTakeOverPageQueue() {
     SkipAwarePlayer sp = sessionPlayer();
-    if (sp == null || sp.isNativeMode()) return false;
+    if (sp == null || sp.isNativeMode() || sleepHold()) return false;
     List<MediaItem> q = sp.pageQueueNow();
     return q != null && !q.isEmpty();
   }
@@ -1835,7 +1900,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private void takeOverPageQueue() {
     SkipAwarePlayer sp = sessionPlayer();
     ExoPlayer p = exo();
-    if (sp == null || p == null || sp.isNativeMode() || p.getPlaybackState() != Player.STATE_ENDED) return;
+    if (sp == null || p == null || sp.isNativeMode() || p.getPlaybackState() != Player.STATE_ENDED || sleepHold()) return;
     MediaItem cur = p.getCurrentMediaItem();
     if (cur == null || pageEndedFor == null || !pageEndedFor.equals(cur.mediaId)) return;
     List<MediaItem> q = sp.pageQueueNow();
