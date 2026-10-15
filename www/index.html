@@ -1355,15 +1355,6 @@
   .nph-media{ position:relative; flex:1 0 auto; min-height:min(28vh, 260px); overflow:hidden; background:var(--main-bg); }
   @media (max-width: 900px){ .nph-media{ min-height:min(56vw, 250px); } }
   .nph-bg, .nph-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; }
-  /* Build 228: parallax. While the page scrolls the picture is held almost still (moved down
-     by most of the scroll, --nph-par) and fades a little (--nph-fade), so the text and the rest
-     of the page slide up over it. The slide strip clips it. */
-  .home-hero .nph-media{ transform:translate3d(0, calc(var(--nph-par, 0) * 1px), 0); opacity:calc(1 - var(--nph-fade, 0) * .75); }
-  .home-hero.nph-par-on .nph-media{ will-change:transform, opacity;
-    /* Dissolves before the strip's bottom edge cuts it (--nph-clip: that edge, in the
-       picture's own coordinates), so no hard line shows under the text. */
-    -webkit-mask-image:linear-gradient(to bottom, #000 calc(var(--nph-clip, 9999) * 1px - 110px), transparent calc(var(--nph-clip, 9999) * 1px - 10px));
-    mask-image:linear-gradient(to bottom, #000 calc(var(--nph-clip, 9999) * 1px - 110px), transparent calc(var(--nph-clip, 9999) * 1px - 10px)); }
   .nph-bg img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
   .nph-bg{ filter:blur(40px) saturate(1.4); transform:scale(1.2); opacity:.85;
     -webkit-mask-image:linear-gradient(to bottom, #000 40%, transparent 88%); mask-image:linear-gradient(to bottom, #000 40%, transparent 88%); }
@@ -34334,29 +34325,6 @@
     if(isChartSong(item)){ openChartSong([item], 0, 'Top 100', slide.querySelector('.nph-art')); return; }
     startNpTarget(item);
   }
-  // Build 228: parallax on the hero's picture. Its scroll offset (how far the hero has gone up
-  // under the header) moves the picture down by 85% of that, so it hardly moves on screen.
-  var HERO_PAR = 0.85, heroParRaf = 0;
-  function syncHeroParallax(){
-    heroParRaf = 0;
-    if(!npHero || npHero.style.display === 'none') return;
-    var reduce = false;
-    try{ reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
-    var y = Math.max(0, window.scrollY || window.pageYOffset || 0);
-    var h = npHero.offsetHeight || 1;
-    if(reduce || y <= 0){
-      npHero.style.removeProperty('--nph-par'); npHero.style.removeProperty('--nph-fade'); npHero.style.removeProperty('--nph-clip');
-      npHero.classList.remove('nph-par-on');
-      return;
-    }
-    y = Math.min(y, h);
-    npHero.classList.add('nph-par-on');
-    npHero.style.setProperty('--nph-par', (y * HERO_PAR).toFixed(1));
-    npHero.style.setProperty('--nph-fade', (y / h).toFixed(3));
-    var trackH = npHeroTrack ? npHeroTrack.clientHeight : h;
-    npHero.style.setProperty('--nph-clip', Math.max(0, trackH - y * HERO_PAR).toFixed(1));
-  }
-  window.addEventListener('scroll', function(){ if(!heroParRaf) heroParRaf = requestAnimationFrame(syncHeroParallax); }, { passive: true });
   // Build 226: a tap in the space under the slides (the progress bar and the gap down to the
   // next heading) goes back to the first slide.
   if(npHero) npHero.addEventListener('click', function(e){
