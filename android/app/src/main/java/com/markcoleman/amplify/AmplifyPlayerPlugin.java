@@ -87,6 +87,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private String currentId;
   private boolean lastLive;
   private MediaMetadata lastMeta;
+  // Build 238: a song's own cover picture (from the page), so a cast song shows it on the TV.
+  @Nullable private byte[] lastArtBytes;
   private final Handler main = new Handler(Looper.getMainLooper());
   private final List<Runnable> pending = new ArrayList();
   private final Player.Listener exoListener = new ExoListener();
@@ -236,6 +238,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         () -> {
           this.connect();
           CrashLog.install(getContext());
+          installCastFileSource();
           try {
             this.cast = new CastBridge(getContext(), this.castListener);
             if (!this.cast.supported()) this.cast = null;
@@ -367,9 +370,39 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       if (m.artist != null) artist = m.artist.toString();
       if (m.artworkUri != null) art = m.artworkUri.toString();
     }
-    final boolean live = CastBridge.liveFor(castUrl, castLiveHint || lastLive);
+    final boolean local = CastRelay.isLocal(castUrl);
+    final boolean live = !local && CastBridge.liveFor(castUrl, castLiveHint || lastLive);
     final String url = castUrl, t = title, ar = artist, im = art;
     final boolean video = castVideoHint;
+    // Build 238: a song or video on the phone: the phone serves it to the Chromecast.
+    if (local) {
+      final byte[] artBytes = (im == null || !im.startsWith("http")) ? lastArtBytes : null;
+      new Thread(() -> {
+        String target = null, artUrl = im, ext = "mp3", why = null;
+        try {
+          String base = CastRelay.get().start();
+          ext = CastRelay.extFor(url, localName(url), video);
+          target = CastRelay.get().wrapFile(url, ext);
+          if (artBytes != null && artBytes.length > 0) {
+            String ae = CastRelay.sniffExt(artBytes, Math.min(artBytes.length, 64), false);
+            artUrl = CastRelay.get().wrapBytes(artBytes, ae.equals("png") ? "png" : "jpg");
+          }
+          CrashLog.info(getContext(), "cast a file from the phone (" + ext + ") through " + base);
+        } catch (Throwable e) {
+          why = String.valueOf(e.getMessage() != null ? e.getMessage() : e);
+          CrashLog.info(getContext(), "can't cast a file from the phone (" + e + "): it plays on the phone");
+        }
+        final String to = target, au = artUrl, kind = ext, whyNot = why;
+        main.post(() -> castSafe("loadFile", () -> {
+          if (!castActive || cast == null || !url.equals(castUrl)) return;
+          if (to == null) { castBackToPhone(whyNot); return; }
+          relayAwake(true);
+          boolean isVideo = video || CastRelay.isVideoExt(kind);
+          cast.load(to, false, t, ar, au, castStartMs, castPlay, isVideo, CastRelay.mimeForExt(kind));
+        }));
+      }, "cast-file").start();
+      return;
+    }
     // Build 199: Pluto only lets its own pages read its playlists: the phone hands them over.
     if (CastRelay.needed(url)) {
       new Thread(() -> {
@@ -404,6 +437,59 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         cast.load(url, live, t, ar, im, castStartMs, castPlay, video || mime.startsWith("video/"), mime);
       }));
     }, "cast-sniff").start();
+  }
+
+  /**
+   * Build 238: a file couldn't be cast (no Wi-Fi address for the phone, say): it plays on the
+   * phone from where it was, and the page is told why.
+   */
+  private void castBackToPhone(@Nullable String why) {
+    boolean play = castPlay;
+    long pos = castStartMs;
+    if (cast != null) cast.loading = false;
+    castGiveBack(pos);
+    ExoPlayer e = exo();
+    if (play && e != null) e.setPlayWhenReady(true);
+    JSObject o = new JSObject();
+    o.put("message", "Couldn\u2019t cast this from the phone" + (why != null && !why.isEmpty() ? " (" + why + ")" : "") + ", so it\u2019s playing here");
+    notifyListeners("castNote", o);
+  }
+
+  /** Build 238: the relay reads Android's documents (content://) as well as plain files. */
+  private void installCastFileSource() {
+    final ContentResolver cr = getContext().getContentResolver();
+    final CastRelay.FileSource plain = CastRelay.fileSource;
+    CastRelay.fileSource = new CastRelay.FileSource() {
+      @Override public long size(String uri) throws Exception {
+        if (!uri.startsWith("content:")) return plain.size(uri);
+        try (android.content.res.AssetFileDescriptor afd = cr.openAssetFileDescriptor(Uri.parse(uri), "r")) {
+          if (afd != null && afd.getLength() >= 0) return afd.getLength();
+        }
+        try (Cursor c = cr.query(Uri.parse(uri), new String[] {android.provider.OpenableColumns.SIZE}, null, null, null)) {
+          if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getLong(0);
+        }
+        return -1;
+      }
+      @Override public java.io.InputStream open(String uri, long offset) throws Exception {
+        if (!uri.startsWith("content:")) return plain.open(uri, offset);
+        android.os.ParcelFileDescriptor pfd = cr.openFileDescriptor(Uri.parse(uri), "r");
+        if (pfd == null) throw new java.io.FileNotFoundException(uri);
+        android.os.ParcelFileDescriptor.AutoCloseInputStream in = new android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd);
+        if (offset > 0) in.getChannel().position(offset);
+        return in;
+      }
+    };
+  }
+
+  /** Build 238: a document's file name (its extension says what it is). */
+  @Nullable private String localName(String uri) {
+    if (uri == null || !uri.startsWith("content:")) return null;
+    try (Cursor c = getContext().getContentResolver().query(Uri.parse(uri), new String[] {android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+      if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getString(0);
+    } catch (Throwable ignored) {
+      // No name: the first bytes decide.
+    }
+    return null;
   }
 
   // Build 199: while the relay feeds the Chromecast, the phone keeps its Wi-Fi and processor
@@ -445,7 +531,14 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   /** A session started: what the phone is playing (a stream) moves to the Chromecast. */
   private void castTakeOver() {
-    if (castActive || cast == null || currentId == null || VlcEngine.isActive()) return;
+    if (castActive || cast == null || currentId == null) return;
+    // Build 238: a video of your own playing in VLC moves to the Chromecast too, where it was.
+    if (VlcEngine.isActive()) {
+      String vu = VlcEngine.sourceUriString();
+      if (vu == null || !CastRelay.isLocal(vu)) return;
+      startCast(vu, currentId, VlcEngine.isPlaying(), Math.max(0L, VlcEngine.positionMs()), false, true);
+      return;
+    }
     SkipAwarePlayer sp = sessionPlayer();
     if (sp != null && sp.isNativeMode()) return; // Android Auto's own queue stays in the car
     ExoPlayer e = exo();
@@ -453,9 +546,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     MediaItem cur = e.getCurrentMediaItem();
     if (cur == null || cur.localConfiguration == null) return;
     String url = cur.localConfiguration.uri.toString();
-    if (!CastBridge.castable(url)) return;
+    boolean local = CastRelay.isLocal(url);
+    if (!CastBridge.castable(url) && !local) return;
     boolean playing = e.getPlayWhenReady();
-    boolean live = e.isCurrentMediaItemLive() || e.getDuration() == C.TIME_UNSET;
+    boolean live = !local && (e.isCurrentMediaItemLive() || e.getDuration() == C.TIME_UNSET);
     long pos = live ? 0L : Math.max(0L, e.getCurrentPosition());
     startCast(url, currentId, playing, pos, live, hasVideo);
   }
@@ -469,7 +563,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     String url = castUrl;
     ExoPlayer e = exo();
     if (url == null || e == null || currentId == null) return;
-    boolean live = CastBridge.liveFor(url, castLiveHint || lastLive);
+    boolean live = !CastRelay.isLocal(url) && CastBridge.liveFor(url, castLiveHint || lastLive);
     MediaItem.Builder b = new MediaItem.Builder().setUri(url).setMediaId(currentId);
     if (url.toLowerCase().contains(".m3u8")) b.setMimeType("application/x-mpegURL");
     if (lastMeta != null) b.setMediaMetadata(lastMeta);
@@ -512,7 +606,9 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     CastBridge c = cast;
     int ps = c == null ? 0 : c.playerState();
     long d = c == null ? -1L : c.duration();
-    boolean live = c != null && (c.live() || CastBridge.liveFor(castUrl == null ? "" : castUrl, castLiveHint || lastLive));
+    // Build 238: a file from the phone always has a length (its address may not say so).
+    boolean live = c != null && !CastRelay.isLocal(castUrl)
+        && (c.live() || CastBridge.liveFor(castUrl == null ? "" : castUrl, castLiveHint || lastLive));
     o.put("position", (c == null ? 0L : c.position()) / 1000.0d);
     o.put("duration", live || d <= 0 ? -1.0d : d / 1000.0d);
     o.put("live", live);
@@ -720,7 +816,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean vlcHw = !Boolean.FALSE.equals(pluginCall.getBoolean("hw", true));
     if (string == null || string.isEmpty()) {
       pluginCall.reject("No url");
-    } else if (useVlc) {
+    } else if (useVlc && !(cast != null && cast.connected() && CastRelay.isLocal(string))) {
       run(
           pluginCall,
           () -> {
@@ -732,12 +828,14 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       run(
           pluginCall,
           () -> {
-            // Build 194: while casting, a stream goes to the Chromecast.
-            if (cast != null && cast.connected() && CastBridge.castable(string)) {
+            // Build 194: while casting, a stream goes to the Chromecast. Build 238: so does a
+            // song or video on the phone (served to it by CastRelay); a video meant for VLC too.
+            boolean local = CastRelay.isLocal(string);
+            if (cast != null && cast.connected() && (CastBridge.castable(string) || local)) {
               try {
                 startCast(string, string2, zEquals, (long) (dDoubleValue * 1000.0d),
-                    Boolean.TRUE.equals(pluginCall.getBoolean("castLive", false)),
-                    Boolean.TRUE.equals(pluginCall.getBoolean("castVideo", false)));
+                    !local && Boolean.TRUE.equals(pluginCall.getBoolean("castLive", false)),
+                    useVlc || Boolean.TRUE.equals(pluginCall.getBoolean("castVideo", false)));
                 pluginCall.resolve();
                 return;
               } catch (Throwable t) {
@@ -960,8 +1058,12 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       if (bArrShrinkArt != null) {
         isPlayable.setArtworkData(bArrShrinkArt, 3);
       }
+      this.lastArtBytes = bArrShrinkArt;
     } else if (string != null && string.startsWith("http")) {
       isPlayable.setArtworkUri(Uri.parse(string));
+      this.lastArtBytes = null;
+    } else {
+      this.lastArtBytes = null;
     }
     final MediaMetadata mediaMetadataBuild = isPlayable.build();
     run(

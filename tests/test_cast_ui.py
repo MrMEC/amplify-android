@@ -80,7 +80,11 @@ async def run(p, theme):
     await pg.evaluate("(id)=>window.__emit('state', {id:id, state:'ready', isPlaying:true, playWhenReady:true, position:0, duration:-1, live:true, external:true})", await pg.evaluate("window.__cur"))
     await pg.wait_for_timeout(300)
     note = await pg.evaluate(NOTE)
-    check(note and note.startswith('Playing on this phone'), f'{t}: something not cast says it plays on the phone ({note})')
+    check(note == 'Playing on this phone', f'{t}: something not cast says it plays on the phone ({note})')
+    # Build 238: a song from the phone that couldn't be cast says why, in a notice
+    await pg.evaluate("window.__emit('castNote', {message:'Couldn\u2019t cast this from the phone (No Wi-Fi address for the phone), so it\u2019s playing here'})"); await pg.wait_for_timeout(300)
+    nm = await pg.evaluate("(document.getElementById('noticeMsg') || {}).textContent || ''")
+    check('No Wi-Fi address' in nm and 'playing here' in nm, f'{t}: build 238: a file that couldn\'t be cast says why ({nm})')
     # the Chromecast refuses something: the reason is shown, and it isn't retried as a network error
     loads0 = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'load'])
     await pg.evaluate("(id)=>window.__emit('error', {id:id, code:4005, cast:true, name:'Chromecast couldn\\'t play it (error 311 HLS)', message:'The Chromecast couldn\\'t play this (error 311 HLS)'})", await pg.evaluate("window.__cur"))
