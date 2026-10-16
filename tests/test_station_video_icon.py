@@ -3,6 +3,7 @@
 Directory codecs ("AAC,H.264") mark a station; so does the app having found video in it.
 Run: python3 tests/test_station_video_icon.py  (screenshots in /tmp/claude-0/t/shots)
 """
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, json, os, shutil, threading, http.server, functools
 from playwright.async_api import async_playwright
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +48,7 @@ async def run(b, w, h, tag):
     ctx = await b.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2, is_mobile=w < 700, has_touch=w < 700)
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.route('**/*radio-browser*/**', lambda r: r.fulfill(status=200, content_type='application/json', body=json.dumps(RESULTS)))
-    await pg.add_init_script(MOCK)
+    await pg.add_init_script(MOCK); await pg.add_init_script(AUTO_NOTICE)
     await pg.goto('http://127.0.0.1:8773/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("(()=>{var i=document.getElementById('searchInput');i.value='news';document.getElementById('searchBtn').click();})()")
     await pg.wait_for_timeout(1500)

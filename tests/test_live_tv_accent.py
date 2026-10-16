@@ -1,6 +1,7 @@
 """Live TV keeps the theme accent (build 203): a playing channel takes no colour from its logo, even when
 the phone can read the logo's pixels (CapacitorHttp mocked). Tab bar, back button and list heading checked
 in both themes, and back on Live TV. Run: python3 tests/test_live_tv_accent.py"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, sys, json, base64, zlib, struct
 sys.argv=[sys.argv[0]]+sys.argv[1:]
 TAG = 'livetv'
@@ -35,7 +36,7 @@ PROBE="""(()=>{var q=s=>document.querySelector(s), cs=e=>e?getComputedStyle(e):n
 async def run(p,theme):
     b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     ctx=await b.new_context(viewport={'width':412,'height':900},device_scale_factor=2,is_mobile=True,has_touch=True,color_scheme='dark',locale='en-US')
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script("window.__IMG=%s; setTimeout(function(){},0); (function(){var C=window.Capacitor; C.Plugins.CapacitorHttp={request:function(a){var k=/red/.test(a.url)?'red':(/green/.test(a.url)?'green':null); return Promise.resolve(k?{status:200,data:window.__IMG[k]}:{status:404,data:''});}};})();" % json.dumps({k:base64.b64encode(v).decode() for k,v in IMG.items()}))
     await ctx.add_init_script("localStorage.setItem('radioPlayerVideoChannels', %s)"%repr(json.dumps(SEED)))
     await ctx.add_init_script("localStorage.setItem('radioPlayerTheme', '%s')"%theme)

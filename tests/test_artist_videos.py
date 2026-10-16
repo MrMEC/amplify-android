@@ -1,6 +1,7 @@
 """Builds 126-127: a favourite artist's page shows a sideways row of YouTube music videos under the
 bio (above Albums; build 127) (channel from Wikidata P2397, videos from YouTube's public feed fetched natively), and tapping one plays it in a full-screen overlay. Artist bio previews are
 left-aligned. Run: python3 tests/test_artist_videos.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess, re
 from urllib.parse import urlparse, parse_qs, unquote
 from playwright.async_api import async_playwright
@@ -197,7 +198,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route)
         await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
@@ -414,7 +415,7 @@ async def main():
 
         # ---- desktop ----
         d = await b.new_context(viewport={'width': 1400, 'height': 900}, color_scheme='dark')
-        await d.add_init_script(MOCK)
+        await d.add_init_script(MOCK); await d.add_init_script(AUTO_NOTICE)
         dp = await d.new_page(); await dp.route('**/*', route)
         await dp.goto(f'http://127.0.0.1:{PORT}/index.html'); await dp.wait_for_timeout(2500)
         await dp.evaluate("""(function(){ var ov=document.getElementById('addMusicOverlay'); if(ov) ov.classList.add('open');

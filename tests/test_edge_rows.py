@@ -7,6 +7,7 @@ Run: python3 tests/test_back_buttons.py (screenshots in /tmp/claude-0/t/shots)""
 """Artist and album pages slide in from the right on phones when opened (tapping a tile),
 using only a transform; Back, and the system's Remove animations setting, open them in place.
 Run: python3 tests/test_page_slide.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess
 from playwright.async_api import async_playwright
 
@@ -149,7 +150,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         for W in (412, 360):
             ctx = await b.new_context(viewport={'width': W, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True)
-            await ctx.add_init_script(MOCK)
+            await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
             await ctx.add_init_script("localStorage.setItem('radioPlayerFavorites', JSON.stringify(Array.from({length:8},function(_,i){return {stationuuid:'s'+i,name:'Fav FM '+i,url:'http://f.example/'+i,favicon:''};})));")
             pg = await ctx.new_page(); errs=[]; pg.on('pageerror', lambda e: errs.append(str(e))); await pg.route('**/*', net)
             await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)

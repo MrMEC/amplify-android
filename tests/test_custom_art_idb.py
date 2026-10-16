@@ -1,6 +1,7 @@
 """Build 155: a cover picked from the device is kept in IndexedDB, so a full localStorage no
 longer stops it saving ("browser storage is full"); it is still there after a restart.
 Run: python3 tests/test_custom_art_idb.py"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_np_nav_pip.py')).read()
@@ -17,7 +18,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script("if(!localStorage.getItem('radioPlayerRecent')) localStorage.setItem('radioPlayerRecent', %s)" % repr(json.dumps(RECENT)))
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route)

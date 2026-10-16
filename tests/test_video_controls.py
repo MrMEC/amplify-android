@@ -5,6 +5,7 @@ only the name and More remain (no skip buttons, no seek bar, no Next card, Favor
 so the channel list gets the height. The same state goes to the native player
 (setVideoControls), whose buttons come back as 'videoctl' events.
 Run: python3 tests/test_video_controls.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_video_channels.py')).read()
@@ -42,7 +43,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script(SPY)
         await ctx.add_init_script("localStorage.setItem('radioPlayerVideoChannels', %s)" % repr(json.dumps(SEED)))
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -123,7 +124,7 @@ async def main():
         await b.close()
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 360, 'height': 780}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='light', locale='en-US')
-        await ctx.add_init_script(MOCK); await ctx.add_init_script(SPY)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE); await ctx.add_init_script(SPY)
         await ctx.add_init_script("localStorage.setItem('radioPlayerVideoChannels', %s)" % repr(json.dumps(SEED)))
         await ctx.add_init_script("localStorage.setItem('radioPlayerTheme', 'light')")
         await ctx.add_init_script("document.addEventListener('DOMContentLoaded',function(){var s=document.createElement('style');s.textContent='.np-name,.np-sub,.tile-name,.np-related-heading{font-size:calc(1em*1.3) !important}';document.head.appendChild(s);})")

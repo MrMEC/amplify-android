@@ -8,6 +8,7 @@ Browser mode: a real video stream (webm) pasted into search shows its picture in
 Run: python3 tests/test_stream_video.py  (needs ffmpeg-made files in /tmp/claude-0/t/vid)
 Screenshots go to /tmp/claude-0/t/shots.
 """
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, json, os, shutil, threading, http.server, functools
 from playwright.async_api import async_playwright
 
@@ -73,7 +74,7 @@ async def app_mode(b, w, h, tag):
     ctx = await b.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2, is_mobile=True, has_touch=True)
     pg = await ctx.new_page()
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
-    await pg.add_init_script(MOCK)
+    await pg.add_init_script(MOCK); await pg.add_init_script(AUTO_NOTICE)
     await pg.goto(BASE + 'index.html'); await pg.wait_for_timeout(2500)
 
     await paste(pg, 'http://iptv.example/live/channel1.m3u8')

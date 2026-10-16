@@ -1,3 +1,4 @@
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools
 from playwright.async_api import async_playwright
 root='/tmp/claude-0/t/srv'
@@ -28,7 +29,7 @@ async def main():
         b=await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         pg=await b.new_page(viewport={'width':412,'height':900})
         errs=[]; pg.on('pageerror',lambda e: errs.append(str(e)))
-        await pg.add_init_script(MOCK)
+        await pg.add_init_script(MOCK); await pg.add_init_script(AUTO_NOTICE)
         await pg.goto('http://127.0.0.1:8765/index.html'); await pg.wait_for_timeout(2500)
         print('folder btn disabled:', await pg.evaluate("document.getElementById('addMusicFolderBtn') && document.getElementById('addMusicFolderBtn').disabled"))
         # open dialog then click folder

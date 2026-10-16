@@ -507,6 +507,8 @@
     .status-line{ transition:none; }
   }
   .status-line.err{ color:var(--danger); }
+  /* Build 234: messages are modals now; the line stays in the page, always empty. */
+  #statusLine{ display:none !important; }
   .status-line-text{ flex:1; min-width:0; }
   .status-line-dismiss{
     display:none; flex-shrink:0; background:none; border:none; color:inherit; cursor:pointer;
@@ -1350,6 +1352,49 @@
     stroke-linecap:round; stroke-linejoin:round; visibility:hidden; }
   .sleep-opt.on .sleep-tick{ visibility:visible; }
   .sleep-opt.off{ color:var(--danger); }
+  /* ---------- Notices (build 234) ---------- */
+  /* Messages and progress as modals, in the delete dialog's style (.confirm-*), above every
+     sheet and dialog. The icon is the import panel's: spinner, tick, cross, dash, or an "i". */
+  .notice-overlay{ z-index:5100; }
+  .import-overlay{ z-index:5050; }
+  .notice-head{ display:flex; align-items:flex-start; gap:12px; margin-bottom:18px; }
+  .notice-icon{ width:22px; height:22px; margin-top:1px; }
+  .notice-text{ flex:1; min-width:0; }
+  .notice-title{ margin:0 0 6px; font-size:18px; font-weight:700; color:var(--text); line-height:1.3; }
+  .notice-title[hidden]{ display:none; }
+  .notice-msg{ margin:0; font-size:15px; line-height:1.45; color:var(--text); overflow-wrap:anywhere; white-space:pre-line; }
+  .notice-title:not([hidden]) + .notice-msg{ font-size:14px; color:var(--text-dim); }
+  .notice-msg b{ color:var(--text); }
+  .notice-ok{ background:var(--accent); color:var(--accent-text); border:1px solid var(--accent); }
+  .notice-actions:empty{ display:none; }
+  .notice-actions button:disabled{ opacity:.55; cursor:default; }
+  /* Icon kinds (the import panel's classes, reused). */
+  .notice-panel.working .notice-icon{ border:2.5px solid var(--accent-dim); border-top-color:var(--accent); animation: importSpin .8s linear infinite; }
+  /* The tick, "!" and "i" are drawn as SVG (noticeIconSvg); only the spinner is CSS. */
+  .notice-icon svg{ display:block; width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .notice-panel.done .notice-icon, .notice-panel.info .notice-icon{ color:var(--accent); }
+  .notice-panel.error .notice-icon{ color:var(--danger); }
+  /* The library's progress, as a modal. */
+  .import-overlay .import-panel{ position:static; right:auto; bottom:auto; z-index:auto; width:min(340px, 100%); max-width:none; padding:22px 20px 16px; }
+  .import-overlay .import-panel-head{ gap:12px; margin-bottom:16px; }
+  .import-overlay .import-panel-icon{ width:22px; height:22px; }
+  .import-overlay .import-panel.working .import-panel-icon{ border-width:2.5px; }
+  .import-overlay .import-panel.done .import-panel-icon::after{ left:6px; top:2px; width:5px; height:10px; }
+  .import-overlay .import-panel.error .import-panel-icon::before,
+  .import-overlay .import-panel.error .import-panel-icon::after{ left:8px; top:2px; height:14px; }
+  .import-overlay .import-panel.stopped .import-panel-icon::after{ left:4px; top:8px; width:10px; }
+  .import-overlay .import-panel-title{ font-size:18px; }
+  .import-overlay .import-panel-track{ height:8px; }
+  .import-overlay .import-panel-meta{ font-size:13px; margin-top:9px; }
+  .import-overlay .import-panel-detail{ font-size:12.5px; margin-top:6px; }
+  .import-overlay .import-panel-actions{ justify-content:stretch; margin-top:18px; }
+  /* Its buttons look like every other dialog's: Stop and Hide quiet, OK in the accent. */
+  .import-overlay .import-panel-stop, .import-overlay .import-panel-close{
+    padding:0; font-size:14px; font-weight:700; border-radius:10px; min-height:44px;
+    background:var(--panel-2); color:var(--text); border:1px solid var(--border);
+  }
+  .import-overlay .import-panel-close.primary{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  .import-overlay .import-panel-stop:disabled{ opacity:.55; }
   /* ---------- Home hero (build 220) ---------- */
   /* What's playing, as a full-width picture at the top of Home that dissolves into the page:
      the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
@@ -6357,7 +6402,6 @@
                   </button>
                   <button type="button" class="np-menu-item" id="npPlaylistBtn" role="menuitem">
                     <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
-                    <span class="np-playlist-tip" id="npPlaylistTip">Added!</span>
                   </button>
                   <!-- A TV channel (or a pasted stream showing video): add it to My Channels, or take it off. -->
                   <button type="button" class="np-menu-item" id="npChannelLink" role="menuitem" style="display:none;"></button>
@@ -6388,7 +6432,6 @@
                   </button>
                   <button type="button" class="np-menu-item" id="npCopyBtn" role="menuitem">
                     <i class="fa-regular fa-copy"></i><span>Copy stream URL</span>
-                    <span class="np-copy-tip" id="npCopyTip">Copied!</span>
                   </button>
                   <button type="button" class="np-menu-item danger" id="npDeleteBtn" role="menuitem">
                     <i class="fa-solid fa-trash"></i><span id="npDeleteLabel">Delete</span>
@@ -6555,6 +6598,20 @@
   </button>
 </nav>
 
+<!-- Build 234: every message the app gives (see setStatus / showNotice), in place of the old
+     line at the top of the page. -->
+<div class="confirm-overlay notice-overlay" id="noticeOverlay" role="alertdialog" aria-modal="true" aria-labelledby="noticeMsg">
+  <div class="confirm-panel notice-panel" id="noticePanel">
+    <div class="notice-head">
+      <span class="import-panel-icon notice-icon" id="noticeIcon" aria-hidden="true"></span>
+      <div class="notice-text">
+        <h2 class="notice-title" id="noticeTitle" hidden></h2>
+        <p class="notice-msg" id="noticeMsg"></p>
+      </div>
+    </div>
+    <div class="confirm-actions notice-actions" id="noticeActions"></div>
+  </div>
+</div>
 <!-- Build 228: asked before anything is deleted (see confirmDelete). -->
 <div class="confirm-overlay" id="confirmOverlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMsg">
   <div class="confirm-panel">
@@ -7026,11 +7083,12 @@
      which left no way to tell a finished import from a failed one you happened to miss.
      This sits above the player bar, survives every view change, and holds its terminal
      state until it is either dismissed or (on success only) times out. -->
-<div class="import-panel" id="importPanel" style="display:none;" role="status" aria-live="polite">
+<!-- Build 234: a modal now (Mark: no inline notifications), styled like the other dialogs. -->
+<div class="confirm-overlay notice-overlay import-overlay" id="importOverlay">
+<div class="confirm-panel import-panel" id="importPanel" style="display:none;" role="dialog" aria-modal="true" aria-live="polite" aria-labelledby="importPanelTitle">
   <div class="import-panel-head">
     <span class="import-panel-icon" id="importPanelIcon" aria-hidden="true"></span>
     <span class="import-panel-title" id="importPanelTitle">Adding music</span>
-    <button type="button" class="import-panel-close" id="importPanelClose" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
   </div>
   <div class="import-panel-track" id="importPanelTrack">
     <div class="import-panel-fill" id="importPanelFill"></div>
@@ -7040,9 +7098,11 @@
     <span id="importPanelPct"></span>
   </div>
   <div class="import-panel-detail" id="importPanelDetail"></div>
-  <div class="import-panel-actions">
-    <button type="button" class="import-panel-stop" id="importPanelStop">Stop</button>
+  <div class="confirm-actions import-panel-actions">
+    <button type="button" class="confirm-cancel import-panel-stop" id="importPanelStop">Stop</button>
+    <button type="button" class="import-panel-close" id="importPanelClose">Hide</button>
   </div>
+</div>
 </div>
 
 <!-- The queue: what is playing, what the listener lined up themselves (Up Next), and what
@@ -10974,10 +11034,10 @@
       return true;
     }catch(e){ return false; }
   }
+  // Build 234: said in a notice, not a little tip on the menu item.
   function showCopiedTip(){
-    npCopyBtn.classList.add('copied');
-    clearTimeout(npCopyBtn._copiedTimer);
-    npCopyBtn._copiedTimer = setTimeout(function(){ npCopyBtn.classList.remove('copied'); }, 1500);
+    if(typeof closeNpMenu === 'function') closeNpMenu();
+    showNotice({ message: 'Stream URL copied.', kind: 'done' });
   }
   npCopyBtn.addEventListener('click', function(){
     var st = npTarget();
@@ -21698,9 +21758,9 @@
       if(!p.stations.some(function(s){ return favKey(s) === key; })){ p.stations.push(it); added++; }
     });
     if(added){ saveStationPlaylists(); renderStationPlaylistList(); }
-    showAddedToPlaylistTip();
     var what = label ? '\u201c' + label + '\u201d' : (items.length === 1 ? '\u201c' + stripExclusively(items[0].name || 'That') + '\u201d' : items.length + ' songs');
-    setStatus(added ? what + ' was added to \u201c' + p.label + '\u201d.' : what + ' is already in \u201c' + p.label + '\u201d.');
+    if(added) showNotice({ message: what + ' was added to \u201c' + p.label + '\u201d.', kind: 'done' });
+    else setStatus(what + ' is already in \u201c' + p.label + '\u201d.');
     if(activeStationPlaylistId === playlistId && !stationPlaylistStationsEditing) renderPlaylistStations(p);
   }
   npPlaylistBtn.addEventListener('click', function(){
@@ -24362,21 +24422,37 @@
   // worked. A success clears itself after a while; a failure or a stopped run waits to be
   // dismissed, because that is the outcome most worth not missing.
   var IMPORT_PANEL_DONE_MS = 15000;
+  var importTruncatedNote = '';
   var importPanelTimer = null;
   var IMPORT_PANEL_STATES = ['working', 'done', 'error', 'stopped', 'indeterminate'];
 
+  // Build 234: the panel is a modal (#importOverlay). Hide puts it away while the import runs
+  // on; the outcome opens it again.
+  var importOverlay = document.getElementById('importOverlay');
+  function importOverlayOpen(){ return !!importOverlay && importOverlay.classList.contains('open'); }
   function hideImportPanel(){
     clearTimeout(importPanelTimer);
     importPanelTimer = null;
     importPanel.style.display = 'none';
+    if(importOverlay) importOverlay.classList.remove('open');
     IMPORT_PANEL_STATES.forEach(function(c){ importPanel.classList.remove(c); });
   }
-  importPanelClose.addEventListener('click', hideImportPanel);
+  var importPanelHidden = false; // Hide was tapped while it ran
+  importPanelClose.addEventListener('click', function(){
+    if(importInProgress) importPanelHidden = true;
+    hideImportPanel();
+  });
+  if(importOverlay) importOverlay.addEventListener('click', function(ev){
+    if(ev.target !== importOverlay) return;
+    if(importInProgress) importPanelHidden = true;
+    hideImportPanel();
+  });
   importPanelStop.addEventListener('click', function(){
     if(!importInProgress) return;
     importCancelled = true;
     importPanelTitle.textContent = 'Stopping…';
     importPanelStop.disabled = true;
+    importPanelStop.textContent = 'Stopping…';
   });
 
   function setLibraryBusy(on){ libraryBusy.classList.toggle('on', !!on); }
@@ -24386,13 +24462,22 @@
     var o = opts || {};
     clearTimeout(importPanelTimer);
     importPanelTimer = null;
-    importPanel.style.display = '';
-    IMPORT_PANEL_STATES.forEach(function(c){ importPanel.classList.remove(c); });
-
     var running = (state === 'scanning' || state === 'working');
     setLibraryBusy(running);
+    // A run put away with Hide stays away until it ends; the outcome always shows.
+    if(running && importPanelHidden) return;
+    if(!running) importPanelHidden = false;
+    // A "Reading…" / "Checking…" notice that led here gives way to the panel.
+    if(noticeShown && noticeShown.status && noticeShown.kind === 'working') closeNotice();
+    importPanel.style.display = '';
+    if(importOverlay) importOverlay.classList.add('open');
+    IMPORT_PANEL_STATES.forEach(function(c){ importPanel.classList.remove(c); });
+
     importPanelStop.style.display = running ? '' : 'none';
     importPanelStop.disabled = false;
+    importPanelStop.textContent = 'Stop';
+    importPanelClose.textContent = running ? 'Hide' : 'OK';
+    importPanelClose.classList.toggle('primary', !running);
 
     if(state === 'scanning'){
       importPanel.classList.add('working', 'indeterminate');
@@ -24416,6 +24501,7 @@
     }
 
     // Terminal states.
+    if(importTruncatedNote){ o.detail = (o.detail ? o.detail + ' ' : '') + importTruncatedNote; importTruncatedNote = ''; }
     importPanel.classList.add(state);
     importPanelFill.style.width = '100%';
     importPanelTitle.textContent = o.title || '';
@@ -24435,7 +24521,6 @@
   importCancelBtn.addEventListener('click', function(){
     if(!importInProgress) return;
     importCancelled = true;
-    setStatus('Stopping…', false, true);
   });
 
   // `fileList` is everything the user handed over, images included: the audio is filtered
@@ -24457,7 +24542,6 @@
       var msg = fromFolder
         ? 'No audio files were found in that folder.'
         : 'No audio files found in what you added.';
-      setStatus(msg, true);
       showImportPanel('error', { title: 'Nothing to add', count: 'No audio files', detail: msg });
       return Promise.resolve();
     }
@@ -24467,6 +24551,7 @@
     }
     importInProgress = true;
     importCancelled = false;
+    importPanelHidden = false;
     setImportCancelVisible(true);
     showImportPanel('working', { done: 0, total: files.length });
     // Adding music is the one place a dead database must be said out loud: reporting
@@ -24480,7 +24565,6 @@
         count: 'Nothing was added',
         detail: libraryStorageError
       });
-      setStatus('Music could not be added. ' + libraryStorageError, true);
       renderLibraryList();
       refreshLibraryView();
       return false;
@@ -24495,8 +24579,6 @@
 
     var currentName = '';
     function report(){
-      // Sticky: a progress count must not slide away while the import is still running.
-      setStatus('Adding music… ' + doneCount + ' of ' + total, false, true);
       showImportPanel('working', { done: doneCount, total: total, detail: currentName });
     }
     report();
@@ -24569,21 +24651,19 @@
       if(importCancelled){
         // Everything already written stays: a stopped import is a partial library, not a
         // rollback, and re-running it skips what is there and picks up where it left off.
-        setStatus(summary + '. Import stopped — ' + (total - doneCount) + ' left unread.', false);
         showImportPanel('stopped', {
           title: 'Import stopped',
           count: summary,
           detail: (total - doneCount) + ' of ' + total + ' were left unread. Adding them again picks up where this left off.'
         });
       } else if(quotaHit){
-        setStatus(summary + '. This browser ran out of storage space, so the rest were skipped.', true);
         showImportPanel('error', {
           title: 'Out of storage space',
           count: summary,
           detail: 'This browser ran out of room, so the rest were skipped.'
         });
       } else if(added){
-        setStatus(bits.join(', ') + '.', false);
+        hideStatus();
         showImportPanel('done', {
           title: 'Library updated',
           count: summary,
@@ -24591,14 +24671,13 @@
           detail: failed ? (failed + ' file' + (failed === 1 ? '' : 's') + ' could not be read.') : ''
         });
       } else if(failed){
-        setStatus(bits.join(', ') + '.', true);
         showImportPanel('error', {
           title: 'Import failed',
           count: summary,
           detail: 'None of the files could be read.'
         });
       } else {
-        setStatus(bits.join(', ') + '.', false);
+        hideStatus();
         showImportPanel('done', {
           title: 'Already up to date',
           count: summary,
@@ -26862,44 +26941,51 @@
   // Says plainly that nothing was deleted -- the browser simply will not give this page a
   // place to keep files. Shown on every library view, because the Artists list is populated
   // from the station directory and so never looks empty even when the library cannot load.
+  // Build 234: when the library can't be read, a notice says why (once per problem, while a
+  // library page is open), with Retry. It used to be a box at the top of the page.
+  var libraryNoticeShownFor = '';
   function syncLibraryNotice(){
     var notice = document.getElementById('libraryNotice');
-    if(!notice) return;
-    if(!activeLibrarySection || !libraryStorageError){
-      notice.style.display = 'none';
-      return;
-    }
-    notice.style.display = '';
-    notice.innerHTML = '';
-    var body = document.createElement('div');
+    if(notice) notice.style.display = 'none';
+    // (A reload clears the error while it tries again; the same problem isn't shown twice.)
+    if(!libraryStorageError) return;
+    if(!activeLibrarySection) return;
+    var tab = libraryBlockedByTab || anotherInstanceOpen();
+    var key = (tab ? 'tab|' : 'store|') + libraryStorageError;
+    if(libraryNoticeShownFor === key) return;
+    libraryNoticeShownFor = key;
+    var body = document.createElement('span');
     // Far and away the most common cause, and the only one the user can fix in five
     // seconds, so it leads whenever there is any sign of it.
-    if(libraryBlockedByTab || anotherInstanceOpen()){
-      body.innerHTML = '<b>Another Amplify tab is open, and it is holding your library.</b> '
-        + 'Nothing has been deleted. Close every other Amplify tab or window — including '
+    if(tab){
+      body.innerHTML = 'Nothing has been deleted. Close every other Amplify tab or window — including '
         + 'older copies of the file — then tap Retry. Only one can be open at a time.';
     } else {
-      body.innerHTML = '<b>Your music is not showing because this browser is not giving the '
-        + 'page a place to store files.</b> Nothing has been deleted. '
-        + escapeHtml(libraryStorageError)
+      body.innerHTML = 'Nothing has been deleted. ' + escapeHtml(libraryStorageError)
         + ' Station artwork and artist details are still cached, so they are not '
         + 're-downloaded. Open Settings and tap Check storage for the details.';
     }
-    notice.appendChild(body);
-    var retry = document.createElement('button');
-    retry.type = 'button';
-    retry.className = 'library-retry-btn';
-    retry.textContent = 'Retry';
-    retry.addEventListener('click', function(){
-      retry.disabled = true;
-      retry.textContent = 'Retrying…';
-      reloadLibrary().then(function(){
-        refreshLibraryView();
-        renderLibraryList();
-      })['catch'](function(){})
-      ['then'](function(){ syncLibraryNotice(); });
+    showNotice({
+      kind: 'error',
+      title: tab ? 'Another Amplify tab is holding your library' : 'Your music isn’t showing',
+      message: body,
+      actions: [
+        { label: 'Close' },
+        { label: 'Retry', primary: true, keepOpen: true, run: function(btn){
+          btn.disabled = true;
+          btn.textContent = 'Retrying…';
+          reloadLibrary().then(function(){
+            refreshLibraryView();
+            renderLibraryList();
+          })['catch'](function(){})
+          ['then'](function(){
+            closeNotice();
+            libraryNoticeShownFor = '';
+            syncLibraryNotice();
+          });
+        } }
+      ]
     });
-    notice.appendChild(retry);
   }
 
   function refreshLibraryView(){
@@ -30114,7 +30200,8 @@
     P.pickMusicFolder().then(function(res){
       if(!res || res.cancelled) return;
       rememberMusicFolder(res.treeUri, res.folder);
-      setStatus('Reading ' + (res.folder || 'folder') + '…', false, true);
+      importPanelHidden = false;
+      showImportPanel('scanning', { count: 'Reading ' + (res.folder || 'the folder') + '…' });
       var stubs = (res.files || []).map(function(f){
         return {
           name: f.name, size: f.size || 0, type: f.type || '', lastModified: f.lastModified || 0,
@@ -30133,15 +30220,13 @@
         return nativeFileFromEntry(st.amplifyEntry)['catch'](function(){ return null; });
       })).then(function(artFiles){
         var list = audio.concat(artFiles.filter(Boolean));
-        if(res.truncated){
-          setStatus('That folder is very large; the first ' + stubs.length + ' files are being added.', false);
-        }
+        // (a folder too large to list in full: the first files are added; said in the outcome)
+        if(res.truncated) importTruncatedNote = 'That folder is very large, so only its first ' + stubs.length + ' files were looked at.';
         return importLocalFiles(list, { fromFolder: true });
       });
       });
     })['catch'](function(err){
       var msg = (err && err.message) ? err.message : 'The folder could not be opened.';
-      setStatus(msg, true);
       showImportPanel('error', { title: 'Import failed', count: 'Nothing was added', detail: msg });
     });
   }
@@ -31786,7 +31871,9 @@
       if(!importedCount){
         setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song'), !!failed);
       } else if(removed){
-        setStatus(changeSummary(importedCount, removed, 'song'), false);
+        // The import's own outcome is showing; the removals go in with it (build 234).
+        var rm = removed + (removed === 1 ? ' song was' : ' songs were') + ' removed (no longer in the folder).';
+        importPanelDetail.textContent = importPanelDetail.textContent ? importPanelDetail.textContent + ' ' + rm : rm;
       }
     })['catch'](function(err){
       musicRefreshBusy = false;
@@ -32028,44 +32115,92 @@
     };
   }
 
-  // Inline messages under the search box clear themselves after 10 seconds, sliding up and
-  // out. `sticky` is for the one message that is a progress indicator rather than a notice
-  // -- an import's running count, which must stay put however long a file takes -- and is
-  // released by the message that replaces it when the import ends.
-  var STATUS_AUTO_HIDE_MS = 10000;
-  var STATUS_LEAVE_MS = 360; // must outlast the CSS transition
-  var statusHideTimer = null;
-  var statusLeaveTimer = null;
-  function clearStatusTimers(){
-    clearTimeout(statusHideTimer); statusHideTimer = null;
-    clearTimeout(statusLeaveTimer); statusLeaveTimer = null;
+  // ---------- notices (build 234) ----------
+  // Every message the app gives is a small modal now (Mark asked for no inline notifications),
+  // in the style of the delete dialog. showNotice({ message, title, kind, sticky, actions }):
+  //   kind 'info' (an "i"), 'done' (a tick), 'error' (a "!"), 'working' (a spinner);
+  //   an info or done notice closes itself after NOTICE_AUTO_MS, an error waits for OK, and a
+  //   'working' one stays until something replaces it (with Hide to put it away meanwhile);
+  //   actions: [{ label, run, primary, keepOpen }] (default: one OK; Hide while working).
+  // A new notice replaces the one showing. A tap outside or Escape closes it.
+  // setStatus(msg, isErr, sticky) is the old one-line call, now a notice; '' closes it.
+  var NOTICE_AUTO_MS = 6000;
+  var NOTICE_ICONS = {
+    done: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.3l3 3 6-6.3"/></svg>',
+    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/></svg>',
+    error: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 7v6.4"/><circle cx="12" cy="16.6" r=".6" fill="currentColor"/></svg>'
+  };
+  var noticeTimer = null, noticeSeq = 0, noticeShown = null;
+  function noticeEls(){
+    return { ov: document.getElementById('noticeOverlay'), panel: document.getElementById('noticePanel'),
+      title: document.getElementById('noticeTitle'), msg: document.getElementById('noticeMsg'),
+      actions: document.getElementById('noticeActions') };
   }
-  function hideStatus(animated){
-    clearStatusTimers();
-    if(!statusLine.classList.contains('has-message')) return;
-    if(!animated){
-      statusLine.classList.remove('leaving', 'has-message', 'err');
-      statusLineText.textContent = '';
-      return;
-    }
-    statusLine.classList.add('leaving');
-    statusLeaveTimer = setTimeout(function(){
-      statusLine.classList.remove('leaving', 'has-message', 'err');
-      statusLineText.textContent = '';
-    }, STATUS_LEAVE_MS);
+  function closeNotice(seq){
+    if(seq !== undefined && seq !== noticeSeq) return;
+    clearTimeout(noticeTimer); noticeTimer = null;
+    var e = noticeEls();
+    if(!e.ov) return;
+    e.ov.classList.remove('open');
+    var was = noticeShown;
+    noticeShown = null;
+    if(was && was.onClose) try{ was.onClose(); }catch(err){}
   }
+  function showNotice(o){
+    o = o || {};
+    var e = noticeEls();
+    if(!e.ov) return 0;
+    clearTimeout(noticeTimer); noticeTimer = null;
+    var seq = ++noticeSeq;
+    var kind = o.kind || 'info';
+    noticeShown = { seq: seq, kind: kind, status: !!o.status, onClose: o.onClose || null };
+    ['info', 'done', 'error', 'working'].forEach(function(k){ e.panel.classList.toggle(k, k === kind); });
+    document.getElementById('noticeIcon').innerHTML = NOTICE_ICONS[kind] || '';
+    e.title.hidden = !o.title;
+    e.title.textContent = o.title || '';
+    e.msg.innerHTML = '';
+    if(o.message && typeof o.message === 'object') e.msg.appendChild(o.message);
+    else e.msg.textContent = o.message || '';
+    // The hidden old line carries the latest message's text too (tests read it there).
+    try{ if(statusLineText) statusLineText.textContent = (o.title ? o.title + ' ' : '') + (e.msg.textContent || ''); }catch(err){}
+    e.ov.setAttribute('aria-labelledby', o.title ? 'noticeTitle' : 'noticeMsg');
+    e.actions.innerHTML = '';
+    var acts = o.actions || [{ label: kind === 'working' ? 'Hide' : 'OK', primary: kind !== 'working' }];
+    acts.forEach(function(a){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = a.primary ? 'notice-ok' : 'confirm-cancel';
+      b.textContent = a.label;
+      b.addEventListener('click', function(){
+        if(!a.keepOpen) closeNotice(seq);
+        if(a.run) a.run(b);
+      });
+      e.actions.appendChild(b);
+    });
+    e.ov.classList.add('open');
+    var auto = o.autoClose !== undefined ? o.autoClose : (kind === 'info' || kind === 'done') && !o.sticky;
+    if(auto) noticeTimer = setTimeout(function(){ closeNotice(seq); }, typeof auto === 'number' ? auto : NOTICE_AUTO_MS);
+    return seq;
+  }
+  // Kept for everything that still calls them by their old names.
+  function hideStatus(){ if(noticeShown && noticeShown.status) closeNotice(); }
   function setStatus(msg, isErr, sticky){
-    clearStatusTimers();
-    // A new message cancels an in-flight exit so it never inherits the slid-out transform.
-    statusLine.classList.remove('leaving');
-    statusLineText.textContent = msg || '';
-    statusLine.classList.toggle('err', !!isErr);
-    statusLine.classList.toggle('has-message', !!msg);
-    if(msg && !sticky){
-      statusHideTimer = setTimeout(function(){ hideStatus(true); }, STATUS_AUTO_HIDE_MS);
-    }
+    // The hidden line still carries the text (tests read it), but nothing is shown there.
+    if(statusLineText) statusLineText.textContent = msg || '';
+    if(!msg){ hideStatus(); return; }
+    // While the library's own progress is showing, its running count says it already.
+    if(sticky && !isErr && importOverlayOpen()) return;
+    showNotice({ message: msg, kind: isErr ? 'error' : (sticky ? 'working' : 'info'), sticky: sticky, status: true });
   }
-  statusLineDismiss.addEventListener('click', function(){ hideStatus(true); });
+  (function(){
+    var e = noticeEls();
+    if(!e.ov) return;
+    e.ov.addEventListener('click', function(ev){ if(ev.target === e.ov) closeNotice(); });
+    document.addEventListener('keydown', function(ev){
+      if(ev.key === 'Escape' && e.ov.classList.contains('open') && !(confirmPending)){ ev.stopImmediatePropagation(); closeNotice(); }
+    }, true);
+  })();
+  window.__notice = { show: showNotice, close: closeNotice, state: function(){ return noticeShown; } };
 
   function loadTopStations(){
     cancelPlaylistStationsEditing();
