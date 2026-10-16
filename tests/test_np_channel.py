@@ -1,8 +1,8 @@
 """Now Playing for a TV channel: video box on top, one-line name right under it, controls
 close below, and a channel list under the controls (My Channels for a saved channel, more
-import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 from its category for one that isn't). A radio station keeps the normal layout.
 Run: python3 tests/test_np_channel.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_video_channels.py')).read()

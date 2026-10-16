@@ -1,7 +1,7 @@
 """Volume leveling setting (build 231): Settings > Volume leveling (On/Off) in the Android app, read
-import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 from and sent to the native player (setLeveling); hidden in a browser. Both themes at 412 wide.
 Run: python3 tests/test_leveling.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, threading, http.server, functools, shutil
 from playwright.async_api import async_playwright
 

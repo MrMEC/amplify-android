@@ -1,8 +1,8 @@
 """Now Playing keeps the bottom navigation for every kind of item (a radio station here), rising
-import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 from behind it; the channel list has no count; picture-in-picture: the page tells the app when
 leaving should float the video, and fills the window with the picture while it floats.
 Run: python3 tests/test_np_nav_pip.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_video_channels.py')).read()
