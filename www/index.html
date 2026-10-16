@@ -10513,15 +10513,15 @@
   // A copy of a picture whose pixels can be read: fetched natively (CapacitorHttp, no CORS on
   // the phone) and drawn from a blob URL. Resolves { img, done } or null; never rejects.
   var readableCopyBusy = {};
-  function readableImageCopy(src){
+  function readableImageCopy(src, maxBytes){
     var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
     var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform());
     if(!src || !/^https?:/i.test(src) || !native || !H || typeof H.request !== 'function') return Promise.resolve(null);
-    if(readableCopyBusy[src]) return readableCopyBusy[src];
+    if(readableCopyBusy[src] && !maxBytes) return readableCopyBusy[src];
     var job = Promise.resolve(H.request({ url: src, method: 'GET', responseType: 'blob', connectTimeout: 8000, readTimeout: 8000 })).then(function(r){
       if(!r || r.status < 200 || r.status >= 300 || typeof r.data !== 'string' || !r.data) return null;
       var bin = atob(r.data.replace(/^data:[^,]*,/, ''));
-      if(bin.length > 4 * 1024 * 1024) return null;
+      if(bin.length > (maxBytes || 4 * 1024 * 1024)) return null;
       var bytes = new Uint8Array(bin.length);
       for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       var url = URL.createObjectURL(new Blob([bytes]));
@@ -10532,7 +10532,7 @@
         im.src = url;
       });
     })['catch'](function(){ return null; }).then(function(x){ delete readableCopyBusy[src]; return x; });
-    readableCopyBusy[src] = job;
+    if(!maxBytes) readableCopyBusy[src] = job;
     return job;
   }
   // A TV channel or a video of your own (the video layout) never takes its colour from the
@@ -11270,6 +11270,7 @@
     artPendingUpload = null;
     artPendingFile = null;
     artUrlFileInput.value = '';
+    setArtFilesNote('');
   }
 
   // A menu item now, so the menu has to get out of the way before the dialog opens over it.
@@ -31276,7 +31277,37 @@
   // ---- a picture for a song's tag (build 232) ----
   // A File, a data: URL or a web address, as a JPEG at most COVER_MAX px on its longest side.
   var COVER_MAX = 1200;
+  var COVER_FETCH_MAX = 30 * 1024 * 1024;
   function coverFromImage(src){
+    // A web picture is fetched by the phone itself (build 233): most image sites (Discogs, for
+    // one) don't let a page copy their pictures, so loading it in the page could show it but
+    // never put it in a file.
+    if(typeof src === 'string' && /^https?:/i.test(src)){
+      var url = secureUrl(src);
+      return readableImageCopy(url, COVER_FETCH_MAX).then(function(copy){
+        if(!copy) return coverFromImageInPage(src);
+        try{ return coverFromLoadedImage(copy.img); }
+        finally{ copy.done(); }
+      });
+    }
+    return coverFromImageInPage(src);
+  }
+  function coverFromLoadedImage(img){
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var k = Math.min(1, COVER_MAX / Math.max(w, h || 1));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k));
+    c.height = Math.max(1, Math.round(h * k));
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    var data = c.toDataURL('image/jpeg', 0.9);
+    var bin = atob(data.slice(data.indexOf(',') + 1)), bytes = new Uint8Array(bin.length);
+    for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { bytes: bytes, mime: 'image/jpeg', width: c.width, height: c.height };
+  }
+  function coverFromImageInPage(src){
     return new Promise(function(resolve, reject){
       var url = src, objUrl = null;
       if(src && typeof src === 'object' && typeof src.size === 'number'){ url = objUrl = URL.createObjectURL(src); }
@@ -31285,19 +31316,7 @@
       if(!objUrl && !/^data:/i.test(url)){ img.crossOrigin = 'anonymous'; url = secureUrl(url); }
       img.onload = function(){
         try{
-          var w = img.naturalWidth, h = img.naturalHeight;
-          var k = Math.min(1, COVER_MAX / Math.max(w, h || 1));
-          var c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round(w * k));
-          c.height = Math.max(1, Math.round(h * k));
-          var ctx = c.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, c.width, c.height);
-          ctx.drawImage(img, 0, 0, c.width, c.height);
-          var data = c.toDataURL('image/jpeg', 0.9);
-          var bin = atob(data.slice(data.indexOf(',') + 1)), bytes = new Uint8Array(bin.length);
-          for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          resolve({ bytes: bytes, mime: 'image/jpeg', width: c.width, height: c.height });
+          resolve(coverFromLoadedImage(img));
         }catch(e){
           var er = new Error('That picture’s website doesn’t let it be copied into song files. Upload the picture instead.');
           er.code = 'CORS';
@@ -31308,7 +31327,9 @@
       };
       img.onerror = function(){
         if(objUrl) URL.revokeObjectURL(objUrl);
-        reject(new Error('That picture couldn’t be loaded.'));
+        reject(new Error(objUrl || /^data:/i.test(String(url))
+          ? 'That picture couldn’t be loaded.'
+          : 'That picture’s website wouldn’t send it to Amplify. Save the picture to your phone and use Upload Image instead.'));
       };
       img.src = url;
     });

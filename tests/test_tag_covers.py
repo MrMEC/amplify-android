@@ -65,6 +65,7 @@ def make_library():
 
 ff('-f', 'lavfi', '-i', 'color=c=blue:s=300x200', '-frames:v', '1', f'{root}/blue.png')
 ff('-f', 'lavfi', '-i', 'color=c=green:s=500x500', '-frames:v', '1', f'{root}/green.png')
+ff('-f', 'lavfi', '-i', 'color=c=red:s=600x600', '-frames:v', '1', '-q:v', '2', f'{root}/red.jpg')
 make_library()
 
 
@@ -160,7 +161,12 @@ MOCK = """
    return function(){ return Promise.resolve({}); };
  }});
  window.Capacitor = { isNativePlatform:function(){return true;}, getPlatform:function(){return 'android';},
-   registerPlugin:function(){ return P; }, Plugins:{AmplifyPlayer:P}, convertFileSrc:function(u){return u;} };
+   registerPlugin:function(){ return P; }, Plugins:{AmplifyPlayer:P, CapacitorHttp: window.__noNativeHttp ? undefined : { request: function(o){
+     window.__httpAsked = (window.__httpAsked || []).concat([o.url]);
+     var path = '/' + String(o.url).split('/').pop();
+     return fetch(path).then(function(r){ return r.blob().then(function(b){ return new Promise(function(res){
+       var fr = new FileReader(); fr.onload = function(){ res({ status: r.status, data: String(fr.result).replace(/^data:[^,]*,/, '') }); }; fr.readAsDataURL(b); }); }); });
+   } } }, convertFileSrc:function(u){return u;} };
 })();
 """ % PORT
 
@@ -215,6 +221,14 @@ async def run(p, theme, full):
     await ctx.add_init_script('window.__listing = %s;' % json.dumps(listing()))
     await ctx.add_init_script("try{ localStorage.setItem('radioPlayerTheme', %s); }catch(e){}" % json.dumps(theme))
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+    # Like Discogs: the picture is served to an ordinary <img> (the preview), but a page asking
+    # to read its pixels (a CORS request) gets nothing it may use.
+    async def image_site(route):
+        if (route.request.headers.get('sec-fetch-mode') == 'cors') or route.request.headers.get('origin'):
+            await route.abort()
+        else:
+            await route.fulfill(path=f'{root}/red.jpg', content_type='image/jpeg')
+    await pg.route('https://i.images.example/**', image_site)
     await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("""(function(){ var ov=document.getElementById('addMusicOverlay'); if(ov) ov.classList.add('open');
       var btn=document.getElementById('addMusicFolderBtn'); btn.disabled=false; btn.click(); })()""")
@@ -364,6 +378,30 @@ async def run(p, theme, full):
         fp = flac_pics('03 Three.flac')
         check(len(fp) == 1 and blueish(fp[0][3]), f'{T} the FLAC too {fp}')
         check(await pg.evaluate("localStorage.getItem('radioPlayerArtToFiles')") == '1', f'{T} the choice is remembered')
+
+        # Build 233 (Mark's Discogs picture): a pasted web address on a site that doesn't let pages
+        # copy its pictures. The phone fetches it itself, so it still goes into the files.
+        await pg.evaluate("document.getElementById('albumMenuBtn').click()"); await pg.wait_for_timeout(250)
+        await pg.evaluate("document.getElementById('albumArtEditBtn').click()"); await pg.wait_for_timeout(500)
+        await pg.fill('#artUrlInput', 'https://i.images.example/kY0/red.jpg'); await pg.wait_for_timeout(800)
+        prev = await pg.evaluate("document.getElementById('artUrlPreviewImg').naturalWidth")
+        check(prev == 600, f'{T} the web picture shows in the preview ({prev})')
+        check(await pg.evaluate("document.getElementById('artToFilesChk').checked"), f'{T} saving in the files is still on')
+        await pg.evaluate("document.getElementById('artUrlSaveBtn').click()")
+        for _ in range(120):
+            await pg.wait_for_timeout(250)
+            if not await pg.evaluate("document.getElementById('artUrlOverlay').classList.contains('open')"): break
+        note = await pg.evaluate("document.getElementById('artFilesNote').hidden ? '' : document.getElementById('artFilesNote').textContent")
+        check(not await pg.evaluate("document.getElementById('artUrlOverlay').classList.contains('open')") and not note,
+              f'{T} no "couldn\'t be loaded" error; the dialog closes ({note})')
+        asked = await pg.evaluate('window.__httpAsked || []')
+        check(any('i.images.example' in u for u in asked), f'{T} the phone fetched the picture itself {asked[-1:]}')
+        for n in ('01 One.mp3', '02 Two.mp3'):
+            pics = id3_pics(n)
+            px = pics[0][3] if pics else (0, 0, 0)
+            check(len(pics) == 1 and px[0] > 180 and px[1] < 80 and px[2] < 80 and pics[0][2] == (600, 600), f'{T} {n}: the web picture is the cover {pics}')
+        fp = flac_pics('03 Three.flac')
+        check(len(fp) == 1 and fp[0][3][0] > 180 and fp[0][2] == (600, 600), f'{T} the FLAC too {fp}')
     else:
         await pg.evaluate("document.getElementById('artUrlCloseBtn').click()")
     check(not errs, f'{T} no page errors {errs[:3]}')
