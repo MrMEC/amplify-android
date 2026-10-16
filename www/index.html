@@ -1404,17 +1404,20 @@
      (it goes back to the first slide). */
   .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 0; padding-bottom:44px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
   /* Build 222: a strip of full-width slides that swipes sideways and snaps one at a time. */
-  .nph-track{ display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
+  .nph-track{ display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; margin-bottom:-26px;
     scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain; outline:none; }
   .nph-track::-webkit-scrollbar{ display:none; }
   .nph-track.dragging{ scroll-snap-type:none; cursor:grabbing; user-select:none; }
   /* Slides are as tall as the tallest; a shorter one's picture grows, so every slide's text
      sits at the same place just above the dots. */
   .nph-slide{ flex:0 0 100%; min-width:0; position:relative; scroll-snap-align:start; scroll-snap-stop:always;
-    display:flex; flex-direction:column; }
+    display:flex; flex-direction:column; padding-bottom:26px; box-sizing:border-box; }
   .nph-slide.nph-tap{ cursor:pointer; }
   /* Build 223: a thin progress bar in place of the dots, in the same 78 x 6px they took
      (seven 6px dots, six 6px gaps): how far through the slides you are, no knob. */
+  /* Build 236: the slides keep 26px under the text so the Play button's shadow isn't cut off
+     by the strip's edge (it hides anything sideways and below); the strip's -26px bottom margin
+     gives that room back, so nothing under the hero moves. */
   .nph-progress{ position:relative; width:78px; height:6px; margin:16px auto 0; border-radius:3px; overflow:hidden;
     background:color-mix(in srgb, var(--text-faint) 45%, transparent); }
   .nph-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--accent); }
@@ -3330,6 +3333,17 @@
   .ch-sort-menu .ch-sort-check{ width:14px; display:inline-flex; justify-content:center; color:var(--accent); }
   .ch-sort-menu .np-menu-item.on{ font-weight:700; }
   /* Build 189: Favorites page order dropdown. */
+  .tile-grid > .fav-group-head{ grid-column:1/-1; margin:14px 0 4px; }
+  .tile-grid > .fav-order-bar + .fav-group-head{ margin-top:6px; }
+  .fav-group-title{ font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-dim, var(--muted, inherit)); opacity:.9; }
+  .fav-group-note{ font-size:13px; line-height:1.35; margin-top:3px; opacity:.62; }
+  /* Build 236: long-press a Favorites cover on Home and drag it. */
+  #favoritesGrid > .tile{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  #favoritesGrid > .tile img{ -webkit-user-drag:none; }
+  #favoritesGrid.fav-reordering{ scroll-snap-type:none !important; scroll-behavior:auto !important; }
+  #favoritesGrid > .tile.fav-dragging{ position:relative; z-index:20; transition:none !important; pointer-events:none; }
+  #favoritesGrid > .tile.fav-dragging{ filter:drop-shadow(0 12px 20px rgba(0,0,0,.38)); }
+  #favoritesGrid.fav-reordering > .tile:not(.fav-dragging){ transition:transform .16s ease; }
   .tile-grid > .fav-order-bar{ grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:0 0 2px; }
   .fav-order-label{ font-size:12.5px; font-weight:700; color:var(--text-dim); }
   .fav-order-btn{ display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px;
@@ -15764,6 +15778,125 @@
     if(renderLandFavs) renderLandFavs();
   }
 
+  // ---------- Build 236: long-press a Favorites cover on Home and drag it ----------
+  // Hold a cover still for a moment (it lifts), then drag it left or right; the others make
+  // room. Letting go saves the order: the same order Edit Favorites (Home row) and the car
+  // show. A quick swipe still scrolls the row, and a tap still plays.
+  (function(){
+    var grid = favoritesGrid;
+    if(!grid) return;
+    var HOLD_MS = 420, SLOP = 10, EDGE = 44;
+    var press = null, eatClick = false;
+    function tiles(){ return Array.prototype.filter.call(grid.children, function(el){ return el.classList.contains('tile'); }); }
+    function cancelPress(){
+      if(!press) return;
+      clearTimeout(press.timer);
+      document.removeEventListener('pointermove', onMove, true);
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('pointercancel', onUp, true);
+      if(press.raf) cancelAnimationFrame(press.raf);
+      press = null;
+    }
+    function start(){
+      if(!press) return;
+      press.active = true;
+      var t = press.tile, r = t.getBoundingClientRect();
+      press.grabX = press.x - r.left; press.grabY = press.y - r.top;
+      grid.classList.add('fav-reordering');
+      t.classList.add('fav-dragging');
+      place();
+      try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+      press.raf = requestAnimationFrame(tick);
+    }
+    // The held cover follows the finger; crossing the middle of a neighbour swaps them.
+    function place(){
+      var t = press.tile;
+      var others = tiles().filter(function(el){ return el !== t; });
+      // Past the last cover (or before the first) it goes to that end.
+      if(others.length){
+        var lastR = others[others.length - 1].getBoundingClientRect(), firstR = others[0].getBoundingClientRect();
+        if(press.x > lastR.right && others[others.length - 1].nextSibling !== t) grid.insertBefore(t, others[others.length - 1].nextSibling);
+        else if(press.x < firstR.left && others[0].previousSibling !== t) grid.insertBefore(t, others[0]);
+      }
+      for(var i = 0; i < others.length; i++){
+        var o = others[i], r = o.getBoundingClientRect();
+        if(press.x < r.left || press.x > r.right || press.y < r.top - 40 || press.y > r.bottom + 40) continue;
+        var mid = r.left + r.width / 2;
+        var tIdx = tiles().indexOf(t), oIdx = tiles().indexOf(o);
+        if(oIdx > tIdx && press.x > mid) grid.insertBefore(t, o.nextSibling);
+        else if(oIdx < tIdx && press.x < mid) grid.insertBefore(t, o);
+        break;
+      }
+      t.style.transform = 'none';
+      var base = t.getBoundingClientRect();
+      t.style.transform = 'translate(' + Math.round(press.x - press.grabX - base.left) + 'px,' + Math.round(press.y - press.grabY - base.top) + 'px) scale(1.06)';
+    }
+    // Near either end the row scrolls on its own so a cover can go anywhere in it.
+    function tick(){
+      if(!press || !press.active) return;
+      var g = grid.getBoundingClientRect(), step = 0;
+      var L = Math.max(g.left, 0), R = Math.min(g.right, window.innerWidth || g.right);
+      if(press.x < L + EDGE) step = -Math.ceil((L + EDGE - press.x) / 4);
+      else if(press.x > R - EDGE) step = Math.ceil((press.x - (R - EDGE)) / 4);
+      if(step){ var before = grid.scrollLeft; grid.scrollLeft += step; if(grid.scrollLeft !== before) place(); }
+      press.raf = requestAnimationFrame(tick);
+    }
+    function onMove(e){
+      if(!press || e.pointerId !== press.id) return;
+      if(!press.active){
+        if(Math.abs(e.clientX - press.x0) > SLOP || Math.abs(e.clientY - press.y0) > SLOP) cancelPress();
+        return;
+      }
+      e.preventDefault();
+      press.x = e.clientX; press.y = e.clientY;
+      place();
+    }
+    function onUp(e){
+      if(!press || e.pointerId !== press.id) return;
+      var was = press.active, t = press.tile;
+      cancelPress();
+      if(!was) return;
+      eatClick = true; setTimeout(function(){ eatClick = false; }, 400);
+      t.classList.remove('fav-dragging');
+      t.style.transform = '';
+      grid.classList.remove('fav-reordering');
+      saveHomeFavRowOrder(tiles().map(function(el){ return el.dataset.key; }));
+    }
+    grid.addEventListener('pointerdown', function(e){
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      var t = e.target.closest ? e.target.closest('.tile') : null;
+      if(!t || t.parentElement !== grid || tiles().length < 2) return;
+      cancelPress();
+      press = { tile: t, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false };
+      press.timer = setTimeout(start, HOLD_MS);
+      document.addEventListener('pointermove', onMove, true);
+      document.addEventListener('pointerup', onUp, true);
+      document.addEventListener('pointercancel', onUp, true);
+    });
+    // Once a cover is held, a finger moving must drag it, not scroll the row or the page.
+    grid.addEventListener('touchmove', function(e){ if(press && press.active && e.cancelable) e.preventDefault(); }, { passive: false });
+    grid.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    grid.addEventListener('dragstart', function(e){ e.preventDefault(); });
+    grid.addEventListener('click', function(e){ if(eatClick){ eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+    window.__amplifyHomeFavDrag = { holdMs: HOLD_MS };
+  })();
+  // Saves the Home row in this order. In A to Z there's no order to keep, so a drag switches
+  // Favorites to Manual (the last Manual choice), starting from the A to Z order as shown.
+  function saveHomeFavRowOrder(keys){
+    if(favOrder === 'az'){
+      var manual = 'oldest';
+      try{ manual = localStorage.getItem(FAV_ORDER_KEY + 'Manual') || 'oldest'; }catch(e){}
+      if(manual !== 'newest') manual = 'oldest';
+      favorites = favoritesInOrder().slice();
+      favOrder = manual;
+      try{ localStorage.setItem(FAV_ORDER_KEY, manual); localStorage.setItem(FAV_ORDER_KEY + 'Manual', manual); }catch(e){}
+      saveFavorites();
+    }
+    if(!applyFavSubsetOrder(keys)) renderFavoritesSection();
+    if(typeof renderFavoritesList === 'function') renderFavoritesList();
+    if(favPageOnScreen()) renderFavoritesPage();
+  }
+
   // ---------- genre nav ----------
   function renderGenreNav(){
     genreNav.innerHTML = '';
@@ -26722,20 +26855,40 @@
   // Saves the order the rows are now in (after a drag).
   function commitFavPageOrder(){
     if(favOrder === 'az') return;   // A to Z isn't an order to keep; the manual one stays as it was
-    var keys = Array.prototype.map.call(stationsGrid.querySelectorAll('.row-item'), function(el){ return el.dataset.key; });
-    var byKey = {};
+    // Build 236: the rows come in two groups (Home row / Other favorites). Each group's new
+    // order fills the places its own favourites had, so the two never trade places.
+    var keys = Array.prototype.map.call(stationsGrid.querySelectorAll('.row-item.fav-edit-row'), function(el){ return el.dataset.key; });
+    if(keys.length !== favorites.length) return;
+    applyFavSubsetOrder(keys);
+  }
+  // Puts the favourites named by `keys` (some or all of them) in that order, each taking one
+  // of the places those favourites held; everything else stays where it is. Grouped favourites
+  // (Home row vs the rest) keep their own places: a group's keys are reordered only among
+  // themselves.
+  function applyFavSubsetOrder(keys){
+    var byKey = {}, home = [], other = [];
     favorites.forEach(function(f){ byKey[favKey(f)] = f; });
-    var reordered = keys.map(function(k){ return byKey[k]; }).filter(Boolean);
-    if(reordered.length === favorites.length){
-      var changed = reordered.some(function(f, i){ return f !== favorites[i]; });
-      if(changed){ favorites = reordered; saveFavorites(); renderFavoritesSection(); }
-    }
+    var picked = {};
+    keys.forEach(function(k){ var f = byKey[k]; if(f && !picked[k]){ picked[k] = 1; (isHomeFavorite(f) ? home : other).push(f); } });
+    var hi = 0, oi = 0;
+    var next = favorites.map(function(f){
+      if(!picked[favKey(f)]) return f;
+      return isHomeFavorite(f) ? home[hi++] : other[oi++];
+    });
+    var changed = next.some(function(f, i){ return f !== favorites[i]; });
+    if(!changed) return false;
+    favorites = next;
+    saveFavorites();
+    renderFavoritesSection();
+    if(typeof renderDrawerShortcuts === 'function') renderDrawerShortcuts();
+    return true;
   }
   // One row of the Favorites page in Edit: a grip to drag it by, and a button to remove it.
   function buildFavEditRow(s){
     var row = document.createElement('div');
     row.className = 'row-item fav-edit-row';
     row.dataset.key = favKey(s);
+    row.dataset.group = isHomeFavorite(s) ? 'home' : 'other';
     // Grips only in Manual: in A to Z there's nothing to drag.
     var manual = favOrder !== 'az';
     var handle = document.createElement('div');
@@ -26787,11 +26940,12 @@
     row.addEventListener('dragover', function(e){
       e.preventDefault();
       var dragging = stationsGrid.querySelector('.row-item.dragging');
-      if(!dragging || dragging === row) return;
+      if(!dragging || dragging === row || dragging.dataset.group !== row.dataset.group) return;
       var rect = row.getBoundingClientRect();
       stationsGrid.insertBefore(dragging, (e.clientY - rect.top) < rect.height / 2 ? row : row.nextSibling);
     });
-    enableTouchReorder({ item: row, handle: handle, list: stationsGrid, selector: '.row-item', onDrop: commitFavPageOrder });
+    enableTouchReorder({ item: row, handle: handle, list: stationsGrid, selector: '.row-item', onDrop: commitFavPageOrder,
+      accept: function(t){ return t.dataset.group === row.dataset.group; } });
     return row;
   }
 
@@ -26800,7 +26954,17 @@
     if(favPageEditing){
       stationsGrid.innerHTML = '';
       stationsGrid.appendChild(buildFavOrderBar());
-      favoritesInOrder().forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
+      // Build 236: what's on Home's Favorites row first, then everything else.
+      var all = favoritesInOrder();
+      var homeList = all.filter(isHomeFavorite), otherList = all.filter(function(f){ return !isHomeFavorite(f); });
+      stationsGrid.appendChild(buildFavGroupHead('Home row', homeList.length
+        ? (favOrder === 'az' ? 'Shown at the top of Home.' : 'Shown at the top of Home. You can also long-press a cover there and drag it.')
+        : 'Stations, artist radio, playlists and custom stations you favourite show here.', 'home'));
+      homeList.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
+      if(otherList.length){
+        stationsGrid.appendChild(buildFavGroupHead('Other favorites', 'Artists, albums, songs, podcasts and video. These stay on this page.', 'other'));
+        otherList.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
+      }
       setResultCount(null); /* build 210: no count (Mark) */
       return;
     }
@@ -26828,6 +26992,22 @@
   function favOrderLabel(v){
     for(var i = 0; i < FAV_ORDER_OPTS.length; i++) if(FAV_ORDER_OPTS[i][0] === v) return FAV_ORDER_OPTS[i][1];
     return '';
+  }
+  function buildFavGroupHead(title, note, group){
+    var h = document.createElement('div');
+    h.className = 'fav-group-head';
+    h.dataset.group = group;
+    var t = document.createElement('div');
+    t.className = 'fav-group-title';
+    t.textContent = title;
+    h.appendChild(t);
+    if(note){
+      var n = document.createElement('div');
+      n.className = 'fav-group-note';
+      n.textContent = note;
+      h.appendChild(n);
+    }
+    return h;
   }
   function buildFavOrderBar(){
     var bar = document.createElement('div');
@@ -34109,6 +34289,7 @@
       item.style.pointerEvents = '';
       var target = under && under.closest ? under.closest(selector) : null;
       if(!target || target === item || target.parentElement !== list) return;
+      if(o.accept && !o.accept(target)) return;
       var rect = target.getBoundingClientRect();
       var before = (e.clientY - rect.top) < rect.height / 2;
       list.insertBefore(item, before ? target : target.nextSibling);
