@@ -106,10 +106,11 @@ async def main():
         g = await pg.evaluate("document.querySelectorAll('#stationsGrid .row-drag-handle').length")
         check(g == 6, f'Edit in Manual has grips to reorder ({g})')
         await pg.screenshot(path=f'{SHOTS}/favord-newest-edit.png')
-        # finger-drag the last row to the top
-        hs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .row-drag-handle'), function(h){ var r=h.getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2]; })")
+        # finger-drag the last row of the Home row group to the top (build 236: Edit groups the
+        # rows -- Home row, then Other favorites -- and each is reordered only within itself)
+        hs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .fav-edit-row[data-group=home] .row-drag-handle'), function(h){ var r=h.getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2]; })")
         src_, dst = hs[-1], hs[0]
-        await pg.evaluate("""([sx,sy,dx,dy])=>{ var h=document.querySelectorAll('#stationsGrid .row-drag-handle'); var el=h[h.length-1];
+        await pg.evaluate("""([sx,sy,dx,dy])=>{ var h=document.querySelectorAll('#stationsGrid .fav-edit-row[data-group=home] .row-drag-handle'); var el=h[h.length-1];
           function ev(t,x,y){ el.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:7,pointerType:'touch',clientX:x,clientY:y,isPrimary:true})); }
           ev('pointerdown',sx,sy); for(var i=1;i<=12;i++) ev('pointermove',sx,sy+(dy-8-sy)*i/12); ev('pointerup',sx,dy-8); }""", [src_[0], src_[1], dst[0], dst[1]])
         await pg.wait_for_timeout(600)
