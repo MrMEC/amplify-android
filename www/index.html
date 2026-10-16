@@ -15702,12 +15702,21 @@
     return tile;
   }
 
+  // Build 235 (Mark): the Home row shows only stations, artist radio and favourite playlists;
+  // artists, albums, songs, podcasts, Live TV channels, movies and TV shows stay on the
+  // Favorites page (the heading) but not in this row.
+  function isHomeFavorite(s){
+    if(!s) return false;
+    if(isArtistRadio(s) || isPlaylistRadio(s)) return true;
+    return isLiveStream(s) && !isArtistFav(s) && !isAlbumFav(s) && !isChannelEntry(s);
+  }
   function renderFavoritesSection(){
     favoritesGrid.innerHTML = '';
-    if(!favorites.length){
+    var homeFavs = favoritesInOrder().filter(isHomeFavorite);
+    if(!homeFavs.length){
       favoritesGrid.innerHTML = '<div class="empty-state">Tap the heart on any station to save it here.</div>';
     } else {
-      favoritesInOrder().forEach(function(s){
+      homeFavs.forEach(function(s){
         // A song is a full-width row everywhere else; in a row of cards it has to be a card
         // like everything beside it.
         var tile = isLocalTrack(s) ? buildEntityTile({
