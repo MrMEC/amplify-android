@@ -19,6 +19,15 @@ public class MainActivity extends BridgeActivity {
     CrashLog.install(this);
     registerPlugin(AmplifyPlayerPlugin.class);
     super.onCreate(bundle);
+    // Build 237: while a Favorites cover on Home is held to drag it, the WebView's own long
+    // press is skipped (see AmplifyPlayerPlugin.holdTouch); otherwise it behaves as before.
+    try {
+      if (getBridge() != null && getBridge().getWebView() != null) {
+        getBridge().getWebView().setOnLongClickListener(v -> AmplifyPlayerPlugin.holdingTile());
+      }
+    } catch (Exception ignored) {
+      // No WebView yet: nothing to change.
+    }
     if (Build.VERSION.SDK_INT < 33
         || ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS") == 0) {
       return;

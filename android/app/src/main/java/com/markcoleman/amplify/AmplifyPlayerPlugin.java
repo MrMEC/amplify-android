@@ -162,6 +162,27 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   /** Build 231: volume leveling on or off ({on}); {} just reports it. */
+  /**
+   * Build 237: true while a Favorites cover on Home is pressed to drag it. MainActivity's long
+   * click listener on the WebView answers with this, so Android's own long press (a picture's
+   * menu or drag) doesn't take the touch away from the drag.
+   */
+  static volatile boolean holdingTile = false;
+  private static long holdSince = 0;
+
+  static boolean holdingTile() {
+    // Never stuck on: a press doesn't last a minute.
+    if (holdingTile && System.currentTimeMillis() - holdSince > 60000) holdingTile = false;
+    return holdingTile;
+  }
+
+  @PluginMethod
+  public void holdTouch(PluginCall call) {
+    holdingTile = Boolean.TRUE.equals(call.getBoolean("on", false));
+    holdSince = System.currentTimeMillis();
+    call.resolve();
+  }
+
   @PluginMethod
   public void setLeveling(PluginCall call) {
     Boolean on = call.getBoolean("on", null);

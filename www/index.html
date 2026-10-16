@@ -3339,9 +3339,9 @@
   .fav-group-note{ font-size:13px; line-height:1.35; margin-top:3px; opacity:.62; }
   /* Build 236: long-press a Favorites cover on Home and drag it. */
   #favoritesGrid > .tile{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
-  #favoritesGrid > .tile img{ -webkit-user-drag:none; }
+  #favoritesGrid > .tile img, #favoritesGrid > .tile a{ -webkit-user-drag:none; user-drag:none; -webkit-touch-callout:none; }
   #favoritesGrid.fav-reordering{ scroll-snap-type:none !important; scroll-behavior:auto !important; }
-  #favoritesGrid > .tile.fav-dragging{ position:relative; z-index:20; transition:none !important; pointer-events:none; }
+  #favoritesGrid > .tile.fav-dragging{ position:relative; z-index:20; transition:none !important; }
   #favoritesGrid > .tile.fav-dragging{ filter:drop-shadow(0 12px 20px rgba(0,0,0,.38)); }
   #favoritesGrid.fav-reordering > .tile:not(.fav-dragging){ transition:transform .16s ease; }
   .tile-grid > .fav-order-bar{ grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:0 0 2px; }
@@ -15782,22 +15782,52 @@
   // Hold a cover still for a moment (it lifts), then drag it left or right; the others make
   // room. Letting go saves the order: the same order Edit Favorites (Home row) and the car
   // show. A quick swipe still scrolls the row, and a tap still plays.
+  // Build 237: on the phone the drag dropped the cover as soon as the finger moved. A finger is
+  // now followed with touch events (pointer events for a finger get cancelled when Android
+  // treats the hold as its own long press: a cover's picture can be dragged out or get a
+  // menu), the picture's drag and the menu are refused while a cover is held, and the app is
+  // told to skip its own long press for the moment (holdTouch).
   (function(){
     var grid = favoritesGrid;
     if(!grid) return;
     var HOLD_MS = 420, SLOP = 10, EDGE = 44;
     var press = null, eatClick = false;
+    var native = null;
+    try{ native = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins) ? Capacitor.Plugins.AmplifyPlayer : null; }catch(e){}
+    function tellNative(on){ try{ if(native && native.holdTouch) native.holdTouch({ on: !!on }).catch(function(){}); }catch(e){} }
     function tiles(){ return Array.prototype.filter.call(grid.children, function(el){ return el.classList.contains('tile'); }); }
+    function stopListening(){
+      document.removeEventListener('pointermove', onPointerMove, true);
+      document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('pointercancel', onPointerUp, true);
+      document.removeEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+      document.removeEventListener('touchend', onTouchEnd, true);
+      document.removeEventListener('touchcancel', onTouchEnd, true);
+    }
     function cancelPress(){
       if(!press) return;
       clearTimeout(press.timer);
-      document.removeEventListener('pointermove', onMove, true);
-      document.removeEventListener('pointerup', onUp, true);
-      document.removeEventListener('pointercancel', onUp, true);
       if(press.raf) cancelAnimationFrame(press.raf);
+      if(press.kind === 'touch') tellNative(false);
+      stopListening();
       press = null;
     }
-    function start(){
+    function begin(t, kind, id, x, y){
+      cancelPress();
+      press = { tile: t, kind: kind, id: id, x0: x, y0: y, x: x, y: y, active: false };
+      press.timer = setTimeout(lift, HOLD_MS);
+      if(kind === 'touch'){
+        tellNative(true);
+        document.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+        document.addEventListener('touchend', onTouchEnd, true);
+        document.addEventListener('touchcancel', onTouchEnd, true);
+      } else {
+        document.addEventListener('pointermove', onPointerMove, true);
+        document.addEventListener('pointerup', onPointerUp, true);
+        document.addEventListener('pointercancel', onPointerUp, true);
+      }
+    }
+    function lift(){
       if(!press) return;
       press.active = true;
       var t = press.tile, r = t.getBoundingClientRect();
@@ -15820,7 +15850,7 @@
       }
       for(var i = 0; i < others.length; i++){
         var o = others[i], r = o.getBoundingClientRect();
-        if(press.x < r.left || press.x > r.right || press.y < r.top - 40 || press.y > r.bottom + 40) continue;
+        if(press.x < r.left || press.x > r.right || press.y < r.top - 60 || press.y > r.bottom + 60) continue;
         var mid = r.left + r.width / 2;
         var tIdx = tiles().indexOf(t), oIdx = tiles().indexOf(o);
         if(oIdx > tIdx && press.x > mid) grid.insertBefore(t, o.nextSibling);
@@ -15841,18 +15871,18 @@
       if(step){ var before = grid.scrollLeft; grid.scrollLeft += step; if(grid.scrollLeft !== before) place(); }
       press.raf = requestAnimationFrame(tick);
     }
-    function onMove(e){
-      if(!press || e.pointerId !== press.id) return;
+    function moveTo(x, y){
       if(!press.active){
-        if(Math.abs(e.clientX - press.x0) > SLOP || Math.abs(e.clientY - press.y0) > SLOP) cancelPress();
-        return;
+        if(Math.abs(x - press.x0) > SLOP || Math.abs(y - press.y0) > SLOP){ cancelPress(); return false; }
+        press.x = x; press.y = y;
+        return false;
       }
-      e.preventDefault();
-      press.x = e.clientX; press.y = e.clientY;
+      press.x = x; press.y = y;
       place();
+      return true;
     }
-    function onUp(e){
-      if(!press || e.pointerId !== press.id) return;
+    function finish(){
+      if(!press) return;
       var was = press.active, t = press.tile;
       cancelPress();
       if(!was) return;
@@ -15862,21 +15892,57 @@
       grid.classList.remove('fav-reordering');
       saveHomeFavRowOrder(tiles().map(function(el){ return el.dataset.key; }));
     }
+    function touchOf(e){
+      if(!press) return null;
+      var lists = [e.changedTouches, e.touches];
+      for(var l = 0; l < lists.length; l++){
+        var tl = lists[l]; if(!tl) continue;
+        for(var i = 0; i < tl.length; i++) if(tl[i].identifier === press.id) return tl[i];
+      }
+      return null;
+    }
+    function onTouchMove(e){
+      if(!press || press.kind !== 'touch') return;
+      var p = touchOf(e); if(!p) return;
+      // Held: the finger drags the cover, so the row and the page don't scroll.
+      if(press.active && e.cancelable) e.preventDefault();
+      moveTo(p.clientX, p.clientY);
+    }
+    function onTouchEnd(e){
+      if(!press || press.kind !== 'touch') return;
+      if(!touchOf(e)) return;
+      finish();
+    }
+    function onPointerMove(e){
+      if(!press || press.kind !== 'mouse' || e.pointerId !== press.id) return;
+      if(press.active) e.preventDefault();
+      moveTo(e.clientX, e.clientY);
+    }
+    function onPointerUp(e){
+      if(!press || press.kind !== 'mouse' || e.pointerId !== press.id) return;
+      finish();
+    }
+    function tileFor(target){
+      var t = target && target.closest ? target.closest('.tile') : null;
+      return t && t.parentElement === grid && tiles().length >= 2 ? t : null;
+    }
+    grid.addEventListener('touchstart', function(e){
+      if(e.touches.length !== 1){ cancelPress(); return; }
+      var t = tileFor(e.target); if(!t) return;
+      var p = e.changedTouches[0];
+      begin(t, 'touch', p.identifier, p.clientX, p.clientY);
+    }, { passive: true });
     grid.addEventListener('pointerdown', function(e){
-      if(e.pointerType === 'mouse' && e.button !== 0) return;
-      var t = e.target.closest ? e.target.closest('.tile') : null;
-      if(!t || t.parentElement !== grid || tiles().length < 2) return;
-      cancelPress();
-      press = { tile: t, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false };
-      press.timer = setTimeout(start, HOLD_MS);
-      document.addEventListener('pointermove', onMove, true);
-      document.addEventListener('pointerup', onUp, true);
-      document.addEventListener('pointercancel', onUp, true);
+      if(e.pointerType === 'touch') return;          // fingers go through touchstart above
+      if(e.button !== 0) return;
+      var t = tileFor(e.target); if(!t) return;
+      begin(t, 'mouse', e.pointerId, e.clientX, e.clientY);
     });
-    // Once a cover is held, a finger moving must drag it, not scroll the row or the page.
-    grid.addEventListener('touchmove', function(e){ if(press && press.active && e.cancelable) e.preventDefault(); }, { passive: false });
-    grid.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-    grid.addEventListener('dragstart', function(e){ e.preventDefault(); });
+    // No menu or picture-drag while a cover is pressed (on a phone either one takes the touch away).
+    function refuse(e){ if(press || (e.target && e.target.closest && e.target.closest('#favoritesGrid'))) e.preventDefault(); }
+    document.addEventListener('contextmenu', refuse, true);
+    document.addEventListener('dragstart', refuse, true);
+    document.addEventListener('selectstart', function(e){ if(press) e.preventDefault(); }, true);
     grid.addEventListener('click', function(e){ if(eatClick){ eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
     window.__amplifyHomeFavDrag = { holdMs: HOLD_MS };
   })();
