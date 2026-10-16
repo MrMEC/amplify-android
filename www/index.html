@@ -32161,6 +32161,8 @@
     e.msg.innerHTML = '';
     if(o.message && typeof o.message === 'object') e.msg.appendChild(o.message);
     else e.msg.textContent = o.message || '';
+    // The hidden old line carries the latest message's text too (tests read it there).
+    try{ if(statusLineText) statusLineText.textContent = (o.title ? o.title + ' ' : '') + (e.msg.textContent || ''); }catch(err){}
     e.ov.setAttribute('aria-labelledby', o.title ? 'noticeTitle' : 'noticeMsg');
     e.actions.innerHTML = '';
     var acts = o.actions || [{ label: kind === 'working' ? 'Hide' : 'OK', primary: kind !== 'working' }];
