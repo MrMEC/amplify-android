@@ -40,7 +40,7 @@ DHOOK = r"""window.__d = {
 };
 """
 _head = _head.replace("open(root + '/index.html', 'w').write(_src.replace(_mark, _mark + HOOK))", "open(root + '/index.html', 'w').write(_src.replace(_mark, _mark + HOOK + DHOOK))")
-_head = _head.replace("   addListener:", "   setCarCatalog: function(o){ window.__cat = JSON.parse(o.json); return Promise.resolve({}); },\n   addListener:", 1)
+_head = _head.replace("   addListener:", "   setCarCatalog: function(o){ window.__cat = JSON.parse(o.json); return Promise.resolve({}); },\n   holdTouch: function(o){ (window.__hold = window.__hold || []).push(o.on); return Promise.resolve({}); },\n   addListener:", 1)
 __file__ = os.path.join(_here, 'test_home_playlists.py')
 exec(_head)
 
@@ -113,6 +113,11 @@ async def main():
             await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': r0['x'], 'y': r0['y'], 'id': 1}]})
             await pg.wait_for_timeout(650)
             check(await pg.evaluate('__d.lifted()') == 'Echo', f'{T} a long press lifts the cover')
+            check(await pg.evaluate('window.__hold') == [True], f'{T} the app is told a cover is held {await pg.evaluate("window.__hold")}')
+            # Build 237: what Android does to a held finger (the pointer is cancelled for its own
+            # long press) mustn't drop the cover
+            await pg.evaluate("document.dispatchEvent(new PointerEvent('pointercancel', {bubbles:true, pointerId:1, pointerType:'touch'})); document.querySelector('#favoritesGrid > .tile').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true}))")
+            check(await pg.evaluate('__d.lifted()') == 'Echo', f'{T} a cancelled pointer leaves it held')
             for i in range(1, 13):
                 await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': r0['x'] + (r1['x'] + 10 - r0['x']) * i / 12, 'y': r0['y'] + 6, 'id': 1}]})
                 await pg.wait_for_timeout(30)
@@ -121,6 +126,7 @@ async def main():
             await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); await pg.wait_for_timeout(500)
             row = await pg.evaluate('__d.row()')
             check(row == ['Alpha', 'Echo', 'Bravo', 'Charlie', 'Delta'], f'{T} dropping it moves it {row}')
+            check(await pg.evaluate('window.__hold') == [True, False], f'{T} and told when it\'s let go {await pg.evaluate("window.__hold")}')
             check(await pg.evaluate('__d.lifted()') is None and await pg.evaluate('__d.cur()') != 'Echo', f'{T} it settles and the press didn\'t play it')
             names = await pg.evaluate('__d.names()')
             check([n for n in names if n not in (song, 'Kay')] == ['Alpha', 'Echo', 'Bravo', 'Charlie', 'Delta'] and names[1] in (song, 'Kay') and names[3] in (song, 'Kay'),
