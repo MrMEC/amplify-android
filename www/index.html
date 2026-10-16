@@ -11674,6 +11674,20 @@
   }
   function saveCustomSearches(){
     try{ localStorage.setItem(CUSTOM_SEARCHES_KEY, JSON.stringify(customSearches)); }catch(e){ storageWorks = false; }
+    // Build 235: a favourite custom station follows its name, and goes when it is deleted.
+    try{
+      if(typeof favorites !== 'undefined' && favorites.some(isCustomStation)){
+        var changed = false;
+        favorites = favorites.filter(function(f){
+          if(!isCustomStation(f)) return true;
+          var cs = findCustomSearchById(f.searchId);
+          if(!cs){ changed = true; return false; }
+          if(f.name !== cs.label){ f.name = cs.label; changed = true; }
+          return true;
+        });
+        if(changed){ saveFavorites(); renderFavoritesList(); }
+      }
+    }catch(e){}
   }
   function makeCustomSearchId(){
     return 'cs_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -11898,6 +11912,10 @@
   // cover follow the playlist's; deleting the playlist removes it.
   function isPlaylistRadio(s){ return !!(s && s.type === 'playlistRadio'); }
   function playlistRadioRecord(pl){ return { type: 'playlistRadio', playlistId: pl.id, name: pl.label || 'Playlist', stationuuid: 'playlistradio:' + pl.id }; }
+  // A custom station (My Stations) as a favourite (build 235): played from Favorites, it plays
+  // one of its stations at random, with Previous/Next going through the rest.
+  function customStationRecord(item){ return { type: 'customStation', searchId: item.id, name: item.label || 'Custom Station', stationuuid: 'customstation:' + item.id }; }
+  function isCustomStation(s){ return !!(s && s.type === 'customStation'); }
   function playlistRadioItems(id){
     var pl = id ? findStationPlaylistById(id) : null;
     return pl ? (pl.stations || []).filter(function(t){ return queueable(t); }) : [];
@@ -12459,6 +12477,12 @@
       paint(customUrl);
       return; // user-supplied art is authoritative -- never overridden by the lookup chain
     }
+    // A favourite custom station wears its cover (or its generated one).
+    if(isCustomStation(station)){
+      container.innerHTML = '';
+      renderCustomSearchCoverArt(container, findCustomSearchById(station.searchId) || { id: station.searchId });
+      return;
+    }
     // A favourite playlist wears the playlist's own cover.
     if(isPlaylistRadio(station)){
       var ppl = findStationPlaylistById(station.playlistId);
@@ -12843,6 +12867,7 @@
       if(isArtistFav(s)) return known && !findArtistEntry(s.artistKey);
       if(isArtistRadio(s)) return !artistRadioAvailable(s);
       if(isPlaylistRadio(s)) return !findStationPlaylistById(s.playlistId);
+      if(isCustomStation(s)) return !findCustomSearchById(s.searchId);
       return false;
     }
     var changed = {};
@@ -15426,6 +15451,7 @@
         entity: 'custom-search',
         name: item.label,
         renderArt: function(art){ renderCustomSearchCoverArt(art, item); },
+        favTarget: customStationRecord(item),
         onClick: function(){ pushView(); searchInput.value = ''; runCustomSearch(item); }
       }));
     });
@@ -15707,7 +15733,7 @@
   // Favorites page (the heading) but not in this row.
   function isHomeFavorite(s){
     if(!s) return false;
-    if(isArtistRadio(s) || isPlaylistRadio(s)) return true;
+    if(isArtistRadio(s) || isPlaylistRadio(s) || isCustomStation(s)) return true;
     return isLiveStream(s) && !isArtistFav(s) && !isAlbumFav(s) && !isChannelEntry(s);
   }
   function renderFavoritesSection(){
@@ -21449,7 +21475,26 @@
     playlistFavBtn.title = on ? 'Remove from Favorites' : 'Add to Favorites';
     playlistFavBtn.setAttribute('aria-label', playlistFavBtn.title);
   }
+  function syncCustomStationFavBtn(){
+    if(!playlistFavBtn) return;
+    var cs = activeCustomSearchId && !activeStationPlaylistId ? findCustomSearchById(activeCustomSearchId) : null;
+    if(!cs){ return; }
+    var on = isFavorite(customStationRecord(cs));
+    playlistFavBtn.style.display = '';
+    playlistFavBtn.classList.toggle('on', on);
+    playlistFavBtn.innerHTML = on ? '<i class="fa-solid fa-heart"></i>' : '<i class="fa-regular fa-heart"></i>';
+    playlistFavBtn.title = on ? 'Remove from Favorites' : 'Add to Favorites';
+    playlistFavBtn.setAttribute('aria-label', playlistFavBtn.title);
+  }
   if(playlistFavBtn) playlistFavBtn.addEventListener('click', function(){
+    if(activeCustomSearchId && !activeStationPlaylistId){
+      var cs = findCustomSearchById(activeCustomSearchId);
+      if(!cs) return;
+      toggleFavorite(customStationRecord(cs));
+      syncCustomStationFavBtn();
+      if(typeof renderFavoritesSection === 'function') try{ renderFavoritesSection(); }catch(e){}
+      return;
+    }
     var pl = activeStationPlaylistId ? findStationPlaylistById(activeStationPlaylistId) : null;
     if(!pl) return;
     toggleFavorite(playlistRadioRecord(pl));
@@ -22033,6 +22078,8 @@
     var isPlaylist = kind === 'playlist';
     var pfb = document.getElementById('playlistFavBtn');
     if(pfb && !isPlaylist) pfb.style.display = 'none';
+    // Build 235: on a custom station's page the same heart favourites the custom station.
+    if(pfb && kind === 'search') setTimeout(syncCustomStationFavBtn, 0);
     editActiveCustomSearchBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
     editActiveCustomSearchBtn.title = isPlaylist ? 'Edit this playlist' : 'Edit this search';
     editActiveCustomSearchBtn.setAttribute('aria-label', editActiveCustomSearchBtn.title);
@@ -29117,6 +29164,38 @@
     playStation(order[0]);
     onQueueContextChanged();
   }
+  // Build 235: a favourite custom station plays one of its stations at random; the queue is all
+  // of them in a random order, so Previous/Next (here, on the lock screen and in the car) go
+  // through the rest. Its stations come from what the page showed last, what the car menu
+  // fetched, or a new search.
+  var customStationAsk = 0;
+  function customStationStations(cs){
+    if(lastCustomSearchResults && lastCustomSearchResults.id === cs.id && lastCustomSearchResults.stations && lastCustomSearchResults.stations.length){
+      return Promise.resolve(lastCustomSearchResults.stations);
+    }
+    return apiFetch('/json/stations/search?name=' + encodeURIComponent(cs.query) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
+      .then(function(data){
+        return dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+      });
+  }
+  function playCustomStation(rec){
+    var cs = findCustomSearchById(rec.searchId);
+    if(!cs){ setStatus((rec.name || 'This custom station') + ' no longer exists.', true); return; }
+    var ask = ++customStationAsk;
+    customStationStations(cs).then(function(list){
+      if(ask !== customStationAsk) return; // something else was tapped meanwhile
+      list = (list || []).filter(function(s){ return s && !isBlacklisted(s) && (s.urlToResolve || s.url); });
+      if(!list.length){ setStatus(cs.label + ' has no stations to play right now.', true); return; }
+      var order = shuffled(list);
+      setQueue(order, order[0], cs.label);
+      radioCtx = null;
+      recordRecent(customStationRecord(cs));
+      playStation(order[0]);
+      onQueueContextChanged();
+    })['catch'](function(err){
+      if(ask === customStationAsk) setStatus((err && err.message) || ('Couldn\u2019t load ' + cs.label + '.'), true);
+    });
+  }
   window.__amplifyPlayArtistRadio = function(key){ var e = findArtistEntry(key); var r = artistRadioFor(e); if(r) playStation(r); return !!r; };
   // Never runs out: nearing the end, another shuffle of the artist's songs (as they are in the
   // library now) is added, with the last few played moved to the back of it.
@@ -29155,6 +29234,13 @@
       if(isPlaylistRadio(f)){
         var pitems = playlistRadioItems(f.playlistId);
         if(pitems.length) pool.push(pitems[Math.floor(Math.random() * pitems.length)]);
+        return;
+      }
+      // A custom station: one of its stations, if the car menu or the page already has them.
+      if(isCustomStation(f)){
+        var cl = (lastCustomSearchResults && lastCustomSearchResults.id === f.searchId && lastCustomSearchResults.stations)
+          || (window.__amplifyCarForYou && window.__amplifyCarForYou(f.searchId)) || [];
+        if(cl.length) pool.push(cl[Math.floor(Math.random() * cl.length)]);
         return;
       }
       if(queueable(f)) pool.push(f);
@@ -34512,6 +34598,7 @@
   function playStation(track){
     if(isArtistRadio(track)) return playArtistRadio(track);
     if(isPlaylistRadio(track)) return playPlaylistRadio(track);
+    if(isCustomStation(track)) return playCustomStation(track);
     if(reconnectState && reconnectState.station !== track) cancelReconnect();
     cancelNextUp();
     if(isLocalTrack(track)) return playLocalTrack(track);
@@ -35211,7 +35298,7 @@
     } else if(isChartSong(item)){
       o.kicker = 'Top 100'; o.title = item.name || ''; o.line = item.artist || '';
     } else {
-      o.kicker = isChannelEntry(item) ? 'Live TV' : isPlaylistRadio(item) ? 'Playlist' : isArtistRadio(item) ? 'Artist Radio' : 'Station';
+      o.kicker = isChannelEntry(item) ? 'Live TV' : isPlaylistRadio(item) ? 'Playlist' : isArtistRadio(item) ? 'Artist Radio' : isCustomStation(item) ? 'Custom Station' : 'Station';
       o.title = stripExclusively((item.channel && item.channel.name) || item.name || '');
       o.line = stationLastSongText(item);
     }
@@ -35325,6 +35412,7 @@
     if(!item || !uiIsPlaying || !currentStation) return false;
     // A favourite playlist or artist Radio is "playing" while its shuffle is the queue.
     if(isPlaylistRadio(item) || isArtistRadio(item)) return !!radioCtx && radioCtx.label === item.name && queueLabel === item.name;
+    if(isCustomStation(item)) return queueLabel === item.name && isQueueCurrent(currentStation);
     if(entry){
       return isLocalTrack(currentStation) && queueLabel === heroShuffleLabel(entry)
         && artistMatchKey(currentStation.artist || '') === entry.key;
@@ -35699,8 +35787,18 @@
       var cover = getCustomArtUrl(playlistArtKey(s.playlistId));
       return { t: 'radio', plid: s.playlistId, key: '', title: pl ? pl.label : (s.name || 'Playlist'), art: cover ? carImage(playlistArtKey(s.playlistId), cover) : '' };
     }
+    // A favourite custom station in the car (build 235): a playable row that plays its stations
+    // in a random order ("fy:<id>"'s list, shuffled), with Next/Previous through them.
+    function carCustomStation(s){
+      if(!isCustomStation(s)) return null;
+      var cs = findCustomSearchById(s.searchId);
+      if(!cs || !(carNet.forYou[cs.id] || []).length) return null;
+      var cover = getCustomArtUrl(customSearchArtKey(cs.id));
+      return { t: 'radio', fyid: cs.id, key: '', title: cs.label, art: cover ? carImage(customSearchArtKey(cs.id), cover) : '' };
+    }
+    window.__amplifyCarForYou = function(id){ return carNet.forYou[id] || null; };
     function carStation(s){
-      if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album' || s.type === 'playlistRadio') return null;
+      if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album' || s.type === 'playlistRadio' || s.type === 'customStation') return null;
       if(!s.urlToResolve || isBlacklisted(s)) return null;
       var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
       // place: the location line the phone's Now Playing shows under a station, which the
@@ -35812,13 +35910,16 @@
         var prog = {};
         (r[0] || []).forEach(function(rec){ if(rec && rec.guid) prog[rec.guid] = rec; });
         var lists = {};
-        lists.favorites = compact(favoritesInOrder().map(function(f){
+        // Build 235 (Mark): the car's Favorites match Home's row: stations, artist radio,
+        // playlists and custom stations.
+        lists.favorites = compact(favoritesInOrder().filter(isHomeFavorite).map(function(f){
           if(isPodcastTrack(f)) return carEpisode(f, prog);
           if(isLocalTrack(f)) return carSong(f);
           if(f && f.type === 'artist') return { t: 'artist', key: f.artistKey || artistMatchKey(f.name || ''), title: f.name || '' };
           if(f && f.type === 'album') return { t: 'album', key: resolveAlbumKey(f.albumKey || ''), title: f.name || f.album || '' };
           if(isArtistRadio(f)) return carRadio(f);
           if(isPlaylistRadio(f)) return carPlaylistRadio(f);
+          if(isCustomStation(f)) return carCustomStation(f);
           return carStation(f);
         }));
         lists.recentSongs = compact(recentStations.filter(isLocalTrack).map(carSong));
@@ -35857,7 +35958,7 @@
           }));
         });
         lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
-          .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : isPlaylistRadio(s) ? carPlaylistRadio(s) : carStation(s); }));
+          .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : isPlaylistRadio(s) ? carPlaylistRadio(s) : isCustomStation(s) ? carCustomStation(s) : carStation(s); }));
         lists.topStations = compact((carNet.top || []).map(carStation));
         lists['continue'] = compact((r[1] || []).map(function(rec){ return carEpisode(podcastTrackFromProgress(rec), prog); }));
         lists.podLatest = latestOf(podcastSubs, prog);
