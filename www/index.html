@@ -3594,6 +3594,17 @@
   .tag-row.multi .tag-v{ max-height:9.5em; overflow-y:auto; }
   .tag-pic{ display:block; width:96px; height:96px; object-fit:cover; border-radius:3.5px; margin-bottom:6px; background:var(--panel-2); }
   .tag-empty{ padding:14px 0; color:var(--text-faint); font-size:13px; }
+  /* Build 232: the cover row (Info & Tags for a song or an album). */
+  .tag-cover-v{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; white-space:normal; }
+  .tag-cover-v .tag-cover-pic{ margin-bottom:0; }
+  .tag-cover-text{ font-size:13px; color:var(--text-dim); }
+  .tag-cover-text.empty{ color:var(--text-faint); }
+  .tag-cover-btns{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+  .tag-cover-btn{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:7px 12px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .tag-cover-btn.danger{ color:var(--danger); }
+  .tag-row.tag-cover-row, .tag-panel.editing .tag-row.tag-cover-row{ align-items:flex-start; }
+  .tag-panel.editing .tag-row.tag-cover-row .tag-k{ padding-top:2px; }
   .tag-panel.editing .tag-row{ align-items:center; padding:5px 0; }
   .tag-panel.editing .tag-row.multi{ align-items:flex-start; }
   .tag-panel.editing .tag-row.multi .tag-k{ padding-top:9px; }
@@ -3660,6 +3671,19 @@
   .art-url-upload-note{ font-size:12px; color:var(--text-faint); margin-top:8px; min-height:0; }
   .art-url-upload-note:empty{ display:none; }
   .art-url-upload-note.err{ color:var(--danger); }
+  .art-to-files{ display:flex; align-items:center; gap:10px; margin-top:12px; font-size:13.5px; color:var(--text); cursor:pointer;
+    -webkit-tap-highlight-color:transparent; }
+  .art-to-files[hidden]{ display:none; }
+  .art-to-files input{ width:18px; height:18px; margin:0; flex-shrink:0; accent-color:var(--accent); }
+  .art-files-note{ display:flex; align-items:center; gap:10px; margin-top:10px; padding:9px 12px; border-radius:10px;
+    background:var(--panel-2); font-size:12.5px; line-height:1.4; color:var(--text-dim); }
+  .art-files-note[hidden]{ display:none; }
+  .art-files-note > span{ flex:1; min-width:0; }
+  .art-files-note.err{ color:var(--danger); }
+  .art-files-note button{ flex-shrink:0; background:var(--accent); color:var(--accent-text); border:none; border-radius:8px;
+    padding:7px 14px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  #artUrlPanel.saving-files .art-url-actions button, #artUrlPanel.saving-files .art-url-input-row,
+  #artUrlPanel.saving-files .art-url-suggest-btn{ opacity:.45; pointer-events:none; }
   .data-dialog-message{ font-size:13.5px; color:var(--text-dim); line-height:1.5; margin:0; }
   .data-dialog-message.err{ color:var(--danger); }
 
@@ -6189,6 +6213,10 @@
               <button type="button" class="np-menu-item" id="albumArtEditBtn" role="menuitem">
                 <i class="fa-solid fa-pen"></i><span>Edit Album Cover</span>
               </button>
+              <!-- Build 232: the album's tags (and cover) in every song's file. -->
+              <button type="button" class="np-menu-item" id="albumTagsBtn" role="menuitem">
+                <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><path d="M8 11.5h5M8 14.5h3"/></svg><span>Info &amp; Tags</span>
+              </button>
             </div>
           </div>
         </div>
@@ -6698,6 +6726,12 @@
         </button>
       </div>
       <div class="art-url-upload-note" id="artUrlNote"></div>
+      <!-- Build 232: also write the picture into the song files' tags (local songs only). -->
+      <label class="art-to-files" id="artToFilesRow" hidden>
+        <input type="checkbox" id="artToFilesChk">
+        <span id="artToFilesLabel">Also save in the song files</span>
+      </label>
+      <div class="art-files-note" id="artFilesNote" hidden></div>
     </div>
     <div class="art-url-actions">
       <div class="art-url-actions-left">
@@ -7991,6 +8025,7 @@
   var albumPlayNextBtn = document.getElementById('albumPlayNextBtn');
   var albumAddQueueBtn = document.getElementById('albumAddQueueBtn');
   var albumAddPlaylistBtn = document.getElementById('albumAddPlaylistBtn');
+  var albumTagsBtn = document.getElementById('albumTagsBtn');
   var azRail = document.getElementById('azRail');
   var azBubble = document.getElementById('azBubble');
   var localFilesInput = document.getElementById('localFilesInput');
@@ -11034,6 +11069,76 @@
   var artUrlUploadBtn = document.getElementById('artUrlUploadBtn');
   var artUrlNote = document.getElementById('artUrlNote');
   var artPendingUpload = null; // data: URL of an image picked from the device, not yet saved
+  var artPendingFile = null;   // build 232: that picture's original file, for the song files
+  var artUrlPanel = document.getElementById('artUrlPanel');
+  var artToFilesRow = document.getElementById('artToFilesRow');
+  var artToFilesChk = document.getElementById('artToFilesChk');
+  var artToFilesLabel = document.getElementById('artToFilesLabel');
+  var artFilesNote = document.getElementById('artFilesNote');
+  var artFilesBusy = false;
+  var ART_TO_FILES_KEY = 'radioPlayerArtToFiles';
+  try{ artToFilesChk.checked = localStorage.getItem(ART_TO_FILES_KEY) === '1'; }catch(e){}
+  artToFilesChk.addEventListener('change', function(){ try{ localStorage.setItem(ART_TO_FILES_KEY, artToFilesChk.checked ? '1' : '0'); }catch(e){} });
+  function setArtFilesNote(msg, isErr, action){
+    artFilesNote.innerHTML = '';
+    artFilesNote.hidden = !msg;
+    artFilesNote.classList.toggle('err', !!isErr);
+    if(!msg) return;
+    var sp = document.createElement('span');
+    sp.textContent = msg;
+    artFilesNote.appendChild(sp);
+    if(action){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = action.label;
+      b.addEventListener('click', action.run);
+      artFilesNote.appendChild(b);
+    }
+  }
+  // Build 232: the picture just chosen goes into the target's song files as their front cover.
+  // The dialog stays open showing how far it has got, and closes when it's done.
+  function saveArtToFiles(t, src){
+    var tracks = (t.files || []).filter(function(x){ return x && isLocalTrack(x); });
+    if(!tracks.length) return false;
+    artFilesBusy = true;
+    artUrlPanel.classList.add('saving-files');
+    setArtFilesNote('Preparing the picture…');
+    function done(){ artFilesBusy = false; artUrlPanel.classList.remove('saving-files'); }
+    function failed(err){
+      if(artDialogTarget !== t) { done(); return; }
+      if(err && err.code === 'NO_WRITE'){
+        done();
+        setArtFilesNote(folderPermissionText(err.tree), false, { label: 'Allow', run: function(){
+          askFolderWrite(err.tree).then(function(r){
+            if(artDialogTarget !== t) return;
+            if(r !== 'ok'){ setArtFilesNote(r === 'other' ? 'That was a different folder. Choose “' + folderNameOfTree(err.tree) + '”.' : 'The picture wasn’t saved in the files.', r === 'other'); return; }
+            artFilesBusy = true;
+            artUrlPanel.classList.add('saving-files');
+            err.resume().then(finished, failed);
+          }, function(){ setArtFilesNote('Permission wasn’t given, so the picture wasn’t saved in the files.', true); });
+        } });
+        return;
+      }
+      done();
+      setArtFilesNote((err && err.message) || 'The picture couldn’t be saved in the files.', true);
+    }
+    function finished(res){
+      done();
+      var msg = batchSummary(res, 'Cover');
+      setStatus(msg, !!res.skipped.length);
+      if(artDialogTarget !== t) return;
+      if(res.skipped.length && !res.saved.length){ setArtFilesNote(msg, true); return; }
+      if(t.refresh) t.refresh();
+      closeArtUrlDialog();
+    }
+    coverFromImage(src).then(function(cover){
+      if(artDialogTarget !== t){ done(); return; }
+      return saveTagsToTracks(tracks, function(){ return { cover: cover }; }, function(i, n){
+        if(artDialogTarget === t) setArtFilesNote('Saving in the song files… ' + (i + 1) + ' of ' + n);
+      }).then(finished);
+    }).then(null, failed);
+    return true;
+  }
 
   // Reads an image file and returns a downscaled data: URL (longest side 640px). WebP where
   // the browser can encode it, otherwise JPEG (or PNG for a source that may be transparent),
@@ -11103,6 +11208,13 @@
       artUrlInput.value = existing;
       setArtNote('');
     }
+    artPendingFile = null;
+    var nFiles = (target.files || []).filter(isLocalTrack).length;
+    artToFilesRow.hidden = !nFiles;
+    artToFilesLabel.textContent = nFiles > 1 ? 'Also save in the album’s song files' : 'Also save in the song file';
+    setArtFilesNote('');
+    artFilesBusy = false;
+    artUrlPanel.classList.remove('saving-files');
     updateArtUrlClearState();
     showArtMainScreen();
     artSuggestBtn.hidden = !target.suggest;
@@ -11122,6 +11234,7 @@
       openArtUrlDialogFor({
         key: 'album:' + akey,
         clearAlso: favKey(st),
+        files: libraryTracks.filter(function(t){ return albumKeyFor(t) === akey; }),
         name: st.album + (st.artist ? ' ' + st.artist : ''),
         title: 'Album Cover',
         suggest: { kind: 'album', artist: st.artist || '', album: st.album },
@@ -11143,6 +11256,7 @@
     var artistLink = isLocalTrack(st) ? null : stationArtistLink(st);
     openArtUrlDialogFor({
       key: favKey(st),
+      files: isLocalTrack(st) ? [libraryById[favKey(st)] || st] : null,
       name: stripExclusively(st.name),
       suggest: isLocalTrack(st) ? { kind: 'album', artist: st.artist || '', album: st.name || '' }
         : artistLink ? { kind: 'artist', name: artistLink.name } : null,
@@ -11150,9 +11264,11 @@
     });
   }
   function closeArtUrlDialog(){
+    if(artFilesBusy) return; // the song files are being written; it closes itself after
     showArtMainScreen();
     artUrlOverlay.classList.remove('open');
     artPendingUpload = null;
+    artPendingFile = null;
     artUrlFileInput.value = '';
   }
 
@@ -11167,7 +11283,7 @@
   });
   artUrlInput.addEventListener('input', function(){
     // Typing a URL replaces a picked upload: whatever is in the field is what gets saved.
-    if(artUrlInput.value.trim()){ artPendingUpload = null; setArtNote(''); }
+    if(artUrlInput.value.trim()){ artPendingUpload = null; artPendingFile = null; setArtNote(''); }
     updateArtUrlClearState();
   });
   artUrlUploadBtn.addEventListener('click', function(){ artUrlFileInput.click(); });
@@ -11177,6 +11293,7 @@
     setArtNote('Preparing image…');
     readImageFileAsDataUrl(file).then(function(dataUrl){
       artPendingUpload = dataUrl;
+      artPendingFile = file;
       artUrlInput.value = '';
       setArtNote('Using an image from your device.');
       updateArtUrlClearState();
@@ -11197,6 +11314,7 @@
       return;
     }
     if(t.refresh) t.refresh();
+    if(val && !artToFilesRow.hidden && artToFilesChk.checked && saveArtToFiles(t, artPendingFile || val)) return;
     closeArtUrlDialog();
   });
   artUrlClearBtn.addEventListener('click', function(){
@@ -11448,6 +11566,15 @@
       if(t.clearAlso) clearCustomArtUrl(t.clearAlso);
       if(!setCustomArtUrl(t.key, url)){ fail(); return; }
       if(t.refresh) t.refresh();
+      if(!artToFilesRow.hidden && artToFilesChk.checked){
+        artSuggestGrid.classList.remove('picking');
+        tile.classList.remove('busy');
+        showArtMainScreen();
+        artPendingUpload = null; artPendingFile = null;
+        artUrlInput.value = url;
+        updateArtUrlClearState();
+        if(saveArtToFiles(t, url)) return;
+      }
       closeArtUrlDialog();
     }, fail);
   }
@@ -28423,11 +28550,14 @@
     // cover (see customArtFor), so one set here would show nowhere.
     var tagged = album.tracks.filter(function(t){ return String(t.album || '').trim(); })[0];
     albumArtEditBtn.hidden = !tagged;
+    albumTagsBtn.hidden = !tagged || !album.tracks.every(isLocalTrack);
+    albumTagsBtn.onclick = function(){ closeAlbumMenu(); openAlbumTagSheet(album); };
     albumArtEditBtn.onclick = function(){
       closeAlbumMenu();
       if(!tagged) return;
       openArtUrlDialogFor({
         key: 'album:' + album.key,
+        files: album.tracks.slice(),
         name: tagged.album + (tagged.artist ? ' ' + tagged.artist : ''),
         title: 'Album Cover',
         suggest: { kind: 'album', artist: tagged.artist || '', album: tagged.album },
@@ -30325,13 +30455,52 @@
     var data = (key === 'comment' || key === 'lyrics') ? id3LangFrameData(major, value) : id3TextFrameData(major, value);
     return { id: id, flags: new Uint8Array(2), data: data };
   }
+  // --- cover art in the file (build 232) ---
+  // changes.cover: { bytes, mime, width, height } puts that picture in as the front cover;
+  // null takes the cover out. The cover replaced is the front cover, or with none the
+  // "other" picture players show in its place; back covers, artist photos and so on stay.
+  function hasCoverChange(changes){ return !!changes && Object.prototype.hasOwnProperty.call(changes, 'cover'); }
+  function coverTypesToReplace(types){ return types.indexOf(3) !== -1 ? [3] : [0, 3]; }
+  function id3PicType(fr, major){
+    if(fr.id !== 'APIC' && fr.id !== 'PIC') return -1;
+    var d = id3FrameBody(fr, major);
+    if(!d || d.length < 5) return -1;
+    if(fr.id === 'PIC') return d[4];
+    var p = 1;
+    while(p < d.length && d[p] !== 0) p++;
+    return p + 1 < d.length ? d[p + 1] : -1;
+  }
+  function id3CoverFrame(cover){
+    var mime = cover.mime || 'image/jpeg';
+    return { id: 'APIC', flags: new Uint8Array(2),
+      data: tagConcat([new Uint8Array([0]), tagLatin1(mime), new Uint8Array([0, 3, 0]), cover.bytes]) };
+  }
+  function flacPictureBlock(cover){
+    var mime = tagLatin1(cover.mime || 'image/jpeg');
+    return { type: 6, data: tagConcat([tagBe32(3), tagBe32(mime.length), mime, tagBe32(0),
+      tagBe32(cover.width || 0), tagBe32(cover.height || 0), tagBe32(24), tagBe32(0),
+      tagBe32(cover.bytes.length), cover.bytes]) };
+  }
+  function flacPicType(bl){ return bl.type === 6 && bl.data.length >= 4 ? u32be(bl.data, 0) : -1; }
+  function withoutCover(changes){
+    var c = {};
+    Object.keys(changes || {}).forEach(function(k){ if(k !== 'cover') c[k] = changes[k]; });
+    return c;
+  }
   // A whole new tag: untouched frames copied byte for byte, changed fields replaced where the
   // old frame stood, new ones added at the end. Padded to the old tag's size when it fits, so
   // the file keeps its length and only the front of it is rewritten.
   function buildId3Tag(doc, changes){
     var major = doc.id3.major;
     var out = [], placed = {};
+    var cover = hasCoverChange(changes) ? { value: changes.cover } : null, coverPlaced = false;
+    var replaceTypes = cover ? coverTypesToReplace(doc.id3.frames.map(function(fr){ return id3PicType(fr, major); })) : [];
+    changes = withoutCover(changes);
     doc.id3.frames.forEach(function(fr){
+      if(cover && (fr.id === 'APIC' || fr.id === 'PIC') && replaceTypes.indexOf(id3PicType(fr, major)) !== -1){
+        if(!coverPlaced){ coverPlaced = true; if(cover.value) out.push(id3CoverFrame(cover.value)); }
+        return;
+      }
       var key = id3FieldOfFrame(fr, major);
       if(key && Object.prototype.hasOwnProperty.call(changes, key)){
         if(!placed[key]){
@@ -30345,6 +30514,7 @@
     Object.keys(changes).forEach(function(key){
       if(!placed[key] && changes[key]) out.push(id3NewFrame(key, major, changes[key]));
     });
+    if(cover && !coverPlaced && cover.value) out.push(id3CoverFrame(cover.value));
     var parts = [];
     out.forEach(function(fr){
       var flags = fr.flags;
@@ -30442,15 +30612,22 @@
   }
   function buildFlacHead(doc, changes){
     var f = doc.flac;
-    var comments = vorbisReplace(f.comments, changes);
+    var cover = hasCoverChange(changes) ? { value: changes.cover } : null, coverPlaced = false;
+    var replaceTypes = cover ? coverTypesToReplace(f.blocks.map(flacPicType)) : [];
+    var comments = vorbisReplace(f.comments, withoutCover(changes));
     var vc = { type: 4, data: encodeVorbisBlock(f.vendor, comments) };
     var blocks = [], hadVc = false;
     f.blocks.forEach(function(bl){
       if(bl.type === 1) return; // padding is rebuilt at the end
       if(bl.type === 4){ if(!hadVc){ hadVc = true; blocks.push(vc); } return; }
+      if(cover && bl.type === 6 && replaceTypes.indexOf(flacPicType(bl)) !== -1){
+        if(!coverPlaced){ coverPlaced = true; if(cover.value) blocks.push(flacPictureBlock(cover.value)); }
+        return;
+      }
       blocks.push(bl);
     });
     if(!hadVc) blocks.splice(1, 0, vc);
+    if(cover && !coverPlaced && cover.value) blocks.splice(blocks.indexOf(vc) + 1, 0, flacPictureBlock(cover.value));
     var used = 4;
     blocks.forEach(function(bl){ used += 4 + bl.data.length; });
     var spare = doc.headLen - used - 4;
@@ -30723,7 +30900,12 @@
   }
 
   // --- the library after a save ---
-  function applySavedTags(track, newFile, disk){
+  // opts.cover: the cover in the file changed (build 232), so the song's picture is taken from
+  // it again. opts.quiet: one of a batch; the lists are redrawn once at the end (afterTagBatch).
+  function applySavedTags(track, newFile, disk, opts){
+    opts = opts || {};
+    var key = favKey(track), artBlob = null;
+    if(track._oldAlbumKey === undefined){ try{ track._oldAlbumKey = albumKeyFor(track); }catch(e){} }
     return Promise.all([readTags(newFile), computeContentKey(newFile)['catch'](function(){ return ''; })]).then(function(r){
       var fresh = buildTrackRecord(newFile, r[0], track.duration, null, r[1]);
       ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo', 'metaKey'].forEach(function(k){ track[k] = fresh[k]; });
@@ -30733,31 +30915,77 @@
         track.diskSize = disk.size;
         track.diskModified = disk.lastModified;
       }
-      var key = favKey(track);
-      return idbDo([LIB_STORE_TRACKS, LIB_STORE_FILES], 'readwrite', function(tx){
+      if(opts.cover && r[0] && r[0].art && r[0].art.length){
+        try{ artBlob = new Blob([r[0].art], { type: r[0].artMime || 'image/jpeg' }); }catch(e){}
+      }
+      return opts.cover ? artSigOf(artBlob) : '';
+    }).then(function(sig){
+      if(opts.cover){
+        track.hasArt = !!artBlob;
+        if(sig){ track.artSig = sig; delete track.artSigNone; } else { delete track.artSig; track.artSigNone = true; }
+        if(libraryArtUrls[key]){ try{ URL.revokeObjectURL(libraryArtUrls[key]); }catch(e){} }
+        delete libraryArtUrls[key];
+        delete libraryArtPending[key];
+        albumMateArt = {};
+        if(typeof compilationVersion === 'number') compilationVersion++;
+      }
+      return idbDo([LIB_STORE_TRACKS, LIB_STORE_FILES, LIB_STORE_ART], 'readwrite', function(tx){
         tx.objectStore(LIB_STORE_FILES).put(newFile, key);
+        if(opts.cover){
+          if(artBlob) tx.objectStore(LIB_STORE_ART).put(artBlob, key);
+          else tx.objectStore(LIB_STORE_ART)['delete'](key);
+        }
         return tx.objectStore(LIB_STORE_TRACKS).put(track);
       });
     }).then(function(){
+      if(opts.quiet) return;
+      afterTagSave([track], opts.cover);
+    });
+  }
+  // The lists, the player and Now Playing after songs' tags changed.
+  function afterTagSave(tracks, coverChanged){
+    var keys = {};
+    tracks.forEach(function(t){ keys[favKey(t)] = t; });
+    {
       indexLibrary();
+      // An album renamed (or given another artist) has a new key: its custom cover and an
+      // open album page go with it, once no song is left under the old one.
+      var moved = {};
+      tracks.forEach(function(t){
+        if(t._oldAlbumKey === undefined) return;
+        var nk = albumKeyFor(t);
+        if(nk && nk !== t._oldAlbumKey) moved[t._oldAlbumKey] = nk;
+        delete t._oldAlbumKey;
+      });
+      Object.keys(moved).forEach(function(oldKey){
+        albumKeyMoved(oldKey, moved[oldKey], libraryTracks.some(function(t){ return albumKeyFor(t) === oldKey; }));
+      });
       renderLibraryList();
       refreshLibraryView();
-      if(currentStation && favKey(currentStation) === favKey(track)){
-        if(currentStation !== track){
-          ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo'].forEach(function(k){ currentStation[k] = track[k]; });
+      var cur = currentStation && keys[favKey(currentStation)];
+      if(cur){
+        if(currentStation !== cur){
+          ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo', 'hasArt'].forEach(function(k){ currentStation[k] = cur[k]; });
         }
-        playerName.textContent = stripExclusively(track.name);
+        playerName.textContent = stripExclusively(cur.name);
+        if(coverChanged){ try{ refreshStationArt(currentStation); }catch(e){} }
         try{ updateMediaSession(currentStation); }catch(e){}
       }
       if(nowPlayingScreen.style.display === 'flex'){
         var st = npTarget();
-        if(st && favKey(st) === favKey(track)){
-          if(st !== track) ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo'].forEach(function(k){ st[k] = track[k]; });
+        var np = st && keys[favKey(st)];
+        if(np){
+          if(st !== np) ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo', 'hasArt'].forEach(function(k){ st[k] = np[k]; });
           renderNowPlayingScreen();
         }
       }
+      if(coverChanged){
+        tracks.forEach(function(t){ try{ refreshStationArt(t); }catch(e){} });
+        try{ if(typeof coverFlow !== 'undefined' && coverFlow) coverFlow.artChanged(); }catch(e){}
+      }
       if(queuePanelOpen) renderQueuePanel();
-    });
+      try{ if(window.AmplifyPublishCarMenu) window.AmplifyPublishCarMenu(); }catch(e){}
+    }
   }
 
   // --- the sheet ---
@@ -30805,8 +31033,16 @@
   }
   function renderTagSheet(){
     var s = tagState, doc = s.doc, track = s.track;
+    // What has been typed so far survives a redraw while editing (e.g. after picking a cover).
+    if(s.editing){
+      s.draft = s.draft || {};
+      tagBody.querySelectorAll('.tag-in').forEach(function(inp){ s.draft[inp.dataset.key] = inp.value; });
+    } else {
+      s.draft = null;
+    }
     tagBody.innerHTML = '';
     syncTagHeader();
+    if(s.mode === 'album'){ renderAlbumTagSheet(); return; }
     var head = tagEl('div', 'tag-head');
     var art = tagEl('div', 'tag-art');
     renderStationArt(art, track);
@@ -30820,6 +31056,11 @@
 
     var sec = tagEl('div', 'tag-sec');
     sec.appendChild(tagEl('div', 'tag-sec-title', 'Tags'));
+    // Build 232: the cover in the file, which Edit can change or take out (MP3 and FLAC).
+    if(doc.editable || docCover(doc)){
+      var cur = docCover(doc);
+      sec.appendChild(buildTagCoverRow(cur, { some: !!cur, shown: !!customArtFor(track) }));
+    }
     TAG_FIELDS.forEach(function(f){
       var val = doc.values[f.key] || '';
       var row = tagEl(s.editing ? 'label' : 'div', 'tag-row' + (f.multi ? ' multi' : ''));
@@ -30828,7 +31069,7 @@
         var inp = document.createElement(f.multi ? 'textarea' : 'input');
         inp.className = 'tag-in';
         inp.dataset.key = f.key;
-        inp.value = val;
+        inp.value = s.draft && s.draft[f.key] !== undefined ? s.draft[f.key] : val;
         if(!f.multi){ inp.type = 'text'; inp.setAttribute('enterkeyhint', 'next'); }
         else inp.rows = f.key === 'lyrics' ? 5 : 2;
         if(f.mode) inp.setAttribute('inputmode', f.mode);
@@ -30909,7 +31150,7 @@
     if(!track || !isLocalTrack(track)) return;
     closeNpMenu();
     if(tagState) closeTagSheet();
-    var mine = tagState = { track: track, doc: null, onDisk: false, editing: false, saving: false, urls: [] };
+    var mine = tagState = { mode: 'song', track: track, doc: null, onDisk: false, editing: false, saving: false, urls: [], cover: undefined };
     tagBody.innerHTML = '';
     tagBody.appendChild(tagEl('div', 'tag-empty', 'Reading tags…'));
     setTagNote('');
@@ -30931,50 +31172,173 @@
   }
   function tagEdits(){
     var changes = {}, any = false, bad = '';
+    var base = tagState.mode === 'album' ? tagState.album.values : tagState.doc.values;
     tagBody.querySelectorAll('.tag-in').forEach(function(inp){
       var k = inp.dataset.key;
       var v = inp.tagName === 'TEXTAREA' ? inp.value.replace(/\s+$/, '') : inp.value.trim();
       if((k === 'track' || k === 'disc') && v && !/^\d+(\s*\/\s*\d+)?$/.test(v)) bad = bad || (k === 'track' ? 'Track' : 'Disc') + ' should be a number, like 3 or 3/12.';
-      if(v !== (tagState.doc.values[k] || '')){ changes[k] = v.replace(/\s*\/\s*/, '/'); any = true; }
+      // An album field that differs from song to song is left alone unless something is typed.
+      if(tagState.mode === 'album' && tagState.album.mixed[k] && !v) return;
+      if(v !== (base[k] || '')){ changes[k] = v.replace(/\s*\/\s*/, '/'); any = true; }
     });
+    if(tagState.cover !== undefined){ changes.cover = tagState.cover; any = true; }
     return { changes: changes, any: any, bad: bad };
   }
   function tagPlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer; }
+
+  // ---- writing tags (build 232: shared by a song, an album and the cover art dialog) ----
+  // The new tag goes over the old one in the music folder's file (or only Amplify's copy, when
+  // the file can't be reached), then the library is brought up to date. Resolves { file, disk }.
+  function writeTagChanges(track, doc, onDisk, changes, opts){
+    return Promise.resolve().then(function(){
+      var newHead = buildTagHead(doc, changes);
+      var oldHead = doc.head.subarray(0, doc.headLen);
+      var newBlob = new Blob([newHead, doc.blob.slice(doc.headLen)], { type: doc.blob.type || track.mime || '' });
+      var write = onDisk
+        ? tagPlugin().writeFileHead({ uri: track.srcUri, data: tagBase64(newHead), replace: doc.headLen, crc: crc32(oldHead), size: doc.blob.size })
+        : Promise.resolve(null);
+      return write.then(function(disk){
+        var file = new File([newBlob], track.fileName || 'song', { type: newBlob.type, lastModified: (disk && disk.lastModified) || Date.now() });
+        return applySavedTags(track, file, disk, { quiet: !!(opts && opts.quiet), cover: hasCoverChange(changes) })
+          .then(function(){ return { file: file, disk: disk }; });
+      });
+    });
+  }
+  // The same kind of change in many songs, one file at a time. changesFor(doc, track) says what
+  // to change in that song ({} for nothing). Resolves { saved, skipped:[{track, why}], unchanged,
+  // appOnly }. A folder Amplify may not write to yet rejects with err.code 'NO_WRITE', err.tree,
+  // and err.resume() to carry on from that song once permission is given.
+  function saveTagsToTracks(tracks, changesFor, onProgress){
+    var res = { saved: [], skipped: [], unchanged: [], appOnly: [], coverChanged: false };
+    var i = 0;
+    function one(){
+      if(i >= tracks.length) return Promise.resolve();
+      var t = tracks[i];
+      if(onProgress) onProgress(i, tracks.length, t);
+      return tagSourceFor(t).then(function(src){
+        return readTagDoc(src.blob, t.fileName || src.blob.name || '').then(function(doc){
+          if(!doc.editable){ res.skipped.push({ track: t, why: doc.whyNot || 'This file can’t be edited.' }); return; }
+          var changes = changesFor(doc, t) || {};
+          if(!Object.keys(changes).length){ res.unchanged.push(t); return; }
+          return writeTagChanges(t, doc, src.onDisk, changes, { quiet: true }).then(function(){
+            res.saved.push(t);
+            if(!src.onDisk) res.appOnly.push(t);
+            if(hasCoverChange(changes)) res.coverChanged = true;
+          });
+        });
+      })['catch'](function(err){
+        if(err && err.code === 'NO_WRITE') throw err;
+        res.skipped.push({ track: t, why: err && err.code === 'CHANGED' ? 'The file was changed by something else meanwhile.' : ((err && err.message) || 'It couldn’t be saved.') });
+      }).then(function(){ i++; return one(); });
+    }
+    function run(){
+      return one().then(function(){
+        if(res.saved.length) afterTagSave(res.saved, res.coverChanged);
+        return res;
+      }, function(err){
+        if(err && err.code === 'NO_WRITE'){
+          var t = tracks[i];
+          err.tree = treeOfUri(t && t.srcUri);
+          err.resume = run;
+          // Whatever was already saved shows now, not only at the end.
+          if(res.saved.length) afterTagSave(res.saved, res.coverChanged);
+        }
+        throw err;
+      });
+    }
+    return run();
+  }
+  // Asks for write access to a music folder (a system folder picker opens at it). Resolves
+  // 'ok', 'cancelled' or 'other' (a different folder was chosen).
+  function askFolderWrite(tree){
+    return tagPlugin().grantFolderWrite({ treeUri: tree }).then(function(r){
+      if(r && r.cancelled) return 'cancelled';
+      if(r && r.matches === false) return 'other';
+      return 'ok';
+    });
+  }
+  function folderPermissionText(tree){
+    return 'Amplify needs your permission to change files in “' + folderNameOfTree(tree) + '”. Tap Allow, then choose that folder and tap Use this folder.';
+  }
+  function batchSummary(res, what){
+    var bits = [];
+    var n = res.saved.length - res.appOnly.length;
+    if(n) bits.push(what + ' saved in ' + (n === 1 ? '1 song file' : n + ' song files') + '.');
+    if(res.appOnly.length) bits.push((res.appOnly.length === 1 ? '1 song isn’t' : res.appOnly.length + ' songs aren’t') + ' in a music folder Amplify can change, so only Amplify’s copy was updated.');
+    if(res.skipped.length){
+      var why = res.skipped[0].why;
+      bits.push((res.skipped.length === 1 ? '1 song was' : res.skipped.length + ' songs were') + ' left as they were: ' + why.replace(/\.$/, '') + '.');
+    }
+    if(!bits.length) bits.push('Nothing needed changing.');
+    return bits.join(' ');
+  }
+
+  // ---- a picture for a song's tag (build 232) ----
+  // A File, a data: URL or a web address, as a JPEG at most COVER_MAX px on its longest side.
+  var COVER_MAX = 1200;
+  function coverFromImage(src){
+    return new Promise(function(resolve, reject){
+      var url = src, objUrl = null;
+      if(src && typeof src === 'object' && typeof src.size === 'number'){ url = objUrl = URL.createObjectURL(src); }
+      if(!url){ reject(new Error('There’s no picture to save.')); return; }
+      var img = new Image();
+      if(!objUrl && !/^data:/i.test(url)){ img.crossOrigin = 'anonymous'; url = secureUrl(url); }
+      img.onload = function(){
+        try{
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var k = Math.min(1, COVER_MAX / Math.max(w, h || 1));
+          var c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w * k));
+          c.height = Math.max(1, Math.round(h * k));
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          var data = c.toDataURL('image/jpeg', 0.9);
+          var bin = atob(data.slice(data.indexOf(',') + 1)), bytes = new Uint8Array(bin.length);
+          for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          resolve({ bytes: bytes, mime: 'image/jpeg', width: c.width, height: c.height });
+        }catch(e){
+          var er = new Error('That picture’s website doesn’t let it be copied into song files. Upload the picture instead.');
+          er.code = 'CORS';
+          reject(er);
+        }finally{
+          if(objUrl) URL.revokeObjectURL(objUrl);
+        }
+      };
+      img.onerror = function(){
+        if(objUrl) URL.revokeObjectURL(objUrl);
+        reject(new Error('That picture couldn’t be loaded.'));
+      };
+      img.src = url;
+    });
+  }
+  // The front cover in a song's tag (or the first picture), as a Blob, or null.
+  function docCover(doc){
+    var pics = (doc && doc.rows || []).filter(function(r){ return r.pic; });
+    var front = pics.filter(function(r){ return r.label === 'Front cover'; })[0];
+    return (front || pics[0] || {}).pic || null;
+  }
+
   function saveTagEdits(){
     var s = tagState;
-    if(!s || !s.doc || s.saving) return;
+    if(!s || s.saving) return;
+    if(s.mode === 'album'){ saveAlbumTagEdits(); return; }
+    if(!s.doc) return;
     var e = tagEdits();
     if(e.bad){ setTagNote(e.bad, 'err'); return; }
-    if(!e.any){ s.editing = false; setTagNote(''); renderTagSheet(); return; }
+    if(!e.any){ s.editing = false; s.cover = undefined; setTagNote(''); renderTagSheet(); return; }
     var doc = s.doc, track = s.track;
-    var newHead;
-    try{ newHead = buildTagHead(doc, e.changes); }
-    catch(err){ setTagNote('These tags could not be prepared for saving.', 'err'); return; }
-    var oldHead = doc.head.subarray(0, doc.headLen);
-    var newBlob = new Blob([newHead, doc.blob.slice(doc.headLen)], { type: doc.blob.type || track.mime || '' });
     s.saving = true;
     setTagNote('');
     syncTagHeader();
-    var write;
-    if(s.onDisk){
-      var P = tagPlugin();
-      var args = null;
-      write = Promise.resolve().then(function(){
-        args = { uri: track.srcUri, data: tagBase64(newHead), replace: doc.headLen, crc: crc32(oldHead), size: doc.blob.size };
-        return P.writeFileHead(args);
-      });
-    } else {
-      write = Promise.resolve(null);
-    }
-    write.then(function(disk){
-      var file = new File([newBlob], track.fileName || 'song', { type: newBlob.type, lastModified: (disk && disk.lastModified) || Date.now() });
-      return applySavedTags(track, file, disk).then(function(){ return { file: file, disk: disk }; });
-    }).then(function(res){
+    writeTagChanges(track, doc, s.onDisk, e.changes).then(function(res){
       if(tagState !== s) return;
       return readTagDoc(res.file, track.fileName || '').then(function(doc2){
         s.doc = doc2;
         s.saving = false;
         s.editing = false;
+        s.cover = undefined;
         renderTagSheet();
         setTagNote(s.onDisk ? 'Saved to the file.' : 'Saved in Amplify. The original file isn’t in a music folder Amplify can change, so it wasn’t updated.', s.onDisk ? 'ok' : 'info');
       });
@@ -30985,17 +31349,13 @@
       var code = err && err.code;
       if(code === 'NO_WRITE'){
         var tree = treeOfUri(track.srcUri);
-        setTagNote('Amplify needs your permission to change files in “' + folderNameOfTree(tree) + '”. Tap Allow, then choose that folder and tap Use this folder.', 'info', {
+        setTagNote(folderPermissionText(tree), 'info', {
           label: 'Allow',
           run: function(){
-            var P = tagPlugin();
-            P.grantFolderWrite({ treeUri: tree }).then(function(r){
+            askFolderWrite(tree).then(function(r){
               if(tagState !== s) return;
-              if(r && r.cancelled){ setTagNote('Nothing was saved. Tap Save to try again.', 'info'); return; }
-              if(r && r.matches === false){
-                setTagNote('That was a different folder. Tap Save and choose “' + folderNameOfTree(tree) + '”.', 'err');
-                return;
-              }
+              if(r === 'cancelled'){ setTagNote('Nothing was saved. Tap Save to try again.', 'info'); return; }
+              if(r === 'other'){ setTagNote('That was a different folder. Tap Save and choose “' + folderNameOfTree(tree) + '”.', 'err'); return; }
               saveTagEdits();
             }, function(){ setTagNote('Permission wasn’t given, so nothing was saved.', 'err'); });
           }
@@ -31009,6 +31369,270 @@
       setTagNote('The tags could not be saved' + (err && err.message ? ': ' + err.message : '.'), 'err');
     });
   }
+
+  // ---- the cover row (build 232): in the file now, and in Edit, Change / Remove ----
+  var tagCoverInput = document.createElement('input');
+  tagCoverInput.id = 'tagCoverInput';
+  tagCoverInput.type = 'file';
+  tagCoverInput.accept = 'image/*';
+  tagCoverInput.style.display = 'none';
+  document.body.appendChild(tagCoverInput);
+  tagCoverInput.addEventListener('change', function(){
+    var file = tagCoverInput.files && tagCoverInput.files[0];
+    tagCoverInput.value = '';
+    var s = tagState;
+    if(!file || !s) return;
+    setTagNote('Preparing the picture…', 'info');
+    coverFromImage(file).then(function(c){
+      if(tagState !== s) return;
+      s.cover = c;
+      setTagNote('');
+      renderTagSheet();
+    }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That file couldn’t be read as a picture.', 'err'); });
+  });
+  function useShownCover(){
+    var s = tagState;
+    var src = s && (s.mode === 'album' ? s.album.customArt : customArtFor(s.track));
+    if(!src) return;
+    setTagNote('Preparing the picture…', 'info');
+    coverFromImage(src).then(function(c){
+      if(tagState !== s) return;
+      s.cover = c;
+      setTagNote('');
+      renderTagSheet();
+    }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
+  }
+  function buildTagCoverRow(current, opts){
+    var s = tagState;
+    var row = tagEl('div', 'tag-row tag-cover-row');
+    row.appendChild(tagEl('span', 'tag-k', 'Cover'));
+    var v = tagEl('div', 'tag-v tag-cover-v');
+    var pending = s.cover !== undefined;
+    var blob = pending ? (s.cover ? new Blob([s.cover.bytes], { type: s.cover.mime }) : null) : current;
+    if(blob){
+      var img = document.createElement('img');
+      img.className = 'tag-pic tag-cover-pic';
+      img.alt = '';
+      img.src = tagPicUrl(blob);
+      v.appendChild(img);
+    }
+    var line = pending ? (s.cover ? 'New cover, saved when you tap Save' : 'Taken out when you tap Save') : (opts.text || (blob ? '' : 'None'));
+    if(line) v.appendChild(tagEl('span', 'tag-cover-text' + (blob || pending ? '' : ' empty'), line));
+    if(s.editing){
+      var btns = tagEl('div', 'tag-cover-btns');
+      function btn(label, fn, cls){
+        var b = tagEl('button', 'tag-cover-btn' + (cls ? ' ' + cls : ''), label);
+        b.type = 'button';
+        b.addEventListener('click', function(e){ e.preventDefault(); fn(); });
+        btns.appendChild(b);
+      }
+      btn(blob ? 'Change' : 'Add', function(){ tagCoverInput.click(); });
+      if(opts.shown) btn('Use Amplify’s Cover', useShownCover);
+      if(blob || (!pending && opts.some)) btn('Remove', function(){ s.cover = null; renderTagSheet(); }, 'danger');
+      if(pending) btn('Undo', function(){ s.cover = undefined; renderTagSheet(); });
+      v.appendChild(btns);
+    }
+    row.appendChild(v);
+    return row;
+  }
+
+  // ---- an album's Info & Tags (build 232) ----
+  // The fields every song on an album shares, read from each file. One that differs from song
+  // to song shows as such and is left alone unless something is typed in it. Saving writes each
+  // song's file in turn; the cover goes in as the front cover of every song.
+  var ALBUM_TAG_FIELDS = [
+    { key: 'album', label: 'Album' },
+    { key: 'albumArtist', label: 'Album Artist' },
+    { key: 'artist', label: 'Artist' },
+    { key: 'genre', label: 'Genre' },
+    { key: 'year', label: 'Year' },
+    { key: 'disc', label: 'Disc', hint: 'e.g. 1 or 1/2', mode: 'numeric' },
+    { key: 'composer', label: 'Composer' }
+  ];
+  function openAlbumTagSheet(album){
+    if(!album || !album.tracks || !album.tracks.length) return;
+    if(tagState) closeTagSheet();
+    var tracks = album.tracks.slice();
+    var mine = tagState = { mode: 'album', album: { key: album.key, name: album.album, artist: album.artist, tracks: tracks,
+      values: {}, mixed: {}, coverBlob: null, withCover: 0, editable: 0, formats: {}, why: '', customArt: getCustomArtUrl('album:' + album.key) || '' },
+      doc: null, editing: false, saving: false, urls: [] };
+    tagBody.innerHTML = '';
+    tagBody.appendChild(tagEl('div', 'tag-empty', 'Reading tags…'));
+    setTagNote('');
+    syncTagHeader();
+    tagOverlay.classList.add('open');
+    readAlbumTags(mine).then(function(){
+      if(tagState !== mine) return;
+      mine.doc = { editable: mine.album.editable > 0, whyNot: mine.album.why || 'These files can’t be edited here.' };
+      renderTagSheet();
+      if(!mine.album.editable) setTagNote(mine.album.why || 'Editing tags works for MP3 and FLAC files.', 'info');
+    })['catch'](function(err){
+      if(tagState !== mine) return;
+      tagBody.innerHTML = '';
+      tagBody.appendChild(tagEl('div', 'tag-empty', (err && err.message) || 'The tags could not be read.'));
+    });
+  }
+  function readAlbumTags(st){
+    var a = st.album, seen = {}, i = 0;
+    a.values = {}; a.mixed = {}; a.withCover = 0; a.editable = 0; a.formats = {}; a.coverBlob = null; a.why = '';
+    function one(){
+      if(i >= a.tracks.length) return Promise.resolve();
+      var t = a.tracks[i];
+      if(tagState === st && i) { var e = tagBody.querySelector('.tag-empty'); if(e) e.textContent = 'Reading tags… ' + (i + 1) + ' of ' + a.tracks.length; }
+      return tagSourceFor(t).then(function(src){
+        return readTagDoc(src.blob, t.fileName || '');
+      }).then(function(doc){
+        ALBUM_TAG_FIELDS.forEach(function(f){
+          var v = f.key === 'disc' ? String(doc.values.disc || '') : (doc.values[f.key] || '');
+          if(!seen[f.key]){ seen[f.key] = true; a.values[f.key] = v; }
+          else if(a.values[f.key] !== v) a.mixed[f.key] = true;
+        });
+        var c = docCover(doc);
+        if(c){ a.withCover++; if(!a.coverBlob) a.coverBlob = c; }
+        if(doc.editable) a.editable++;
+        else if(!a.why) a.why = doc.whyNot;
+        a.formats[doc.formatLabel.split(' · ')[0]] = true;
+      }, function(){ if(!a.why) a.why = 'Some songs’ files couldn’t be read.'; }).then(function(){ i++; return one(); });
+    }
+    return one().then(function(){
+      Object.keys(a.mixed).forEach(function(k){ a.values[k] = ''; });
+    });
+  }
+  function renderAlbumTagSheet(){
+    var s = tagState, a = s.album;
+    var head = tagEl('div', 'tag-head');
+    var art = tagEl('div', 'tag-art');
+    renderStationArt(art, artSourceForTracks(a.tracks) || a.tracks[0]);
+    head.appendChild(art);
+    var ht = tagEl('div', 'tag-head-text');
+    ht.appendChild(tagEl('div', 'tag-head-title', a.values.album || a.name || 'Album'));
+    ht.appendChild(tagEl('div', 'tag-head-sub', a.values.albumArtist || a.values.artist || a.artist || ''));
+    ht.appendChild(tagEl('div', 'tag-head-fmt', 'Album · ' + Object.keys(a.formats).join(', ')));
+    head.appendChild(ht);
+    tagBody.appendChild(head);
+
+    var sec = tagEl('div', 'tag-sec');
+    sec.appendChild(tagEl('div', 'tag-sec-title', 'Every Song on the Album'));
+    var n = a.tracks.length;
+    sec.appendChild(buildTagCoverRow(a.coverBlob, {
+      text: a.withCover === n ? '' : (a.withCover ? 'In ' + a.withCover + ' of ' + n + ' songs' : 'None'),
+      some: a.withCover > 0,
+      shown: !!a.customArt
+    }));
+    ALBUM_TAG_FIELDS.forEach(function(f){
+      var val = a.values[f.key] || '', mixed = !!a.mixed[f.key];
+      var row = tagEl(s.editing ? 'label' : 'div', 'tag-row');
+      row.appendChild(tagEl('span', 'tag-k', f.label));
+      if(s.editing){
+        var inp = document.createElement('input');
+        inp.className = 'tag-in';
+        inp.type = 'text';
+        inp.dataset.key = f.key;
+        inp.value = s.draft && s.draft[f.key] !== undefined ? s.draft[f.key] : val;
+        inp.placeholder = mixed ? 'Varies by song' : (f.hint || '');
+        if(f.mode) inp.setAttribute('inputmode', f.mode);
+        inp.setAttribute('enterkeyhint', 'next');
+        inp.setAttribute('autocomplete', 'off');
+        inp.setAttribute('autocapitalize', f.mode ? 'off' : 'words');
+        inp.spellcheck = false;
+        row.appendChild(inp);
+      } else {
+        row.appendChild(tagEl('span', 'tag-v' + (val ? '' : ' empty'), mixed ? 'Different on each song' : (val || '—')));
+      }
+      sec.appendChild(row);
+    });
+    tagBody.appendChild(sec);
+
+    var list = tagEl('div', 'tag-sec');
+    list.appendChild(tagEl('div', 'tag-sec-title', 'Songs'));
+    a.tracks.forEach(function(t){
+      var row = tagEl('div', 'tag-row raw');
+      row.appendChild(tagEl('span', 'tag-k', t.trackNo ? String(t.trackNo) : '—'));
+      row.appendChild(tagEl('span', 'tag-v', t.name || t.fileName || ''));
+      list.appendChild(row);
+    });
+    tagBody.appendChild(list);
+  }
+  function saveAlbumTagEdits(){
+    var s = tagState;
+    if(!s || s.mode !== 'album' || s.saving) return;
+    var e = tagEdits();
+    if(e.bad){ setTagNote(e.bad, 'err'); return; }
+    if(!e.any){ s.editing = false; s.cover = undefined; setTagNote(''); renderTagSheet(); return; }
+    var a = s.album;
+    var changes = e.changes;
+    s.saving = true;
+    syncTagHeader();
+    function changesFor(doc){
+      var c = {};
+      Object.keys(changes).forEach(function(k){
+        if(k === 'cover'){ c.cover = changes.cover; return; }
+        if((doc.values[k] || '') !== changes[k]) c[k] = changes[k];
+      });
+      return c;
+    }
+    function progress(i, total){ if(tagState === s) setTagNote('Saving ' + (i + 1) + ' of ' + total + '…', 'info'); }
+    function finish(res){
+      if(tagState !== s) return;
+      // The sheet goes on showing the songs that were changed (an album renamed leaves any it
+      // couldn't change behind under the old name).
+      if(res.saved.length && (changes.album !== undefined || changes.artist !== undefined)){
+        a.tracks = a.tracks.filter(function(t){ return res.saved.indexOf(t) !== -1 || res.unchanged.indexOf(t) !== -1; });
+        if(changes.album) a.name = changes.album;
+      }
+      a.key = albumKeyFor(a.tracks[0]);
+      a.customArt = getCustomArtUrl('album:' + a.key) || '';
+      s.saving = false;
+      s.editing = false;
+      s.cover = undefined;
+      setTagNote('Reading tags…', 'info');
+      return readAlbumTags(s).then(function(){
+        if(tagState !== s) return;
+        renderTagSheet();
+        setTagNote(batchSummary(res, 'Changes'), !res.skipped.length ? 'ok' : (res.saved.length ? 'info' : 'err'));
+      });
+    }
+    function failed(err){
+      if(tagState !== s) return;
+      if(err && err.code === 'NO_WRITE'){
+        s.saving = false;
+        syncTagHeader();
+        setTagNote(folderPermissionText(err.tree), 'info', {
+          label: 'Allow',
+          run: function(){
+            askFolderWrite(err.tree).then(function(r){
+              if(tagState !== s) return;
+              if(r !== 'ok'){ setTagNote(r === 'other' ? 'That was a different folder. Tap Save and choose “' + folderNameOfTree(err.tree) + '”.' : 'The rest wasn’t saved. Tap Save to try again.', r === 'other' ? 'err' : 'info'); return; }
+              s.saving = true;
+              syncTagHeader();
+              err.resume().then(finish, failed);
+            }, function(){ setTagNote('Permission wasn’t given, so the rest wasn’t saved.', 'err'); });
+          }
+        });
+        return;
+      }
+      s.saving = false;
+      syncTagHeader();
+      setTagNote('The tags could not be saved' + (err && err.message ? ': ' + err.message : '.'), 'err');
+    }
+    saveTagsToTracks(a.tracks, changesFor, progress).then(finish, failed);
+  }
+  // An album whose name or artist changed has a new key: its custom cover and an open album
+  // page follow it there.
+  // Songs that couldn't be changed (an M4A, say) stay under the old key: the cover is then
+  // copied rather than moved, and the open page still goes where the changed songs went.
+  function albumKeyMoved(oldKey, newKey, someLeft){
+    if(!newKey || newKey === oldKey) return;
+    var art = getCustomArtUrl('album:' + oldKey);
+    if(art && !getCustomArtUrl('album:' + newKey)){
+      setCustomArtUrl('album:' + newKey, art);
+      if(!someLeft) clearCustomArtUrl('album:' + oldKey);
+    }
+    if(activeAlbumKey === oldKey) activeAlbumKey = newKey;
+  }
+  window.__tagw = { openAlbum: function(key){ var al = buildAlbumIndex().filter(function(x){ return x.key === key; })[0]; openAlbumTagSheet(al); },
+    saveTo: saveTagsToTracks, cover: coverFromImage };
+
   tagEditBtn.addEventListener('click', function(){
     var s = tagState;
     if(!s || !s.doc) return;
@@ -31022,7 +31646,7 @@
   });
   tagCloseBtn.addEventListener('click', function(){
     var s = tagState;
-    if(s && s.editing && !s.saving){ s.editing = false; setTagNote(''); renderTagSheet(); return; }
+    if(s && s.editing && !s.saving){ s.editing = false; s.cover = undefined; setTagNote(''); renderTagSheet(); return; }
     if(s && s.saving) return;
     closeTagSheet();
   });
