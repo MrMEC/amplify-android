@@ -351,6 +351,10 @@ object VlcEngine {
     @JvmStatic
     fun durationMs(): Long = lengthMs
 
+    /** Build 238: the file playing (so casting can take it over). */
+    @JvmStatic
+    fun sourceUriString(): String? = if (isActive) sourceUri?.toString() else null
+
     @JvmStatic
     fun isPlaying(): Boolean = isActive && player?.isPlaying == true
 

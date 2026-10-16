@@ -94,6 +94,97 @@ public class CastRelayTest {
     for (int i = 0; i < ts.length; i++) { ts[i] = new Thread(() -> { try { if (get(wrapped, "GET")[0].equals("200")) synchronized (good) { good[0]++; } } catch (Exception e) {} }); ts[i].start(); }
     for (Thread t : ts) t.join();
     ok(good[0] == 8, "8 requests at once all served (" + good[0] + ")");
+    // ---- Build 238: files on the phone ----
+    java.io.File song = java.io.File.createTempFile("amplify-song", ".mp3");
+    byte[] data = new byte[300000];
+    for (int i = 0; i < data.length; i++) data[i] = (byte) (i * 7 + (i >> 8));
+    java.nio.file.Files.write(song.toPath(), data);
+    ok(CastRelay.isLocal(song.toURI().toString()) && CastRelay.isLocal("content://com.android.externalstorage.documents/tree/x/document/y")
+        && !CastRelay.isLocal("https://example.com/a.mp3"), "local addresses are recognised");
+    String fu = r.wrapFile(song.toURI().toString(), "mp3");
+    ok(fu.startsWith(base + "/f/") && fu.endsWith(".mp3"), "a song gets a relay address " + fu);
+    HttpURLConnection fc = (HttpURLConnection) new URL(fu).openConnection();
+    fc.setRequestProperty("Origin", "https://www.gstatic.com");
+    byte[] whole = fc.getInputStream().readAllBytes();
+    ok(fc.getResponseCode() == 200 && java.util.Arrays.equals(whole, data), "the whole file is served (" + whole.length + " bytes)");
+    ok("audio/mpeg".equals(fc.getContentType()) && "*".equals(fc.getHeaderField("Access-Control-Allow-Origin")) && "bytes".equals(fc.getHeaderField("Accept-Ranges"))
+        && String.valueOf(data.length).equals(fc.getHeaderField("Content-Length")), "as audio/mpeg with CORS, ranges and its length (" + fc.getContentType() + ")");
+    HttpURLConnection rc = (HttpURLConnection) new URL(fu).openConnection();
+    rc.setRequestProperty("Range", "bytes=1000-1999");
+    byte[] part = rc.getInputStream().readAllBytes();
+    ok(rc.getResponseCode() == 206 && part.length == 1000 && java.util.Arrays.equals(part, java.util.Arrays.copyOfRange(data, 1000, 2000))
+        && ("bytes 1000-1999/" + data.length).equals(rc.getHeaderField("Content-Range")), "a byte range is served (seeking) " + rc.getHeaderField("Content-Range"));
+    HttpURLConnection oc = (HttpURLConnection) new URL(fu).openConnection();
+    oc.setRequestProperty("Range", "bytes=299000-");
+    byte[] tail = oc.getInputStream().readAllBytes();
+    ok(oc.getResponseCode() == 206 && tail.length == 1000 && tail[999] == data[data.length - 1], "an open-ended range to the end (" + tail.length + ")");
+    HttpURLConnection sc = (HttpURLConnection) new URL(fu).openConnection();
+    sc.setRequestProperty("Range", "bytes=-500");
+    byte[] last = sc.getInputStream().readAllBytes();
+    ok(sc.getResponseCode() == 206 && last.length == 500, "the last N bytes (" + last.length + ")");
+    HttpURLConnection bc = (HttpURLConnection) new URL(fu).openConnection();
+    bc.setRequestProperty("Range", "bytes=999999-");
+    ok(bc.getResponseCode() == 416, "a range past the end is refused (" + bc.getResponseCode() + ")");
+    HttpURLConnection hc = (HttpURLConnection) new URL(fu).openConnection();
+    hc.setRequestMethod("HEAD");
+    ok(hc.getResponseCode() == 200 && String.valueOf(data.length).equals(hc.getHeaderField("Content-Length")), "HEAD gives the length without the body");
+    String vu = r.wrapFile(song.toURI().toString(), "mkv");
+    HttpURLConnection vc = (HttpURLConnection) new URL(vu).openConnection();
+    vc.getInputStream().readAllBytes();
+    ok("video/x-matroska".equals(vc.getContentType()), "a video's kind comes from its extension (" + vc.getContentType() + ")");
+    ok(CastRelay.isVideoExt("mp4") && CastRelay.isVideoExt("mkv") && !CastRelay.isVideoExt("flac"), "videos and songs told apart by extension");
+    // a content:// file through the app's reader
+    CastRelay.FileSource prev = CastRelay.fileSource;
+    CastRelay.fileSource = new CastRelay.FileSource() {
+      @Override public long size(String uri) { return uri.startsWith("content://") ? data.length : -1; }
+      @Override public InputStream open(String uri, long off) { return new java.io.ByteArrayInputStream(data, (int) off, data.length - (int) off); }
+    };
+    HttpURLConnection cc2 = (HttpURLConnection) new URL(r.wrapFile("content://docs/tree/a/document/b", "flac")).openConnection();
+    cc2.setRequestProperty("Range", "bytes=10-19");
+    byte[] cpart = cc2.getInputStream().readAllBytes();
+    ok(cc2.getResponseCode() == 206 && java.util.Arrays.equals(cpart, java.util.Arrays.copyOfRange(data, 10, 20)) && "audio/flac".equals(cc2.getContentType()), "a content:// file is served through the app's reader");
+    CastRelay.fileSource = prev;
+    // the cover picture
+    byte[] jpg = new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, 1, 2, 3};
+    String bu = r.wrapBytes(jpg, "jpg");
+    HttpURLConnection jc = (HttpURLConnection) new URL(bu).openConnection();
+    ok(java.util.Arrays.equals(jc.getInputStream().readAllBytes(), jpg) && "image/jpeg".equals(jc.getContentType()), "a cover picture is served " + bu);
+    ok(get(base + "/f/nope.mp3", "GET")[0].equals("404"), "an unknown file 404");
+    // two Chromecast reads at once (it often opens a second connection to seek)
+    Thread[] fts = new Thread[4]; final int[] fgood = {0};
+    for (int i = 0; i < fts.length; i++) { final int k = i; fts[i] = new Thread(() -> { try {
+      HttpURLConnection x = (HttpURLConnection) new URL(fu).openConnection(); x.setRequestProperty("Range", "bytes=" + (k * 1000) + "-" + (k * 1000 + 99999));
+      if (x.getInputStream().readAllBytes().length == 100000) synchronized (fgood) { fgood[0]++; } } catch (Exception e) {} }); fts[i].start(); }
+    for (Thread t : fts) t.join();
+    ok(fgood[0] == 4, "4 ranged reads at once (" + fgood[0] + ")");
+    // a reader that hangs up mid-file doesn't break the relay
+    java.net.Socket hang = new java.net.Socket("127.0.0.1", Integer.parseInt(base.substring(base.lastIndexOf(':') + 1)));
+    hang.getOutputStream().write(("GET " + fu.substring(base.length()) + " HTTP/1.1\r\nHost: x\r\n\r\n").getBytes(StandardCharsets.ISO_8859_1));
+    hang.getInputStream().read(new byte[100]);
+    hang.close();
+    HttpURLConnection after = (HttpURLConnection) new URL(fu).openConnection();
+    ok(after.getInputStream().readAllBytes().length == data.length, "still serving after a reader hung up");
+    // what a file is from its first bytes
+    byte[] id3 = new byte[64]; id3[0]='I'; id3[1]='D'; id3[2]='3'; id3[9]=10; id3[20]=(byte)0xff; id3[21]=(byte)0xfb;
+    ok(CastRelay.sniffExt(id3, 64, false).equals("mp3"), "ID3 + MP3 is mp3");
+    byte[] id3f = new byte[64]; id3f[0]='I'; id3f[1]='D'; id3f[2]='3'; id3f[9]=4; id3f[14]='f'; id3f[15]='L'; id3f[16]='a'; id3f[17]='C';
+    ok(CastRelay.sniffExt(id3f, 64, false).equals("flac"), "ID3 + FLAC is flac");
+    byte[] m4a = new byte[32]; m4a[4]='f'; m4a[5]='t'; m4a[6]='y'; m4a[7]='p'; m4a[8]='M'; m4a[9]='4'; m4a[10]='A'; m4a[11]=' ';
+    ok(CastRelay.sniffExt(m4a, 32, false).equals("m4a") && CastRelay.sniffExt(m4a, 32, true).equals("m4a"), "an M4A brand is m4a");
+    byte[] mp4 = new byte[32]; mp4[4]='f'; mp4[5]='t'; mp4[6]='y'; mp4[7]='p'; mp4[8]='i'; mp4[9]='s'; mp4[10]='o'; mp4[11]='m';
+    ok(CastRelay.sniffExt(mp4, 32, true).equals("mp4") && CastRelay.sniffExt(mp4, 32, false).equals("m4a"), "isom is mp4 for a video, m4a for a song");
+    byte[] mkv = new byte[40]; mkv[0]=0x1a; mkv[1]=0x45; mkv[2]=(byte)0xdf; mkv[3]=(byte)0xa3; System.arraycopy("matroska".getBytes(), 0, mkv, 20, 8);
+    ok(CastRelay.sniffExt(mkv, 40, true).equals("mkv"), "Matroska is mkv");
+    byte[] ogg = "OggS....".getBytes(); byte[] wav = "RIFF....WAVEfmt ".getBytes(); byte[] fl = "fLaC....".getBytes();
+    ok(CastRelay.sniffExt(ogg, ogg.length, false).equals("ogg") && CastRelay.sniffExt(wav, wav.length, false).equals("wav") && CastRelay.sniffExt(fl, fl.length, false).equals("flac"), "Ogg, WAV, FLAC");
+    ok(CastRelay.extOfName("content://x/document/primary%3AMusic%2FSong.FLAC").equals("flac") && CastRelay.extOfName("file:///cache/abc.bin").equals("bin")
+        && CastRelay.extOfName("content://x/document/1234").equals(""), "extensions from names and addresses");
+    java.io.File cached = java.io.File.createTempFile("abc", ".bin");
+    java.nio.file.Files.write(cached.toPath(), id3f);
+    ok(CastRelay.extFor(cached.toURI().toString(), null, false).equals("flac"), "a cached .bin song is sniffed (flac)");
+    ok(CastRelay.extFor(song.toURI().toString(), "Track.mp3", false).equals("mp3"), "a known extension is used as is");
+    cached.delete();
+    song.delete();
     ok(CastRelay.lanAddress() == null || CastRelay.lanAddress().matches("\\d+\\.\\d+\\.\\d+\\.\\d+"), "LAN address lookup returns an IPv4 address or nothing (" + CastRelay.lanAddress() + ")");
     r.stop(); up.stop(0);
   }
