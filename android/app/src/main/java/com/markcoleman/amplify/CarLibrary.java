@@ -1320,8 +1320,10 @@ final class CarLibrary {
     String key = e.optString("key");
     // Build 227: a favourite playlist uses the same row, shuffling the playlist ("pl:<id>").
     String plid = e.optString("plid", "");
+    // Build 235: a favourite custom station ("fy:<id>"), its stations in a random order.
+    String fyid = e.optString("fyid", "");
     Uri art = ArtProvider.uriFor(e.optString("art"));
-    if (art == null && plid.isEmpty()) {
+    if (art == null && plid.isEmpty() && fyid.isEmpty()) {
       JSONObject artist;
       synchronized (this) {
         artist = this.artistsByKey.get(key);
@@ -1333,7 +1335,7 @@ final class CarLibrary {
     MediaMetadata.Builder md =
         new MediaMetadata.Builder()
             .setTitle(e.optString("title", "Radio"))
-            .setArtist(plid.isEmpty() ? "Artist Radio" : "Playlist")
+            .setArtist(!fyid.isEmpty() ? "Custom Station" : plid.isEmpty() ? "Artist Radio" : "Playlist")
             .setArtworkUri(art)
             .setIsPlayable(true)
             .setIsBrowsable(false)
@@ -1344,7 +1346,8 @@ final class CarLibrary {
       md.setExtras(bundle);
     }
     return new MediaItem.Builder()
-        .setMediaId(plid.isEmpty() ? SHUFFLE_PREFIX + RADIO_PREFIX + enc(key) : SHUFFLE_PREFIX + "pl:" + enc(plid))
+        .setMediaId(!fyid.isEmpty() ? SHUFFLE_PREFIX + "fy:" + fyid
+            : plid.isEmpty() ? SHUFFLE_PREFIX + RADIO_PREFIX + enc(key) : SHUFFLE_PREFIX + "pl:" + enc(plid))
         .setMediaMetadata(md.build())
         .build();
   }
