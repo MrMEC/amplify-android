@@ -235,6 +235,7 @@ final class CarLibrary {
     linkedHashMap.put("home:favorites", "Favorites");
     linkedHashMap.put("home:topartists", "Top Artists");
     linkedHashMap.put("home:madeforyou", "Made for You");
+    linkedHashMap.put("home:mixes", "Daily Mixes");
     linkedHashMap.put("home:continue", "Continue Listening");
     linkedHashMap.put("home:recentsongs", "Recent Songs");
     linkedHashMap.put("home:latest", "Latest Podcasts");
@@ -260,6 +261,7 @@ final class CarLibrary {
           "home:continue",
           "home:recentsongs",
           "home:latest",
+          "home:mixes",
           "home:madeforyou",
           "home:topstations"
         });
@@ -349,6 +351,11 @@ final class CarLibrary {
         return null;
       }
       return albumFolder(jSONObject2.optString("key"), jSONObject2.optString("title"), null);
+    }
+    // Build 231: a Daily Mix, Discover or Hear It Again (the day's lists from the phone).
+    if (str.startsWith(MIX_PREFIX)) {
+      JSONObject mix = findIn("mixes", str);
+      return mix == null ? null : folder(str, mix.optString("title", "Mix"), null, null, null);
     }
     if (str.startsWith("pl:")) {
       JSONObject jSONObjectFindIn3 = findIn("playlists", dec(str.substring(3)));
@@ -477,6 +484,21 @@ final class CarLibrary {
             return arrayList;
           }
           break;
+        // Build 231: the day's Daily Mixes, then Discover and Hear It Again.
+        case "home:mixes":
+          synchronized (this) {
+            for (JSONObject mix : arrayOf(this.catalog, "mixes")) {
+              String id = mix.optString("id");
+              if (id.startsWith(MIX_PREFIX)) {
+                arrayList.add(folder(id, mix.optString("title", "Mix"), mix.optString("sub", null), null, null));
+              }
+            }
+          }
+          if (arrayList.isEmpty()) {
+            arrayList.add(message("Your mixes show up here once you've played some of your songs."));
+            return arrayList;
+          }
+          break;
         case "st:foryou":
           synchronized (this) {
             for (JSONObject jSONObject5 : arrayOf(this.catalog, "forYou")) {
@@ -512,7 +534,8 @@ final class CarLibrary {
           // An album, a playlist or the Songs list opens with a Shuffle row that plays all of it in
           // a random order.
           if (playableCount > 1
-              && (str.startsWith("album:") || str.startsWith("pl:") || "lib:songs".equals(str))) {
+              && (str.startsWith("album:") || str.startsWith("pl:") || str.startsWith(MIX_PREFIX)
+                  || "lib:songs".equals(str))) {
             arrayList.add(0, shuffleItem(str));
           }
           break;
@@ -631,6 +654,9 @@ final class CarLibrary {
       }
       if (str2 == null && str.startsWith("pl:")) {
         str2 = "pl:" + dec(str.substring(3));
+      }
+      if (str2 == null && str.startsWith(MIX_PREFIX)) {
+        str2 = str;
       }
       if (str2 == null) {
         return Collections.emptyList();
@@ -1258,6 +1284,8 @@ final class CarLibrary {
   }
 
   static final String SHUFFLE_PREFIX = "shuffle:";
+  /** Build 231: the day's lists, ids as on the phone ("mix:dm1".."mix:dm5", "mix:discover", "mix:again"). */
+  static final String MIX_PREFIX = "mix:";
   static final String RADIO_PREFIX = "artistradio:";
 
   /** An artist's songs only (no stations), for their Radio. */

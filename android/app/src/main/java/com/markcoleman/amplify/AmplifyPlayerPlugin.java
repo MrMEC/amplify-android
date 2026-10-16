@@ -161,6 +161,16 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         });
   }
 
+  /** Build 231: volume leveling on or off ({on}); {} just reports it. */
+  @PluginMethod
+  public void setLeveling(PluginCall call) {
+    Boolean on = call.getBoolean("on", null);
+    if (on != null) PlaybackService.setLeveling(getContext(), on);
+    JSObject o = new JSObject();
+    o.put("on", Leveler.enabled);
+    call.resolve(o);
+  }
+
   @PluginMethod
   public void sleepInfo(PluginCall call) {
     main.post(() -> call.resolve(sleepObj(false)));
