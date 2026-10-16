@@ -1,6 +1,7 @@
 """Video > channels: Add Channels (Recommended / All Channels / From a Link), My Channels,
 playing a channel, "Not working" marking, reorder and remove. Mocked sources and native bridge.
 Run: python3 tests/test_video_channels.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, json, os, shutil, threading, http.server, functools
 from playwright.async_api import async_playwright
 import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from confirm_auto import AUTO_CONFIRM
@@ -78,7 +79,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script(AUTO_CONFIRM)  # build 228: deletes ask first
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route)

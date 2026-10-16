@@ -2,6 +2,7 @@
 (songs as song rows, stations as station rows), and Edit lets you remove entries and drag them
 into a new order (with a finger or a mouse), which is saved.
 Run: python3 tests/test_playlists.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess
 from playwright.async_api import async_playwright
 import sys as _sys, os as _os; _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); from confirm_auto import AUTO_CONFIRM
@@ -82,7 +83,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script(AUTO_CONFIRM)  # build 228: deletes ask first
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', lambda route: route.continue_() if '127.0.0.1' in route.request.url else route.abort())

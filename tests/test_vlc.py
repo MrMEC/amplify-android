@@ -4,6 +4,7 @@ hardware-decoding choice), so Now Playing, controls and the floating window are 
 "Play in VLC" item and no separate VLC screen. Settings can switch to the phone's player; a file
 one player fails on is tried in the other. Plex stays on the phone's player.
 Run: python3 tests/test_vlc.py"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_music_videos.py')).read()
@@ -18,7 +19,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', lambda route: route.continue_() if '127.0.0.1' in route.request.url else route.abort())
         await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)

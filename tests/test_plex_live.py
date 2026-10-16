@@ -3,6 +3,7 @@ only while signed in to Plex). Channels come from Plex's channel service with th
 are added to My Channels, play with the token put on at play time (never stored), keep the
 category, survive a restart, and the tab goes away on Sign Out.
 Run: python3 tests/test_plex_live.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, json, os, shutil, threading, http.server, functools, sys
 from urllib.parse import urlparse, parse_qs
 from playwright.async_api import async_playwright
@@ -82,7 +83,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 360, 'height': 780}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route)
 

@@ -3,6 +3,7 @@ still saves (a cache is cleared to make room) and is there after a restart; with
 listener's own data, Android's copy (kvSet) still gets the new list and puts it back at start-up.
 Check storage reports how full it is. Mark: a channel added to Favorites was gone after reopening.
 Run: python3 tests/test_ls_full.py"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_kv_mirror.py')).read()
@@ -23,7 +24,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script(KV)
         await ctx.add_init_script("if(!localStorage.getItem('__seeded')){ localStorage.setItem('__seeded','1'); localStorage.setItem('radioPlayerVideoChannels', %s); localStorage.setItem('radioPlayerFavorites', %s); }"
                                   % (repr(json.dumps(CHS)), repr(json.dumps(FAVS[:2]))))

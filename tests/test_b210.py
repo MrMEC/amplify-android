@@ -1,6 +1,7 @@
 """Build 210: Library's heading, podcast dates without capitals, smaller cover corners, no counts on the
 Favorites / Top Artists / Top Stations / Continue Listening pages, larger Top Artists on Home.
 Run: python3 tests/test_b210.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, sys
 from playwright.async_api import async_playwright
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'www', 'index.html'); OUT = '/tmp/claude-0/t/shots'; os.makedirs(OUT, exist_ok=True); PORT = 8807
@@ -55,7 +56,7 @@ async def main():
         for theme in ['dark', 'light']:
             ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, locale='en-US')
             await ctx.route('**/*', lambda r: r.continue_() if '127.0.0.1' in r.request.url or r.request.url.startswith('data:') else r.abort())
-            await ctx.add_init_script(MOCK)
+            await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
             await ctx.add_init_script("try{ localStorage.setItem('radioPlayerFavorites', %s); localStorage.setItem('radioPlayerRecent', %s); localStorage.setItem('radioPlayerTheme', %s); localStorage.setItem('radioPlayerPodcastSubs', %s); localStorage.setItem('radioPlayerArtistPlays', JSON.stringify({madonna:{name:'Madonna',count:9,last:Date.now()},prince:{name:'Prince',count:7,last:Date.now()},adele:{name:'Adele',count:5,last:Date.now()},sade:{name:'Sade',count:4,last:Date.now()},cher:{name:'Cher',count:3,last:Date.now()}})); localStorage.setItem('radioPlayerArtistPlaysReset1','1');}catch(e){}" % (json.dumps(json.dumps(ST[:6])), json.dumps(json.dumps(ST[:5])), json.dumps(theme), json.dumps(json.dumps(SUBS))))
             pg = await ctx.new_page(); errs = []
             pg.on('pageerror', lambda e: errs.append(str(e)))

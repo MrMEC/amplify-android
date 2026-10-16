@@ -7,6 +7,7 @@ Run: python3 tests/test_back_buttons.py (screenshots in /tmp/claude-0/t/shots)""
 """Artist and album pages slide in from the right on phones when opened (tapping a tile),
 using only a transform; Back, and the system's Remove animations setting, open them in place.
 Run: python3 tests/test_page_slide.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess
 from playwright.async_api import async_playwright
 
@@ -147,7 +148,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': W, 'height': 900}, device_scale_factor=2, is_mobile=W<900, has_touch=W<900, color_scheme='dark')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script("if(!sessionStorage.getItem('s')){sessionStorage.setItem('s','1'); localStorage.setItem('radioPlayerTheme','%s'); localStorage.setItem('radioPlayerCustomSearches', JSON.stringify([{id:'cs1',label:'Chill',mode:'tag',query:'chill'}])); localStorage.setItem('radioPlayerFavorites', JSON.stringify([{stationuuid:'s1',name:'Zeta FM',url:'http://z.example/s',favicon:''},{stationuuid:'s2',name:'Alpha FM',url:'http://a.example/s',favicon:''}]));}" % THEME)
         pg = await ctx.new_page(); errs=[]; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', net)

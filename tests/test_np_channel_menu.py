@@ -2,6 +2,7 @@
 dark panel with the white screen's dark text on it), and the More button sits level with the
 channel name. Pluto channel and a link channel; light and dark themes; text 1.35x at 412 and 360.
 Run: python3 tests/test_np_channel_menu.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import os, json, asyncio
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_pluto.py')).read()
@@ -15,7 +16,7 @@ def lum(rgb):
 async def run(p, theme, w, big):
     b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     ctx = await b.new_context(viewport={'width': w, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme)
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script("localStorage.setItem('radioPlayerVideoChannels', %s); localStorage.setItem('radioPlayerTheme','%s');" % (repr(json.dumps(CH)), theme))
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.route('**/*', route)

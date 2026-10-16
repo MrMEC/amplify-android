@@ -1,6 +1,7 @@
 """Build 207 (208: shades from the playing cover, faster turn, grey Top Artists ring): the playing cover has a thin border in shades of the theme colour (no glow) on Home, the
 Favorites page, Shortcuts and the landscape favourites row; it turns while playing and holds when paused.
 Run: python3 tests/test_play_ring.py"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, sys
 from playwright.async_api import async_playwright
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'www', 'index.html'); OUT = '/tmp/claude-0/t/shots'; os.makedirs(OUT, exist_ok=True); PORT = 8806
@@ -53,7 +54,7 @@ async def main():
                 await asyncio.sleep(0.9)
                 await route.fulfill(status=200, content_type='image/png', headers={'Access-Control-Allow-Origin': '*'}, body=png_of(SVG_SLOW.get(name, '#808080')))
             await ctx.route('https://covers.example/**', slow_cover)
-            await ctx.add_init_script(MOCK)
+            await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
             await ctx.add_init_script("try{ localStorage.setItem('radioPlayerFavorites', %s); localStorage.setItem('radioPlayerRecent', %s); localStorage.setItem('radioPlayerTheme', %s); localStorage.setItem('radioPlayerArtistPlays', JSON.stringify({madonna:{name:'Madonna',count:9,last:Date.now()},prince:{name:'Prince',count:7,last:Date.now()},adele:{name:'Adele',count:5,last:Date.now()}})); localStorage.setItem('radioPlayerArtistPlaysReset1','1');}catch(e){}" % (json.dumps(json.dumps(ST)), json.dumps(json.dumps(ST[:5])), json.dumps(theme)))
             pg = await ctx.new_page()
             pg.on('pageerror', lambda e: print('PAGEERR', e))

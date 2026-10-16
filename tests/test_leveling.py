@@ -1,4 +1,5 @@
 """Volume leveling setting (build 231): Settings > Volume leveling (On/Off) in the Android app, read
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 from and sent to the native player (setLeveling); hidden in a browser. Both themes at 412 wide.
 Run: python3 tests/test_leveling.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, os, threading, http.server, functools, shutil
@@ -56,7 +57,7 @@ ROW = """() => { var r = document.getElementById('levelingRow'), s = document.ge
 async def run(p, scheme):
     b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=scheme)
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script("try{ localStorage.setItem('radioPlayerTheme', '%s'); }catch(e){}" % scheme)
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.route('**/*', lambda route: route.continue_() if '127.0.0.1' in route.request.url else route.abort())

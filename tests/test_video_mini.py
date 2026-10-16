@@ -3,6 +3,7 @@ window above the mini player; opening Now Playing again puts the same picture ba
 reload. Covers a video podcast (the page's own <video>, moved, never reloaded) here; native
 pictures (channels, local videos) are covered in test_stream_video.py.
 Run: python3 tests/test_video_mini.py (needs /tmp/claude-0/t/vid/test.webm, see test_stream_video.py)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_stream_video.py')).read()
@@ -22,7 +23,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--autoplay-policy=no-user-gesture-required'])
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script("localStorage.setItem('radioPlayerRecent', %s)" % repr(json.dumps([EP])))
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto(BASE + 'index.html'); await pg.wait_for_timeout(2500)

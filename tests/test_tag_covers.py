@@ -7,6 +7,7 @@ its page and custom cover. Edit Album Cover: "Also save in the album's song file
 plugin hands writes to this server, which applies them like TagWriter.java; mutagen checks the
 files. Both themes; 360 wide with larger text.
 Run: python3 tests/test_tag_covers.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, subprocess, base64, zlib, hashlib
 from playwright.async_api import async_playwright
 from mutagen.id3 import ID3
@@ -217,7 +218,7 @@ async def run(p, theme, full):
     audio_before = {n: audio_md5(F(n)) for n in os.listdir(f'{M}/Cover Album')}
     b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme)
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script('window.__listing = %s;' % json.dumps(listing()))
     await ctx.add_init_script("try{ localStorage.setItem('radioPlayerTheme', %s); }catch(e){}" % json.dumps(theme))
     pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -414,7 +415,7 @@ async def big_text(p):
     open(f'{root}/__listing.json', 'w').write(json.dumps(listing()))
     b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     ctx = await b.new_context(viewport={'width': 360, 'height': 780}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark')
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script('window.__listing = %s;' % json.dumps(listing()))
     pg = await ctx.new_page()
     await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)

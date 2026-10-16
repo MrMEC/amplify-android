@@ -2,6 +2,7 @@
 Playlists row). Tapped in Favorites it plays at once, shuffled, and never runs out (like an artist's
 Radio); its name follows renames and it goes when the playlist is deleted. Android Auto lists it as a
 playable row that shuffles the playlist. Run: python3 tests/test_playlist_fav.py"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import os, sys
 _here = os.path.dirname(os.path.abspath(__file__))
 _src = open(os.path.join(_here, 'test_home_playlists.py')).read()
@@ -25,7 +26,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         for theme in ('dark', 'light'):
             ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme)
-            await ctx.add_init_script(MOCK)
+            await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
             await ctx.add_init_script("try{ localStorage.setItem('radioPlayerTheme', '%s'); }catch(e){}" % theme)
             pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
             await pg.route('**/*', lambda route: route.continue_() if '127.0.0.1' in route.request.url else route.abort())

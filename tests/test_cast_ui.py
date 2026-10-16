@@ -5,6 +5,7 @@ Playing, an album-like glass page), dark and light; it opens the picker; connect
 icon + title; Now Playing says "Casting to Living Room TV" for a stream on the Chromecast and
 "Playing on this phone" for one that isn't; it all goes when the session ends.
 Run: python3 tests/test_cast_ui.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_fav_order.py')).read()
@@ -30,7 +31,7 @@ NOTE = "(()=>{ var n=document.getElementById('npCastNote'); return n.hidden || g
 async def run(p, theme):
     b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
     ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme, locale='en-US')
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script(CASTMOCK)
     if theme == 'dark':
         await ctx.add_init_script("if(!sessionStorage.getItem('crashShown')){ sessionStorage.setItem('crashShown','1'); window.__crashText = '2026-10-10 12:31:00 Android 16 (36) SM-S948U thread main\\njava.lang.IllegalStateException: test crash\\n\\tat com.markcoleman.amplify.CastBridge.load(CastBridge.java:1)'; }")

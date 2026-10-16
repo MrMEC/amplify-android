@@ -1,3 +1,4 @@
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, json, threading, http.server, functools
 from playwright.async_api import async_playwright
 root='/tmp/claude-0/t/srv'
@@ -33,7 +34,7 @@ async def main():
         pg=await b.new_page()
         errs=[]; pg.on('pageerror',lambda e: errs.append(str(e)))
         await pg.route('**/*radio-browser*/**', lambda r: r.fulfill(status=200, content_type='application/json', body=json.dumps([{'name':'Top One','url_resolved':'http://top/1','stationuuid':'t1','favicon':'','tags':'pop'}])))
-        await pg.add_init_script(MOCK)
+        await pg.add_init_script(MOCK); await pg.add_init_script(AUTO_NOTICE)
         await pg.goto('http://127.0.0.1:8766/index.html'); await pg.wait_for_timeout(8000)
         cats=await pg.evaluate('window.__cat')
         print('publishes:',len(cats))

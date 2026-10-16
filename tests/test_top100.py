@@ -5,6 +5,7 @@ chart listed under it, the next song at the end. Build 218: a song in the librar
 with no video (or one YouTube won't play here) plays its 30-second preview in Now Playing, with a YouTube search
 button; a spinner while the video is looked up; never a "No official video found" screen. Chart files, iTunes, Wikidata, the channel feed, YouTube's player and the plugin are mocked.
 Run: python3 tests/test_top100.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json, threading, http.server, functools, shutil, sys, re
 from urllib.parse import urlparse, parse_qs
 from playwright.async_api import async_playwright
@@ -183,7 +184,7 @@ async def run(theme, b):
             return await r.fulfill(status=200, content_type='text/html', body='<!doctype html><body style="background:#111;color:#fff;font:20px sans-serif">VIDEO ' + p.path.split('/')[2] + '</body>')
         return await r.abort()
     await ctx.route('**/*', route)
-    await ctx.add_init_script(MOCK)
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
     await ctx.add_init_script("try{ localStorage.setItem('radioPlayerTheme', %s); }catch(e){}" % json.dumps(theme))
     pg = await ctx.new_page(); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))

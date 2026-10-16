@@ -3,6 +3,7 @@ favourites arrow. It switches the screen to a blank Albums page: the favourites 
 the player fades out and the background fades to black, while the arrow stays put and the button
 turns into the Now Playing bars (moving while music plays) that lead back.
 Run: python3 tests/test_land_albums.py (screenshots in /tmp/claude-0/t/shots)"""
+import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
 import asyncio, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'test_land_favs.py')).read()
@@ -23,7 +24,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': 844, 'height': 390}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US')
-        await ctx.add_init_script(MOCK)
+        await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         await ctx.add_init_script("if(!localStorage.getItem('radioPlayerFavorites')) localStorage.setItem('radioPlayerFavorites', %s);" % repr(json.dumps(FAVS)))
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.route('**/*', route2)
