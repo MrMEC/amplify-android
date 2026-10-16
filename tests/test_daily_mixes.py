@@ -67,6 +67,7 @@ MOCK = """
  var impl = {
    pickMusicFolder: function(){ return Promise.resolve({folder:'Music', files:picked, truncated:false}); },
    fetchText: function(o){ if(/api\\.deezer\\.com/.test(o.url)) return Promise.resolve({ text: JSON.stringify(dz(o.url)) }); return Promise.reject(new Error('offline')); },
+   setCarCatalog: function(o){ window.__cat = JSON.parse(o.json); window.__catN = (window.__catN || 0) + 1; return Promise.resolve({}); },
    addListener: function(n, f){ (listeners[n] = listeners[n] || []).push(f); return Promise.resolve({remove:function(){}}); }
  };
  var P = new Proxy({}, {get:function(t,k){
@@ -127,6 +128,7 @@ async def run(theme):
         check(r['shown'] and r['after'] == 'top100Section', f'[{theme}] the rows sit right under Top 100 (after {r["after"]})')
         check(len([t for t in titles[:5] if t.startswith('Daily Mix: ')]) == 5,
               f'[{theme}] five Daily Mixes, one per top artist {titles[:5]}')
+        check(len(set(titles)) == len(titles), f'[{theme}] no artist gets two mixes {titles}')
         check(titles[5:7] == ['Discover', 'Hear It Again'], f'[{theme}] then Discover and Hear It Again {titles[5:7]}')
         check(titles[-1] == 'Kay' and ids[-1] == 'videos', f'[{theme}] then Artist Videos, headed by the artist ({titles[-1]})')
         for x in [y for y in r['rows'] if y['id'] != 'videos']:
@@ -163,6 +165,25 @@ async def run(theme):
         check(played <= set(again), f'[{theme}] Hear It Again has every song played 5 times')
         check(len(again) >= 20 and all(a.split('|')[0] in ('Madonna', 'Prince', 'Kay', 'Earth, Wind & Fire', 'Rick James', 'Lee') for a in again),
               f'[{theme}] and is filled from the most played artists ({len(again)})')
+        # Build 231: the same lists in Android Auto (Home > Daily Mixes), each a folder of songs
+        await pg.wait_for_timeout(1500)
+        cat = await pg.evaluate('window.__cat || null')
+        shown = [m for m in (await pg.evaluate('__d.st()'))['mixes'] if len(m['songs']) >= 10]
+        check(cat and [m['id'] for m in cat.get('mixes', [])] == [m['id'] for m in shown]
+              and [m['title'] for m in cat['mixes']] == [m['title'] for m in shown],
+              f'[{theme}] the car gets every list shown on Home, in order {[m["title"] for m in shown]} {[m["title"] for m in (cat or {}).get("mixes", [])]}')
+        if cat:
+            ok = all(len(cat['lists'].get(m['id'], [])) == len(m['songs']) and all(e.get('t') == 'song' for e in cat['lists'][m['id']]) for m in shown)
+            check(ok, f'[{theme}] each car list holds the whole mix as songs')
+            subs = {m['id']: m.get('sub') for m in cat['mixes']}
+            check(subs.get('mix:discover') == 'Songs you rarely play' and subs.get('mix:again') == 'Your most played songs'
+                  and subs.get('mix:dm1', '').endswith(' and similar artists'), f'[{theme}] each car list says what it is {subs}')
+        java = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'android/app/src/main/java/com/markcoleman/amplify/CarLibrary.java')).read()
+        home = java[java.index('"tab:home",\n'):java.index('"tab:library",\n')]
+        check('"home:mixes"' in home and home.index('"home:mixes"') < home.index('"home:madeforyou"') and 'put("home:mixes", "Daily Mixes")' in java,
+              f'[{theme}] CarLibrary: Daily Mixes under Home, before Made for You')
+        check('str.startsWith(MIX_PREFIX)\n                  || "lib:songs"' in java.replace('\r', '') or 'str.startsWith(MIX_PREFIX)' in java[java.index('arrayList.add(0, shuffleItem(str))') - 400:java.index('arrayList.add(0, shuffleItem(str))')],
+              f'[{theme}] CarLibrary: a mix opens with a Shuffle row')
         # tap a tile: plays through that mix
         await pg.evaluate('__d.stopPlay()')
         dm1 = await pg.evaluate("__d.names('mix:dm1')"); t1 = st['mixes'][0]['title']
@@ -213,6 +234,13 @@ async def run(theme):
         await pg.evaluate('__d.home()'); await pg.wait_for_timeout(800)
         st2 = await pg.evaluate('__d.st()')
         check(st2['day'] != '2000-1-1' and json.dumps(st2['mixes']) != after, f'[{theme}] a new day makes new lists')
+        await pg.wait_for_timeout(1500)
+        cat2 = await pg.evaluate('window.__cat || null')
+        want = [m['id'] for m in st2['mixes'] if len(m['songs']) >= 10]
+        check(cat2 and [m['id'] for m in cat2['mixes']] == want
+              and all(len(cat2['lists'][m['id']]) == len(m['songs']) for m in st2['mixes'] if m['id'] in want)
+              and json.dumps([cat2['lists'][i] for i in want]) != json.dumps([(cat or {}).get('lists', {}).get(i) for i in want]),
+              f'[{theme}] and the car gets the new day\'s lists')
         # song plays are counted
         c1 = await pg.evaluate("__d.note('Lee 01')")
         c2 = await pg.evaluate("__d.note('Lee 01')")

@@ -6584,6 +6584,14 @@
         <option value="500">500</option>
       </select>
     </div>
+    <!-- Build 231: volume leveling, evening out loud and quiet songs and stations (Android app). -->
+    <div class="settings-row" id="levelingRow" style="display:none;">
+      <span class="settings-label">Volume leveling</span>
+      <select class="settings-select" id="levelingSelect" aria-label="Volume leveling">
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+    </div>
     <!-- Build 159: which player plays the videos on the phone (movies, TV, music videos). VLC
          is the default; the phone's own player stays as an alternative. -->
     <div class="settings-row" id="videoPlayerRow" style="display:none;">
@@ -8254,6 +8262,19 @@
     try{ sel.value = localStorage.getItem('radioPlayerVideoPlayer') === 'builtin' ? 'builtin' : 'vlc'; hw.value = localStorage.getItem('radioPlayerVlcHw') === 'off' ? 'off' : 'on'; }catch(e){}
     sel.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVideoPlayer', sel.value); }catch(e){} });
     hw.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVlcHw', hw.value); }catch(e){} });
+  })();
+  // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
+  (function(){
+    var row = document.getElementById('levelingRow'), sel = document.getElementById('levelingSelect');
+    var Cap = window.Capacitor;
+    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    if(!row || !P || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform() || typeof P.setLeveling !== 'function') return;
+    row.style.display = '';
+    sel.value = 'on';
+    P.setLeveling({}).then(function(o){ if(o && typeof o.on === 'boolean') sel.value = o.on ? 'on' : 'off'; })['catch'](function(){});
+    sel.addEventListener('change', function(){
+      P.setLeveling({ on: sel.value === 'on' })['catch'](function(){ setStatus('Couldn\u2019t change volume leveling', true); });
+    });
   })();
   resultLimitSelect.value = String(resultLimit);
   resultLimitSelect.addEventListener('change', function(){
@@ -27566,8 +27587,12 @@
     if(dailyState && dailyState.videoKey && keys.indexOf(dailyState.videoKey) !== -1) return dailyState.videoKey;
     return keys.length ? mfySeeded(keys, 'vid|' + day)[0] : null;
   }
+  var dailyBuildSeq = 0;
   function buildDailyLists(){
     var day = mfyDay();
+    // Build 231: an answer from Deezer for an earlier build of the lists (the library was still
+    // being added, say) must not replace a mix in this one; that put the same artist in twice.
+    var seq = ++dailyBuildSeq;
     var top = dailyTopArtists();
     var sim = similarStore();
     function simFor(e){ return similarKnown(e.key) ? sim[e.key].names : null; }
@@ -27581,20 +27606,27 @@
     dailyState = { v: DAILY_VERSION, day: day, lib: libraryTracks.length, mixes: mixes.concat(buildDiscoverAndAgain(day)), videoKey: null };
     dailyState.videoKey = pickDailyVideoArtist(day);
     dailySave();
+    dailyToCar();
     // Related artists not known yet: asked now, and that mix made again (once) with them.
     featured.forEach(function(e, i){
       if(similarKnown(e.key)) return;
       fetchSimilarArtists(e).then(function(names){
-        if(names == null || !dailyState || dailyState.day !== day) return;
+        if(names == null || !dailyState || dailyState.day !== day || seq !== dailyBuildSeq) return;
         var m = buildOneDailyMix(e, i + 1, day, names);
         dailyState.mixes = dailyState.mixes.map(function(x){ return x.id === m.id ? m : x; });
         dailySave();
+        dailyToCar();
         renderDailyHome();
         if(activeHomeSection === m.id && stationsHeading.textContent === m.title) renderDailyMixPage(m.id);
       });
     });
     // The rest of the top ten in the background, so the next days' mixes are ready.
     setTimeout(function(){ top.forEach(function(e){ if(!similarKnown(e.key)) fetchSimilarArtists(e); }); }, 20000);
+  }
+  // Build 231: Android Auto lists them too, so a new set goes to the car (after this turn, since
+  // the car menu itself asks for the lists).
+  function dailyToCar(){
+    setTimeout(function(){ try{ if(window.AmplifyPublishCarMenu) window.AmplifyPublishCarMenu(); }catch(e){} }, 0);
   }
   function ensureDailyLists(){
     if(!libraryLoaded || libraryStorageError || !libraryTracks.length) return false;
@@ -35013,6 +35045,21 @@
             return c;
           }));
         }catch(e){ lists.madeForYou = []; }
+        // Build 231: the day's Daily Mixes, Discover and Hear It Again, as on Home.
+        var mixes = [];
+        try{
+          if(dailyReady && ensureDailyLists()){
+            dailyState.mixes.forEach(function(m){
+              var songs = dailyMixSongs(m);
+              if(songs.length < DAILY_MIN_SONGS) return;
+              lists[m.id] = compact(songs.map(carSong));
+              if(!lists[m.id].length) return;
+              var sub = m.id === 'mix:discover' ? 'Songs you rarely play' : m.id === 'mix:again' ? 'Your most played songs'
+                : (m.title.replace(/^Daily Mix: /, '') + ' and similar artists');
+              mixes.push({ id: m.id, title: m.title, sub: sub });
+            });
+          }
+        }catch(e){ mixes = []; }
         stationPlaylists.forEach(function(pl){
           lists['pl:' + pl.id] = compact((pl.stations || []).map(function(it){
             if(isPodcastTrack(it)) return carEpisode(it, prog);
@@ -35040,6 +35087,7 @@
           forYou: forYou,
           categories: podcastCategories.map(function(c){ return { id: String(c.id), name: c.name }; }),
           playlists: stationPlaylists.map(function(pl){ return { id: String(pl.id), label: pl.label || 'Playlist' }; }),
+          mixes: mixes,
           genres: genreOrder.slice(),
           blacklist: blacklist.slice(),
           apiHosts: API_HOSTS.slice(),

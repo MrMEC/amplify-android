@@ -166,12 +166,40 @@ public class PlaybackService extends MediaLibraryService {
         .build();
   }
 
+  // ---- volume leveling (build 231) ----
+  // Every sound the phone's player makes goes through LevelingProcessor (Leveler), on or off by
+  // the setting, which is kept here so it also holds when the car starts the app.
+  static final String AUDIO_PREFS = "amplify_audio";
+  static final String KEY_LEVELING = "leveling";
+
+  static void setLeveling(android.content.Context c, boolean on) {
+    Leveler.enabled = on;
+    c.getSharedPreferences(AUDIO_PREFS, android.content.Context.MODE_PRIVATE)
+        .edit().putBoolean(KEY_LEVELING, on).apply();
+  }
+
+  private androidx.media3.exoplayer.DefaultRenderersFactory levelingRenderers() {
+    Leveler.enabled =
+        getSharedPreferences(AUDIO_PREFS, MODE_PRIVATE).getBoolean(KEY_LEVELING, true);
+    return new androidx.media3.exoplayer.DefaultRenderersFactory(this) {
+      @Override
+      protected androidx.media3.exoplayer.audio.AudioSink buildAudioSink(
+          android.content.Context context, boolean enableFloatOutput, boolean enableAudioTrackPlaybackParams) {
+        return new androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(enableFloatOutput)
+            .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+            .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[] {new LevelingProcessor()})
+            .build();
+      }
+    };
+  }
+
   @Override // androidx.media3.session.MediaSessionService, android.app.Service
   public void onCreate() {
     CrashLog.install(this);
     super.onCreate();
     this.exo =
-        new ExoPlayer.Builder(this)
+        new ExoPlayer.Builder(this, levelingRenderers())
             .setMediaSourceFactory(
                 new DefaultMediaSourceFactory(
                     new DefaultDataSource.Factory(
