@@ -2100,10 +2100,16 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
    * Channels" goes through here: {url, max} -> {text, url (after redirects)}. Follows up to five
    * redirects, including http <-> https, which plain Java does not.
    */
+  // Build 242: two downloads at a time at most, so several large ones can't fill the app's
+  // memory together (Mark's phone ran out twice: OutOfMemoryError in amplify-fetch, then in a
+  // plugin call while the memory was still full).
+  private static final java.util.concurrent.Semaphore FETCH_SLOTS = new java.util.concurrent.Semaphore(2, true);
+
   @PluginMethod
   public void fetchText(PluginCall call) {
     String url = call.getString("url");
-    int max = call.getInt("max", 48 * 1024 * 1024);
+    // Build 242: a limit in bytes (was 48 M characters, ~96 MB in memory before the copies).
+    final int max = Math.max(64 * 1024, Math.min(call.getInt("max", 24 * 1024 * 1024), 32 * 1024 * 1024));
     if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) {
       call.reject("Not a web address");
       return;
@@ -2111,8 +2117,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     new Thread(
             () -> {
               java.net.HttpURLConnection c = null;
+              boolean slot = false;
+              String current = url;
               try {
-                String current = url;
+                FETCH_SLOTS.acquire();
+                slot = true;
                 for (int hop = 0; hop < 6; hop++) {
                   c = (java.net.HttpURLConnection) new java.net.URL(current).openConnection();
                   c.setConnectTimeout(10000);
@@ -2128,27 +2137,40 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                     continue;
                   }
                   if (code != 200) throw new Exception("HTTP " + code);
-                  StringBuilder sb = new StringBuilder();
-                  try (java.io.Reader r =
-                      new java.io.InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8)) {
-                    char[] buf = new char[16384];
+                  long declared = c.getContentLengthLong();
+                  if (declared > max) throw new Exception("File is too large");
+                  java.io.ByteArrayOutputStream bytes =
+                      new java.io.ByteArrayOutputStream(declared > 0 ? (int) declared : 64 * 1024);
+                  try (java.io.InputStream in = c.getInputStream()) {
+                    byte[] buf = new byte[64 * 1024];
                     int n;
-                    while ((n = r.read(buf)) > 0) {
-                      sb.append(buf, 0, n);
-                      if (sb.length() > max) throw new Exception("File is too large");
+                    while ((n = in.read(buf)) > 0) {
+                      bytes.write(buf, 0, n);
+                      if (bytes.size() > max) throw new Exception("File is too large");
                     }
                   }
+                  int size = bytes.size();
+                  String text = bytes.toString("UTF-8");
+                  bytes = null;
+                  if (size > 4 * 1024 * 1024) {
+                    CrashLog.info(getContext(), "large download " + (size / (1024 * 1024)) + " MB: " + current);
+                  }
                   JSObject o = new JSObject();
-                  o.put("text", sb.toString());
+                  o.put("text", text);
                   o.put("url", current);
                   call.resolve(o);
                   return;
                 }
                 throw new Exception("Too many redirects");
+              } catch (OutOfMemoryError oom) {
+                // Too big for the memory left: this download fails, the app carries on.
+                CrashLog.info(getContext(), "download too large for memory: " + current);
+                call.reject("File is too large");
               } catch (Exception e) {
                 call.reject(String.valueOf(e.getMessage()));
               } finally {
                 if (c != null) c.disconnect();
+                if (slot) FETCH_SLOTS.release();
               }
             },
             "amplify-fetch")

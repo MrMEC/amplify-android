@@ -17582,7 +17582,7 @@
     if(src.kind === 'pluto'){
       var url = 'https://api.pluto.tv/v2/channels/' + src.id + '?start=' + encodeURIComponent(new Date(now - 3600 * 1000).toISOString())
         + '&stop=' + encodeURIComponent(new Date(now + GUIDE_AHEAD_MS).toISOString());
-      return fetchTextAny(url).then(function(t){ return plutoGuideItems(JSON.parse(t)); });
+      return fetchTextAny(url, 2 * 1024 * 1024).then(function(t){ return plutoGuideItems(JSON.parse(t)); });
     }
     if(src.kind === 'plex'){
       if(!plexSignedIn()) return Promise.reject(new Error('not signed in to Plex'));
@@ -17804,13 +17804,15 @@
     var cap = window.Capacitor;
     return (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer) || null;
   }
-  function fetchTextAny(url){
+  // max (bytes, optional): the most the app's own fetch reads (build 242: it used to allow 48 M
+  // characters, enough to run the app out of memory).
+  function fetchTextAny(url, max){
     var nat = nativePluginOrNull();
     return fetch(url).then(function(r){
       if(!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
     })['catch'](function(e){
-      if(nat && nat.fetchText) return nat.fetchText({ url: url }).then(function(r){ return r.text; });
+      if(nat && nat.fetchText) return nat.fetchText(max ? { url: url, max: max } : { url: url }).then(function(r){ return r.text; });
       throw e;
     });
   }
@@ -18989,7 +18991,7 @@
   function plutoEnsureSession(force){
     if(!force && plutoSessionValid()) return Promise.resolve(plutoSession);
     if(plutoSessionPromise) return plutoSessionPromise;
-    plutoSessionPromise = fetchTextAny(plutoBootUrl()).then(function(t){
+    plutoSessionPromise = fetchTextAny(plutoBootUrl(), 1024 * 1024).then(function(t){
       var d = null;
       try{ d = JSON.parse(t); }catch(e){}
       var stitcher = d && d.servers && d.servers.stitcher;
