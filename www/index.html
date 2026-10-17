@@ -469,7 +469,7 @@
     .browse-view{ padding-top:76px; }
     /* Build 224: the Home hero starts right under the header (Mark): the 16px the page keeps
        below the header is taken back, unless a status message is showing above it. */
-    .status-line:not(.has-message) + .home-hero{ margin-top:-16px; }
+    .status-line:not(.has-message) + .home-hero{ margin-top:0; }
     /* While a page slides in (slideInPage), the page is its own layer for the trip. */
     body.page-sliding .browse-view{ will-change:transform; }
   }
@@ -1395,61 +1395,66 @@
   }
   .import-overlay .import-panel-close.primary{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
   .import-overlay .import-panel-stop:disabled{ opacity:.55; }
-  /* ---------- Home hero (build 220) ---------- */
-  /* What's playing, as a full-width picture at the top of Home that dissolves into the page:
-     the crisp picture fades out over a blurred copy of itself, and the blurred copy fades into
-     the page colour, so the title, details and Play button sit on plain page colour and read
-     in either theme. Logos (channels, stations) sit whole in the middle over their own blur. */
+  /* ---------- Home hero (build 220; a card since build 241) ---------- */
+  /* What's playing, at the top of Home. Build 241 (Mark): a card with rounded corners and the
+     page around it, and the picture blurs out toward the bottom instead of fading into the page
+     colour: the sharp picture gives way to a softly blurred copy, then a heavily blurred one,
+     and the title, details and Play button sit on that blur in white (either theme). */
   /* Build 226: the room under it is padding, not margin, so a tap there belongs to the hero
      (it goes back to the first slide). */
-  .home-hero{ position:relative; margin:0 calc(var(--main-pad) * -1) 0; padding-bottom:44px; width:calc(100% + var(--main-pad) * 2); max-width:none; box-sizing:border-box; isolation:isolate; }
-  /* Build 222: a strip of full-width slides that swipes sideways and snaps one at a time. */
-  .nph-track{ display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; margin-bottom:-26px;
+  .home-hero{ position:relative; margin:12px 0 0; padding-bottom:34px; width:100%; max-width:none; box-sizing:border-box; isolation:isolate; }
+  /* Build 222: a strip of slides that swipes sideways and snaps one at a time; the strip is the
+     card (its rounded corners clip every slide). */
+  .nph-track{ display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
+    border-radius:22px; background:#15161a; box-shadow:0 10px 30px rgba(0,0,0,.28);
     scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain; outline:none; }
+  html[data-theme="light"] .nph-track{ box-shadow:0 10px 28px rgba(0,0,0,.16); }
   .nph-track::-webkit-scrollbar{ display:none; }
   .nph-track.dragging{ scroll-snap-type:none; cursor:grabbing; user-select:none; }
-  /* Slides are as tall as the tallest; a shorter one's picture grows, so every slide's text
-     sits at the same place just above the dots. */
+  /* Every slide is the card's height; the text sits at its foot on the blur. */
   .nph-slide{ flex:0 0 100%; min-width:0; position:relative; scroll-snap-align:start; scroll-snap-stop:always;
-    display:flex; flex-direction:column; padding-bottom:26px; box-sizing:border-box; }
+    display:flex; flex-direction:column; justify-content:flex-end; box-sizing:border-box; overflow:hidden;
+    min-height:min(36vh, 380px); }
+  /* Build 221's half height (Mark), kept: about 330px on a phone, text included. */
+  @media (max-width: 900px){ .nph-slide{ min-height:clamp(270px, 80vw, 340px); } }
   .nph-slide.nph-tap{ cursor:pointer; }
   /* Build 223: a thin progress bar in place of the dots, in the same 78 x 6px they took
      (seven 6px dots, six 6px gaps): how far through the slides you are, no knob. */
-  /* Build 236: the slides keep 26px under the text so the Play button's shadow isn't cut off
-     by the strip's edge (it hides anything sideways and below); the strip's -26px bottom margin
-     gives that room back, so nothing under the hero moves. */
   .nph-progress{ position:relative; width:78px; height:6px; margin:16px auto 0; border-radius:3px; overflow:hidden;
     background:color-mix(in srgb, var(--text-faint) 45%, transparent); }
   .nph-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--accent); }
-  /* Build 221: half the height it was (Mark). */
-  .nph-media{ position:relative; flex:1 0 auto; min-height:min(28vh, 260px); overflow:hidden; background:var(--main-bg); }
-  @media (max-width: 900px){ .nph-media{ min-height:min(56vw, 250px); } }
-  .nph-bg, .nph-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; }
-  .nph-bg img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
-  .nph-bg{ filter:blur(40px) saturate(1.4); transform:scale(1.2); opacity:.85;
-    -webkit-mask-image:linear-gradient(to bottom, #000 40%, transparent 88%); mask-image:linear-gradient(to bottom, #000 40%, transparent 88%); }
-  .nph-art{ -webkit-mask-image:linear-gradient(to bottom, #000 30%, rgba(0,0,0,.55) 62%, transparent 96%);
-    mask-image:linear-gradient(to bottom, #000 30%, rgba(0,0,0,.55) 62%, transparent 96%); }
-  /* The text's own floor: page colour rising from the bottom, whatever the picture is. */
-  .nph-scrim{ position:absolute; inset:0; background:linear-gradient(to bottom, transparent 22%,
-    color-mix(in srgb, var(--main-bg) 60%, transparent) 54%, var(--main-bg) 84%); }
-  /* The text overlaps the faded lower part of the picture and carries on below it, so a long
-     title or a podcast's episode line never climbs over the top of the cover. */
-  .nph-body{ position:relative; z-index:2; margin:-92px var(--main-pad) 0;
-    display:flex; align-items:flex-end; gap:16px; }
-  .nph-text{ flex:1; min-width:0; }
-  .nph-kicker{ font-size:11.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+  /* The pictures never take a press (a drag would pick the image up, a long press open its
+     menu): swipes and taps go to the slide. */
+  .nph-media{ position:absolute; inset:0; overflow:hidden; background:#15161a; pointer-events:none; }
+  .nph-media img{ -webkit-user-drag:none; user-select:none; -webkit-touch-callout:none; }
+  .nph-bg, .nph-mid, .nph-art{ position:absolute; inset:0; border-radius:0; overflow:hidden; }
+  .nph-bg img, .nph-mid img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
+  /* The blur, in three steps from the top down: sharp, softly blurred, heavily blurred (a
+     little darker, so white text reads on any picture). No colour fade. */
+  .nph-bg{ filter:blur(26px) saturate(1.35) brightness(.72); transform:scale(1.18); }
+  .nph-mid{ filter:blur(9px) saturate(1.2) brightness(.88); transform:scale(1.06);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 48%, transparent 76%); mask-image:linear-gradient(to bottom, #000 0%, #000 48%, transparent 76%); }
+  .nph-art{ -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 30%, transparent 56%);
+    mask-image:linear-gradient(to bottom, #000 0%, #000 30%, transparent 56%); }
+  .nph-scrim{ display:none; }
+  /* A channel's logo stays whole on top; the blurred copies under it fill the card (cover), so
+     the foot of the card is the logo's colours blurred, not a dark backing. */
+  .nph-bg.channel-art img, .nph-mid.channel-art img{ object-fit:cover; }
+  .nph-body{ position:relative; z-index:2; margin:0; padding:0 18px 18px;
+    display:flex; align-items:flex-end; gap:14px; }
+  .nph-text{ flex:1; min-width:0; text-shadow:0 1px 2px rgba(0,0,0,.35), 0 2px 14px rgba(0,0,0,.35); }
+  .nph-kicker{ font-size:11.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.88); margin-bottom:6px; }
   .nph-kicker:empty{ display:none; }
-  .nph-title{ margin:0; font-size:clamp(28px, 8vw, 40px); font-weight:800; line-height:1.08; letter-spacing:-.01em; color:var(--text);
+  .nph-title{ margin:0; font-size:clamp(28px, 8vw, 40px); font-weight:800; line-height:1.08; letter-spacing:-.01em; color:#fff;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
-  .nph-line{ margin-top:6px; font-size:15px; font-weight:700; color:var(--text);
+  .nph-line{ margin-top:6px; font-size:15px; font-weight:700; color:#fff;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .nph-desc{ margin-top:5px; font-size:14px; line-height:1.4; color:var(--text-dim);
+  .nph-desc{ margin-top:5px; font-size:14px; line-height:1.4; color:rgba(255,255,255,.84);
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .nph-line:empty, .nph-desc:empty{ display:none; }
-  .nph-play{ flex:0 0 auto; width:58px; height:58px; border-radius:50%; border:0; margin-bottom:2px;
+  .nph-play{ flex:0 0 auto; width:56px; height:56px; border-radius:50%; border:0; margin-bottom:2px;
     background:var(--accent); color:var(--accent-text); display:flex; align-items:center; justify-content:center;
-    font-size:22px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+    font-size:21px; cursor:pointer; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 6px 18px rgba(0,0,0,.35); }
   .nph-play .fa-play{ margin-left:3px; }
   .nph-play:active{ transform:scale(.95); }
   /* ---------- Artist page hero ---------- */
@@ -36127,7 +36132,7 @@
   function buildHeroSlide(item){
     var slide = document.createElement('div');
     slide.className = 'nph-slide';
-    slide.innerHTML = '<div class="nph-media" aria-hidden="true"><div class="nph-bg"></div><div class="nph-art"></div><div class="nph-scrim"></div></div>'
+    slide.innerHTML = '<div class="nph-media" aria-hidden="true"><div class="nph-bg"></div><div class="nph-mid"></div><div class="nph-art"></div><div class="nph-scrim"></div></div>'
       + '<div class="nph-body"><div class="nph-text"><div class="nph-kicker"></div><h2 class="nph-title"></h2><div class="nph-line"></div><div class="nph-desc"></div></div>'
       + '<button type="button" class="nph-play" aria-label="Play"><i class="fa-solid fa-play" aria-hidden="true"></i></button></div>';
     slide._play = slide.querySelector('.nph-play');
@@ -36163,6 +36168,7 @@
     var item = slide._item, entry = slide._entry;
     renderStationArt(slide.querySelector('.nph-art'), item);
     renderStationArt(slide.querySelector('.nph-bg'), item);
+    renderStationArt(slide.querySelector('.nph-mid'), item);
     if(entry){
       Promise.resolve(ensureArtistMeta(entry)).then(function(){
         if(slide._item === item) slide.querySelector('.nph-desc').textContent = heroArtistBio(entry);
