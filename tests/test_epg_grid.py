@@ -173,6 +173,12 @@ async def run(p, theme, width, big):
     await pg.evaluate("document.querySelector('#stationsGrid .epg-head-track').scrollLeft = 120"); await pg.wait_for_timeout(300)
     sl2 = await pg.evaluate("document.querySelector('#stationsGrid .epg-scroll').scrollLeft")
     check(abs(sl2 - 120) <= 1, f'{T} swiping the times scrolls the grid too ({sl2})')
+    # build 245: a channel without a schedule keeps its name in view, however far the grid scrolls
+    for x in (900, 2400):
+        await pg.evaluate(f"document.querySelector('#stationsGrid .epg-scroll').scrollLeft = {x}"); await pg.wait_for_timeout(250)
+        w = await pg.evaluate("""(()=>{ var r=Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(x=>x.dataset.chUrl.indexOf('news.example')>=0);
+          var t=r.querySelector('.epg-prog.whole .epg-t').getBoundingClientRect(), c=r.querySelector('.epg-ch').getBoundingClientRect(); return [Math.round(t.left), Math.round(t.right), Math.round(c.right), innerWidth]; })()""")
+        check(w[0] >= w[2] and w[1] <= w[3] and w[0] - w[2] < 20, f'{T} scrolled {x}px: the no-schedule channel’s name stays just right of the logos {w}')
     if not big: await pg.screenshot(path=f'{SHOTS}/epg-sticky-{theme}.png')
     await pg.evaluate("document.querySelector('#stationsGrid .epg-scroll').scrollLeft = 0; document.getElementById('stationsGrid').style.paddingBottom=''; window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
     await pg.set_viewport_size({'width': width, 'height': 900}); await pg.wait_for_timeout(400)
@@ -199,6 +205,10 @@ async def run(p, theme, width, big):
       grid: !!grid, rows: grid ? grid.querySelectorAll('.epg-row').length : 0, heading: getComputedStyle(h).display !== 'none' && h.textContent ? h.textContent : '',
       gridBelowName: grid ? grid.getBoundingClientRect().top >= n.getBoundingClientRect().bottom : false, edge: grid ? [Math.round(grid.getBoundingClientRect().left), Math.round(grid.getBoundingClientRect().right)] : null }; })()""")
     check(np['open'] and np['channel'] and np['name'] == 'Buzzr' and np['sub'] == 'The Price Is Right \u00b7 Season 12 Episode 4', f'{T} playing: the channel’s name and what’s on {np["name"]!r} / {np["sub"]!r}')
+    # build 245: the title smaller, the episode tight under it, the pair centred between video and guide
+    tg = await pg.evaluate("""(()=>{ var R=e=>e.getBoundingClientRect(), n=R(document.getElementById('npName')), sb=R(document.getElementById('npSub')), f=R(document.querySelector('#nowPlayingScreen .np-hero-foot')), g=R(document.querySelector('#npCollection .epg'));
+      return { fs: parseFloat(getComputedStyle(document.getElementById('npName')).fontSize), gap: Math.round(sb.top - n.bottom), above: Math.round(n.top - f.top), below: Math.round(g.top - sb.bottom) }; })()""")
+    check((tg['fs'] <= 17 or big) and 0 <= tg['gap'] <= 4 and abs(tg['above'] - tg['below']) <= 3, f'{T} the title is smaller, the episode right under it, centred between video and guide {tg}')
     check(np['grid'] and np['rows'] == 4 and not np['heading'] and np['gridBelowName'] and np['edge'] == [0, width], f'{T} the full grid below, edge to edge, no heading {np}')
     await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
     q = await pg.evaluate("getComputedStyle(document.getElementById('npQueueMenuBtn')).display")
