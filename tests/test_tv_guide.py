@@ -30,23 +30,26 @@ CHANNELS = [
 LOG = {'pluto': [], 'plex': [], 'tokens': []}
 state = {'down': False}
 NOW = time.time()
+# Programs placed around the half hour we're in (not just around now), so the one on now still
+# rounds to a block containing now whatever minute the test runs (build 244).
+BASE = NOW // 1800 * 1800
 
 
 def iso(t): return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
 
 def pluto_body(cid):
-    progs = {BUZZR: [('The Price Is Right', 'Season 12 Episode 4', -600, 1800), ('Match Game', 'Charles Nelson Reilly', 1200, 1800), ('Family Feud', '', 3000, 1800), ('Press Your Luck', '', 4800, 1800)],
-             KIDS: [('Maggie and the Ferocious Beast', 'The Big Hat / The Camping Trip', -300, 1740), ('Maggie and the Ferocious Beast', 'Just a Little Off the Top', 1440, 1740)]}[cid]
+    progs = {BUZZR: [('The Price Is Right', 'Season 12 Episode 4', -120, 1980), ('Match Game', 'Charles Nelson Reilly', 1860, 1800), ('Family Feud', '', 3660, 1800), ('Press Your Luck', '', 5460, 1800)],
+             KIDS: [('Maggie and the Ferocious Beast', 'The Big Hat / The Camping Trip', -60, 1740), ('Maggie and the Ferocious Beast', 'Just a Little Off the Top', 1680, 1740)]}[cid]
     tl = []
     for title, ep, off, dur in progs:
-        tl.append({'start': iso(NOW + off), 'stop': iso(NOW + off + dur), 'title': title,
+        tl.append({'start': iso(BASE + off), 'stop': iso(BASE + off + dur), 'title': title,
                    'episode': {'name': ep or title, 'description': 'A classic game show. ' * 3, 'rating': 'TV-G', 'series': {'name': title}}})
     return {'_id': cid, 'name': 'x', 'timelines': tl}
 
 
 def plex_body(day):
-    t0 = int(NOW) - 900
+    t0 = int(BASE) - 60
     return {'MediaContainer': {'Metadata': [
         {'type': 'episode', 'title': 'Markets Open', 'grandparentTitle': 'Reuters Now Live', 'summary': 'Business news.', 'Media': [{'beginsAt': t0, 'endsAt': t0 + 3600}]},
         {'type': 'episode', 'title': 'World Report', 'grandparentTitle': 'Reuters Now Live', 'Media': [{'beginsAt': t0 + 3600, 'endsAt': t0 + 7200}]},

@@ -3365,34 +3365,48 @@
   .epg.epg-np{ margin:0 calc(var(--main-pad) * -1); }
   .epg-scroll{ overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   .epg-scroll::-webkit-scrollbar{ display:none; }
-  .epg-inner{ position:relative; padding-bottom:6px; }
-  .epg-head{ position:relative; height:52px; }
-  .epg-corner{ position:sticky; left:0; z-index:4; width:112px; height:52px; display:flex; align-items:center; justify-content:center;
+  .epg-inner{ position:relative; padding-bottom:4px; }
+  /* Build 244: denser (Mark: more on screen, like his mockup), and the times stick to the top. */
+  .epg-head{ position:sticky; top:0; z-index:5; display:flex; height:34px; background:var(--epg-bg); }
+  @media (max-width: 900px){
+    .tile-grid > .epg > .epg-head{ top:60px; transition:top .28s cubic-bezier(.4,0,.2,1); }
+    body.hdr-autohide.hdr-hidden .tile-grid > .epg > .epg-head{ top:0; }
+  }
+  .epg-corner{ flex:none; width:80px; height:34px; display:flex; align-items:center; justify-content:center;
     background:var(--epg-bg); border:0; color:var(--text-dim); cursor:pointer; padding:0; }
-  .epg-corner svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
-  .epg-time{ position:absolute; top:0; height:52px; display:flex; align-items:center; padding-left:6px; font-size:16.5px; font-weight:500;
+  .epg-corner svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+  .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
+  .epg-head-track::-webkit-scrollbar{ display:none; }
+  .epg-head-times{ position:relative; height:34px; }
+  .epg-time{ position:absolute; top:0; height:34px; display:flex; align-items:center; padding-left:6px; font-size:13px; font-weight:600;
     color:var(--text-dim); white-space:nowrap; }
-  .epg-row{ position:relative; height:88px; margin-top:6px; }
-  .epg-ch{ position:sticky; left:0; z-index:3; width:112px; height:88px; padding:0 6px 0 6px; margin:0; border:0; background:var(--epg-bg);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; color:var(--text); }
-  .epg-ch::before{ content:''; position:absolute; inset:0 6px 0 6px; background:var(--epg-cell); border-radius:6px; z-index:-1; }
+  .epg-row{ position:relative; height:50px; margin-top:3px; }
+  .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:50px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--text); }
+  .epg-ch::before{ content:''; position:absolute; inset:0 4px 0 4px; background:var(--epg-cell); border-radius:5px; z-index:-1; }
   .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
-  .epg-logo{ display:flex; align-items:center; justify-content:center; width:84px; height:44px; }
-  .epg-logo img{ max-width:84px; max-height:44px; object-fit:contain; display:block; }
-  .epg-logo-name{ font-size:13px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
-  .epg-heart{ color:var(--accent); font-size:15px; }
-  .epg-prog{ position:absolute; top:0; height:88px; border-radius:6px; background:var(--epg-cell); border:0; margin:0; padding:0 12px;
-    display:flex; flex-direction:column; justify-content:center; gap:3px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:hidden; }
+  .epg-logo{ display:flex; align-items:center; justify-content:center; width:60px; height:28px; }
+  .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
+  .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+  .epg-heart{ color:var(--accent); font-size:11px; }
+  .epg-prog{ position:absolute; top:0; height:50px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
+    display:flex; flex-direction:column; justify-content:center; gap:1px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:hidden; }
   button.epg-prog{ cursor:pointer; }
   .epg-prog.now{ background:var(--epg-cell-now); }
-  .epg-t{ font-size:16.5px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .epg-s{ font-size:14.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-t{ font-size:13px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-s{ font-size:11.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .epg-prog.whole .epg-t{ font-weight:500; }
-  /* Now: an accent line down the grid with a marker at the top, under the channel column. */
-  .epg-now{ position:absolute; top:40px; bottom:0; width:2px; background:var(--epg-line); z-index:2; pointer-events:none; opacity:.85; }
-  .epg-now::before{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); border-left:9px solid transparent; border-right:9px solid transparent;
-    border-top:11px solid var(--epg-line); }
+  /* Now: an accent line down the rows, its marker in the (sticky) time bar. */
+  .epg-now{ position:absolute; top:0; bottom:0; width:2px; background:var(--epg-line); z-index:2; pointer-events:none; opacity:.85; }
+  .epg-now-mark{ position:absolute; bottom:0; width:0; height:0; transform:translateX(-50%); border-left:7px solid transparent; border-right:7px solid transparent;
+    border-top:9px solid var(--epg-line); pointer-events:none; }
   .epg-order-menu{ z-index:6000; }
+  /* Build 244: sideways on Live TV with nothing playing: the grid alone, over everything, the
+     times stuck to the top of the screen. */
+  body.epg-land #stationsGrid > .epg{ position:fixed; inset:0; z-index:5000; margin:0; overflow-y:auto; overscroll-behavior:contain;
+    padding:0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+  body.epg-land #stationsGrid > .epg > .epg-head{ top:0 !important; padding-top:env(safe-area-inset-top, 0px); height:auto; }
+  body.epg-land{ overflow:hidden; }
   /* Under a playing channel: no heading, the grid runs edge to edge. */
   .np-related.np-epg > .np-related-heading{ display:none; }
   .np-related.np-epg{ padding-left:0; padding-right:0; }
@@ -3440,6 +3454,9 @@
   .np-related-grid.np-ch-list > .ch-group-head{ margin:16px 0 6px; }
   /* ---------- Video: movies and TV shows on the phone ---------- */
   .tile-grid > .video-tabs{ grid-column:1/-1; margin:0 0 6px; }
+  /* Build 244 (Mark): Live TV, Movies and TV Shows start as close under the tabs as Continue's list
+     does (18px: Continue's 6px + its list's 4px gap + a row's 8px padding), not the grid's 24px gap. */
+  .tile-grid:not(.grid-songs) > .video-tabs.watch-tabs{ margin-bottom:-6px; }
   /* Build 180: tab rows scroll sideways rather than squeeze (Watch now has four tabs). */
   .scroll-tabs{ flex-wrap:nowrap !important; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -ms-overflow-style:none;
     -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; }
@@ -9010,6 +9027,8 @@
   // animate: only when the user taps the mini player. Every other opener (rotating into
   // landscape, a restore) puts the screen up at once.
   function openNowPlaying(station, animate){
+    // From the landscape guide (build 244): once Now Playing is up, the landscape Now Playing applies.
+    if(document.body.classList.contains('epg-land')) setTimeout(function(){ if(typeof syncRotateLock === 'function') syncRotateLock(); }, 0);
     // Falls back to whatever was last played so the screen never opens on nothing -- see
     // lastPlayedStation().
     var target = station || currentStation || lastPlayedStation();
@@ -15169,6 +15188,9 @@
   if(window.matchMedia){
     var rotateLockQuery = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 926px)');
     var rotateLockOpenedNp = false;
+    var epgLandGridShowing = function(){
+      return !!(onVideoView && videoTab === 'channels' && !videoChannelsEditing && stationsGrid.querySelector(':scope > .epg'));
+    };
     var syncRotateLock = function(){
       // A YouTube video playing over the app (build 126) just gets bigger when the phone turns;
       // the landscape layout takes over once it is closed.
@@ -15176,6 +15198,24 @@
       var active = rotateLockQuery.matches;
       var wasActive = document.body.classList.contains('rotate-lock');
       var coverFlowFromLibrary = null;
+      // Build 244 (Mark): turned sideways on Live TV with nothing playing, the guide grid alone fills
+      // the screen (no header, heading, tabs, player bar or tab bar) instead of Now Playing. Once
+      // something plays (Now Playing opens), the usual landscape Now Playing takes over.
+      var epgLand = document.body.classList.contains('epg-land');
+      if(epgLand){
+        if(!active){ document.body.classList.remove('epg-land'); return; }
+        if(nowPlayingScreen.style.display !== 'flex' && epgLandGridShowing()) return;
+        document.body.classList.remove('epg-land');
+        rotateLockOpenedNp = false;
+        document.body.classList.add('rotate-lock');
+        return;
+      }
+      if(active && !wasActive && !document.body.classList.contains('np-open') && !uiIsPlaying && epgLandGridShowing()){
+        document.body.classList.add('epg-land');
+        var eg = stationsGrid.querySelector(':scope > .epg');
+        if(eg) eg.scrollTop = 0;
+        return;
+      }
       if(active && !wasActive){
         if(document.body.classList.contains('np-open')){
           rotateLockOpenedNp = false;
@@ -17534,7 +17574,8 @@
   // across, scrolling sideways. A program takes the half hours nearest its start and end. A
   // channel with no schedule is one block across. The accent line marks now. Tapping the block
   // that's on now plays the channel; other blocks do nothing.
-  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 160, EPG_CH_W = 112, EPG_ROW_H = 88, EPG_HEAD_H = 52, EPG_GAP = 6;
+  // Build 244 (Mark): denser, closer to his mockup: narrower half hours, a slimmer channel column, shorter rows.
+  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 124, EPG_CH_W = 80, EPG_ROW_H = 50, EPG_HEAD_H = 34, EPG_GAP = 4;
   function epgStart(now){ return Math.floor(now / EPG_SLOT_MS) * EPG_SLOT_MS; }
   function epgChannelOrder(list){
     var split = splitFavChannels(list);
@@ -17571,12 +17612,9 @@
     var wrap = document.createElement('div');
     wrap.className = 'epg' + (opts.np ? ' epg-np' : '');
     wrap.dataset.t0 = String(t0);
-    var scroller = document.createElement('div');
-    scroller.className = 'epg-scroll';
-    var inner = document.createElement('div');
-    inner.className = 'epg-inner';
-    inner.style.width = (EPG_CH_W + EPG_SLOTS * EPG_SLOT_W) + 'px';
-    // the times
+    // Build 244: the times are a bar of their own that sticks to the top while the rows scroll
+    // up under it (a sticky inside the sideways scroller can't stick to the page), following the
+    // grid's sideways scroll (and scrolling it, when swiped).
     var head = document.createElement('div');
     head.className = 'epg-head';
     var corner = document.createElement('button');
@@ -17587,14 +17625,30 @@
     corner.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h6"/></svg>';
     corner.addEventListener('click', function(e){ e.stopPropagation(); openEpgOrderMenu(corner); });
     head.appendChild(corner);
+    var track = document.createElement('div');
+    track.className = 'epg-head-track';
+    var times = document.createElement('div');
+    times.className = 'epg-head-times';
+    times.style.width = (EPG_SLOTS * EPG_SLOT_W) + 'px';
     for(var i = 0; i < EPG_SLOTS; i++){
       var tl = document.createElement('span');
       tl.className = 'epg-time';
-      tl.style.left = (EPG_CH_W + i * EPG_SLOT_W) + 'px';
+      tl.style.left = (i * EPG_SLOT_W) + 'px';
       tl.textContent = guideTime(t0 + i * EPG_SLOT_MS);
-      head.appendChild(tl);
+      times.appendChild(tl);
     }
-    inner.appendChild(head);
+    var mark = document.createElement('span');
+    mark.className = 'epg-now-mark';
+    mark.setAttribute('aria-hidden', 'true');
+    times.appendChild(mark);
+    track.appendChild(times);
+    head.appendChild(track);
+    wrap.appendChild(head);
+    var scroller = document.createElement('div');
+    scroller.className = 'epg-scroll';
+    var inner = document.createElement('div');
+    inner.className = 'epg-inner';
+    inner.style.width = (EPG_CH_W + EPG_SLOTS * EPG_SLOT_W) + 'px';
     channels.forEach(function(ch){ inner.appendChild(buildEpgRow(ch, t0, t1)); });
     var line = document.createElement('div');
     line.className = 'epg-now';
@@ -17602,14 +17656,19 @@
     inner.appendChild(line);
     scroller.appendChild(inner);
     wrap.appendChild(scroller);
+    var syncing = false;
+    scroller.addEventListener('scroll', function(){ if(syncing){ syncing = false; return; } if(track.scrollLeft !== scroller.scrollLeft){ syncing = true; track.scrollLeft = scroller.scrollLeft; } }, { passive: true });
+    track.addEventListener('scroll', function(){ if(syncing){ syncing = false; return; } if(scroller.scrollLeft !== track.scrollLeft){ syncing = true; scroller.scrollLeft = track.scrollLeft; } }, { passive: true });
     wrap._channels = channels;
     wrap._opts = opts;
     placeEpgNow(wrap, now);
     return wrap;
   }
   function placeEpgNow(wrap, now){
-    var t0 = Number(wrap.dataset.t0), line = wrap.querySelector('.epg-now');
-    if(line) line.style.left = Math.round(EPG_CH_W + (now - t0) / EPG_SLOT_MS * EPG_SLOT_W - 1) + 'px';
+    var t0 = Number(wrap.dataset.t0), line = wrap.querySelector('.epg-now'), mark = wrap.querySelector('.epg-now-mark');
+    var x = (now - t0) / EPG_SLOT_MS * EPG_SLOT_W;
+    if(line) line.style.left = Math.round(EPG_CH_W + x - 1) + 'px';
+    if(mark) mark.style.left = Math.round(x) + 'px';
   }
   function buildEpgRow(ch, t0, t1){
     var row = document.createElement('div');
@@ -20337,7 +20396,7 @@
   // ---- the Video page: Continue Watching and the tabs
   function appendVideoTabs(){
     var tabs = document.createElement('div');
-    tabs.className = 'home-tabs video-tabs';
+    tabs.className = 'home-tabs video-tabs watch-tabs';
     tabs.classList.add('scroll-tabs');
     [['channels', 'Live TV'], ['movies', 'Movies'], ['shows', 'TV Shows'], ['continue', 'Continue']].forEach(function(t){
       var b = document.createElement('button');
