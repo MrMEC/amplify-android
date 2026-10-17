@@ -26,9 +26,10 @@ async def main():
         await pg.route('**/*', route)
         await pg.goto('http://127.0.0.1:8816/index.html'); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(700)
-        bg = await pg.evaluate("""Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile.ch-item .tile-art'), function(a){
-            return [a.classList.contains('channel-art'), getComputedStyle(a).backgroundImage, getComputedStyle(a).backgroundColor];})""")
-        check(bg and all(x[0] and x[1] == 'none' and x[2] == 'rgb(43, 44, 49)' for x in bg), f'channel logos sit on dark gray {bg}')
+        # build 243+: the guide grid's channel cells: the logo on the plain cell, no generated colour wash
+        bg = await pg.evaluate("""Array.prototype.map.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){
+            var b=getComputedStyle(c,'::before'); return [getComputedStyle(c.querySelector('.epg-logo')).backgroundImage, b.backgroundImage, b.backgroundColor];})""")
+        check(bg and all(x[0] == 'none' and x[1] == 'none' and x[2] == 'rgb(42, 43, 49)' for x in bg), f'channel logos sit on the plain dark cell {bg}')
         await pg.screenshot(path=f'{SHOTS}/tvs-channels.png')
         await tab(pg, 'movies')
         await pg.evaluate("document.getElementById('videoAddHeaderBtn').click()"); await pg.wait_for_timeout(2500)

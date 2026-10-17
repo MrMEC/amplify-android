@@ -46,7 +46,7 @@ async def run(p,theme):
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
     print(theme,'livetv',await pg.evaluate(PROBE)); await pg.screenshot(path=f'{SHOTS}/probe-{TAG}-{theme}-livetv.png')
     for name in ['Red TV','Green TV']:
-        await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile.ch-item, #npCollectionGrid .tile-row'),function(t){return t.textContent.indexOf(n)>=0 && t.offsetParent;}).click()",name); await pg.wait_for_timeout(1500)
+        await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .epg-ch, #npCollectionGrid .epg-ch, #npCollectionGrid .tile-row'),function(t){return ((t.getAttribute('aria-label')||'')+t.textContent).indexOf(n)>=0 && t.getClientRects().length;}).click()",name); await pg.wait_for_timeout(1500)
         cur=await pg.evaluate("window.__cur")
         await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})",cur); await pg.wait_for_timeout(900)
         if await pg.evaluate("document.body.classList.contains('np-video-full')"):

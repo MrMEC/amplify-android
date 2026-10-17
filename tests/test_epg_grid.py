@@ -30,23 +30,26 @@ CHANNELS = [
 LOG = {'pluto': [], 'plex': [], 'tokens': []}
 state = {'down': False}
 NOW = time.time()
+# Programs placed around the half hour we're in (not just around now), so the one on now still
+# rounds to a block containing now whatever minute the test runs (build 244).
+BASE = NOW // 1800 * 1800
 
 
 def iso(t): return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
 
 def pluto_body(cid):
-    progs = {BUZZR: [('The Price Is Right', 'Season 12 Episode 4', -600, 1800), ('Match Game', 'Charles Nelson Reilly', 1200, 1800), ('Family Feud', '', 3000, 1800), ('Press Your Luck', '', 4800, 1800)],
-             KIDS: [('Maggie and the Ferocious Beast', 'The Big Hat / The Camping Trip', -300, 1740), ('Maggie and the Ferocious Beast', 'Just a Little Off the Top', 1440, 1740)]}[cid]
+    progs = {BUZZR: [('The Price Is Right', 'Season 12 Episode 4', -120, 1980), ('Match Game', 'Charles Nelson Reilly', 1860, 1800), ('Family Feud', '', 3660, 1800), ('Press Your Luck', '', 5460, 1800)],
+             KIDS: [('Maggie and the Ferocious Beast', 'The Big Hat / The Camping Trip', -60, 1740), ('Maggie and the Ferocious Beast', 'Just a Little Off the Top', 1680, 1740)]}[cid]
     tl = []
     for title, ep, off, dur in progs:
-        tl.append({'start': iso(NOW + off), 'stop': iso(NOW + off + dur), 'title': title,
+        tl.append({'start': iso(BASE + off), 'stop': iso(BASE + off + dur), 'title': title,
                    'episode': {'name': ep or title, 'description': 'A classic game show. ' * 3, 'rating': 'TV-G', 'series': {'name': title}}})
     return {'_id': cid, 'name': 'x', 'timelines': tl}
 
 
 def plex_body(day):
-    t0 = int(NOW) - 900
+    t0 = int(BASE) - 60
     return {'MediaContainer': {'Metadata': [
         {'type': 'episode', 'title': 'Markets Open', 'grandparentTitle': 'Reuters Now Live', 'summary': 'Business news.', 'Media': [{'beginsAt': t0, 'endsAt': t0 + 3600}]},
         {'type': 'episode', 'title': 'World Report', 'grandparentTitle': 'Reuters Now Live', 'Media': [{'beginsAt': t0 + 3600, 'endsAt': t0 + 7200}]},
@@ -100,6 +103,7 @@ async def route(r):
 
 
 SLOT = 1800
+SW, CW, GAP = 124, 80, 4   # build 244: denser
 def snap(t): return round(t / SLOT) * SLOT
 GRID = """(()=>{ var w=document.querySelector('.epg'); if(!w) return null; var sc=w.querySelector('.epg-scroll'), wr=w.getBoundingClientRect();
   var rows=Array.from(w.querySelectorAll('.epg-row')).map(function(r){ var ch=r.querySelector('.epg-ch'); var cr=ch.getBoundingClientRect();
@@ -125,7 +129,7 @@ async def run(p, theme, width, big):
     cdp = await ctx.new_cdp_session(pg)
     await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
     if big:
-        await pg.add_style_tag(content='.epg-t{font-size:22px !important} .epg-s{font-size:19.5px !important} .epg-time{font-size:22px !important} .np-name{font-size:30px !important} .np-sub{font-size:19px !important}')
+        await pg.add_style_tag(content='.epg-t{font-size:17.6px !important} .epg-s{font-size:15.5px !important} .epg-time{font-size:17.6px !important} .epg-logo-name{font-size:14.2px !important} .np-name{font-size:30px !important} .np-sub{font-size:19px !important}')
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2500)
     g = await pg.evaluate(GRID)
     check(g is not None and len(g['rows']) == 4, f'{T} Live TV is a guide grid with a row per channel {g and len(g["rows"])}')
@@ -139,17 +143,39 @@ async def run(p, theme, width, big):
     bz = [r for r in g['rows'] if BUZZR in r['url']][0]['blocks']
     want = []
     prev = t0
-    for title, ep, off, dur in [('The Price Is Right', '', -600, 1800), ('Match Game', '', 1200, 1800), ('Family Feud', '', 3000, 1800), ('Press Your Luck', '', 4800, 1800)]:
-        s0 = max(snap(NOW + off), prev); e0 = snap(NOW + off + dur)
+    for title, ep, off, dur in [('The Price Is Right', '', -120, 1980), ('Match Game', '', 1860, 1800), ('Family Feud', '', 3660, 1800), ('Press Your Luck', '', 5460, 1800)]:
+        s0 = max(snap(BASE + off), prev); e0 = snap(BASE + off + dur)
         if e0 > s0: want.append((title, s0, e0)); prev = e0
     got = [(x['t'], x['ss'] // 1000, x['ee'] // 1000) for x in bz]
     check(got == want, f'{T} programs take the nearest half hours {got} vs {want}')
-    check(all(abs(x['w'] - ((x['ee'] - x['ss']) / 1000 / SLOT * 160 - 6)) < 1 for x in bz), f'{T} a block’s width is its half hours')
+    check(all(abs(x['w'] - ((x['ee'] - x['ss']) / 1000 / SLOT * SW - GAP)) < 1 for x in bz), f'{T} a block’s width is its half hours')
     ln = [r for r in g['rows'] if 'news.example' in r['url']][0]['blocks']
-    check(len(ln) == 1 and ln[0]['whole'] and ln[0]['w'] > 24 * 160 - 10, f'{T} a channel without a schedule is one block across {ln}')
-    exp_line = 112 + (NOW - t0) / SLOT * 160
+    check(len(ln) == 1 and ln[0]['whole'] and ln[0]['w'] > 24 * SW - 10, f'{T} a channel without a schedule is one block across {ln}')
+    exp_line = CW + (NOW - t0) / SLOT * SW
     check(abs(g['line'] - exp_line) < 40 and g['lineColor'] not in ('', 'rgba(0, 0, 0, 0)'), f'{T} the now line sits at the current time, in the accent ({g["line"]:.0f} vs {exp_line:.0f})')
     check(g['left'] == 0 and g['right'] == g['vw'] and g['scroll'], f'{T} the grid runs edge to edge and scrolls sideways')
+    # build 244: denser, text still fits; 18px under the tabs (as Continue)
+    d = await pg.evaluate("""(()=>{ var r=document.querySelector('.epg-row'), tabs=document.querySelector('#stationsGrid .video-tabs'), e=document.querySelector('#stationsGrid > .epg');
+      var over=Array.from(document.querySelectorAll('.epg-prog')).filter(function(b){ return b.scrollHeight > b.clientHeight + 1; }).length;
+      return { rowH: r.getBoundingClientRect().height, gap: Math.round(e.getBoundingClientRect().top - tabs.getBoundingClientRect().bottom), over: over }; })()""")
+    check(d['rowH'] <= 50 and d['over'] == 0, f'{T} rows are 50px or less and every block’s text fits {d}')
+    check(d['gap'] == 18, f'{T} the grid starts 18px under the tabs, like Continue {d["gap"]}')
+    # build 244: the times stick to the top while the rows scroll up, and follow the sideways scroll
+    await pg.set_viewport_size({'width': width, 'height': 520}); await pg.wait_for_timeout(400)   # short (still upright), so four rows scroll
+    await pg.evaluate("(()=>{ document.getElementById('stationsGrid').style.paddingBottom='900px'; window.scrollTo(0, 0); })()"); await pg.wait_for_timeout(200)
+    await pg.evaluate("window.scrollBy(0, 240)"); await pg.wait_for_timeout(600)
+    sk = await pg.evaluate("""(()=>{ var h=document.querySelector('#stationsGrid .epg-head').getBoundingClientRect(), hdr=document.querySelector('.app-header, header'); var hb=hdr?hdr.getBoundingClientRect().bottom:0;
+      var first=document.querySelector('#stationsGrid > .epg').getBoundingClientRect(); var tb=document.querySelector('#stationsGrid .video-tabs').getBoundingClientRect(); window.__dbg=[tb.top, document.querySelector('#stationsGrid .epg-row').getBoundingClientRect().top]; return { top: Math.round(h.top), hdr: Math.round(hb), firstTop: Math.round(first.top), y: Math.round(scrollY) }; })()""")
+    check(sk['firstTop'] < sk['top'] and (abs(sk['top']) <= 1 or abs(sk['top'] - sk['hdr']) <= 1), f'{T} the time row sticks at the top while the rows scroll under it {sk}')
+    await pg.evaluate("document.querySelector('#stationsGrid .epg-scroll').scrollLeft = 300"); await pg.wait_for_timeout(300)
+    sl = await pg.evaluate("document.querySelector('#stationsGrid .epg-head-track').scrollLeft")
+    check(abs(sl - 300) <= 1, f'{T} the times follow the grid sideways ({sl})')
+    await pg.evaluate("document.querySelector('#stationsGrid .epg-head-track').scrollLeft = 120"); await pg.wait_for_timeout(300)
+    sl2 = await pg.evaluate("document.querySelector('#stationsGrid .epg-scroll').scrollLeft")
+    check(abs(sl2 - 120) <= 1, f'{T} swiping the times scrolls the grid too ({sl2})')
+    if not big: await pg.screenshot(path=f'{SHOTS}/epg-sticky-{theme}.png')
+    await pg.evaluate("document.querySelector('#stationsGrid .epg-scroll').scrollLeft = 0; document.getElementById('stationsGrid').style.paddingBottom=''; window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
+    await pg.set_viewport_size({'width': width, 'height': 900}); await pg.wait_for_timeout(400)
     await pg.evaluate("document.querySelector('.epg').scrollIntoView({block:'start'}); window.scrollBy(0, -140)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{SHOTS}/epg-grid-{theme}-{width}{"-big" if big else ""}.png')
     # channels stay on the left while the grid scrolls
@@ -194,10 +220,50 @@ async def run(p, theme, width, big):
     await b.close()
 
 
+async def land(p, theme):
+    # Build 244: sideways on Live TV with nothing playing: only the grid. Playing hands over to the
+    # landscape Now Playing; upright again, the page is back.
+    T = f'[{theme} landscape]'
+    b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
+    ctx = await b.new_context(viewport={'width': 412, 'height': 900}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme, locale='en-US', timezone_id='America/New_York')
+    await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE); await ctx.add_init_script(SEED)
+    pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+    await pg.route('**/*', route)
+    await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2500)
+    await pg.set_viewport_size({'width': 900, 'height': 412}); await pg.wait_for_timeout(1200)
+    VIS = """(()=>{ var pts=[[450,20],[20,200],[450,200],[880,390],[450,395]]; return { land: document.body.classList.contains('epg-land'), rot: document.body.classList.contains('rotate-lock'),
+      all: pts.every(function(p){ var e=document.elementFromPoint(p[0],p[1]); return !!(e && e.closest('#stationsGrid > .epg')); }),
+      nav: (function(){ var n=document.querySelector('.mobile-nav'); if(!n) return false; var r=n.getBoundingClientRect(); var e=document.elementFromPoint(r.left+r.width/2, Math.min(innerHeight-2, r.top+r.height/2)); return !!(e && e.closest('.mobile-nav')); })(),
+      head: Math.round(document.querySelector('#stationsGrid > .epg > .epg-head').getBoundingClientRect().top) }; })()"""
+    v = await pg.evaluate(VIS)
+    check(v['land'] and not v['rot'] and v['all'] and not v['nav'] and v['head'] == 0, f'{T} turned sideways with nothing playing: only the grid, times at the top {v}')
+    await pg.screenshot(path=f'{SHOTS}/epg-land-{theme}.png')
+    await pg.evaluate("document.querySelector('#stationsGrid > .epg').scrollTop = 200"); await pg.wait_for_timeout(300)
+    h = await pg.evaluate("Math.round(document.querySelector('#stationsGrid > .epg > .epg-head').getBoundingClientRect().top)")
+    check(h == 0, f'{T} the times stay at the top as the channels scroll ({h})')
+    await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('.epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); r.querySelector('.epg-prog.now').click(); })()" % BUZZR); await pg.wait_for_timeout(1800)
+    v = await pg.evaluate("[document.body.classList.contains('epg-land'), document.body.classList.contains('rotate-lock'), document.getElementById('nowPlayingScreen').style.display]")
+    check(v == [False, True, 'flex'], f'{T} playing hands over to the landscape Now Playing {v}')
+    await pg.set_viewport_size({'width': 412, 'height': 900}); await pg.wait_for_timeout(1200)
+    v = await pg.evaluate("[document.body.classList.contains('epg-land'), document.body.classList.contains('rotate-lock')]")
+    check(v == [False, False], f'{T} upright again: the usual screens {v}')
+    await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(800)
+    # something playing: turning sideways is the usual landscape Now Playing, not the grid
+    await pg.set_viewport_size({'width': 900, 'height': 412}); await pg.wait_for_timeout(1200)
+    v = await pg.evaluate("[document.body.classList.contains('epg-land'), document.body.classList.contains('rotate-lock')]")
+    check(v == [False, True], f'{T} with something playing, sideways is Now Playing as before {v}')
+    await pg.set_viewport_size({'width': 412, 'height': 900}); await pg.wait_for_timeout(1000)
+    check(not errs, f'{T} no page errors {errs[:3]}')
+    await b.close()
+
+
 async def main():
     async with async_playwright() as p:
         await run(p, 'dark', 412, False)
         await run(p, 'light', 412, False)
         await run(p, 'dark', 360, True)
+        await land(p, 'dark')
+        await land(p, 'light')
     print('ALL PASSED' if not fails else f'FAILED {fails}')
 asyncio.run(main())
