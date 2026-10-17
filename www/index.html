@@ -31356,6 +31356,9 @@
         track.diskSize = disk.size;
         track.diskModified = disk.lastModified;
       }
+      // Build 240: a refresh (coverIfAny) takes the file's picture when it has one, and
+      // otherwise leaves the song's picture (a folder's cover, say) as it was.
+      if(opts.coverIfAny && r[0] && r[0].art && r[0].art.length) opts.cover = true;
       if(opts.cover && r[0] && r[0].art && r[0].art.length){
         try{ artBlob = new Blob([r[0].art], { type: r[0].artMime || 'image/jpeg' }); }catch(e){}
       }
@@ -32147,10 +32150,12 @@
     });
     return Object.keys(set);
   }
-  function changeSummary(added, removed, noun){
-    if(!added && !removed) return 'Everything is up to date.';
+  function changeSummary(added, removed, noun, updated, merged){
+    if(!added && !removed && !updated && !merged) return 'Everything is up to date.';
     var bits = [];
     if(added) bits.push(added + ' new ' + noun + (added === 1 ? '' : 's') + ' added');
+    if(updated) bits.push(updated + ' ' + noun + (updated === 1 ? '' : 's') + ' updated');
+    if(merged) bits.push(merged + ' duplicate' + (merged === 1 ? '' : 's') + ' merged');
     if(removed) bits.push(removed + ' ' + noun + (removed === 1 ? '' : 's') + ' removed');
     return bits.join(', ') + '.';
   }
@@ -32163,6 +32168,53 @@
         amplifyEntry: f
       };
     });
+  }
+  // Build 240: of the songs sharing one file, the one to keep: the one with the most attached to
+  // it (favourite, in playlists, plays), else the oldest (not the copy made by the last refresh).
+  function pickKeeper(list, newId){
+    if(list.length === 1) return list[0];
+    var plays = loadSongPlays();
+    function score(t){
+      var k = favKey(t), n = 0;
+      if(favorites.some(function(f){ return favKey(f) === k; })) n += 1000;
+      stationPlaylists.forEach(function(p){ if((p.stations || []).some(function(x){ return favKey(x) === k; })) n += 100; });
+      n += ((plays[k] || [0])[0] || 0);
+      if(k !== newId) n += 0.5;
+      return n;
+    }
+    return list.slice().sort(function(a, b){ return score(b) - score(a); })[0];
+  }
+  // Build 240: whatever pointed at a duplicate song points at the one kept instead.
+  function mergeTrackRefs(dupKey, keep){
+    var keepKey = favKey(keep);
+    if(!dupKey || dupKey === keepKey) return;
+    function swap(list){
+      var seen = {}, out = [];
+      (list || []).forEach(function(x){
+        var k = favKey(x);
+        if(k === dupKey){ x = keep; k = keepKey; }
+        if(seen[k]) return;
+        seen[k] = true;
+        out.push(x);
+      });
+      return out;
+    }
+    if(favorites.some(function(f){ return favKey(f) === dupKey; })){ favorites = swap(favorites); saveFavorites(); }
+    var plChanged = false;
+    stationPlaylists.forEach(function(p){
+      if((p.stations || []).some(function(x){ return favKey(x) === dupKey; })){ p.stations = swap(p.stations); plChanged = true; }
+    });
+    if(plChanged) saveStationPlaylists();
+    if(recentStations.some(function(x){ return favKey(x) === dupKey; })){ recentStations = swap(recentStations); saveRecent(); }
+    try{
+      var m = loadSongPlays();
+      if(m[dupKey]){
+        var a = m[keepKey] || [0, 0], b = m[dupKey];
+        m[keepKey] = [(a[0] || 0) + (b[0] || 0), Math.max(a[1] || 0, b[1] || 0)];
+        delete m[dupKey];
+        localStorage.setItem(SONG_PLAYS_KEY, JSON.stringify(m));
+      }
+    }catch(e){}
   }
   var musicRefreshBusy = false;
   function refreshMusicLibrary(){
@@ -32179,6 +32231,13 @@
     libraryRefreshHeaderBtn.classList.add('refreshing');
     setStatus('Checking your music folders…', false, true);
     var removed = 0, failed = 0, toImport = [];
+    // Build 240: songs are matched to their files by where the file is on the phone, so a
+    // file retagged outside Amplify (a new size and date) updates its song in place, keeping
+    // its favourites, playlists and plays, instead of coming back as a second song. Copies
+    // left by earlier refreshes are merged into one.
+    var changed = [], dups = [], updated = 0, merged = 0;
+    var bySrc = {};
+    libraryTracks.forEach(function(t){ if(t.srcUri) (bySrc[t.srcUri] = bySrc[t.srcUri] || []).push(t); });
     var chain = Promise.resolve();
     trees.forEach(function(tree){
       chain = chain.then(function(){
@@ -32193,6 +32252,15 @@
           var edited = {};
           libraryTracks.forEach(function(t){ if(t.srcUri && t.diskSize) edited[t.srcUri] = t; });
           var fresh = stubs.filter(function(st){ return isAudioFile(st) && !videoSet[st.amplifyEntry.uri]; }).filter(function(st){
+            var same = st.amplifyEntry && bySrc[st.amplifyEntry.uri];
+            if(same && same.length){
+              var newId = makeLocalTrackId(relPathOf(st), st.size, st.lastModified);
+              var keep = pickKeeper(same, newId);
+              same.forEach(function(t){ if(t !== keep) dups.push({ dup: t, keep: keep }); });
+              var current = favKey(keep) === newId || (keep.diskSize === st.size && keep.diskModified === st.lastModified);
+              if(!current) changed.push({ track: keep, stub: st });
+              return false;
+            }
             var e = st.amplifyEntry && edited[st.amplifyEntry.uri];
             if(e && e.diskSize === st.size && e.diskModified === st.lastModified) return false;
             return !libraryById[makeLocalTrackId(relPathOf(st), st.size, st.lastModified)];
@@ -32210,6 +32278,24 @@
       });
     });
     chain.then(function(){
+      // Copies from earlier refreshes: their favourites, playlists and plays move to the one kept.
+      return dups.reduce(function(p, d){
+        return p.then(function(){
+          mergeTrackRefs(favKey(d.dup), d.keep);
+          return removeLocalTrack(d.dup).then(function(){ merged++; }, function(){});
+        });
+      }, Promise.resolve());
+    }).then(function(){
+      // Files changed outside Amplify: their songs take the new tags (and picture) in place.
+      var done = [];
+      return changed.reduce(function(p, c){
+        return p.then(function(){
+          return nativeFileFromEntry(c.stub.amplifyEntry).then(function(file){
+            return applySavedTags(c.track, file, { size: c.stub.size, lastModified: c.stub.lastModified }, { coverIfAny: true, quiet: true });
+          }).then(function(){ updated++; done.push(c.track); }, function(){});
+        });
+      }, Promise.resolve()).then(function(){ if(done.length) afterTagSave(done, true); });
+    }).then(function(){
       var audioNew = toImport.filter(isAudioFile);
       var art = toImport.filter(function(x){ return !isAudioFile(x); });
       if(!audioNew.length) return null;
@@ -32224,10 +32310,13 @@
       refreshLibraryView();
       // With new songs the import reports its own result; otherwise say what changed.
       if(!importedCount){
-        setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song'), !!failed);
-      } else if(removed){
+        setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song', updated, merged), !!failed);
+      } else if(removed || updated || merged){
         // The import's own outcome is showing; the removals go in with it (build 234).
-        var rm = removed + (removed === 1 ? ' song was' : ' songs were') + ' removed (no longer in the folder).';
+        var rm = (updated ? updated + (updated === 1 ? ' song was' : ' songs were') + ' updated with new tags. ' : '')
+          + (merged ? merged + (merged === 1 ? ' duplicate was' : ' duplicates were') + ' merged. ' : '')
+          + (removed ? removed + (removed === 1 ? ' song was' : ' songs were') + ' removed (no longer in the folder).' : '');
+        rm = rm.trim();
         importPanelDetail.textContent = importPanelDetail.textContent ? importPanelDetail.textContent + ' ' + rm : rm;
       }
     })['catch'](function(err){
