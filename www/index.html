@@ -28665,7 +28665,17 @@
       var i = order.indexOf(sec);
       sec.style.display = i === -1 ? 'none' : '';
     });
-    order.forEach(function(sec){ dailyHomeSections.appendChild(sec); });
+    // Build 241: putting a section back in place takes it out of the page for a moment, which
+    // sends its row back to the start; it happened on every redraw (something played, a
+    // favourite...) and so mid-swipe. Sections already in order stay put; one that has to move
+    // keeps where its row was scrolled to.
+    var now = Array.prototype.filter.call(dailyHomeSections.children, function(c){ return order.indexOf(c) !== -1; });
+    var inOrder = now.length === order.length && now.every(function(c, i){ return c === order[i]; });
+    if(!inOrder){
+      var lefts = order.map(function(sec){ return sec._grid ? sec._grid.scrollLeft : 0; });
+      order.forEach(function(sec){ dailyHomeSections.appendChild(sec); });
+      order.forEach(function(sec, i){ if(sec._grid && lefts[i]) sec._grid.scrollLeft = lefts[i]; });
+    }
     if(document.body.classList.contains('home-stacked')) syncHomeRows();
   }
   function renderDailyVideos(){
