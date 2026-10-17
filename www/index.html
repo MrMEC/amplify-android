@@ -5579,6 +5579,10 @@
   html[data-theme="light"] .now-playing-screen.np-channel .np-cast-note{ color:var(--accent); }
   html[data-theme="light"] .now-playing-screen.np-channel .np-cast-note.local{ color:rgba(0,0,0,.62); }
   body:not(.rotate-lock) .now-playing-screen.np-vplayer .np-details > .np-cast-note{ grid-column:1; justify-self:start; }
+  /* Build 239: midway between the artist line and the Play button (Mark): the artist line's
+     20px (12px on a channel) below it, less 7px, matches the 13px under it. */
+  body:not(.rotate-lock) .now-playing-screen:not(.np-vplayer) .np-details > .np-cast-note{ margin:-7px 0 13px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel:not(.np-vplayer) .np-details > .np-cast-note{ margin-top:1px; }
 
   /* The menu button: a grey pill with the lines and the word Menu. */
   .hamburger-btn .hb-lines{ display:flex; flex-direction:column; justify-content:center; gap:4px; font-style:normal; }
