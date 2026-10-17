@@ -102,7 +102,7 @@ async def run(p, theme):
     await pg.evaluate("window.__castInfo.connected = true; window.__castInfo.device = 'Living Room TV'; window.__emit('cast', window.__castInfo)"); await pg.wait_for_timeout(200)
     await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(600)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-    await pg.evaluate("document.querySelector('#stationsGrid .tile-row').click()"); await pg.wait_for_timeout(1500)
+    await pg.evaluate("document.querySelector('#stationsGrid .epg-ch').click()"); await pg.wait_for_timeout(1500)
     await pg.evaluate("(id)=>window.__emit('state', {id:id, state:'ready', isPlaying:true, playWhenReady:true, position:0, duration:-1, live:true, cast:true, castDevice:'Living Room TV', external:true})", await pg.evaluate("window.__cur"))
     await pg.wait_for_timeout(500)
     lv = await pg.evaluate("window.__loads")

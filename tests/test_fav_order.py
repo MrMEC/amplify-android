@@ -134,41 +134,32 @@ async def main():
         # ---- Live TV: favourite channels first
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
         await pg.evaluate("(()=>{ var t=document.querySelector('#stationsGrid .video-tabs [data-tab=channels]') || Array.prototype.find.call(document.querySelectorAll('#stationsGrid .home-tab'), function(b){ return /Live TV/.test(b.textContent); }); if(t) t.click(); })()"); await pg.wait_for_timeout(700)
-        LIST = """(()=>Array.prototype.filter.call(document.querySelectorAll('#stationsGrid > *'), function(e){ return e.classList.contains('ch-group-head') || e.classList.contains('grid-section-label') || e.classList.contains('tile-row'); })
-          .map(function(e){ return e.classList.contains('tile-row') ? (e.querySelector('.tile-name')||e).textContent.trim() : '#' + e.textContent.trim(); }))()"""
+        LIST = """(()=>{ var heads = document.querySelectorAll('#stationsGrid .grid-section-label, #stationsGrid .ch-group-head').length;
+          return (heads ? ['#heading'] : []).concat(Array.prototype.map.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){ return (c.getAttribute('aria-label')||'').replace(/, playing$/,'') + (c.querySelector('.epg-heart') ? '*' : ''); })); })()"""
         lt = await pg.evaluate(LIST)
-        check(lt[:4] == ['#Favorites', 'Kitchen TV', 'Zed TV', '#My Channels'] and 'Zed TV' not in lt[4:] and 'Kitchen TV' not in lt[4:] and all(x in lt for x in ['Alpha TV', 'Beach TV', 'Mango TV', 'Movies 24']),
-              f'Live TV: Favorites (A to Z) first, then My Channels with the rest {lt}')
+        check(lt[:2] == ['Kitchen TV*', 'Zed TV*'] and '#heading' not in lt and not any(x.endswith('*') for x in lt[2:]) and all(x in lt for x in ['Alpha TV', 'Beach TV', 'Mango TV', 'Movies 24']),
+              f'Live TV grid: favourites (A to Z, with a heart) first, then the rest, no headings (build 243) {lt}')
         await pg.screenshot(path=f'{SHOTS}/favord-livetv.png')
-        lsz = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid > .ch-group-head'), function(e){ var c=getComputedStyle(e); return [c.fontSize, c.fontWeight, c.color]; })")
-        # ---- the list under a playing channel
-        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile-row'), function(r){ return /Alpha TV/.test(r.textContent); }).click()"); await pg.wait_for_timeout(1500)
+        # ---- the guide under a playing channel (build 243): the same order, no headings
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){ return /Alpha TV/.test(c.getAttribute('aria-label')||''); }).click()"); await pg.wait_for_timeout(1500)
         cur = await pg.evaluate("window.__cur")
         await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})", cur); await pg.wait_for_timeout(900)
         if await pg.evaluate("document.body.classList.contains('np-video-full')"):
             await pg.evaluate("window.__emit('videotap',{})"); await pg.wait_for_timeout(600)
-        np = await pg.evaluate("""(()=>{ var out=[document.getElementById('npCollectionHeading').textContent.trim()];
-          Array.prototype.forEach.call(document.querySelectorAll('#npCollectionGrid > *'), function(e){ out.push(e.classList.contains('ch-group-head') ? '#' + e.textContent.trim() : (e.querySelector('.tile-name')||e).textContent.trim()); });
-          var h=document.getElementById('npCollectionHeading'), s=document.querySelector('#npCollectionGrid > .ch-group-head'); var hc=getComputedStyle(h), sc=s?getComputedStyle(s):null;
-          return {list:out, head:[hc.fontSize, hc.fontWeight, hc.color], sub:sc?[sc.fontSize, sc.fontWeight, sc.color]:null}; })()""")
-        check(np['list'][:4] == ['Favorites', 'Kitchen TV', 'Zed TV', '#My Channels'] and len(np['list']) == 1 + 2 + 1 + 4,
-              f'under a playing channel: Favorites (A to Z), then My Channels with the rest {np["list"]}')
-        check(np['sub'] == np['head'], f'the My Channels heading matches the list heading {np["head"]} {np["sub"]}')
-        check(all(x[0] == np['head'][0] and x[1] == np['head'][1] for x in lsz) and len(lsz) == 2, f'Live TV headings are the same size {lsz} vs {np["head"]}')
-        dim = await pg.evaluate("(()=>{ var d=document.createElement('div'); d.style.color='var(--text-dim)'; document.body.appendChild(d); var c=getComputedStyle(d).color; d.remove(); return c; })()")
-        check(all(x[2] == dim for x in lsz), f'Live TV headings use the default grey heading colour {lsz} vs {dim}')
+        NPL = """(()=>{ var out=[document.getElementById('npCollectionHeading').textContent.trim()];
+          Array.prototype.forEach.call(document.querySelectorAll('#npCollectionGrid .epg-ch'), function(c){ out.push((c.getAttribute('aria-label')||'').replace(/, playing$/,'') + (c.querySelector('.epg-heart') ? '*' : '')); });
+          out.push(document.querySelectorAll('#npCollectionGrid .ch-group-head, #npCollectionGrid .grid-section-label').length); return out; })()"""
+        np = await pg.evaluate(NPL)
+        check(np[:3] == ['', 'Kitchen TV*', 'Zed TV*'] and len(np) == 1 + 6 + 1 and np[-1] == 0,
+              f'under a playing channel: favourites first in the guide, no headings {np}')
         await pg.evaluate("document.getElementById('npCollectionGrid').scrollIntoView({block:'start'})"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{SHOTS}/favord-np.png')
-        # un-favourite both channels: no headings (back to the plain My Channels list)
+        # un-favourite both channels: plain A to Z, updated at once
         for c in [CHS[0], CHS[4]]:
             await pg.evaluate("(s)=>window.__fo.toggle(s)", chst(c)); await pg.wait_for_timeout(300)
         await pg.wait_for_timeout(400)
-        np2 = await pg.evaluate("[document.getElementById('npCollectionHeading').textContent.trim(), document.querySelectorAll('#npCollectionGrid > .ch-group-head').length, document.querySelectorAll('#npCollectionGrid .tile-row').length]")
-        check(np2 == ['My Channels', 0, 6], f'with no favourite channels the list is My Channels alone, updated at once {np2}')
-        await pg.evaluate("document.querySelector('#npMinimize, .np-float .np-back, #npBackBtn') && document.querySelector('#npMinimize, .np-float .np-back, #npBackBtn').click()"); await pg.wait_for_timeout(800)
-        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        h3 = await pg.evaluate("document.querySelectorAll('#stationsGrid > .ch-group-head').length")
-        check(h3 == 0, f'and Live TV shows no Favorites / My Channels headings ({h3})')
+        np2 = await pg.evaluate(NPL)
+        check(np2[0] == '' and len(np2) == 8 and not any(str(x).endswith('*') for x in np2[1:-1]) and np2[1:-1] == sorted(np2[1:-1], key=str.lower), f'with no favourite channels the guide is A to Z, updated at once {np2}')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('ALL PASSED' if not fails else f'FAILED {fails}')

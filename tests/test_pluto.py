@@ -200,7 +200,7 @@ async def main():
         # and its stream server is used
         b0 = LOG['boot']
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        PLAY_CNN = """(()=>{ var t = Array.prototype.find.call(document.querySelectorAll('#stationsGrid .ch-list .tile, #stationsGrid .tile'), function(x){ var n = x.querySelector('.tile-name'); return n && n.textContent === 'CNN Headlines'; }); t.click(); })()"""
+        PLAY_CNN = """(()=>{ var t = Array.prototype.find.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){ return (c.getAttribute('aria-label')||'').replace(/, playing$/,'') === 'CNN Headlines'; }); t.click(); })()"""
         await pg.evaluate(PLAY_CNN); await pg.wait_for_timeout(1500)
         l3 = loads(await pg.evaluate('window.__calls'))[-1]
         check('jwt=JWTTOKEN1' in l3 and LOG['boot'] == b0, f'after a restart the kept session plays My Channels without a new start {l3}')

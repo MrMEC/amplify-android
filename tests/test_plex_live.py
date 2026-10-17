@@ -156,7 +156,7 @@ async def main():
         state['down'] = True
         await pg.reload(); await pg.wait_for_timeout(2000)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        mine = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile .tile-name, #stationsGrid .ch-list .tile-name'),function(t){return t.textContent;})")
+        mine = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .epg-ch'),function(c){return (c.getAttribute('aria-label')||'').replace(/, playing$/,'');})")
         check('Stingray Naturescape' in mine and 'The Carol Burnett Show' in mine, f'My Channels keeps them after a restart {mine}')
         await pg.screenshot(path=f'{SHOTS}/plexlive-mychannels.png')
         await pg.evaluate("document.getElementById('videoAddHeaderBtn').click()"); await pg.wait_for_timeout(1000)
