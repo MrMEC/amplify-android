@@ -178,9 +178,19 @@ public class PlaybackService extends MediaLibraryService {
         .edit().putBoolean(KEY_LEVELING, on).apply();
   }
 
+  // Build 240: the equalizer preset (Settings), kept like volume leveling.
+  static final String KEY_EQ = "eqPreset";
+
+  static void setEq(android.content.Context c, String preset) {
+    Equalizer.setPreset(preset);
+    c.getSharedPreferences(AUDIO_PREFS, android.content.Context.MODE_PRIVATE)
+        .edit().putString(KEY_EQ, Equalizer.preset()).apply();
+  }
+
   private androidx.media3.exoplayer.DefaultRenderersFactory levelingRenderers() {
     Leveler.enabled =
         getSharedPreferences(AUDIO_PREFS, MODE_PRIVATE).getBoolean(KEY_LEVELING, true);
+    Equalizer.setPreset(getSharedPreferences(AUDIO_PREFS, MODE_PRIVATE).getString(KEY_EQ, "Off"));
     return new androidx.media3.exoplayer.DefaultRenderersFactory(this) {
       @Override
       protected androidx.media3.exoplayer.audio.AudioSink buildAudioSink(
@@ -188,7 +198,7 @@ public class PlaybackService extends MediaLibraryService {
         return new androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
             .setEnableFloatOutput(enableFloatOutput)
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-            .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[] {new LevelingProcessor()})
+            .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[] {new EqProcessor(), new LevelingProcessor()})
             .build();
       }
     };

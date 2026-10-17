@@ -6697,6 +6697,22 @@
         <option value="off">Off</option>
       </select>
     </div>
+    <!-- Build 240: equalizer presets (Android app), applied by the phone's player before leveling. -->
+    <div class="settings-row" id="eqRow" style="display:none;">
+      <span class="settings-label">Equalizer</span>
+      <select class="settings-select" id="eqSelect" aria-label="Equalizer">
+        <option value="Off">Off</option>
+        <option value="Bass Boost">Bass Boost</option>
+        <option value="Treble Boost">Treble Boost</option>
+        <option value="Vocal">Vocal</option>
+        <option value="Rock">Rock</option>
+        <option value="Pop">Pop</option>
+        <option value="Jazz">Jazz</option>
+        <option value="Classical">Classical</option>
+        <option value="Dance">Dance</option>
+        <option value="Late Night">Late Night</option>
+      </select>
+    </div>
     <!-- Build 159: which player plays the videos on the phone (movies, TV, music videos). VLC
          is the default; the phone's own player stays as an alternative. -->
     <div class="settings-row" id="videoPlayerRow" style="display:none;">
@@ -8397,6 +8413,31 @@
     P.setLeveling({}).then(function(o){ if(o && typeof o.on === 'boolean') sel.value = o.on ? 'on' : 'off'; })['catch'](function(){});
     sel.addEventListener('change', function(){
       P.setLeveling({ on: sel.value === 'on' })['catch'](function(){ setStatus('Couldn\u2019t change volume leveling', true); });
+    });
+  })();
+  // Equalizer presets (build 240): the phone's player keeps the choice (Equalizer, EqProcessor).
+  (function(){
+    var row = document.getElementById('eqRow'), sel = document.getElementById('eqSelect');
+    var Cap = window.Capacitor;
+    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    if(!row || !P || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform() || typeof P.setEq !== 'function') return;
+    row.style.display = '';
+    sel.value = 'Off';
+    function show(o){
+      if(!o || !o.preset) return;
+      // The player's own list wins (a newer app may have more presets than this page knows).
+      if(Array.isArray(o.presets) && o.presets.length){
+        var have = Array.prototype.map.call(sel.options, function(x){ return x.value; }).join('|');
+        if(have !== o.presets.join('|')){
+          sel.innerHTML = '';
+          o.presets.forEach(function(n){ var op = document.createElement('option'); op.value = n; op.textContent = n; sel.appendChild(op); });
+        }
+      }
+      sel.value = o.preset;
+    }
+    P.setEq({}).then(show)['catch'](function(){});
+    sel.addEventListener('change', function(){
+      P.setEq({ preset: sel.value }).then(show)['catch'](function(){ setStatus('Couldn\u2019t change the equalizer', true); });
     });
   })();
   resultLimitSelect.value = String(resultLimit);
