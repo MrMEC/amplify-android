@@ -33,7 +33,7 @@ import java.util.Locale;
  */
 final class VideoControls extends FrameLayout {
   interface Listener {
-    /** action: play, pause, seek (value = seconds), full. */
+    /** action: play, pause, seek (value = seconds), full, stop. */
     void onControl(String action, double value);
   }
 
@@ -50,6 +50,7 @@ final class VideoControls extends FrameLayout {
   private final TextView elapsed, total, liveTag;
   private final SeekBar seek;
   private final Glyph full;
+  private final TextView stop;
 
   private boolean enabled, shown, playing, live, isFull, seeking;
   private double pos, dur;
@@ -179,6 +180,35 @@ final class VideoControls extends FrameLayout {
 
     addView(bar, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, px(52), Gravity.BOTTOM));
 
+    // Build 246: Stop, top right: the page ends the video and goes back to where it came from.
+    stop = new TextView(context);
+    stop.setText("Stop");
+    stop.setTextColor(Color.WHITE);
+    stop.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+    stop.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+    stop.setLetterSpacing(0.02f);
+    stop.setGravity(Gravity.CENTER);
+    stop.setIncludeFontPadding(false);
+    GradientDrawable sb = new GradientDrawable();
+    sb.setColor(0x80000000);
+    sb.setCornerRadius(px(15));
+    stop.setBackground(sb);
+    stop.setPadding(px(13), 0, px(13), 0);
+    stop.setContentDescription("Stop");
+    stop.setClickable(true);
+    stop.setFocusable(true);
+    stop.setOnClickListener(
+        new OnClickListener() {
+          @Override
+          public void onClick(View v) {
+            listener.onControl("stop", 0);
+          }
+        });
+    LayoutParams stp = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(30), Gravity.TOP | Gravity.END);
+    stp.topMargin = px(10);
+    stp.rightMargin = px(10);
+    addView(stop, stp);
+
     applyAccent();
     applyMode();
     setVisibility(View.INVISIBLE);
@@ -302,6 +332,14 @@ final class VideoControls extends FrameLayout {
       LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) spacer.getLayoutParams();
       lp.weight = live ? 1f : 0f;
       spacer.setLayoutParams(lp);
+    }
+    // Full screen: Stop a little further in, clear of rounded corners and the camera.
+    LayoutParams stp = (LayoutParams) stop.getLayoutParams();
+    int m = px(isFull ? 18 : 10);
+    if (stp.topMargin != m) {
+      stp.topMargin = m;
+      stp.rightMargin = m;
+      stop.setLayoutParams(stp);
     }
     full.setKind(isFull ? Glyph.EXIT_FULL : Glyph.FULL);
     full.setContentDescription(isFull ? "Exit full screen" : "Full screen");

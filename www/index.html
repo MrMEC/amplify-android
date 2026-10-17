@@ -2234,7 +2234,8 @@
      margin), so the two combined left barely any air between the tab row and that heading.
      Restore the roomier gap .home-tabs normally gives a tab row on its own. */
   /* Breathing room between the tabs and the first thing under them. */
-  #podcastTabs.search-tabs{ margin-bottom:32px; }
+  /* Build 246 (Mark): 18px from the tabs to the first heading's text or row, the same as Watch (was 34). */
+  #podcastTabs.search-tabs{ margin-bottom:16px; }
 
   /* Back link above a detail page's heading. */
   .detail-back-btn{
@@ -3257,9 +3258,16 @@
     background:linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 46%), rgba(0,0,0,.18);
     opacity:0; transition:opacity .22s ease;
   }
-  .vctl-play, .vctl-bar{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
+  .vctl-play, .vctl-bar, .vctl-stop{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
   .vctl.show::before{ opacity:1; }
-  .vctl.show .vctl-play, .vctl.show .vctl-bar{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
+  .vctl.show .vctl-play, .vctl.show .vctl-bar, .vctl.show .vctl-stop{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
+  /* Build 246 (Mark): Stop, top right of the controls: ends the video and goes back to where it came
+     from (the Live TV guide, or the movie's / show's page). */
+  .vctl-stop{
+    position:absolute; top:10px; right:10px; z-index:1; height:30px; padding:0 13px; border-radius:999px; border:none; cursor:pointer;
+    background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:13px; font-weight:700; letter-spacing:.02em; line-height:30px;
+  }
+  body.np-video-full .vctl-stop{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
   .vctl-play{
     position:absolute; left:50%; top:50%; width:64px; height:64px; margin:-32px 0 0 -32px; border-radius:50%;
     display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
@@ -6460,6 +6468,7 @@
                (so full screen carries them along). Where the phone draws the picture itself, it
                draws the same controls on it (VideoControls.java). -->
           <div class="vctl" id="vctl">
+            <button type="button" class="vctl-stop" id="vctlStop" aria-label="Stop">Stop</button>
             <button type="button" class="vctl-play" id="vctlPlay" aria-label="Play">
               <svg class="vctl-ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5a.8.8 0 0 0-1.2.7z"/></svg>
               <svg class="vctl-ico-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4.2" height="15" rx="1.2"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2"/></svg>
@@ -10286,7 +10295,7 @@
   }
   vctl.addEventListener('click', function(e){
     e.stopPropagation();
-    if(e.target.closest('.vctl-play, .vctl-bar')){ vctlShow(true); return; }
+    if(e.target.closest('.vctl-play, .vctl-bar, .vctl-stop')){ vctlShow(true); return; }
     vctlShow(!vctl.classList.contains('show'));
   });
   // Any button or the bar touched keeps them up for another 3 seconds.
@@ -10294,6 +10303,34 @@
     if(vctl.classList.contains('show') && e.target.closest('button, input')) vctlArm();
   }, true);
   vctlPlay.addEventListener('click', function(){ npPlayBtn.click(); });
+  document.getElementById('vctlStop').addEventListener('click', function(e){ e.stopPropagation(); npStopVideo(); });
+  // Build 246 (Mark): Stop on the video. The video stops and closes, Now Playing closes, and the page
+  // under it is where the video came from: the Live TV guide for a channel, the movie's or the
+  // show's page for a video on the phone (or from Plex).
+  function npStopVideo(){
+    var st = npTarget() || currentStation;
+    var channel = !!(st && isNpChannel(st));
+    var vid = st && isLocalVideo(st) ? st : null;
+    if(npVideoFull){ try{ exitVideoFull(); }catch(e){} }
+    stopPlayback();
+    if(channel){
+      videoTab = 'channels'; vsave(VIDEO_TAB_KEY, videoTab);
+      videoChannelsEditing = false;
+      if(onVideoView){ renderVideoHome(); } else { pushView(); openVideoHome(); }
+      window.scrollTo(0, 0);
+    } else if(vid){
+      var where = vid.videoKind === 'episode' && vid.showKey ? 's:' + vid.showKey : 'm:' + vid.id;
+      if(!(onVideoDetailView && videoDetailWhere === where)) pushView();
+      if(where.charAt(0) === 's') openVideoShow(vid.showKey); else openVideoMovie(vid.id);
+      window.scrollTo(0, 0);
+    }
+    // Sideways: on Live TV, the guide alone (build 244); a movie's or show's page shows as it is
+    // (not Now Playing again, which the sideways screen would otherwise open).
+    if(document.body.classList.contains('rotate-lock')){
+      document.body.classList.remove('rotate-lock');
+      if(channel && typeof syncRotateLock === 'function') syncRotateLock();
+    }
+  }
   vctlRange.addEventListener('input', function(){
     vctlFill();
     var t = vctlTimes();
@@ -10325,6 +10362,8 @@
         if(npSeekApplies() && npIsCurrent()){ try{ audio.currentTime = Math.max(0, Number(ev.value) || 0); }catch(e){} }
       } else if(a === 'full'){
         npVideoFullBtn.click();
+      } else if(a === 'stop'){
+        npStopVideo();
       }
     });
   }
@@ -20861,9 +20900,11 @@
     hero.appendChild(row);
     return { hero: hero, text: text, poster: poster };
   }
+  var videoDetailWhere = '';
   function openVideoMovie(id){
     var v = vlib().byId[id];
     if(!v){ openVideoHome(); return; }
+    videoDetailWhere = 'm:' + id;
     enterVideoDetail(v.title);
     videoDetailRerender = function(){ var y = window.scrollY; openVideoMovie(id); window.scrollTo(0, y); };
     var h = detailHero(movieBackdropUrl(v), videoPosterUrl(v), v.title,
@@ -20906,6 +20947,7 @@
   function openVideoShow(key){
     var s = vlib().showsByKey[key];
     if(!s){ openVideoHome(); return; }
+    videoDetailWhere = 's:' + key;
     enterVideoDetail(s.title);
     videoDetailRerender = function(){ var y = window.scrollY; openVideoShow(key); window.scrollTo(0, y); };
     var eps = s.episodes;
