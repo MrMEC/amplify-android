@@ -43,8 +43,8 @@ async def main():
               f'a full store makes room by clearing a cache, and the favourite is saved (cleared {len(log["freed"])})')
         await pg.reload(); await pg.wait_for_timeout(3000)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        lt = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid > .ch-group-head, #stationsGrid > .tile-row'), function(e){ return e.classList.contains('ch-group-head') ? '#' + e.textContent : (e.querySelector('.tile-name')||e).textContent.trim(); })")
-        check(lt[:3] == ['#Favorites', 'Alpha TV', 'Zed TV'], f'after a restart the channel is still under Favorites {lt[:4]}')
+        lt = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){ return (c.getAttribute('aria-label')||'').replace(/, playing$/,'') + (c.querySelector('.epg-heart') ? '*' : ''); })")
+        check(lt[:2] == ['Alpha TV*', 'Zed TV*'], f'after a restart the channel is still a favourite, first in the guide {lt[:4]}')
         check(await pg.evaluate("localStorage.getItem('radioPlayerVideoChannels') !== null && localStorage.getItem('radioPlayerFavorites') !== null"), 'the listener\'s own lists are never cleared')
 
         # 2) full of things that aren't caches: localStorage refuses, Android's copy still gets it

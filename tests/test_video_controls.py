@@ -50,7 +50,7 @@ async def main():
         await pg.route('**/*', route)
         await pg.goto('http://127.0.0.1:8815/index.html'); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
-        await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelector('#stationsGrid .epg-ch').click()"); await pg.wait_for_timeout(500)
         g = await pg.evaluate(STATE)
         check(g['vplayer'] and g['inWrap'] == 'npArtWrap' and g['show'] and g['noFull'], f'before the picture: controls over the logo, no full screen button {g}')
         await pg.screenshot(path=f'{SHOTS}/vctl-ch-logo.png')
@@ -132,7 +132,7 @@ async def main():
         await pg.route('**/*', route)
         await pg.goto('http://127.0.0.1:8815/index.html'); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
-        await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelector('#stationsGrid .epg-ch').click()"); await pg.wait_for_timeout(500)
         cur = await pg.evaluate("window.__cur")
         await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})", cur); await pg.wait_for_timeout(400)
         if not await pg.evaluate("document.getElementById('vctl').classList.contains('show')"):
