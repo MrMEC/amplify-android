@@ -3356,6 +3356,48 @@
   .fav-order-chev{ width:14px; height:14px; fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; flex:none; }
   /* Build 189: Favorites / My Channels headings on Live TV, sized like the list heading under a
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
+  /* ---------- Build 243: the Live TV guide grid (Mark's mockups) ---------- */
+  :root{ --epg-bg:#1b1c20; --epg-cell:#2a2b31; --epg-cell-now:#32333a; --epg-line:var(--accent); }
+  html[data-theme="light"]{ --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; } }
+  .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1); }
+  .epg{ background:var(--epg-bg); min-width:0; }
+  .epg.epg-np{ margin:0 calc(var(--main-pad) * -1); }
+  .epg-scroll{ overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .epg-scroll::-webkit-scrollbar{ display:none; }
+  .epg-inner{ position:relative; padding-bottom:6px; }
+  .epg-head{ position:relative; height:52px; }
+  .epg-corner{ position:sticky; left:0; z-index:4; width:112px; height:52px; display:flex; align-items:center; justify-content:center;
+    background:var(--epg-bg); border:0; color:var(--text-dim); cursor:pointer; padding:0; }
+  .epg-corner svg{ width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+  .epg-time{ position:absolute; top:0; height:52px; display:flex; align-items:center; padding-left:6px; font-size:16.5px; font-weight:500;
+    color:var(--text-dim); white-space:nowrap; }
+  .epg-row{ position:relative; height:88px; margin-top:6px; }
+  .epg-ch{ position:sticky; left:0; z-index:3; width:112px; height:88px; padding:0 6px 0 6px; margin:0; border:0; background:var(--epg-bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; color:var(--text); }
+  .epg-ch::before{ content:''; position:absolute; inset:0 6px 0 6px; background:var(--epg-cell); border-radius:6px; z-index:-1; }
+  .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
+  .epg-logo{ display:flex; align-items:center; justify-content:center; width:84px; height:44px; }
+  .epg-logo img{ max-width:84px; max-height:44px; object-fit:contain; display:block; }
+  .epg-logo-name{ font-size:13px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+  .epg-heart{ color:var(--accent); font-size:15px; }
+  .epg-prog{ position:absolute; top:0; height:88px; border-radius:6px; background:var(--epg-cell); border:0; margin:0; padding:0 12px;
+    display:flex; flex-direction:column; justify-content:center; gap:3px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:hidden; }
+  button.epg-prog{ cursor:pointer; }
+  .epg-prog.now{ background:var(--epg-cell-now); }
+  .epg-t{ font-size:16.5px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-s{ font-size:14.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-prog.whole .epg-t{ font-weight:500; }
+  /* Now: an accent line down the grid with a marker at the top, under the channel column. */
+  .epg-now{ position:absolute; top:40px; bottom:0; width:2px; background:var(--epg-line); z-index:2; pointer-events:none; opacity:.85; }
+  .epg-now::before{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); border-left:9px solid transparent; border-right:9px solid transparent;
+    border-top:11px solid var(--epg-line); }
+  .epg-order-menu{ z-index:6000; }
+  /* Under a playing channel: no heading, the grid runs edge to edge. */
+  .np-related.np-epg > .np-related-heading{ display:none; }
+  .np-related.np-epg{ padding-left:0; padding-right:0; }
+  .np-related.np-epg > .np-related-grid{ display:block; overflow:visible; margin:0; padding:0; }
+
   /* Build 240: Now / Next under a channel row, and the TV Guide page. */
   .ch-guide{ margin-top:3px; min-width:0; }
   .ch-guide-now, .ch-guide-next{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.35; }
@@ -4493,6 +4535,11 @@
       flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
       padding:4px 6px 10px; margin:0 -6px;
     }
+    /* Build 243: the guide grid runs to both edges of the screen and scrolls up and down here. */
+    body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection.np-epg #npCollectionGrid{
+      padding:0 0 10px; margin:0 calc(var(--main-pad) * -1);
+    }
+    body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection.np-epg .epg.epg-np{ margin:0; }
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
     .mobile-nav, .search-sheet{ background:var(--panel); }
@@ -9542,6 +9589,7 @@
   }
   function renderNpCollection(station){
     npCollectionGrid.classList.remove('np-ch-list');
+    if(!isNpChannel(station)) npCollection.classList.remove('np-epg');
     if(isNpChannel(station)){ renderNpChannels(station); return; }
     if(isLocalVideo(station)){ renderNpVideoList(station); return; }
     var col = collectionForStation(station);
@@ -17240,13 +17288,12 @@
       });
       return;
     }
-    // Build 240: the TV guide, when any channel here publishes a schedule; schedules are
-    // fetched (or renewed) in the background and the rows fill in as they arrive.
-    var withGuide = mine.filter(function(ch){ return !!guideSource(ch); });
-    if(withGuide.length){
-      stationsGrid.appendChild(buildGuideLink());
-      guideRefresh(withGuide);
-    }
+    // Build 243 (Mark's mockups): the guide grid. Channels down the left (favourites first, no
+    // headings), half-hour columns across; schedules are fetched in the background and the rows
+    // fill in as they arrive.
+    stationsGrid.appendChild(buildEpgGrid(epgChannelOrder(mine)));
+    guideRefresh(mine.filter(function(ch){ return !!guideSource(ch); }));
+    return;
     var split = splitFavChannels(mine);
     if(split.favs.length){
       stationsGrid.appendChild(buildChGroupHead('Favorites'));
@@ -17291,11 +17338,6 @@
         channelOrder = v;
         try{ localStorage.setItem(CHANNEL_ORDER_KEY, v); }catch(e){}
         saveVideoChannels();
-      }],
-     ['Show', [['category', 'By Category'], ['list', 'One List']], function(){ return channelSort; }, function(v){
-        if(channelOrder === 'manual') reorderVideoChannelsFromGrid();
-        channelSort = v;
-        try{ localStorage.setItem(CHANNEL_SORT_KEY, v); }catch(e){}
       }]
     ].forEach(function(g){
       var line = document.createElement('div');
@@ -17413,7 +17455,19 @@
       }
       list.forEach(function(ch){ npCollectionGrid.appendChild(buildChannelRow(ch, { saved: saved })); });
     }
-    if(findVideoChannel(url)){ show('My Channels', visibleVideoChannels(), true); return; }
+    // Build 243: a channel in My Channels has the guide grid under it (no heading).
+    if(findVideoChannel(url)){
+      var mineList = visibleVideoChannels();
+      npCollectionGrid.innerHTML = '';
+      npCollectionGrid.classList.remove('np-ch-list');
+      npCollection.classList.add('np-epg');
+      npCollectionHeading.textContent = '';
+      npCollection.style.display = mineList.length ? '' : 'none';
+      npCollectionGrid.appendChild(buildEpgGrid(epgChannelOrder(mineList), { np: true }));
+      guideRefresh(mineList.filter(function(ch){ return !!guideSource(ch); }));
+      return;
+    }
+    npCollection.classList.remove('np-epg');
     npCollection.style.display = 'none';
     var c = st.channel || {};
     function others(list){
@@ -17464,6 +17518,234 @@
       onRename: saved ? function(){ promptRenameVideoChannel(ch); } : null }));
     return tile;
   }
+  // ---------- Live TV guide grid (build 243, Mark's mockups) ----------
+  // One grid for the Live TV tab and under a playing channel: the channels fixed down the left
+  // (logo, a heart for a favourite), then half-hour columns from the half hour we're in, 12 hours
+  // across, scrolling sideways. A program takes the half hours nearest its start and end. A
+  // channel with no schedule is one block across. The accent line marks now. Tapping the block
+  // that's on now plays the channel; other blocks do nothing.
+  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 160, EPG_CH_W = 112, EPG_ROW_H = 88, EPG_HEAD_H = 52, EPG_GAP = 6;
+  function epgStart(now){ return Math.floor(now / EPG_SLOT_MS) * EPG_SLOT_MS; }
+  function epgChannelOrder(list){
+    var split = splitFavChannels(list);
+    return split.favs.concat(split.rest);
+  }
+  // The programs as half-hour blocks: each start and end moved to the nearest half hour, kept in
+  // order without overlapping; one that rounds away to nothing is left out.
+  function epgBlocks(ch, t0, t1){
+    var out = [], prevEnd = t0;
+    guideItemsFor(ch).slice().sort(function(a, b){ return a.s - b.s; }).forEach(function(it){
+      var s = Math.round(it.s / EPG_SLOT_MS) * EPG_SLOT_MS, e = Math.round(it.e / EPG_SLOT_MS) * EPG_SLOT_MS;
+      s = Math.max(s, prevEnd);
+      e = Math.min(e, t1);
+      if(e <= s) return;
+      out.push({ s: s, e: e, it: it });
+      prevEnd = e;
+    });
+    return out;
+  }
+  function epgNowText(st){
+    var url = st && (st.urlToResolve || st.url_resolved || st.url || '');
+    var ch = url ? findVideoChannel(url) : null;
+    if(!ch || !guideSource(ch)) return '';
+    var it = guideNowNext(ch).now;
+    if(!it) return '';
+    var parts = [];
+    if(it.t && alphaSortKey(it.t) !== alphaSortKey(ch.name || '')) parts.push(it.t);
+    if(it.sub) parts.push(it.sub);
+    return parts.join(' · ');
+  }
+  function buildEpgGrid(channels, opts){
+    opts = opts || {};
+    var now = Date.now(), t0 = epgStart(now), t1 = t0 + EPG_SLOTS * EPG_SLOT_MS;
+    var wrap = document.createElement('div');
+    wrap.className = 'epg' + (opts.np ? ' epg-np' : '');
+    wrap.dataset.t0 = String(t0);
+    var scroller = document.createElement('div');
+    scroller.className = 'epg-scroll';
+    var inner = document.createElement('div');
+    inner.className = 'epg-inner';
+    inner.style.width = (EPG_CH_W + EPG_SLOTS * EPG_SLOT_W) + 'px';
+    // the times
+    var head = document.createElement('div');
+    head.className = 'epg-head';
+    var corner = document.createElement('button');
+    corner.type = 'button';
+    corner.className = 'epg-corner';
+    corner.setAttribute('aria-label', 'Channel order');
+    corner.title = 'Channel order';
+    corner.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h6"/></svg>';
+    corner.addEventListener('click', function(e){ e.stopPropagation(); openEpgOrderMenu(corner); });
+    head.appendChild(corner);
+    for(var i = 0; i < EPG_SLOTS; i++){
+      var tl = document.createElement('span');
+      tl.className = 'epg-time';
+      tl.style.left = (EPG_CH_W + i * EPG_SLOT_W) + 'px';
+      tl.textContent = guideTime(t0 + i * EPG_SLOT_MS);
+      head.appendChild(tl);
+    }
+    inner.appendChild(head);
+    channels.forEach(function(ch){ inner.appendChild(buildEpgRow(ch, t0, t1)); });
+    var line = document.createElement('div');
+    line.className = 'epg-now';
+    line.setAttribute('aria-hidden', 'true');
+    inner.appendChild(line);
+    scroller.appendChild(inner);
+    wrap.appendChild(scroller);
+    wrap._channels = channels;
+    wrap._opts = opts;
+    placeEpgNow(wrap, now);
+    return wrap;
+  }
+  function placeEpgNow(wrap, now){
+    var t0 = Number(wrap.dataset.t0), line = wrap.querySelector('.epg-now');
+    if(line) line.style.left = Math.round(EPG_CH_W + (now - t0) / EPG_SLOT_MS * EPG_SLOT_W - 1) + 'px';
+  }
+  function buildEpgRow(ch, t0, t1){
+    var row = document.createElement('div');
+    row.className = 'epg-row';
+    var src = guideSource(ch);
+    row.dataset.chUrl = ch.url;
+    if(src) row.dataset.guideKey = src.key;
+    var st = channelToStation(ch);
+    var playing = !!(currentStation && favKey(currentStation) === favKey(st));
+    // the channel: its logo (or name), a heart if it's a favourite
+    var cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'epg-ch' + (playing ? ' playing' : '');
+    cell.setAttribute('aria-label', (ch.name || 'Channel') + (playing ? ', playing' : ''));
+    var logo = document.createElement('span');
+    logo.className = 'epg-logo';
+    if(ch.logo){
+      var img = document.createElement('img');
+      img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+      img.src = secureUrl(ch.logo);
+      img.onerror = function(){ logo.innerHTML = ''; logo.appendChild(epgLogoName(ch)); };
+      logo.appendChild(img);
+    } else logo.appendChild(epgLogoName(ch));
+    cell.appendChild(logo);
+    if(isFavorite(st)){
+      var heart = document.createElement('i');
+      heart.className = 'fa-solid fa-heart epg-heart';
+      heart.setAttribute('aria-hidden', 'true');
+      cell.appendChild(heart);
+    }
+    cell.addEventListener('click', function(){ playChannel(ch); });
+    row.appendChild(cell);
+    var blocks = src ? epgBlocks(ch, t0, t1) : [];
+    var now = Date.now();
+    if(!blocks.length){
+      // No schedule (or not yet): the channel as one block across.
+      row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', '', true, true));
+    } else {
+      blocks.forEach(function(b){
+        row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0));
+      });
+    }
+    return row;
+  }
+  function epgLogoName(ch){
+    var n = document.createElement('span');
+    n.className = 'epg-logo-name';
+    n.textContent = ch.name || 'Channel';
+    return n;
+  }
+  function epgBlock(ch, s, e, title, sub, isNow, whole, t0){
+    t0 = t0 == null ? s : t0;
+    var b = document.createElement(isNow ? 'button' : 'div');
+    if(isNow) b.type = 'button';
+    b.className = 'epg-prog' + (isNow ? ' now' : '') + (whole ? ' whole' : '');
+    var left = EPG_CH_W + (s - (whole ? s : t0)) / EPG_SLOT_MS * EPG_SLOT_W;
+    if(whole) left = EPG_CH_W;
+    b.style.left = (left + EPG_GAP / 2) + 'px';
+    b.style.width = ((e - s) / EPG_SLOT_MS * EPG_SLOT_W - EPG_GAP) + 'px';
+    b.dataset.s = String(s); b.dataset.e = String(e);
+    var t = document.createElement('span');
+    t.className = 'epg-t';
+    t.textContent = title;
+    b.appendChild(t);
+    if(sub){
+      var su = document.createElement('span');
+      su.className = 'epg-s';
+      su.textContent = sub;
+      b.appendChild(su);
+    }
+    // Only what's on now plays; a later program is there to read.
+    if(isNow) b.addEventListener('click', function(){ playChannel(ch); });
+    return b;
+  }
+  // The rows of a channel whose schedule just came in, in every grid on screen.
+  function epgChannelUpdated(key){
+    document.querySelectorAll('.epg-row[data-guide-key]').forEach(function(row){
+      if(row.dataset.guideKey !== key) return;
+      var wrap = row.closest('.epg'), ch = findVideoChannel(row.dataset.chUrl);
+      if(!wrap || !ch) return;
+      var t0 = Number(wrap.dataset.t0);
+      row.parentNode.replaceChild(buildEpgRow(ch, t0, t0 + EPG_SLOTS * EPG_SLOT_MS), row);
+    });
+    try{ var st = npTarget(); if(st && isNpChannel(st) && nowPlayingScreen.style.display === 'flex') renderNpSub(st); }catch(e){}
+  }
+  // Every minute: the line moves; at the next half hour the grid starts again from it.
+  function epgTick(){
+    var now = Date.now();
+    document.querySelectorAll('.epg').forEach(function(wrap){
+      if(epgStart(now) !== Number(wrap.dataset.t0)){
+        var fresh = buildEpgGrid(wrap._channels || [], wrap._opts || {});
+        wrap.parentNode.replaceChild(fresh, wrap);
+      } else {
+        placeEpgNow(wrap, now);
+        wrap.querySelectorAll('.epg-prog').forEach(function(b){
+          var on = Number(b.dataset.s) <= now && now < Number(b.dataset.e);
+          if(on !== b.classList.contains('now')){
+            var row = b.closest('.epg-row'), ch = row && findVideoChannel(row.dataset.chUrl);
+            if(row && ch) row.parentNode.replaceChild(buildEpgRow(ch, Number(wrap.dataset.t0), Number(wrap.dataset.t0) + EPG_SLOTS * EPG_SLOT_MS), row);
+          }
+        });
+      }
+    });
+    try{ var st = npTarget(); if(st && isNpChannel(st) && nowPlayingScreen.style.display === 'flex') renderNpSub(st); }catch(e){}
+  }
+  setInterval(epgTick, 30000);
+  // The corner button: the channels' order (A to Z, or the order arranged in Edit).
+  var epgOrderMenu = null;
+  function closeEpgOrderMenu(){ if(epgOrderMenu){ epgOrderMenu.remove(); epgOrderMenu = null; } }
+  function openEpgOrderMenu(anchor){
+    if(epgOrderMenu){ closeEpgOrderMenu(); return; }
+    var m = document.createElement('div');
+    m.className = 'ch-sort-menu epg-order-menu';
+    m.setAttribute('role', 'menu');
+    [['az', 'A to Z'], ['manual', 'Manual']].forEach(function(o){
+      var it = document.createElement('button');
+      it.type = 'button';
+      var on = channelOrder === o[0];
+      it.className = 'np-menu-item' + (on ? ' on' : '');
+      it.setAttribute('role', 'menuitemradio');
+      it.setAttribute('aria-checked', on ? 'true' : 'false');
+      it.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (on ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
+      it.lastChild.textContent = o[1];
+      it.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        closeEpgOrderMenu();
+        if(channelOrder === o[0]) return;
+        channelOrder = o[0];
+        try{ localStorage.setItem(CHANNEL_ORDER_KEY, o[0]); }catch(e){}
+        saveVideoChannels();
+        document.querySelectorAll('.epg').forEach(function(wrap){
+          var fresh = buildEpgGrid(epgChannelOrder(visibleVideoChannels()), wrap._opts || {});
+          wrap.parentNode.replaceChild(fresh, wrap);
+        });
+      });
+      m.appendChild(it);
+    });
+    document.body.appendChild(m);
+    var r = anchor.getBoundingClientRect();
+    m.style.top = Math.round(r.bottom + 6) + 'px';
+    m.style.left = Math.max(8, Math.round(r.left)) + 'px';
+    epgOrderMenu = m;
+  }
+  document.addEventListener('click', function(e){ if(epgOrderMenu && !epgOrderMenu.contains(e.target)) closeEpgOrderMenu(); });
+  window.addEventListener('scroll', closeEpgOrderMenu, { passive: true });
+
   // ---------- TV guide (build 240) ----------
   // Pluto channels publish their schedules (api.pluto.tv/v2/channels/<id>?start&stop, about
   // 40 KB a channel for 12 hours); Plex channels through the guide key saved with them
@@ -17631,6 +17913,7 @@
     next();
   }
   function guideUpdated(key){
+    epgChannelUpdated(key);
     document.querySelectorAll('.ch-guide[data-guide-key]').forEach(function(el){
       if(el.dataset.guideKey !== key) return;
       var ch = guideChannelByKey(key);
@@ -29698,6 +29981,12 @@
       }
       return;
     }
+    // Build 243: a channel with a schedule shows what's on now under its name (the show, when
+    // it isn't the channel's own name, and the episode).
+    if(isNpChannel(st)){
+      var gText = epgNowText(st);
+      if(gText){ npSub.classList.remove('np-sub-linked'); npSub.textContent = gText; return; }
+    }
     if(!isLocalTrack(st)){
       // A channel that stands for an artist gets the same way in as a song does: the
       // artist's name, ahead of the stream details.
@@ -30399,6 +30688,8 @@
     surface.addEventListener('touchstart', function(e){
       mode = null;
       if(e.touches.length !== 1 || queuePanelOpen !== !opening || scrollsSideways(e.target, surface)){ mode = 'ignore'; return; }
+      // Build 243: no queue while a channel is on screen.
+      if(opening && nowPlayingScreen.classList.contains('np-channel')){ mode = 'ignore'; return; }
       sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); dx = 0;
     }, { passive: true });
     surface.addEventListener('touchmove', function(e){
@@ -30622,6 +30913,8 @@
     npMenuBtn.setAttribute('aria-expanded', 'false');
   }
   function toggleNpMenu(){
+    // Build 243: a channel has no queue (sideways swipes are for the guide grid).
+    try{ npQueueMenuBtn.style.display = isNpChannel(npTarget()) ? 'none' : ''; }catch(e){}
     var open = npMenu.classList.toggle('open');
     npMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
