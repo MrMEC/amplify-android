@@ -3351,6 +3351,42 @@
   .fav-order-chev{ width:14px; height:14px; fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; flex:none; }
   /* Build 189: Favorites / My Channels headings on Live TV, sized like the list heading under a
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
+  /* Build 240: Now / Next under a channel row, and the TV Guide page. */
+  .ch-guide{ margin-top:3px; min-width:0; }
+  .ch-guide-now, .ch-guide-next{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.35; }
+  .ch-guide-now{ font-size:13px; color:var(--text); font-weight:600; }
+  .ch-guide-next{ font-size:12px; color:var(--text-dim); }
+  .tile-grid > .guide-link{ grid-column:1/-1; display:flex; align-items:center; gap:14px; width:100%; margin:0 0 -6px; padding:12px 14px;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:14px; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .guide-link-icon{ width:40px; height:40px; flex:none; border-radius:10px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:var(--accent-text, #fff); }
+  .guide-link-icon svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .guide-link-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .guide-link-title{ font-size:15.5px; font-weight:700; }
+  .guide-link-sub{ font-size:12.5px; color:var(--text-dim); }
+  .guide-link-chev{ color:var(--text-dim); font-size:14px; }
+  .tile-grid.guide-grid{ display:flex; flex-direction:column; gap:14px; }
+  .guide-card{ border:1px solid var(--border); border-radius:16px; background:var(--panel); overflow:hidden; }
+  .guide-card.playing{ border-color:color-mix(in srgb, var(--accent) 60%, var(--border)); }
+  .guide-head{ display:flex; align-items:center; gap:12px; width:100%; padding:12px 14px; background:none; border:0; border-bottom:1px solid var(--border);
+    color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .guide-logo{ width:44px; height:44px; flex:none; border-radius:8px; overflow:hidden; background:var(--panel-2); position:relative; }
+  .guide-logo img{ width:100%; height:100%; object-fit:contain; }
+  .guide-name{ flex:1; min-width:0; font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .guide-play{ width:34px; height:34px; flex:none; border-radius:50%; background:var(--accent); color:var(--accent-text, #fff); display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .guide-play i{ margin-left:2px; }
+  .guide-prog{ display:flex; align-items:flex-start; gap:12px; width:100%; padding:10px 14px; background:none; border:0; color:var(--text); font:inherit; text-align:left; }
+  .guide-prog + .guide-prog{ border-top:1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  button.guide-prog{ cursor:pointer; }
+  .guide-time{ flex:none; min-width:5.6em; font-size:12.5px; font-weight:600; color:var(--text-dim); padding-top:1px; white-space:nowrap; }
+  .guide-prog.now .guide-time{ color:var(--accent); font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+  .guide-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .guide-title{ font-size:14.5px; font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+  .guide-prog.now .guide-title{ font-weight:700; }
+  .guide-sub{ font-size:12.5px; color:var(--text-dim); line-height:1.35; overflow-wrap:anywhere; }
+  .guide-bar{ display:block; height:3px; border-radius:2px; background:color-mix(in srgb, var(--text-faint, #888) 35%, transparent); margin-top:5px; overflow:hidden; }
+  .guide-bar span{ display:block; height:100%; background:var(--accent); border-radius:2px; }
+  .guide-empty{ padding:12px 14px; font-size:13px; color:var(--text-dim); }
+  .tile-grid.guide-grid > .guide-foot{ font-size:12.5px; color:var(--text-dim); text-align:center; padding:4px 8px 10px; }
   .tile-grid > .ch-group-head{ grid-column:1/-1; font-size:13px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); margin:-4px 0 -12px; }
   .tile-grid > .tile-row + .ch-group-head{ margin-top:6px; }
   .tile-grid > .ch-group-head + .grid-section-label.ch-row-label{ margin-top:4px; }
@@ -3662,6 +3698,8 @@
   .tag-cover-btn{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px;
     padding:7px 12px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
   .tag-cover-btn.danger{ color:var(--danger); }
+  .tag-cover-btn.tag-cover-save{ background:var(--accent); color:var(--accent-text, #fff); border-color:transparent; font-weight:700; }
+  .tag-cover-shown{ opacity:.9; }
   .tag-row.tag-cover-row, .tag-panel.editing .tag-row.tag-cover-row{ align-items:flex-start; }
   .tag-panel.editing .tag-row.tag-cover-row .tag-k{ padding-top:2px; }
   .tag-panel.editing .tag-row{ align-items:center; padding:5px 0; }
@@ -6695,6 +6733,22 @@
         <option value="off">Off</option>
       </select>
     </div>
+    <!-- Build 240: equalizer presets (Android app), applied by the phone's player before leveling. -->
+    <div class="settings-row" id="eqRow" style="display:none;">
+      <span class="settings-label">Equalizer</span>
+      <select class="settings-select" id="eqSelect" aria-label="Equalizer">
+        <option value="Off">Off</option>
+        <option value="Bass Boost">Bass Boost</option>
+        <option value="Treble Boost">Treble Boost</option>
+        <option value="Vocal">Vocal</option>
+        <option value="Rock">Rock</option>
+        <option value="Pop">Pop</option>
+        <option value="Jazz">Jazz</option>
+        <option value="Classical">Classical</option>
+        <option value="Dance">Dance</option>
+        <option value="Late Night">Late Night</option>
+      </select>
+    </div>
     <!-- Build 159: which player plays the videos on the phone (movies, TV, music videos). VLC
          is the default; the phone's own player stays as an alternative. -->
     <div class="settings-row" id="videoPlayerRow" style="display:none;">
@@ -7180,6 +7234,10 @@
   </button>
   <button type="button" class="np-menu-item" id="rowMenuAddPlaylist" role="menuitem">
     <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
+  </button>
+  <!-- Build 240: a library song's Info & Tags, from its row too. -->
+  <button type="button" class="np-menu-item" id="rowMenuTags" role="menuitem" style="display:none;">
+    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><path d="M8 11.5h5M8 14.5h3"/></svg><span>Info &amp; Tags</span>
   </button>
   <button type="button" class="np-menu-item" id="rowMenuRename" role="menuitem" style="display:none;">
     <i class="fa-solid fa-pen"></i><span>Rename</span>
@@ -7854,6 +7912,7 @@
     stationsGrid.innerHTML = '';
     stationsGrid.classList.remove('grid-songs');
     stationsGrid.classList.remove('grid-album');
+    stationsGrid.classList.remove('guide-grid');
     hideAzRail();
   }
   var stationsHeading = document.getElementById('stationsHeading');
@@ -8184,6 +8243,7 @@
   var onStationsHomeView = false;
   var onVideoView = false;   // the Video page (bottom nav / sidebar)
   var onAddChannelsView = false; // Video > Add Channels
+  var onGuideView = false; // Video > Live TV > TV Guide (build 240)
   var onPlaylistsHomeView = false;
   var onGenresHomeView = false;
   // Which home section's own "see all" page the centre grid is showing --
@@ -8391,6 +8451,31 @@
     P.setLeveling({}).then(function(o){ if(o && typeof o.on === 'boolean') sel.value = o.on ? 'on' : 'off'; })['catch'](function(){});
     sel.addEventListener('change', function(){
       P.setLeveling({ on: sel.value === 'on' })['catch'](function(){ setStatus('Couldn\u2019t change volume leveling', true); });
+    });
+  })();
+  // Equalizer presets (build 240): the phone's player keeps the choice (Equalizer, EqProcessor).
+  (function(){
+    var row = document.getElementById('eqRow'), sel = document.getElementById('eqSelect');
+    var Cap = window.Capacitor;
+    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    if(!row || !P || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform() || typeof P.setEq !== 'function') return;
+    row.style.display = '';
+    sel.value = 'Off';
+    function show(o){
+      if(!o || !o.preset) return;
+      // The player's own list wins (a newer app may have more presets than this page knows).
+      if(Array.isArray(o.presets) && o.presets.length){
+        var have = Array.prototype.map.call(sel.options, function(x){ return x.value; }).join('|');
+        if(have !== o.presets.join('|')){
+          sel.innerHTML = '';
+          o.presets.forEach(function(n){ var op = document.createElement('option'); op.value = n; op.textContent = n; sel.appendChild(op); });
+        }
+      }
+      sel.value = o.preset;
+    }
+    P.setEq({}).then(show)['catch'](function(){});
+    sel.addEventListener('change', function(){
+      P.setEq({ preset: sel.value }).then(show)['catch'](function(){ setStatus('Couldn\u2019t change the equalizer', true); });
     });
   })();
   resultLimitSelect.value = String(resultLimit);
@@ -17150,6 +17235,13 @@
       });
       return;
     }
+    // Build 240: the TV guide, when any channel here publishes a schedule; schedules are
+    // fetched (or renewed) in the background and the rows fill in as they arrive.
+    var withGuide = mine.filter(function(ch){ return !!guideSource(ch); });
+    if(withGuide.length){
+      stationsGrid.appendChild(buildGuideLink());
+      guideRefresh(withGuide);
+    }
     var split = splitFavChannels(mine);
     if(split.favs.length){
       stationsGrid.appendChild(buildChGroupHead('Favorites'));
@@ -17352,10 +17444,334 @@
     if(currentStation && favKey(currentStation) === favKey(st)) tile.classList.add('playing');
     var sub = tile.querySelector('.tile-sub');
     if(sub && ch.dead) sub.classList.add('ch-dead');
+    // Build 240: what's on now and next, for a channel that publishes a schedule.
+    var gsrc = guideSource(ch);
+    if(gsrc && !ch.dead){
+      var txt = tile.querySelector('.tile-row-text') || (tile.querySelector('.tile-name') || tile).parentNode;
+      var g = document.createElement('div');
+      g.className = 'ch-guide';
+      g.dataset.guideKey = gsrc.key;
+      txt.appendChild(g);
+      fillGuideRow(g, ch);
+    }
     tile.appendChild(buildRowMoreBtn(st, { fav: true, className: 'row-more-btn',
       onRemove: saved ? function(){ removeVideoChannel(ch.url); } : null,
       onRename: saved ? function(){ promptRenameVideoChannel(ch); } : null }));
     return tile;
+  }
+  // ---------- TV guide (build 240) ----------
+  // Pluto channels publish their schedules (api.pluto.tv/v2/channels/<id>?start&stop, about
+  // 40 KB a channel for 12 hours); Plex channels through the guide key saved with them
+  // (epg.provider.plex.tv/grid?channelGridKey&date, signed in). Kept on the phone a few hours,
+  // trimmed to what's still to come, so the rows show Now / Next at once. Other channels
+  // (iptv-org, Free-TV, links) don't publish one.
+  var GUIDE_KEY = 'radioPlayerGuide';
+  var GUIDE_AHEAD_MS = 12 * 3600 * 1000;      // how far ahead to fetch
+  var GUIDE_RENEW_MS = 3 * 3600 * 1000;       // renewed after this long...
+  var GUIDE_LOW_MS = 2 * 3600 * 1000;         // ...or when less than this is left
+  var GUIDE_MAX_ITEMS = 30;
+  var guideCache = vload(GUIDE_KEY, {}) || {};
+  if(typeof guideCache !== 'object' || Array.isArray(guideCache)) guideCache = {};
+  var guideBusy = {}, guideFailedAt = {};
+  function guideSource(ch){
+    if(!ch || !ch.url) return null;
+    if(ch.src === 'pluto' || isPlutoUrl(ch.url)){
+      var id = plutoChannelId(ch.url);
+      return id ? { kind: 'pluto', key: 'pluto:' + id, id: id } : null;
+    }
+    if(ch.gridKey) return { kind: 'plex', key: 'plex:' + ch.gridKey, gridKey: ch.gridKey };
+    return null;
+  }
+  function guideItemsFor(ch){
+    var src = guideSource(ch), c = src && guideCache[src.key];
+    return c && Array.isArray(c.items) ? c.items : [];
+  }
+  function guideNowNext(ch, now){
+    now = now || Date.now();
+    var cur = null, next = null;
+    guideItemsFor(ch).forEach(function(it){
+      if(it.s <= now && it.e > now){ if(!cur) cur = it; }
+      else if(it.s > now && (!next || it.s < next.s)) next = it;
+    });
+    return { now: cur, next: next };
+  }
+  function guideTime(ms){
+    try{ return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }catch(e){ return ''; }
+  }
+  function guideTitle(it){ return it ? (it.t || it.sub || '') : ''; }
+  function fillGuideRow(el, ch){
+    var nn = guideNowNext(ch);
+    el.innerHTML = '';
+    if(!nn.now && !nn.next){ el.hidden = true; return; }
+    el.hidden = false;
+    if(nn.now){
+      var a = document.createElement('div');
+      a.className = 'ch-guide-now';
+      a.textContent = 'Now: ' + guideTitle(nn.now);
+      el.appendChild(a);
+    }
+    if(nn.next){
+      var b = document.createElement('div');
+      b.className = 'ch-guide-next';
+      b.textContent = 'Next ' + guideTime(nn.next.s) + ': ' + guideTitle(nn.next);
+      el.appendChild(b);
+    }
+  }
+  function guideSave(){
+    // Only what's still to come is kept; a phone short on storage just keeps it in memory.
+    var now = Date.now(), out = {};
+    Object.keys(guideCache).forEach(function(k){
+      var c = guideCache[k];
+      if(!c || !Array.isArray(c.items)) return;
+      var items = c.items.filter(function(it){ return it.e > now; });
+      if(items.length || now - (c.at || 0) < GUIDE_RENEW_MS) out[k] = { at: c.at, items: items };
+    });
+    guideCache = out;
+    vsave(GUIDE_KEY, out);
+  }
+  function guideNeedsFetch(src){
+    var c = guideCache[src.key], now = Date.now();
+    if(guideBusy[src.key]) return false;
+    if(guideFailedAt[src.key] && now - guideFailedAt[src.key] < 10 * 60 * 1000) return false;
+    if(!c || !Array.isArray(c.items)) return true;
+    if(now - (c.at || 0) > GUIDE_RENEW_MS) return true;
+    // A channel that only publishes a short schedule isn't asked again more than every 30 min.
+    if(now - (c.at || 0) < 30 * 60 * 1000) return false;
+    return !c.items.some(function(it){ return it.e > now + GUIDE_LOW_MS; });
+  }
+  function trimGuideText(t, n){ t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+  function plutoGuideItems(d){
+    var tl = (d && Array.isArray(d.timelines)) ? d.timelines : (Array.isArray(d) && d[0] && Array.isArray(d[0].timelines) ? d[0].timelines : []);
+    return tl.map(function(t){
+      var ep = t.episode || {}, series = (ep.series && ep.series.name) || '';
+      var title = String(t.title || series || ep.name || '').trim();
+      var epName = String(ep.name || '').trim();
+      return { s: Date.parse(t.start), e: Date.parse(t.stop), t: trimGuideText(title, 90),
+        sub: epName && epName !== title ? trimGuideText(epName, 90) : '', d: trimGuideText(ep.description, 160), r: ep.rating || '' };
+    });
+  }
+  function plexGuideItems(d){
+    var mc = d && (d.MediaContainer || d);
+    var meta = (mc && (mc.Metadata || mc.metadata || mc.Video)) || [];
+    var out = [];
+    (Array.isArray(meta) ? meta : []).forEach(function(m){
+      var media = m.Media || m.media || [];
+      (Array.isArray(media) && media.length ? media : [m]).forEach(function(md){
+        var b = Number(md.beginsAt || m.beginsAt), e = Number(md.endsAt || m.endsAt);
+        if(!b || !e) return;
+        if(b < 1e12) b *= 1000;
+        if(e < 1e12) e *= 1000;
+        var show = String(m.grandparentTitle || '').trim(), title = String(m.title || '').trim();
+        out.push({ s: b, e: e, t: trimGuideText(show || title, 90), sub: show && title !== show ? trimGuideText(title, 90) : '',
+          d: trimGuideText(m.summary, 160), r: m.contentRating || '' });
+      });
+    });
+    return out;
+  }
+  function guideDate(ms){
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function guideFetch(src){
+    var now = Date.now();
+    if(src.kind === 'pluto'){
+      var url = 'https://api.pluto.tv/v2/channels/' + src.id + '?start=' + encodeURIComponent(new Date(now - 3600 * 1000).toISOString())
+        + '&stop=' + encodeURIComponent(new Date(now + GUIDE_AHEAD_MS).toISOString());
+      return fetchTextAny(url).then(function(t){ return plutoGuideItems(JSON.parse(t)); });
+    }
+    if(src.kind === 'plex'){
+      if(!plexSignedIn()) return Promise.reject(new Error('not signed in to Plex'));
+      var days = [guideDate(now), guideDate(now + 24 * 3600 * 1000)];
+      return Promise.all(days.map(function(day){
+        return plexRequest('GET', PLEX_LIVE_BASE + '/grid?channelGridKey=' + encodeURIComponent(src.gridKey) + '&date=' + day, plexAccount.token, 15000)
+          .then(plexGuideItems, function(){ return []; });
+      })).then(function(parts){ return parts[0].concat(parts[1]); });
+    }
+    return Promise.resolve([]);
+  }
+  // Fetches what's missing or old for these channels (three at a time); each one that comes
+  // in updates its rows (and the guide page) where they are.
+  function guideRefresh(channels, force){
+    var queue = [], seen = {};
+    (channels || []).forEach(function(ch){
+      var src = guideSource(ch);
+      if(!src || seen[src.key]) return;
+      seen[src.key] = true;
+      if(force && !guideBusy[src.key]) delete guideFailedAt[src.key];
+      if(force ? !guideBusy[src.key] : guideNeedsFetch(src)) queue.push({ src: src, ch: ch });
+    });
+    var running = 0;
+    function next(){
+      while(running < 3 && queue.length){
+        var job = queue.shift();
+        running++;
+        guideBusy[job.src.key] = true;
+        (function(job){
+          guideFetch(job.src).then(function(items){
+            var now = Date.now(), byStart = {};
+            items = items.filter(function(it){ return it.s && it.e && it.e > it.s && it.e > now - 3600 * 1000 && !byStart[it.s] && (byStart[it.s] = true); });
+            items.sort(function(a, b){ return a.s - b.s; });
+            guideCache[job.src.key] = { at: now, items: items.slice(0, GUIDE_MAX_ITEMS) };
+            delete guideFailedAt[job.src.key];
+            guideSave();
+          }, function(){ guideFailedAt[job.src.key] = Date.now(); }).then(function(){
+            delete guideBusy[job.src.key];
+            running--;
+            guideUpdated(job.src.key);
+            next();
+          });
+        })(job);
+      }
+    }
+    next();
+  }
+  function guideUpdated(key){
+    document.querySelectorAll('.ch-guide[data-guide-key]').forEach(function(el){
+      if(el.dataset.guideKey !== key) return;
+      var ch = guideChannelByKey(key);
+      if(ch) fillGuideRow(el, ch);
+    });
+    if(onGuideView){
+      var card = document.querySelector('.guide-card[data-guide-key="' + key + '"]');
+      var ch2 = guideChannelByKey(key);
+      if(card && ch2) card.parentNode.replaceChild(buildGuideCard(ch2), card);
+    }
+  }
+  function guideChannelByKey(key){
+    var list = visibleVideoChannels();
+    for(var i = 0; i < list.length; i++){ var src = guideSource(list[i]); if(src && src.key === key) return list[i]; }
+    return null;
+  }
+  // Every minute the rows move on to what's on now (and fetch more when it runs low).
+  setInterval(function(){
+    var rows = document.querySelectorAll('.ch-guide[data-guide-key]');
+    if(rows.length){
+      rows.forEach(function(el){ var ch = guideChannelByKey(el.dataset.guideKey); if(ch) fillGuideRow(el, ch); });
+      if(onVideoView && videoTab === 'channels') guideRefresh(visibleVideoChannels().filter(function(c){ return !!guideSource(c); }));
+    }
+    if(onGuideView) renderGuidePage(true);
+  }, 60000);
+
+  // The row at the top of Live TV that opens the guide.
+  function buildGuideLink(){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'guide-link';
+    b.innerHTML = '<span class="guide-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M3 10h18M9 10v9"></path></svg></span>'
+      + '<span class="guide-link-text"><span class="guide-link-title">TV Guide</span><span class="guide-link-sub">What’s on now and next</span></span>'
+      + '<i class="fa-solid fa-chevron-right guide-link-chev" aria-hidden="true"></i>';
+    b.addEventListener('click', function(){ pushView(); openGuidePage(); });
+    return b;
+  }
+  function openGuidePage(){
+    enterLibraryChrome();
+    onGuideView = true;
+    clearLibraryPlace();
+    setDetailBackToHistory(function(){ openVideoHome(); }, 'Watch');
+    stationsHeading.textContent = 'TV Guide';
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    renderGuidePage();
+    guideRefresh(guideChannels());
+  }
+  // The channels with a schedule, favourites first (as on Live TV).
+  function guideChannels(){
+    var mine = visibleVideoChannels().filter(function(ch){ return !!guideSource(ch); });
+    var split = splitFavChannels(mine);
+    return split.favs.concat(split.rest);
+  }
+  function renderGuidePage(keepScroll){
+    if(!onGuideView) return;
+    var y = window.scrollY;
+    resetStationsGrid();
+    stationsGrid.classList.add('guide-grid');
+    var list = guideChannels();
+    if(!list.length){
+      stationsGrid.innerHTML = '<div class="empty-state">None of your channels publishes a schedule. Pluto TV and Plex channels do: add them from Add Channels.</div>';
+      return;
+    }
+    list.forEach(function(ch){ stationsGrid.appendChild(buildGuideCard(ch)); });
+    var others = visibleVideoChannels().length - list.length;
+    if(others > 0){
+      var n = document.createElement('div');
+      n.className = 'guide-foot';
+      n.textContent = others === 1 ? 'One other channel in My Channels doesn’t publish a schedule.' : others + ' other channels in My Channels don’t publish a schedule.';
+      stationsGrid.appendChild(n);
+    }
+    if(keepScroll) window.scrollTo(0, y);
+  }
+  function buildGuideCard(ch){
+    var src = guideSource(ch), now = Date.now();
+    var card = document.createElement('section');
+    card.className = 'guide-card';
+    card.dataset.guideKey = src.key;
+    var st = channelToStation(ch);
+    if(currentStation && favKey(currentStation) === favKey(st)) card.classList.add('playing');
+    var head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'guide-head';
+    head.setAttribute('aria-label', 'Play ' + (ch.name || 'channel'));
+    var logo = document.createElement('div');
+    logo.className = 'guide-logo';
+    try{ renderStationArt(logo, st); }catch(e){}
+    head.appendChild(logo);
+    var nm = document.createElement('span');
+    nm.className = 'guide-name';
+    nm.textContent = ch.name || 'Channel';
+    head.appendChild(nm);
+    var play = document.createElement('span');
+    play.className = 'guide-play';
+    play.setAttribute('aria-hidden', 'true');
+    play.innerHTML = '<i class="fa-solid fa-play"></i>';
+    head.appendChild(play);
+    head.addEventListener('click', function(){ playChannel(ch); });
+    card.appendChild(head);
+    var items = guideItemsFor(ch).filter(function(it){ return it.e > now; }).slice(0, 6);
+    if(!items.length){
+      var msg = document.createElement('div');
+      msg.className = 'guide-empty';
+      msg.textContent = guideBusy[src.key] || guideNeedsFetch(src) ? 'Loading the schedule…'
+        : (src.kind === 'plex' && !plexSignedIn() ? 'Sign in to Plex in Settings to see this schedule.' : 'No schedule right now.');
+      card.appendChild(msg);
+      return card;
+    }
+    items.forEach(function(it){
+      var on = it.s <= now && it.e > now;
+      var row = document.createElement(on ? 'button' : 'div');
+      if(on){ row.type = 'button'; row.addEventListener('click', function(){ playChannel(ch); }); }
+      row.className = 'guide-prog' + (on ? ' now' : '');
+      var t = document.createElement('span');
+      t.className = 'guide-time';
+      t.textContent = on ? 'Now' : guideTime(it.s);
+      row.appendChild(t);
+      var body = document.createElement('span');
+      body.className = 'guide-body';
+      var ti = document.createElement('span');
+      ti.className = 'guide-title';
+      ti.textContent = guideTitle(it);
+      body.appendChild(ti);
+      // The start time is in the left column, so a later program shows only its episode.
+      var bits = [];
+      if(it.sub) bits.push(it.sub);
+      if(on) bits.push(Math.max(1, Math.round((it.e - now) / 60000)) + ' min left');
+      var sb = document.createElement('span');
+      sb.className = 'guide-sub';
+      sb.textContent = bits.join(' · ');
+      if(bits.length) body.appendChild(sb);
+      if(on){
+        var bar = document.createElement('span');
+        bar.className = 'guide-bar';
+        var fill = document.createElement('span');
+        fill.style.width = Math.max(2, Math.min(100, Math.round((now - it.s) / (it.e - it.s) * 100))) + '%';
+        bar.appendChild(fill);
+        body.appendChild(bar);
+      }
+      row.appendChild(body);
+      card.appendChild(row);
+    });
+    return card;
   }
   function reorderVideoChannelsFromGrid(){
     var order = Array.prototype.map.call(stationsGrid.querySelectorAll('.tile[data-entity="video-channel"]'), function(el){ return el.dataset.reorderId; });
@@ -21580,7 +21996,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A playlist is Playlists' own item, so its back button always returns there -- same
@@ -22356,7 +22772,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A true back button: it returns to wherever the search was opened from (Home's For You
@@ -26623,7 +27039,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     onHomeView = false;
@@ -26719,6 +27135,7 @@
     if(onStationsHomeView) return entry('My Stations', function(){ openStationsHome(); });
     if(onVideoView) return entry('Watch', function(){ openVideoHome(); });
     if(onAddChannelsView) return entry('Add Channels', function(){ openAddChannelsPage(); });
+    if(onGuideView) return entry('TV Guide', function(){ openGuidePage(); });
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
     if(section) return entry(sectionLabel(section), function(){ runLibrarySection(section); });
@@ -30132,6 +30549,7 @@
     rowMenuRemove.style.display = rowMenuOnRemove ? '' : 'none';
     rowMenuOnRename = (opts && opts.onRename) || null;
     rowMenuRename.style.display = rowMenuOnRename ? '' : 'none';
+    rowMenuTags.style.display = tracks.length === 1 && isLocalTrack(tracks[0]) ? '' : 'none';
     rowMenu._anchor = anchor;
     rowMenu.classList.add('open');
     var r = anchor.getBoundingClientRect();
@@ -30161,6 +30579,12 @@
     e.stopPropagation();
     var t = rowMenuTracks; closeRowMenu();
     if(t) queueAddToEnd(t);
+  });
+  var rowMenuTags = document.getElementById('rowMenuTags');
+  rowMenuTags.addEventListener('click', function(e){
+    e.stopPropagation();
+    var t = rowMenuTracks && rowMenuTracks[0]; closeRowMenu();
+    if(t && isLocalTrack(t)) openTagSheet(libraryById[favKey(t)] || t);
   });
   document.getElementById('rowMenuAddPlaylist').addEventListener('click', function(e){
     e.stopPropagation();
@@ -31356,6 +31780,9 @@
         track.diskSize = disk.size;
         track.diskModified = disk.lastModified;
       }
+      // Build 240: a refresh (coverIfAny) takes the file's picture when it has one, and
+      // otherwise leaves the song's picture (a folder's cover, say) as it was.
+      if(opts.coverIfAny && r[0] && r[0].art && r[0].art.length) opts.cover = true;
       if(opts.cover && r[0] && r[0].art && r[0].art.length){
         try{ artBlob = new Blob([r[0].art], { type: r[0].artMime || 'image/jpeg' }); }catch(e){}
       }
@@ -31500,7 +31927,7 @@
     // Build 232: the cover in the file, which Edit can change or take out (MP3 and FLAC).
     if(doc.editable || docCover(doc)){
       var cur = docCover(doc);
-      sec.appendChild(buildTagCoverRow(cur, { some: !!cur, shown: !!customArtFor(track) }));
+      sec.appendChild(buildTagCoverRow(cur, { some: !!cur, shown: !!(customArtFor(track) || s.shownSrc) }));
     }
     TAG_FIELDS.forEach(function(f){
       var val = doc.values[f.key] || '';
@@ -31602,8 +32029,15 @@
         if(tagState !== mine) return;
         mine.doc = doc;
         mine.onDisk = src.onDisk;
-        renderTagSheet();
-        if(!doc.editable) setTagNote(doc.whyNot, 'info');
+        // Build 240: a picture Amplify shows for the song that isn't in the file (a cover added
+        // in Amplify, or the folder's picture): offered for saving into the file.
+        var shown = (!docCover(doc) && doc.editable) ? (customArtFor(track) || (track.hasArt ? localArtUrl(track)['catch'](function(){ return null; }) : null)) : null;
+        return Promise.resolve(shown).then(function(u){
+          if(tagState !== mine) return;
+          mine.shownSrc = u || null;
+          renderTagSheet();
+          if(!doc.editable) setTagNote(doc.whyNot, 'info');
+        });
       });
     })['catch'](function(err){
       if(tagState !== mine) return;
@@ -31853,7 +32287,7 @@
   });
   function useShownCover(){
     var s = tagState;
-    var src = s && (s.mode === 'album' ? s.album.customArt : customArtFor(s.track));
+    var src = s && (s.mode === 'album' ? s.album.customArt : (customArtFor(s.track) || s.shownSrc));
     if(!src) return;
     setTagNote('Preparing the picture…', 'info');
     coverFromImage(src).then(function(c){
@@ -31861,6 +32295,17 @@
       s.cover = c;
       setTagNote('');
       renderTagSheet();
+    }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
+  }
+  // Build 240: the picture Amplify shows, written into the song's file as its front cover.
+  function saveShownCoverToFile(){
+    var s = tagState;
+    if(!s || s.saving || !s.shownSrc) return;
+    setTagNote('Saving the cover in the file…', 'info');
+    coverFromImage(s.shownSrc).then(function(c){
+      if(tagState !== s) return;
+      s.cover = c;
+      saveTagEdits();
     }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
   }
   function buildTagCoverRow(current, opts){
@@ -31877,8 +32322,26 @@
       img.src = tagPicUrl(blob);
       v.appendChild(img);
     }
-    var line = pending ? (s.cover ? 'New cover, saved when you tap Save' : 'Taken out when you tap Save') : (opts.text || (blob ? '' : 'None'));
-    if(line) v.appendChild(tagEl('span', 'tag-cover-text' + (blob || pending ? '' : ' empty'), line));
+    // Build 240: not in the file, but Amplify shows one: it can go into the file in one tap.
+    var offer = !s.editing && !blob && !pending && s.mode === 'song' && s.shownSrc && s.doc && s.doc.editable;
+    if(offer){
+      var simg = document.createElement('img');
+      simg.className = 'tag-pic tag-cover-pic tag-cover-shown';
+      simg.alt = '';
+      simg.src = s.shownSrc;
+      v.appendChild(simg);
+    }
+    var line = pending ? (s.cover ? 'New cover, saved when you tap Save' : 'Taken out when you tap Save')
+      : offer ? 'Shown in Amplify, not saved in the file' : (opts.text || (blob ? '' : 'None'));
+    if(line) v.appendChild(tagEl('span', 'tag-cover-text' + (blob || pending || offer ? '' : ' empty'), line));
+    if(offer){
+      var ob = tagEl('div', 'tag-cover-btns');
+      var save = tagEl('button', 'tag-cover-btn tag-cover-save', 'Save in the File');
+      save.type = 'button';
+      save.addEventListener('click', function(e){ e.preventDefault(); saveShownCoverToFile(); });
+      ob.appendChild(save);
+      v.appendChild(ob);
+    }
     if(s.editing){
       var btns = tagEl('div', 'tag-cover-btns');
       function btn(label, fn, cls){
@@ -32147,10 +32610,12 @@
     });
     return Object.keys(set);
   }
-  function changeSummary(added, removed, noun){
-    if(!added && !removed) return 'Everything is up to date.';
+  function changeSummary(added, removed, noun, updated, merged){
+    if(!added && !removed && !updated && !merged) return 'Everything is up to date.';
     var bits = [];
     if(added) bits.push(added + ' new ' + noun + (added === 1 ? '' : 's') + ' added');
+    if(updated) bits.push(updated + ' ' + noun + (updated === 1 ? '' : 's') + ' updated');
+    if(merged) bits.push(merged + ' duplicate' + (merged === 1 ? '' : 's') + ' merged');
     if(removed) bits.push(removed + ' ' + noun + (removed === 1 ? '' : 's') + ' removed');
     return bits.join(', ') + '.';
   }
@@ -32163,6 +32628,53 @@
         amplifyEntry: f
       };
     });
+  }
+  // Build 240: of the songs sharing one file, the one to keep: the one with the most attached to
+  // it (favourite, in playlists, plays), else the oldest (not the copy made by the last refresh).
+  function pickKeeper(list, newId){
+    if(list.length === 1) return list[0];
+    var plays = loadSongPlays();
+    function score(t){
+      var k = favKey(t), n = 0;
+      if(favorites.some(function(f){ return favKey(f) === k; })) n += 1000;
+      stationPlaylists.forEach(function(p){ if((p.stations || []).some(function(x){ return favKey(x) === k; })) n += 100; });
+      n += ((plays[k] || [0])[0] || 0);
+      if(k !== newId) n += 0.5;
+      return n;
+    }
+    return list.slice().sort(function(a, b){ return score(b) - score(a); })[0];
+  }
+  // Build 240: whatever pointed at a duplicate song points at the one kept instead.
+  function mergeTrackRefs(dupKey, keep){
+    var keepKey = favKey(keep);
+    if(!dupKey || dupKey === keepKey) return;
+    function swap(list){
+      var seen = {}, out = [];
+      (list || []).forEach(function(x){
+        var k = favKey(x);
+        if(k === dupKey){ x = keep; k = keepKey; }
+        if(seen[k]) return;
+        seen[k] = true;
+        out.push(x);
+      });
+      return out;
+    }
+    if(favorites.some(function(f){ return favKey(f) === dupKey; })){ favorites = swap(favorites); saveFavorites(); }
+    var plChanged = false;
+    stationPlaylists.forEach(function(p){
+      if((p.stations || []).some(function(x){ return favKey(x) === dupKey; })){ p.stations = swap(p.stations); plChanged = true; }
+    });
+    if(plChanged) saveStationPlaylists();
+    if(recentStations.some(function(x){ return favKey(x) === dupKey; })){ recentStations = swap(recentStations); saveRecent(); }
+    try{
+      var m = loadSongPlays();
+      if(m[dupKey]){
+        var a = m[keepKey] || [0, 0], b = m[dupKey];
+        m[keepKey] = [(a[0] || 0) + (b[0] || 0), Math.max(a[1] || 0, b[1] || 0)];
+        delete m[dupKey];
+        localStorage.setItem(SONG_PLAYS_KEY, JSON.stringify(m));
+      }
+    }catch(e){}
   }
   var musicRefreshBusy = false;
   function refreshMusicLibrary(){
@@ -32179,6 +32691,13 @@
     libraryRefreshHeaderBtn.classList.add('refreshing');
     setStatus('Checking your music folders…', false, true);
     var removed = 0, failed = 0, toImport = [];
+    // Build 240: songs are matched to their files by where the file is on the phone, so a
+    // file retagged outside Amplify (a new size and date) updates its song in place, keeping
+    // its favourites, playlists and plays, instead of coming back as a second song. Copies
+    // left by earlier refreshes are merged into one.
+    var changed = [], dups = [], updated = 0, merged = 0;
+    var bySrc = {};
+    libraryTracks.forEach(function(t){ if(t.srcUri) (bySrc[t.srcUri] = bySrc[t.srcUri] || []).push(t); });
     var chain = Promise.resolve();
     trees.forEach(function(tree){
       chain = chain.then(function(){
@@ -32193,6 +32712,15 @@
           var edited = {};
           libraryTracks.forEach(function(t){ if(t.srcUri && t.diskSize) edited[t.srcUri] = t; });
           var fresh = stubs.filter(function(st){ return isAudioFile(st) && !videoSet[st.amplifyEntry.uri]; }).filter(function(st){
+            var same = st.amplifyEntry && bySrc[st.amplifyEntry.uri];
+            if(same && same.length){
+              var newId = makeLocalTrackId(relPathOf(st), st.size, st.lastModified);
+              var keep = pickKeeper(same, newId);
+              same.forEach(function(t){ if(t !== keep) dups.push({ dup: t, keep: keep }); });
+              var current = favKey(keep) === newId || (keep.diskSize === st.size && keep.diskModified === st.lastModified);
+              if(!current) changed.push({ track: keep, stub: st });
+              return false;
+            }
             var e = st.amplifyEntry && edited[st.amplifyEntry.uri];
             if(e && e.diskSize === st.size && e.diskModified === st.lastModified) return false;
             return !libraryById[makeLocalTrackId(relPathOf(st), st.size, st.lastModified)];
@@ -32210,6 +32738,24 @@
       });
     });
     chain.then(function(){
+      // Copies from earlier refreshes: their favourites, playlists and plays move to the one kept.
+      return dups.reduce(function(p, d){
+        return p.then(function(){
+          mergeTrackRefs(favKey(d.dup), d.keep);
+          return removeLocalTrack(d.dup).then(function(){ merged++; }, function(){});
+        });
+      }, Promise.resolve());
+    }).then(function(){
+      // Files changed outside Amplify: their songs take the new tags (and picture) in place.
+      var done = [];
+      return changed.reduce(function(p, c){
+        return p.then(function(){
+          return nativeFileFromEntry(c.stub.amplifyEntry).then(function(file){
+            return applySavedTags(c.track, file, { size: c.stub.size, lastModified: c.stub.lastModified }, { coverIfAny: true, quiet: true });
+          }).then(function(){ updated++; done.push(c.track); }, function(){});
+        });
+      }, Promise.resolve()).then(function(){ if(done.length) afterTagSave(done, true); });
+    }).then(function(){
       var audioNew = toImport.filter(isAudioFile);
       var art = toImport.filter(function(x){ return !isAudioFile(x); });
       if(!audioNew.length) return null;
@@ -32224,10 +32770,13 @@
       refreshLibraryView();
       // With new songs the import reports its own result; otherwise say what changed.
       if(!importedCount){
-        setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song'), !!failed);
-      } else if(removed){
+        setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song', updated, merged), !!failed);
+      } else if(removed || updated || merged){
         // The import's own outcome is showing; the removals go in with it (build 234).
-        var rm = removed + (removed === 1 ? ' song was' : ' songs were') + ' removed (no longer in the folder).';
+        var rm = (updated ? updated + (updated === 1 ? ' song was' : ' songs were') + ' updated with new tags. ' : '')
+          + (merged ? merged + (merged === 1 ? ' duplicate was' : ' duplicates were') + ' merged. ' : '')
+          + (removed ? removed + (removed === 1 ? ' song was' : ' songs were') + ' removed (no longer in the folder).' : '');
+        rm = rm.trim();
         importPanelDetail.textContent = importPanelDetail.textContent ? importPanelDetail.textContent + ' ' + rm : rm;
       }
     })['catch'](function(err){
@@ -32573,7 +33122,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -32639,7 +33188,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     setDetailBack(null);
@@ -33633,7 +34182,7 @@
     activeShowCollectionId = null;
     onPodcastsView = false;
     onMyLibraryHomeView = false;
-    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
+    onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
     // A genre's station list is Genres' own category, so its back button always returns
@@ -33874,7 +34423,7 @@
     if(document.body.classList.contains('search-open')) return 'search';
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
-    if(onVideoView || onAddChannelsView || onVideoDetailView) return 'video';
+    if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView) return 'video';
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
     // For You (and its searches) lives on Home now.

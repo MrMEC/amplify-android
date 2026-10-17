@@ -185,6 +185,25 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     call.resolve();
   }
 
+  /** Build 240: the equalizer preset ({preset} to change it); answers {preset, presets}. */
+  @PluginMethod
+  public void setEq(PluginCall call) {
+    String p = call.getString("preset", null);
+    if (p != null) PlaybackService.setEq(getContext(), p);
+    else {
+      // Before the player has started, the saved choice is read here.
+      String saved = getContext().getSharedPreferences(PlaybackService.AUDIO_PREFS, Context.MODE_PRIVATE)
+          .getString(PlaybackService.KEY_EQ, null);
+      if (saved != null && !saved.equals(Equalizer.preset())) Equalizer.setPreset(saved);
+    }
+    JSObject o = new JSObject();
+    o.put("preset", Equalizer.preset());
+    JSArray names = new JSArray();
+    for (String n : Equalizer.PRESETS.keySet()) names.put(n);
+    o.put("presets", names);
+    call.resolve(o);
+  }
+
   @PluginMethod
   public void setLeveling(PluginCall call) {
     Boolean on = call.getBoolean("on", null);
