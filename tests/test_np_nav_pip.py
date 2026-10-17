@@ -71,7 +71,7 @@ async def main():
 
         # a channel with video
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
-        await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()"); await pg.wait_for_timeout(900)
+        await pg.evaluate("document.querySelector('#stationsGrid .epg-ch').click()"); await pg.wait_for_timeout(900)
         cur = await pg.evaluate("window.__cur")
         await pg.evaluate("(id)=>window.__emit('video',{id:id,hasVideo:true,width:1280,height:720})", cur); await pg.wait_for_timeout(1500)
         hid = await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display")
@@ -89,7 +89,7 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/np-channel-search.png')
         await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(400)
         heading = await pg.evaluate("document.getElementById('npCollectionHeading').textContent")
-        check(heading == 'My Channels', f'no count over the channel list ({heading!r})')
+        check(heading == '', f'no heading or count over the channel guide (build 243) ({heading!r})')
         last = await pg.evaluate("window.__pip.slice(-1)[0]")
         check(last and last.get('allowed') and last.get('width') == 1280 and last.get('height') == 720, f'the app is told leaving should float the video (16:9) {last}')
         await pg.evaluate("window.__emit('pip',{active:true})"); await pg.wait_for_timeout(400)

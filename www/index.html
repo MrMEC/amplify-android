@@ -3323,7 +3323,7 @@
   .tile-video svg{ width:15px; height:15px; fill:currentColor; }
   .cs-video{ display:inline-flex; align-items:center; flex:none; color:var(--text-dim); line-height:0; }
   /* ---------- Video: channels ---------- */
-  .tile .ch-dead{ color:#e5534b; }
+  .tile .ch-dead, .epg-prog .epg-s.ch-dead{ color:#e5534b; }
   /* My Channels' category headings: clear of the row under them (and of the ring round a
      playing tile), with a row's worth of air above each. */
   .tile-grid > .grid-section-label.ch-row-label{ margin:10px 0 -28px; }
@@ -17193,6 +17193,12 @@
     if(!ch || !!ch.dead === !ok) return;
     ch.dead = !ok;
     saveVideoChannels();
+    // its row in a grid on Now Playing too
+    try{ document.querySelectorAll('.epg-row').forEach(function(row){
+      if(row.dataset.chUrl !== ch.url) return;
+      var wrap = row.closest('.epg'), t0 = Number(wrap.dataset.t0);
+      row.parentNode.replaceChild(buildEpgRow(ch, t0, t0 + EPG_SLOTS * EPG_SLOT_MS), row);
+    }); }catch(e){}
     if(onVideoView) renderVideoHome();
   }
 
@@ -17277,6 +17283,10 @@
           artFrom: channelToStation(ch), draggable: manual, onReorder: manual ? reorderVideoChannelsFromGrid : null
         });
         row.classList.add('ch-item');
+        // Build 243: the grid has no menus (Mark), so Favorite, Rename and Remove live here.
+        row.appendChild(buildRowMoreBtn(channelToStation(ch), { fav: true, className: 'row-more-btn',
+          onRemove: function(){ removeVideoChannel(ch.url); },
+          onRename: function(){ promptRenameVideoChannel(ch); } }));
         if(manual){
           var grip = document.createElement('span');
           grip.className = 'ch-grip';
@@ -17612,7 +17622,7 @@
     // the channel: its logo (or name), a heart if it's a favourite
     var cell = document.createElement('button');
     cell.type = 'button';
-    cell.className = 'epg-ch' + (playing ? ' playing' : '');
+    cell.className = 'epg-ch' + (playing ? ' playing' : '') + (ch.dead ? ' dead' : '');
     cell.setAttribute('aria-label', (ch.name || 'Channel') + (playing ? ', playing' : ''));
     var logo = document.createElement('span');
     logo.className = 'epg-logo';
@@ -17636,7 +17646,7 @@
     var now = Date.now();
     if(!blocks.length){
       // No schedule (or not yet): the channel as one block across.
-      row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', '', true, true));
+      row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', ch.dead ? 'Not working' : '', true, true));
     } else {
       blocks.forEach(function(b){
         row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0));
@@ -17666,7 +17676,7 @@
     b.appendChild(t);
     if(sub){
       var su = document.createElement('span');
-      su.className = 'epg-s';
+      su.className = 'epg-s' + (whole && ch.dead ? ' ch-dead' : '');
       su.textContent = sub;
       b.appendChild(su);
     }

@@ -25,7 +25,7 @@ async def run(p, theme, w, big):
     tag = f'{theme}-{w}' + ('-big' if big else '')
     for name in ["Three's Company", 'Alpha TV']:
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile-row'), function(r){ return r.textContent.indexOf(n) !== -1; }).click()", name); await pg.wait_for_timeout(2000)
+        await pg.evaluate("(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){ return (c.getAttribute('aria-label')||'').indexOf(n) !== -1; }).click()", name); await pg.wait_for_timeout(2000)
         g = await pg.evaluate("""(()=>{ var n=document.getElementById('npName').getBoundingClientRect(), b=document.getElementById('npMenuBtn').getBoundingClientRect(); return [(n.top+n.bottom)/2, (b.top+b.bottom)/2]; })()""")
         check(abs(g[0] - g[1]) <= 2, f'{tag} {name}: More is level with the name ({g[0]:.1f} vs {g[1]:.1f})')
         await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(500)

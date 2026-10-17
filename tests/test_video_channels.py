@@ -70,7 +70,11 @@ async def route(r):
 async def rows(pg):
     return await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.ch-row'),function(r){return {name:r.querySelector('.ch-name').textContent,added:r.querySelector('.ch-add').classList.contains('added')};})")
 async def my_tiles(pg):
-    return await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile'),function(t){var d=t.querySelector('.ch-dead');return {name:t.querySelector('.tile-name').textContent,dead:!!d};})")
+    # build 243: the guide grid (outside Edit), else the Edit list's rows
+    return await pg.evaluate("""(()=>{ var r=document.querySelectorAll('#stationsGrid .epg-row');
+      if(r.length) return Array.prototype.map.call(r,function(x){var c=x.querySelector('.epg-ch');return {name:(c.getAttribute('aria-label')||'').replace(/, playing$/,''),dead:c.classList.contains('dead')&&!!x.querySelector('.epg-s.ch-dead')};});
+      return Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile'),function(t){var d=t.querySelector('.ch-dead');return {name:t.querySelector('.tile-name').textContent,dead:!!d};}); })()""")
+TAP = "(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .epg-ch'),function(c){return (c.getAttribute('aria-label')||'').replace(/, playing$/,'')===n;}).click()"
 async def tab(pg, label):
     await pg.evaluate("(l)=>Array.prototype.find.call(document.querySelectorAll('.ch-tools .home-tab'),function(b){return b.textContent===l;}).click()", label)
     await pg.wait_for_timeout(900)
@@ -160,14 +164,14 @@ async def main():
         await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(700)
         t = await my_tiles(pg)
         labels = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return !/^Continue Watching/.test(x);})")
-        rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .cl-row:not(.vw-row)').length===0 && document.querySelectorAll('#stationsGrid > .tile.tile-row.ch-item').length")
-        check(labels == ['News', 'Other'] and rows_ok == 5, f'back to Video: stacked rows under a heading per category, uncategorised last {labels} rows={rows_ok}')
-        check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z by default, within each category {[x["name"] for x in t]}')
-        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='BBC News';}).click()"); await pg.wait_for_timeout(900)
+        rows_ok = await pg.evaluate("document.querySelectorAll('#stationsGrid > .tile.ch-item').length===0 && document.querySelectorAll('#stationsGrid .epg-row').length")
+        check(labels == [] and rows_ok == 5, f'back to Video: the guide grid, one row per channel, no headings (build 243) {labels} rows={rows_ok}')
+        check([x['name'] for x in t] == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z by default {[x["name"] for x in t]}')
+        await pg.evaluate(TAP, 'BBC News'); await pg.wait_for_timeout(900)
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(700)
         t = {x['name']: x for x in await my_tiles(pg)}
         check(t['BBC News']['dead'] and not t['PBS']['dead'], 'a channel that fails is marked Not working')
-        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='PBS';}).click()"); await pg.wait_for_timeout(900)
+        await pg.evaluate(TAP, 'PBS'); await pg.wait_for_timeout(900)
         np = await pg.evaluate("document.getElementById('nowPlayingScreen').style.display")
         check(np == 'flex', 'tapping a channel tile plays it and opens Now Playing')
         lk2 = await pg.evaluate("(()=>{var l=document.getElementById('npChannelLink');return l.style.display==='none'?null:l.textContent;})()")
@@ -185,7 +189,7 @@ async def main():
         check(home == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'the Home row of My Channels is A to Z too {home}')
 
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
-        check(await pg.evaluate(opts) == ['A to Z*', 'Manual', 'By Category*', 'One List'], f'editing shows the sort options, A to Z and By Category ticked {await pg.evaluate(opts)}')
+        check(await pg.evaluate(opts) == ['A to Z*', 'Manual'], f'editing shows the order options, A to Z ticked (no category choice with the grid) {await pg.evaluate(opts)}')
         drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile.tile-draggable').length")
         check(drag == 0 and await pg.evaluate(names) == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'in A to Z the list is sorted and nothing drags ({drag})')
         await pg.screenshot(path=f'{SHOTS}/ch-edit-az.png')
@@ -197,10 +201,9 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/ch-edit-manual.png')
         # Drag Link Three to the top (moving the row is what a drag does), then One List, then Done.
         await pg.evaluate("(()=>{var g=document.getElementById('stationsGrid'); var t=Array.prototype.find.call(g.querySelectorAll('.tile[data-entity=video-channel]'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}); var first=g.querySelector('.tile[data-entity=video-channel]'); g.insertBefore(t, first);})()")
-        await pg.evaluate(pick, 'list'); await pg.wait_for_timeout(300)
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(await pg.evaluate(lbls) == [] and t == ['Link Three', 'PBS', 'ABC News Live', 'BBC News', 'Link One'], f'Manual + One List: your dragged order, with no "My Channels" label (build 180) {t}')
+        check(await pg.evaluate(lbls) == [] and t == ['Link Three', 'PBS', 'ABC News Live', 'BBC News', 'Link One'], f'Manual: your dragged order in the grid, no labels {t}')
         check(not await pg.evaluate("!!document.querySelector('.ch-sort-opts')"), 'Done hides the sort options')
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
@@ -209,15 +212,15 @@ async def main():
         # Back to A to Z: sorted again; the manual order is still there for next time.
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         await pg.evaluate(pick, 'az'); await pg.wait_for_timeout(300)
-        await pg.evaluate(pick, 'category'); await pg.wait_for_timeout(300)
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(await pg.evaluate(lbls) == ['News', 'Other'] and t == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z again, by category {t}')
+        check(await pg.evaluate(lbls) == [] and t == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'A to Z again {t}')
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         await pg.evaluate(pick, 'manual'); await pg.wait_for_timeout(300)
         check((await pg.evaluate(names))[0] == 'Link Three', f'switching back to Manual finds the hand order intact {await pg.evaluate(names)}')
         await pg.evaluate(pick, 'az'); await pg.wait_for_timeout(300)
-        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        # (still editing) Rename via the Edit list's More menu (the grid has none, build 243)
+        check(await pg.evaluate("document.querySelectorAll('#stationsGrid .epg-row').length===0 && document.querySelectorAll('#stationsGrid .tile.ch-item .row-more-btn').length===5"), 'the Edit list rows each have a More button')
         # Rename via the More menu: the row re-sorts under its new name (A to Z), the Home row
         # follows, and it's kept after a restart. Cancel leaves it alone.
         def more(name):
@@ -232,7 +235,8 @@ async def main():
         pg.once('dialog', lambda d: asyncio.ensure_future(answer(d)))
         await pg.evaluate("document.getElementById('rowMenuRename').click()"); await pg.wait_for_timeout(500)
         t = [x['name'] for x in await my_tiles(pg)]
-        check(asked == [('Channel name', 'PBS')] and t == ['ABC News Live', 'BBC News', 'Aardvark TV', 'Link One', 'Link Three'],
+        check(await pg.evaluate("!!document.querySelector('.ch-sort-opts')"), 'still in Edit after Rename')
+        check(asked == [('Channel name', 'PBS')] and t == ['Aardvark TV', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'],
               f'Rename asks with the current name and the list re-sorts under the new one {asked} {t}')
         home = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#channelsHomeGrid .tile-name'),function(n){return n.textContent;})")
         check(home[0] == 'Aardvark TV', f'the Home row uses the new name, in order {home}')
@@ -245,10 +249,13 @@ async def main():
         t = [x['name'] for x in await my_tiles(pg)]
         check('Aardvark TV' in t and 'PBS' not in t, f'the new name is kept after a restart {t}')
         await pg.screenshot(path=f'{SHOTS}/ch-renamed.png')
-        # Remove via the More menu
+        # Remove via the Edit list's More menu
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .tile'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}).querySelector('.row-more-btn').click()"); await pg.wait_for_timeout(300)
         await pg.evaluate("document.getElementById('rowMenuRemove').click()"); await pg.wait_for_timeout(300)
         check('Link Three' not in [x['name'] for x in await my_tiles(pg)], 'More > Remove takes a channel out')
+        await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
+        check(not await pg.evaluate("document.querySelector('#stationsGrid .epg .row-more-btn, #stationsGrid .epg .epg-more')"), 'no More buttons in the grid')
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(600)
         check(len(await my_tiles(pg)) == 4, 'My Channels kept after a restart')

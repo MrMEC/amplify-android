@@ -98,13 +98,14 @@ async def route(r):
     if '127.0.0.1' in u.netloc: return await r.continue_()
     return await r.abort()
 
-ROWS = """Array.from(document.querySelectorAll('#stationsGrid .tile.ch-item')).map(function(t){ var g=t.querySelector('.ch-guide');
-  return { name: t.querySelector('.tile-name').textContent, now: g && !g.hidden && g.querySelector('.ch-guide-now') ? g.querySelector('.ch-guide-now').textContent : null,
-    next: g && !g.hidden && g.querySelector('.ch-guide-next') ? g.querySelector('.ch-guide-next').textContent : null }; })"""
-CARDS = """Array.from(document.querySelectorAll('#stationsGrid .guide-card')).map(function(c){ return { name: c.querySelector('.guide-name').textContent,
-  progs: Array.from(c.querySelectorAll('.guide-prog')).map(function(p){ return [p.querySelector('.guide-time').textContent, p.querySelector('.guide-title').textContent, (p.querySelector('.guide-sub')||{}).textContent||'', !!p.querySelector('.guide-bar span')]; }),
-  empty: (c.querySelector('.guide-empty')||{}).textContent || '' }; })"""
-FIT = """(()=>{ var bad=[]; document.querySelectorAll('#stationsGrid *').forEach(function(e){ var r=e.getBoundingClientRect(); if(r.width && (r.right > innerWidth + 0.5 || r.left < -0.5)) bad.push(e.className); }); return bad.slice(0,5); })()"""
+# build 243: the guide grid. now = the block on now (unless it's the whole-row "no schedule" block),
+# next = the block after it.
+ROWS = """Array.from(document.querySelectorAll('#stationsGrid .epg-row')).map(function(r){ var c=r.querySelector('.epg-ch');
+  var bl=Array.from(r.querySelectorAll('.epg-prog')), n=bl.findIndex(function(b){ return b.classList.contains('now') && !b.classList.contains('whole'); });
+  return { name: (c.getAttribute('aria-label')||'').replace(/, playing$/,''), now: n >= 0 ? bl[n].querySelector('.epg-t').textContent : null,
+    next: n >= 0 && bl[n+1] ? bl[n+1].querySelector('.epg-t').textContent : null, nextSub: n >= 0 && bl[n+1] && bl[n+1].querySelector('.epg-s') ? bl[n+1].querySelector('.epg-s').textContent : '',
+    whole: !!r.querySelector('.epg-prog.whole') }; })"""
+FIT = """(()=>{ var bad=[]; document.querySelectorAll('#stationsGrid *').forEach(function(e){ if(e.closest('.epg-scroll')) return; var r=e.getBoundingClientRect(); if(r.width && (r.right > innerWidth + 0.5 || r.left < -0.5)) bad.push(e.className); }); return bad.slice(0,5); })()"""
 
 
 async def run(p, theme, width, big):
@@ -121,53 +122,30 @@ async def run(p, theme, width, big):
         await pg.add_style_tag(content='.tile-name{font-size:20px !important} .ch-guide-now{font-size:17.5px !important} .ch-guide-next{font-size:16px !important} .guide-title{font-size:19.5px !important} .guide-sub,.guide-time{font-size:16.9px !important} .guide-name{font-size:21.6px !important} .guide-link-title{font-size:21px !important} .guide-link-sub{font-size:17px !important}')
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2500)
     rows = {r['name']: r for r in await pg.evaluate(ROWS)}
-    check(rows.get('Buzzr', {}).get('now') == 'Now: The Price Is Right' and (rows.get('Buzzr', {}).get('next') or '').startswith('Next ') and rows['Buzzr']['next'].endswith(': Match Game'),
-          f'{T} a Pluto row shows Now / Next {rows.get("Buzzr")}')
-    check(rows.get('Reuters Now', {}).get('now') == 'Now: Reuters Now Live' and (rows.get('Reuters Now', {}).get('next') or '').endswith(': Reuters Now Live'), f'{T} a Plex row too {rows.get("Reuters Now")}')
-    check(rows.get('Local News', {}).get('now') is None, f'{T} a link channel has no guide lines')
-    nx = rows.get('Buzzr', {}).get('next') or ''
-    check(('AM' in nx or 'PM' in nx), f'{T} the next time reads like a clock ({nx})')
+    check(rows.get('Buzzr', {}).get('now') == 'The Price Is Right' and rows['Buzzr'].get('next') == 'Match Game' and rows['Buzzr'].get('nextSub') == 'Charles Nelson Reilly',
+          f'{T} a Pluto channel’s row shows what’s on now, then next with its episode {rows.get("Buzzr")}')
+    check(rows.get('Reuters Now', {}).get('now') == 'Reuters Now Live' and rows['Reuters Now'].get('next') == 'Reuters Now Live', f'{T} a Plex channel too {rows.get("Reuters Now")}')
+    check(rows.get('Local News', {}).get('now') is None and rows['Local News']['whole'], f'{T} a link channel is one solid block')
     cids = sorted(set(x[0] for x in LOG['pluto']))
     check(cids == sorted([BUZZR, KIDS]) and len(LOG['pluto']) == 2, f'{T} each Pluto channel\'s schedule fetched once {LOG["pluto"]}')
     st, sp = LOG['pluto'][0][1], LOG['pluto'][0][2]
     span = (datetime.datetime.fromisoformat(sp.replace('Z', '+00:00')) - datetime.datetime.fromisoformat(st.replace('Z', '+00:00'))).total_seconds() / 3600
     check(12 <= span <= 14, f'{T} for the next 12 hours ({span:.1f} h)')
     check(len(LOG['plex']) >= 1 and all(k == 'reuters-now' for k, _ in LOG['plex']) and all(t == 'USERTOKEN123' for t in LOG['tokens']), f'{T} the Plex schedule by guide key, with the account token {LOG["plex"]}')
-    link = await pg.evaluate("(()=>{ var l=document.querySelector('#stationsGrid .guide-link'); if(!l) return null; var r=l.getBoundingClientRect(), first=document.querySelector('#stationsGrid .tile.ch-item').getBoundingClientRect(); return { text: l.textContent, above: r.bottom <= first.top, w: Math.round(r.width) }; })()")
-    check(link and 'TV Guide' in link['text'] and link['above'], f'{T} a TV Guide row at the top of Live TV {link}')
-    check(await pg.evaluate(FIT) == [], f'{T} nothing runs off the screen')
+    check(not await pg.evaluate("!!document.querySelector('#stationsGrid .guide-link, #stationsGrid .ch-guide')"), f'{T} no separate TV Guide row or Now/Next lines: the grid is the guide')
+    check(await pg.evaluate(FIT) == [], f'{T} nothing runs off the screen (the grid scrolls inside itself)')
     await pg.screenshot(path=f'{SHOTS}/guide-rows-{theme}-{width}{"-big" if big else ""}.png')
-
-    # ---- the guide page ----
-    await pg.evaluate("document.querySelector('#stationsGrid .guide-link').click()"); await pg.wait_for_timeout(1200)
-    head = await pg.evaluate("document.getElementById('stationsHeading').textContent")
-    cards = await pg.evaluate(CARDS)
-    check(head == 'TV Guide' and [c['name'] for c in cards] == ['Buzzr', 'Little Stars Universe', 'Reuters Now'], f'{T} the guide page has a card per channel with a schedule {head} {[c["name"] for c in cards]}')
-    bz = cards[0]['progs'] if cards else []
-    check(bz and bz[0][0] == 'Now' and bz[0][1] == 'The Price Is Right' and 'min left' in bz[0][2] and bz[0][3], f'{T} Now with time left and a progress bar {bz[:1]}')
-    check(len(bz) == 4 and bz[1][1] == 'Match Game' and ('AM' in bz[1][0] or 'PM' in bz[1][0]) and bz[1][2] == 'Charles Nelson Reilly' and bz[2][2] == '', f'{T} then what\'s next: its time once, and the episode name {bz[1:3]}')
-    gap = await pg.evaluate("(()=>{ var p=document.querySelectorAll('.guide-card .guide-prog')[1]; var t=p.querySelector('.guide-time').getBoundingClientRect(), b=p.querySelector('.guide-title').getBoundingClientRect(); return Math.round(b.left - t.right); })()")
-    check(gap >= 8, f'{T} the time and the title don\'t touch ({gap}px)')
-    foot = await pg.evaluate("(document.querySelector('#stationsGrid .guide-foot')||{}).textContent")
-    check(foot and 'One other channel' in foot, f'{T} a note about the channel without a schedule ({foot})')
-    check(await pg.evaluate(FIT) == [], f'{T} the guide fits the screen')
-    nav = await pg.evaluate("(document.querySelector('.mobile-nav-btn.active')||{}).dataset.nav")
-    check(nav == 'video', f'{T} Watch stays selected in the tab bar ({nav})')
-    await pg.screenshot(path=f'{SHOTS}/guide-page-{theme}-{width}{"-big" if big else ""}.png')
-    await pg.evaluate("document.querySelector('.guide-card .guide-prog.now').click()"); await pg.wait_for_timeout(1500)
+    await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(function(r){ return /Buzzr/.test(r.querySelector('.epg-ch').getAttribute('aria-label')); }).querySelector('.epg-prog.now').click()"); await pg.wait_for_timeout(1500)
     loads = [c[1] for c in await pg.evaluate('window.__calls') if c[0] == 'load']
-    check(loads and BUZZR in loads[-1], f'{T} tapping what\'s on now plays the channel {loads[-1:]}')
+    check(loads and BUZZR in loads[-1], f'{T} tapping what’s on now plays the channel {loads[-1:]}')
     await pg.evaluate("(()=>{ var b=document.getElementById('npBackBtn'); if(b) b.click(); })()"); await pg.wait_for_timeout(700)
-    await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(900)
-    back = await pg.evaluate("[document.getElementById('stationsHeading').textContent, !!document.querySelector('#stationsGrid .guide-link')]")
-    check(back[1], f'{T} Back returns to Live TV {back}')
 
     # ---- kept: after a restart the rows show at once, nothing asked again ----
     n0 = len(LOG['pluto']) + len(LOG['plex'])
     await pg.reload(); await pg.wait_for_timeout(2500)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
     rows = {r['name']: r for r in await pg.evaluate(ROWS)}
-    check(rows.get('Buzzr', {}).get('now') == 'Now: The Price Is Right' and len(LOG['pluto']) + len(LOG['plex']) == n0, f'{T} after a restart: shown from what was kept, no new requests ({len(LOG["pluto"]) + len(LOG["plex"]) - n0})')
+    check(rows.get('Buzzr', {}).get('now') == 'The Price Is Right' and len(LOG['pluto']) + len(LOG['plex']) == n0, f'{T} after a restart: shown from what was kept, no new requests ({len(LOG["pluto"]) + len(LOG["plex"]) - n0})')
     check(not errs, f'{T} no page errors {errs[:3]}')
     await b.close()
 
@@ -182,10 +160,7 @@ async def down(p):
     await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2500)
     rows = await pg.evaluate(ROWS)
-    check(all(r['now'] is None for r in rows) and len(rows) == 4, f'[down] with the schedules unreachable the rows are as before {rows}')
-    await pg.evaluate("document.querySelector('#stationsGrid .guide-link').click()"); await pg.wait_for_timeout(1200)
-    cards = await pg.evaluate(CARDS)
-    check(cards and all(c['empty'] for c in cards) and not any(c['progs'] for c in cards), f'[down] the guide says there is no schedule {[c["empty"] for c in cards]}')
+    check(all(r['now'] is None and r['whole'] for r in rows) and len(rows) == 4, f'[down] with the schedules unreachable every channel is one solid block {rows}')
     check(not errs, f'[down] no page errors {errs[:3]}')
     await b.close()
 

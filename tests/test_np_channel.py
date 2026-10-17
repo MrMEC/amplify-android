@@ -27,8 +27,9 @@ async def geom(pg):
       return {artBottom:a.bottom, videoBottom:v.bottom, videoShown:!document.getElementById('npVideoWrap').hidden, nameTop:nr.top, nameH:nr.height, lh:lh, ctrlTop:c.top,
         channel:document.getElementById('nowPlayingScreen').classList.contains('np-channel'),
         heading:(document.getElementById('npCollection').style.display!=='none')?document.getElementById('npCollectionHeading').textContent:null,
-        rows:Array.prototype.map.call(document.querySelectorAll('#npCollectionGrid .tile-row'),function(r){return r.querySelector('.tile-name').textContent;}),
-        playing:Array.prototype.map.call(document.querySelectorAll('#npCollectionGrid .tile-row.playing'),function(r){return r.querySelector('.tile-name').textContent;}),
+        rows:Array.prototype.map.call(document.querySelectorAll('#npCollectionGrid .epg-ch, #npCollectionGrid .tile-row'),function(c){return c.classList.contains('epg-ch')?(c.getAttribute('aria-label')||'').replace(/, playing$/,''):c.querySelector('.tile-name').textContent;}),
+        playing:Array.prototype.map.call(document.querySelectorAll('#npCollectionGrid .epg-ch.playing, #npCollectionGrid .tile-row.playing'),function(c){return c.classList.contains('epg-ch')?(c.getAttribute('aria-label')||'').replace(/, playing$/,''):c.querySelector('.tile-name').textContent;}),
+        grid:!!document.querySelector('#npCollectionGrid .epg.epg-np'),
         related:getComputedStyle(document.getElementById('npRelated')).display};
     })()""")
 
@@ -44,7 +45,7 @@ async def run(p, w, h, tag, theme='dark'):
     await pg.goto('http://127.0.0.1:8778/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]') ? document.querySelector('.mobile-nav-btn[data-nav=video]').click() : document.querySelector('[data-nav=video]').click()"); await pg.wait_for_timeout(600)
     # a saved channel
-    await pg.evaluate("document.querySelector('#stationsGrid .tile.ch-item').click()")
+    await pg.evaluate("document.querySelector('#stationsGrid .epg-ch').click()")
     if mobile and theme == 'dark':
         # Mid-slide: the tab bar stays on top and the screen rises from behind it.
         frames = []
@@ -69,8 +70,8 @@ async def run(p, w, h, tag, theme='dark'):
     check(g['videoShown'] and 0 <= g['nameTop'] - g['videoBottom'] <= 30, f'{tag}: the name sits right under the video ({g["nameTop"] - g["videoBottom"]:.0f}px)')
     check(g['nameH'] <= g['lh'] * 1.3, f'{tag}: the name is one line ({g["nameH"]:.0f} / {g["lh"]:.0f})')
     check(g['ctrlTop'] - g['nameTop'] < 80, f'{tag}: controls close under the name ({g["ctrlTop"] - g["nameTop"]:.0f}px)')
-    check(g['heading'] and g['heading'].startswith('My Channels') and len(g['rows']) == 18 and len(g['playing']) == 1 and g['related'] == 'none',
-          f'{tag}: saved channel lists My Channels, current one highlighted, no Related Stations {g["heading"]} {g["rows"]} {g["playing"]}')
+    check(g['grid'] and not g['heading'] and len(g['rows']) == 18 and len(g['playing']) == 1 and g['related'] == 'none',
+          f'{tag}: saved channel shows the guide grid of My Channels (no heading), current one highlighted, no Related Stations {g["heading"]} {g["rows"]} {g["playing"]}')
     await pg.screenshot(path=f'{SHOTS}/npch-{tag}-saved.png')
     bg = await pg.evaluate("getComputedStyle(document.getElementById('nowPlayingScreen')).backgroundColor")
     want = 'rgb(255, 255, 255)' if theme == 'light' else 'rgb(0, 0, 0)'
@@ -115,7 +116,7 @@ async def run(p, w, h, tag, theme='dark'):
         st = await pg.evaluate("[document.body.classList.contains('np-open'), document.getElementById('nowPlayingScreen').style.transform, document.body.classList.contains('np-sheet')]")
         check(st[0] and not st[1] and not st[2], f'{tag}: pulling down on the channel list does not drag the screen away {st}')
     # tap another channel in the list
-    await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#npCollectionGrid .tile-row'),function(r){return r.querySelector('.tile-name').textContent==='PBS';}).click()"); await pg.wait_for_timeout(900)
+    await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#npCollectionGrid .epg-ch'),function(c){return (c.getAttribute('aria-label')||'').replace(/, playing$/,'')==='PBS';}).click()"); await pg.wait_for_timeout(900)
     g = await geom(pg)
     check(g['playing'] == ['PBS'], f'{tag}: tapping a channel in the list switches to it {g["playing"]}')
     # a channel not in My Channels (from All, category News)
@@ -130,7 +131,7 @@ async def run(p, w, h, tag, theme='dark'):
     await pg.screenshot(path=f'{SHOTS}/npch-{tag}-unsaved.png')
     await pg.evaluate("document.getElementById('npChannelLink').click()"); await pg.wait_for_timeout(500)
     g = await geom(pg)
-    check(g['heading'] and g['heading'].startswith('My Channels') and 'BBC News' in g['rows'], f'{tag}: adding it from the menu switches the list to My Channels {g["heading"]} {g["rows"]}')
+    check(g['grid'] and not g['heading'] and 'BBC News' in g['rows'], f'{tag}: adding it from the menu switches to the My Channels grid {g["heading"]} {g["rows"]}')
     if mobile and theme == 'dark':
         await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(40)
         st = await pg.evaluate("[document.body.classList.contains('np-sheet'), getComputedStyle(document.getElementById('nowPlayingScreen')).display]")
