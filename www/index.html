@@ -3158,6 +3158,15 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; overflow-wrap:normal; width:100%;
   }
   body:not(.rotate-lock) .now-playing-screen.np-channel .np-sub{ margin-bottom:12px; }
+  /* Build 245 (Mark): a playing channel's title smaller, the episode tight under it, the pair centred
+     between the video and the guide (equal space above and below); More spans both lines, so its
+     height no longer pushes the episode down. */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-hero-foot{ margin-top:0; padding-top:14px; padding-bottom:14px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details{ row-gap:2px; align-content:center; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details > .np-name{ font-size:17px; line-height:1.25; align-self:end; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details > .np-sub{ margin:0; align-self:start; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details > .np-controls{ grid-row:1 / span 2; }
+  .now-playing-screen.np-channel #npCollection.np-epg{ margin-top:0; }
   .now-playing-screen.np-channel .np-video-toggle{ display:none; }
   #npVideoMenuBtn span{ white-space:nowrap; }
   .now-playing-screen.np-channel #npCollection{ margin-top:22px; }
@@ -3390,12 +3399,16 @@
   .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
   .epg-heart{ color:var(--accent); font-size:11px; }
   .epg-prog{ position:absolute; top:0; height:50px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
-    display:flex; flex-direction:column; justify-content:center; gap:1px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:hidden; }
+    display:flex; flex-direction:column; justify-content:center; gap:1px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:visible; }
   button.epg-prog{ cursor:pointer; }
   .epg-prog.now{ background:var(--epg-cell-now); }
   .epg-t{ font-size:13px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .epg-s{ font-size:11.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .epg-prog.whole .epg-t{ font-weight:500; }
+  /* Build 245 (Mark): a block's words stay in view as the grid scrolls sideways (they ride along
+     just right of the channel column until the block's own end pushes them off), so a channel
+     without a schedule never turns into an empty bar, and a long program keeps its title showing. */
+  .epg-prog > .epg-t, .epg-prog > .epg-s{ position:sticky; left:calc(80px + 11px); width:fit-content; max-width:100%; }
   /* Now: an accent line down the rows, its marker in the (sticky) time bar. */
   .epg-now{ position:absolute; top:0; bottom:0; width:2px; background:var(--epg-line); z-index:2; pointer-events:none; opacity:.85; }
   .epg-now-mark{ position:absolute; bottom:0; width:0; height:0; transform:translateX(-50%); border-left:7px solid transparent; border-right:7px solid transparent;
@@ -4557,6 +4570,7 @@
       padding:0 0 10px; margin:0 calc(var(--main-pad) * -1);
     }
     body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection.np-epg .epg.epg-np{ margin:0; }
+    body.np-channel-open:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen.np-channel #npCollection.np-epg{ margin-top:0; }
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
     .mobile-nav, .search-sheet{ background:var(--panel); }
