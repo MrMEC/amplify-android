@@ -3662,6 +3662,8 @@
   .tag-cover-btn{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px;
     padding:7px 12px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
   .tag-cover-btn.danger{ color:var(--danger); }
+  .tag-cover-btn.tag-cover-save{ background:var(--accent); color:var(--accent-text, #fff); border-color:transparent; font-weight:700; }
+  .tag-cover-shown{ opacity:.9; }
   .tag-row.tag-cover-row, .tag-panel.editing .tag-row.tag-cover-row{ align-items:flex-start; }
   .tag-panel.editing .tag-row.tag-cover-row .tag-k{ padding-top:2px; }
   .tag-panel.editing .tag-row{ align-items:center; padding:5px 0; }
@@ -7180,6 +7182,10 @@
   </button>
   <button type="button" class="np-menu-item" id="rowMenuAddPlaylist" role="menuitem">
     <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
+  </button>
+  <!-- Build 240: a library song's Info & Tags, from its row too. -->
+  <button type="button" class="np-menu-item" id="rowMenuTags" role="menuitem" style="display:none;">
+    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><path d="M8 11.5h5M8 14.5h3"/></svg><span>Info &amp; Tags</span>
   </button>
   <button type="button" class="np-menu-item" id="rowMenuRename" role="menuitem" style="display:none;">
     <i class="fa-solid fa-pen"></i><span>Rename</span>
@@ -30132,6 +30138,7 @@
     rowMenuRemove.style.display = rowMenuOnRemove ? '' : 'none';
     rowMenuOnRename = (opts && opts.onRename) || null;
     rowMenuRename.style.display = rowMenuOnRename ? '' : 'none';
+    rowMenuTags.style.display = tracks.length === 1 && isLocalTrack(tracks[0]) ? '' : 'none';
     rowMenu._anchor = anchor;
     rowMenu.classList.add('open');
     var r = anchor.getBoundingClientRect();
@@ -30161,6 +30168,12 @@
     e.stopPropagation();
     var t = rowMenuTracks; closeRowMenu();
     if(t) queueAddToEnd(t);
+  });
+  var rowMenuTags = document.getElementById('rowMenuTags');
+  rowMenuTags.addEventListener('click', function(e){
+    e.stopPropagation();
+    var t = rowMenuTracks && rowMenuTracks[0]; closeRowMenu();
+    if(t && isLocalTrack(t)) openTagSheet(libraryById[favKey(t)] || t);
   });
   document.getElementById('rowMenuAddPlaylist').addEventListener('click', function(e){
     e.stopPropagation();
@@ -31503,7 +31516,7 @@
     // Build 232: the cover in the file, which Edit can change or take out (MP3 and FLAC).
     if(doc.editable || docCover(doc)){
       var cur = docCover(doc);
-      sec.appendChild(buildTagCoverRow(cur, { some: !!cur, shown: !!customArtFor(track) }));
+      sec.appendChild(buildTagCoverRow(cur, { some: !!cur, shown: !!(customArtFor(track) || s.shownSrc) }));
     }
     TAG_FIELDS.forEach(function(f){
       var val = doc.values[f.key] || '';
@@ -31605,8 +31618,15 @@
         if(tagState !== mine) return;
         mine.doc = doc;
         mine.onDisk = src.onDisk;
-        renderTagSheet();
-        if(!doc.editable) setTagNote(doc.whyNot, 'info');
+        // Build 240: a picture Amplify shows for the song that isn't in the file (a cover added
+        // in Amplify, or the folder's picture): offered for saving into the file.
+        var shown = (!docCover(doc) && doc.editable) ? (customArtFor(track) || (track.hasArt ? localArtUrl(track)['catch'](function(){ return null; }) : null)) : null;
+        return Promise.resolve(shown).then(function(u){
+          if(tagState !== mine) return;
+          mine.shownSrc = u || null;
+          renderTagSheet();
+          if(!doc.editable) setTagNote(doc.whyNot, 'info');
+        });
       });
     })['catch'](function(err){
       if(tagState !== mine) return;
@@ -31856,7 +31876,7 @@
   });
   function useShownCover(){
     var s = tagState;
-    var src = s && (s.mode === 'album' ? s.album.customArt : customArtFor(s.track));
+    var src = s && (s.mode === 'album' ? s.album.customArt : (customArtFor(s.track) || s.shownSrc));
     if(!src) return;
     setTagNote('Preparing the picture…', 'info');
     coverFromImage(src).then(function(c){
@@ -31864,6 +31884,17 @@
       s.cover = c;
       setTagNote('');
       renderTagSheet();
+    }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
+  }
+  // Build 240: the picture Amplify shows, written into the song's file as its front cover.
+  function saveShownCoverToFile(){
+    var s = tagState;
+    if(!s || s.saving || !s.shownSrc) return;
+    setTagNote('Saving the cover in the file…', 'info');
+    coverFromImage(s.shownSrc).then(function(c){
+      if(tagState !== s) return;
+      s.cover = c;
+      saveTagEdits();
     }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
   }
   function buildTagCoverRow(current, opts){
@@ -31880,8 +31911,26 @@
       img.src = tagPicUrl(blob);
       v.appendChild(img);
     }
-    var line = pending ? (s.cover ? 'New cover, saved when you tap Save' : 'Taken out when you tap Save') : (opts.text || (blob ? '' : 'None'));
-    if(line) v.appendChild(tagEl('span', 'tag-cover-text' + (blob || pending ? '' : ' empty'), line));
+    // Build 240: not in the file, but Amplify shows one: it can go into the file in one tap.
+    var offer = !s.editing && !blob && !pending && s.mode === 'song' && s.shownSrc && s.doc && s.doc.editable;
+    if(offer){
+      var simg = document.createElement('img');
+      simg.className = 'tag-pic tag-cover-pic tag-cover-shown';
+      simg.alt = '';
+      simg.src = s.shownSrc;
+      v.appendChild(simg);
+    }
+    var line = pending ? (s.cover ? 'New cover, saved when you tap Save' : 'Taken out when you tap Save')
+      : offer ? 'Shown in Amplify, not saved in the file' : (opts.text || (blob ? '' : 'None'));
+    if(line) v.appendChild(tagEl('span', 'tag-cover-text' + (blob || pending || offer ? '' : ' empty'), line));
+    if(offer){
+      var ob = tagEl('div', 'tag-cover-btns');
+      var save = tagEl('button', 'tag-cover-btn tag-cover-save', 'Save in the File');
+      save.type = 'button';
+      save.addEventListener('click', function(e){ e.preventDefault(); saveShownCoverToFile(); });
+      ob.appendChild(save);
+      v.appendChild(ob);
+    }
     if(s.editing){
       var btns = tagEl('div', 'tag-cover-btns');
       function btn(label, fn, cls){
