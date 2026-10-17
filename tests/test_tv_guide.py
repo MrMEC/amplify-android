@@ -108,7 +108,7 @@ ROWS = """Array.from(document.querySelectorAll('#stationsGrid .epg-row')).map(fu
   return { name: (c.getAttribute('aria-label')||'').replace(/, playing$/,''), now: n >= 0 ? bl[n].querySelector('.epg-t').textContent : null,
     next: n >= 0 && bl[n+1] ? bl[n+1].querySelector('.epg-t').textContent : null, nextSub: n >= 0 && bl[n+1] && bl[n+1].querySelector('.epg-s') ? bl[n+1].querySelector('.epg-s').textContent : '',
     whole: !!r.querySelector('.epg-prog.whole') }; })"""
-FIT = """(()=>{ var bad=[]; document.querySelectorAll('#stationsGrid *').forEach(function(e){ if(e.closest('.epg-scroll')) return; var r=e.getBoundingClientRect(); if(r.width && (r.right > innerWidth + 0.5 || r.left < -0.5)) bad.push(e.className); }); return bad.slice(0,5); })()"""
+FIT = """(()=>{ var bad=[]; document.querySelectorAll('#stationsGrid *').forEach(function(e){ if(e.closest('.epg-scroll, .epg-head-track')) return; var r=e.getBoundingClientRect(); if(r.width && (r.right > innerWidth + 0.5 || r.left < -0.5)) bad.push(e.className); }); return bad.slice(0,5); })()"""
 
 
 async def run(p, theme, width, big):

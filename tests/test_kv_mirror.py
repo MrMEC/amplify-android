@@ -49,8 +49,8 @@ async def main():
         favs = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerFavorites')).map(function(f){ return f.name; })")
         check('Alpha TV' in favs and len(favs) == 3, f'a lost write is put back from Android at start-up {favs}')
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
-        lt = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid > .ch-group-head, #stationsGrid > .tile-row'), function(e){ return e.classList.contains('ch-group-head') ? '#' + e.textContent : (e.querySelector('.tile-name')||e).textContent.trim(); })")
-        check(lt[:4] == ['#Favorites', 'Alpha TV', 'Zed TV', '#My Channels'], f'and the channel shows under Favorites on Live TV {lt[:5]}')
+        lt = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#stationsGrid .epg-ch'), function(c){ return (c.getAttribute('aria-label')||'').replace(/, playing$/,'') + (c.querySelector('.epg-heart') ? '*' : ''); })")
+        check(lt[:2] == ['Alpha TV*', 'Zed TV*'], f'and the channel leads the Live TV guide with a heart {lt[:5]}')
         gets = await pg.evaluate("window.__kvgets")
         # no reload loop: a further restart with everything in step reloads nothing
         await pg.reload(); await pg.wait_for_timeout(3000)
