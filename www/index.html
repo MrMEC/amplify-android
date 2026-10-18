@@ -3399,7 +3399,7 @@
     background:var(--epg-bg); border:0; color:var(--text-dim); cursor:pointer; padding:0; }
   .epg-corner svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
   /* Build 252: greyed out while nothing is playing. */
-  .epg-corner:disabled{ opacity:.35; cursor:default; }
+  .epg-corner.off{ visibility:hidden; pointer-events:none; }
   .epg-corner:not(:disabled){ color:var(--text); }
   /* The playing channel's details hidden (the corner's up arrow): none of its height left. */
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed .np-hero-foot{
@@ -17803,8 +17803,12 @@
   var EPG_ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
   var EPG_ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   function syncEpgFootBtn(b){
-    var on = !!currentStation;
+    // Build 253 (Mark): only while something is playing (or starting to); otherwise not there at
+    // all (its place kept, so the times stay where they are). A station merely remembered from
+    // last time (shown in the player bar, not playing) doesn't count.
+    var on = !!currentStation && (uiIsPlaying || attemptInProgress);
     b.disabled = !on;
+    b.classList.toggle('off', !on);
     var want = npFootCollapsed ? 'down' : 'up';
     if(b.dataset.arrow !== want){ b.dataset.arrow = want; b.innerHTML = npFootCollapsed ? EPG_ARROW_DOWN : EPG_ARROW_UP; }
     var label = npFootCollapsed ? 'Show channel details' : 'Hide channel details';
@@ -37094,6 +37098,7 @@
     syncHeroPlayPills();
     if(typeof syncNpHeroPlay === 'function') syncNpHeroPlay();
     updateMediaSessionState();
+    if(typeof syncEpgFootBtns === 'function') syncEpgFootBtns();
   }
   // Pause only when the screen is showing the station that's actually playing; for any
   // other station the button is a Play button that switches playback over to it.
