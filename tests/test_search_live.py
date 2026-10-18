@@ -156,6 +156,20 @@ async def main():
         titles = [r[1] for r in s2['rows']]
         check(titles.index('Ray of Light') < titles.index('Raye'), 'closest names first: "Ray of Light" (starts with ray) above Raye (contains it)')
         await pg.screenshot(path=f'{shots}/search-top.png')
+        # build 256: opening an artist from the results takes the box away (header back); Back brings both back
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('#stationsGrid .song-row'), function(r){ return r.querySelector('.song-row-title').textContent === 'Raye'; }).click()")
+        await pg.wait_for_timeout(900)
+        SB = """(()=>[document.getElementById('searchSheet').classList.contains('open'), getComputedStyle(document.getElementById('searchSheet')).opacity,
+          getComputedStyle(document.querySelector('.sidebar-top')).visibility, document.body.classList.contains('search-view'), document.getElementById('searchSheetInput').value,
+          document.querySelector('.mobile-nav-btn.active') ? document.querySelector('.mobile-nav-btn.active').dataset.nav : null])()"""
+        ar = await pg.evaluate(SB)
+        await pg.screenshot(path=f'{shots}/search-artist.png')
+        check(not ar[0] and float(ar[1]) == 0 and ar[2] == 'visible' and not ar[3], f'artist from the results: no search box, header back {ar}')
+        await pg.evaluate("""(()=>{ var c = Array.prototype.filter.call(document.querySelectorAll('#detailBackBtn, button[aria-label=Back], .artist-back, .float-back'), function(b){ var r=b.getBoundingClientRect(); return r.width && r.height && getComputedStyle(b).visibility!=='hidden'; }); window.__backUsed = c[0] && (c[0].id || c[0].className); c[0].click(); })()"""); await pg.wait_for_timeout(900)
+        print('back button used:', await pg.evaluate('window.__backUsed'))
+        bk = await pg.evaluate(SB)
+        await pg.screenshot(path=f'{shots}/search-artist-back.png')
+        check(bk[0] and bk[2] == 'hidden' and bk[3] and bk[4] == 'ray' and bk[5] == 'search', f'Back to the results: the box returns with its text {bk}')
         # the tabs stay fixed under the header as the results scroll
         t0 = await pg.evaluate("document.getElementById('searchTabs').getBoundingClientRect().top")
         await pg.evaluate("window.scrollTo(0, 500)"); await pg.wait_for_timeout(300)

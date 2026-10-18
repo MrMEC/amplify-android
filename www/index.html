@@ -35194,6 +35194,29 @@
     searchAsYouType(searchSheetInput.value);
   });
 
+  // ---------- the box belongs to the Search page (build 256) ----------
+  // Mark: opening an artist, album, station etc. from the results left the search box over
+  // the new page. On a phone the box now shows exactly while the Search page is the page on
+  // screen: it goes when another page opens from the results (the header comes back), and
+  // returns, text kept, when Back brings the results back. Now Playing over the results hides
+  // it too. Desktop's sheet is left as it was.
+  if(window.MutationObserver){
+    var searchBoxSyncQueued = false;
+    new MutationObserver(function(){
+      if(searchBoxSyncQueued) return;
+      searchBoxSyncQueued = true;
+      Promise.resolve().then(function(){
+        searchBoxSyncQueued = false;
+        if(!isPhoneLayout()) return;
+        var b = document.body.classList;
+        var want = b.contains('search-view') && !b.contains('np-open') && !b.contains('rotate-lock');
+        var open = searchSheet.classList.contains('open');
+        if(open && !want) closeSearchSheet(false);
+        else if(!open && want) openSearchSheet();
+      });
+    }).observe(document.body, { attributes:true, attributeFilter:['class'] });
+  }
+
   // ---------- the tab bar steps aside for the keyboard (build 255) ----------
   // Mark: while typing (the on-screen keyboard up) the tab bar is hidden, so it doesn't ride up
   // on top of the keyboard and eat what is left of the screen. A text field taking the focus
