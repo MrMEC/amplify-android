@@ -247,7 +247,13 @@ async def run(p, theme, width, big):
     th = await pg.evaluate("""(()=>{ var t=document.getElementById('npEpThumb'), n=document.getElementById('npName'), s=document.getElementById('npSub'); var tr=t.getBoundingClientRect(), nr=n.getBoundingClientRect(), sr=s.getBoundingClientRect();
       return { shown: !t.hidden && tr.width > 0, loaded: t.querySelector('img').naturalWidth > 0, w: Math.round(tr.width), h: Math.round(tr.height), left: tr.right <= nr.left - 6 && tr.right <= sr.left - 6,
         mid: Math.abs((tr.top + tr.bottom) / 2 - (nr.top + sr.bottom) / 2) <= 4 }; })()""")
-    check(th['shown'] and th['loaded'] and th['left'] and th['mid'] and th['h'] <= 48, f'{T} a small picture of what’s on, left of the name and episode, centred on them {th}')
+    check(th['shown'] and th['loaded'] and th['left'] and th['mid'] and th['w'] == th['h'], f'{T} a square picture of what’s on, left of the name and episode, centred on them {th}')
+    # build 250: lined up with the guide: the picture over the logo column, name / episode / times / programs at one left edge
+    al = await pg.evaluate("""(()=>{ var q=s=>document.querySelector(s), L=function(el){ var r=document.createRange(); r.selectNodeContents(el); return Math.round(r.getBoundingClientRect().left); };
+      var cell=q('#npCollection .epg-ch'), cb=getComputedStyle(cell,'::before'), cl=cell.getBoundingClientRect().left + parseFloat(cb.left), t=q('#npEpThumb').getBoundingClientRect();
+      return { thumb: [Math.round(t.left), Math.round(t.right)], cell: [Math.round(cl), Math.round(cl + parseFloat(cb.width))],
+        text: [L(q('#npName')), L(q('#npSub')), L(q('#npCollection .epg-time')), L(q('#npCollection .epg-prog .epg-t'))] }; })()""")
+    check(al['thumb'] == al['cell'] and len(set(al['text'])) == 1, f'{T} lined up with the guide: picture over the logos, name, episode, times and programs at one edge {al}')
     # build 249: the title smaller and on up to two lines; a smaller More
     nm = await pg.evaluate("""(()=>{ var e=document.getElementById('npName'); var keep=e.textContent; e.textContent='Little House on the Prairie Classics and More Westerns All Day';
       var c=getComputedStyle(e), lh=parseFloat(c.lineHeight); var n=Math.round(e.getBoundingClientRect().height/lh); e.textContent=keep;
