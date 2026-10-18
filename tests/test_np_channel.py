@@ -68,7 +68,8 @@ async def run(p, w, h, tag, theme='dark'):
     g = await geom(pg)
     check(g['channel'], f'{tag}: a channel gets the channel layout')
     check(g['videoShown'] and 0 <= g['nameTop'] - g['videoBottom'] <= 30, f'{tag}: the name sits right under the video ({g["nameTop"] - g["videoBottom"]:.0f}px)')
-    check(g['nameH'] <= g['lh'] * 1.3, f'{tag}: the name is one line ({g["nameH"]:.0f} / {g["lh"]:.0f})')
+    # build 249 (Mark): the name may take two lines (never more)
+    check(g['nameH'] <= g['lh'] * 2.3, f'{tag}: the name takes at most two lines ({g["nameH"]:.0f} / {g["lh"]:.0f})')
     check(g['ctrlTop'] - g['nameTop'] < 80, f'{tag}: controls close under the name ({g["ctrlTop"] - g["nameTop"]:.0f}px)')
     check(g['grid'] and not g['heading'] and len(g['rows']) == 18 and len(g['playing']) == 1 and g['related'] == 'none',
           f'{tag}: saved channel shows the guide grid of My Channels (no heading), current one highlighted, no Related Stations {g["heading"]} {g["rows"]} {g["playing"]}')
