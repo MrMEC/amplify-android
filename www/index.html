@@ -3401,7 +3401,7 @@
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
   .epg-head-times{ position:relative; height:34px; }
-  .epg-time{ position:absolute; top:0; height:34px; display:flex; align-items:center; padding-left:6px; font-size:13px; font-weight:600;
+  .epg-time{ position:absolute; top:0; height:34px; display:flex; align-items:center; padding-left:11px; font-size:13px; font-weight:600;
     color:var(--text-dim); white-space:nowrap; }
   .epg-row{ position:relative; height:50px; margin-top:3px; }
   .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:50px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
@@ -3458,9 +3458,14 @@
   /* Build 248: under a playing channel's video, the picture of what's on, left of its name. */
   .np-ep-thumb{ display:none; padding:0; border:0; background:var(--panel-2); border-radius:6px; overflow:hidden; cursor:pointer; }
   .np-ep-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
-  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep{ grid-template-columns:auto minmax(0, 1fr) auto; column-gap:12px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep{ grid-template-columns:auto minmax(0, 1fr) auto; column-gap:15px; }
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep > .np-ep-thumb{
-    display:block; grid-column:1; grid-row:1 / span 2; align-self:center; width:72px; height:41px; }
+    display:block; grid-column:1; grid-row:1 / span 2; align-self:center; width:72px; height:72px; }
+  /* Build 250 (Mark): lined up with the guide below: the square picture over the logo column
+     (4px in, 72 wide, like the logo cells), the name and episode at the programs' text (91px). */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-hero-foot:has(> .np-details.np-has-ep){ padding-left:4px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep{ column-gap:15px; }
+  .np-ep-thumb{ border-radius:5px; }
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep > :is(.np-name, .np-onair, .np-sub, .np-cast-note){ grid-column:2; }
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep > .np-controls{ grid-column:3; }
   .now-playing-screen.np-channel.np-ep-info :is(#npName, #npSub){ cursor:pointer; }
@@ -17964,7 +17969,7 @@
   var npEpThumb = document.getElementById('npEpThumb');
   function syncNpEpThumb(st){
     var on = st && isNpChannel(st) ? epgNowItem(st) : null;
-    var pic = on ? (on.it.im || on.it.sq) : '';
+    var pic = on ? (on.it.sq || on.it.im) : '';   // square (build 250): the square picture first
     var src = pic ? epgImg(pic, 240) : '';
     var details = npDetailsEl();
     npEpThumb.hidden = !src;
