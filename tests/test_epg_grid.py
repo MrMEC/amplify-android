@@ -95,7 +95,7 @@ INFO = """(()=>{ var o=document.getElementById('epgInfoOverlay'), p=o.querySelec
     desc: vis('epgInfoDesc') ? document.getElementById('epgInfoDesc').textContent : null, pic: !pic.hidden && img.naturalWidth > 0, picW: Math.round(pic.getBoundingClientRect().width),
     watch: vis('epgInfoWatch'), fits: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5 }; })()"""
 
-CORNER = """(()=>{ var b=document.querySelector(arguments_sel); var cs=getComputedStyle(b); return { disabled: b.disabled, label: b.getAttribute('aria-label'), arrow: b.dataset.arrow, op: parseFloat(cs.opacity) }; })()"""
+CORNER = """(()=>{ var b=document.querySelector(arguments_sel); var cs=getComputedStyle(b); return { disabled: b.disabled, label: b.getAttribute('aria-label'), arrow: b.dataset.arrow, op: parseFloat(cs.opacity), hidden: cs.visibility === 'hidden', w: Math.round(b.getBoundingClientRect().width) }; })()"""
 async def corner(pg, sel):
     return await pg.evaluate(CORNER.replace('arguments_sel', repr(sel)))
 FOOT = """(()=>{ var f=document.querySelector('#nowPlayingScreen .np-hero-foot'), g=document.querySelector('#npCollection .epg'); return { h: Math.round(f.getBoundingClientRect().height),
@@ -160,7 +160,7 @@ async def run(p, theme, width, big):
     g = await pg.evaluate(GRID)
     # build 252: the corner is the details' up / down arrow, greyed out while nothing plays
     c0 = await corner(pg, '#stationsGrid .epg-corner')
-    check(c0['disabled'] and c0['arrow'] == 'up' and c0['op'] < 0.5, f'{T} nothing playing: the corner’s up arrow is greyed out {c0}')
+    check(c0['disabled'] and c0['hidden'] and c0['w'] == 80, f'{T} build 253: nothing playing: no arrow at all (its place kept) {c0}')
     check(g is not None and len(g['rows']) == 4, f'{T} Live TV is a guide grid with a row per channel {g and len(g["rows"])}')
     order = [r['url'] for r in g['rows']]
     check(order[0] == CHANNELS[1]['url'] and g['rows'][0]['heart'] and not any(r['heart'] for r in g['rows'][1:]), f'{T} the favourite first, with a heart')
@@ -316,7 +316,13 @@ async def run(p, theme, width, big):
     c3 = await corner(pg, '#stationsGrid .epg-corner')
     await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); r.querySelector('.epg-prog.now').click(); })()" % BUZZR); await pg.wait_for_timeout(1800)
     f3 = await pg.evaluate(FOOT)
-    check(c3['arrow'] == 'down' and c3['disabled'] and f3['collapsed'] and f3['h'] == 0, f'{T} after a restart: still hidden (down arrow, greyed until something plays) {c3} {f3}')
+    check(c3['arrow'] == 'down' and c3['hidden'] and f3['collapsed'] and f3['h'] == 0, f'{T} after a restart: still hidden (no arrow until something plays) {c3} {f3}')
+    # paused (a channel loaded but not playing, as when the app comes back to one): no arrow; playing again: back
+    await pg.evaluate("document.getElementById('npPlayBtn').click()"); await pg.wait_for_timeout(500)
+    cp = await corner(pg, '#npCollection .epg-corner')
+    await pg.evaluate("document.getElementById('npPlayBtn').click()"); await pg.wait_for_timeout(900)
+    cq = await corner(pg, '#npCollection .epg-corner')
+    check(cp['hidden'] and not cq['hidden'] and not cq['disabled'], f'{T} paused: no arrow; playing: it’s back {cp["hidden"]} {cq["hidden"]}')
     await pg.evaluate("document.querySelector('#npCollection .epg-corner').click()"); await pg.wait_for_timeout(600)
     check((await pg.evaluate(FOOT))['h'] > 40, f'{T} and shown again')
     # the menu still plays other channels from the grid under the player
