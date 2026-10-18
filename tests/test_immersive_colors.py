@@ -162,19 +162,15 @@ async def main():
             check(close(ph, th) and ps > 0.4, f'[{name}] Play button pixels are the artwork colour on screen {c}')
             await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(600)
 
-        # ---- the search box opened from the tab bar over Now Playing ----
+        # ---- build 255: Search from Now Playing opens the Search page (box at the top, no mini player) ----
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(500)
-        go = await pg.evaluate("(()=>{ var c = getComputedStyle(document.getElementById('searchSheetGo')); return [c.backgroundColor, document.body.classList.contains('np-open'), getComputedStyle(document.getElementById('searchSheet')).display]; })()")
-        vv = parse_rgb((await pg.evaluate(ST))['vivid'])
-        check(go[1] and parse_rgb(go[0]) == vv, f'search button in the colour while Now Playing is open {go}')
+        bar = await pg.evaluate(BAR)
+        npo = await pg.evaluate("document.body.classList.contains('np-open')")
+        check(bar['sheetOpen'] and bar['sheetTop'] == 0 and bar['op'] == 0 and not npo, f'Search leaves Now Playing; box at the top, mini player hidden {bar} {npo}')
         await pg.screenshot(path=f'{shots}/immcol-search.png')
-        bar = await pg.evaluate(BAR)
-        print('bar with search open over Now Playing', bar)
-        check(bar['sheetOpen'] and bar['sheetTop'] < bar['H'] - 60 and bar['top'] >= bar['H'] and bar['op'] == 0, f'Search rises in from the tab bar; the mini player stays down {bar}')
-        await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(700)
-        bar = await pg.evaluate(BAR)
-        check(bar['top'] >= bar['H'] and bar['op'] == 0 and bar['pe'] == 'none', f'closing Search on Now Playing does not bring the mini player back {bar}')
-        await pg.screenshot(path=f'{shots}/immcol-search-closed.png')
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
+        await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(900)
+        await pg.evaluate('__t.imm(true)'); await pg.wait_for_timeout(300)
         # ---- closing Now Playing: the tab bar's colour goes back ----
         await pg.evaluate('__t.imm(false)'); await pg.wait_for_timeout(300)
         await pg.evaluate('__t.closeNp()'); await pg.wait_for_timeout(900)
@@ -191,7 +187,7 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(500)
         go2 = await pg.evaluate("(()=>{ var p = document.createElement('div'); p.style.color = getComputedStyle(document.body).getPropertyValue('--accent'); document.body.appendChild(p); var a = getComputedStyle(p).color; p.remove(); return [getComputedStyle(document.getElementById('searchSheetGo')).backgroundColor, a]; })()")
         check(go2[0] == go2[1], f'search button back to the app colour away from Now Playing {go2}')
-        await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(400)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'{shots}/immcol-closed.png')
         await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(900)
         # ---- a menu open when entering immersive closes ----

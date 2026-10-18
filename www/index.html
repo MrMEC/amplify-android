@@ -658,7 +658,7 @@
   .recent-anchors{ display:none !important; gap:8px; margin:0 0 16px; }
   .recent-anchor{
     flex:1; padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700;
-    letter-spacing:.04em; text-transform:uppercase;
+    letter-spacing:.01em; text-transform:none;
     background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim);
     cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px;
   }
@@ -874,7 +874,9 @@
   .home-tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:2px 0 18px; }
   .home-tab{
     padding:7px 16px; border-radius:999px; font-size:12.5px; font-weight:700;
-    letter-spacing:.04em; text-transform:uppercase;
+    /* Build 255 (Mark): tab labels are written as they are, never in capitals, on every page.
+       The tracking came down with the capitals, as on the podcast date headings (build 210). */
+    letter-spacing:.01em; text-transform:none;
     background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim);
     cursor:pointer; white-space:nowrap;
     transition: color .15s ease, border-color .15s ease, background .15s ease;
@@ -971,7 +973,7 @@
   .song-row .song-row-art.search-more-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); font-size:20px; }
   /* Recent Searches (build 135): flush with the heading, rows close together, an X each. */
   .song-row.recent-search-row{ padding:0; min-height:46px; gap:12px; border-radius:8px; }
-  .song-row.recent-search-row .song-row-art.search-more-art{ width:20px; height:20px; margin:0; font-size:16px; background:none; justify-content:flex-start; border-radius:0; }
+  .song-row.recent-search-row .song-row-art.search-more-art{ width:20px; height:20px; margin:0; font-size:16px; background:none; justify-content:flex-start; border-radius:0; box-shadow:none; }
   .song-row.recent-search-row .song-row-title{ font-weight:500; }
   .recent-search-del{
     flex-shrink:0; width:40px; height:40px; margin-right:-6px; border:none; background:none; border-radius:50%;
@@ -979,7 +981,10 @@
   }
   .recent-search-del:hover{ color:var(--text); background:var(--panel-2); }
   .recent-search-del svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
-  .tile-grid > .grid-section-label.recent-searches-head{ margin:4px 0 14px; }
+  /* Build 255 (Mark): smaller heading and Clear, more room above them, less below. */
+  .tile-grid > .grid-section-label.recent-searches-head,
+  .tile-grid > .grid-section-label.recent-searches-head:first-child{ margin:8px 0 2px; font-size:15px; font-weight:700; }
+  .recent-searches-head .recent-searches-clear{ font-size:13.5px; }
   /* The search page has no heading row: no "Results for", count, save or clear above the tabs
      (build 118). Save Search lives on the Stations tab instead. */
   body.search-view #sectionHeadingRow{ display:none; }
@@ -4134,6 +4139,19 @@
     }
     .search-sheet-inner button:hover{ color:var(--text); border-color:var(--accent-dim); }
     #searchSheetGo{ background:var(--accent); border-color:var(--accent); color:var(--accent-text); }
+    /* Build 255 (Mark): the clear X sits inside the field at its far right, a bare icon (no
+       box or rounded button), and only once there is something in the box to clear. It
+       replaced the separate close button that sat to the right of the yellow Search button. */
+    .search-sheet-field{ position:relative; flex:1; min-width:0; display:flex; }
+    .search-sheet-inner .search-sheet-field input{ flex:1; width:100%; padding-right:44px; }
+    .search-sheet-inner .search-sheet-clear{
+      position:absolute; top:50%; right:2px; transform:translateY(-50%);
+      width:40px; height:40px; padding:0; border:0; border-radius:0; background:none;
+      color:var(--text-dim); display:flex; align-items:center; justify-content:center;
+    }
+    .search-sheet-inner .search-sheet-clear:hover{ color:var(--text); border:0; background:none; }
+    .search-sheet-clear svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.3; stroke-linecap:round; }
+    .search-sheet-field input:placeholder-shown ~ .search-sheet-clear{ display:none; }
   @media (max-width: 900px){
     /* Settings left the bar; search took the slot. */
     #settingsFab{ display:none; }
@@ -4435,6 +4453,25 @@
     .search-sheet-inner{ padding:9px 10px; }
     .search-sheet-inner input{ padding:11px 13px; }
     .search-sheet-inner button{ width:40px; height:40px; }
+    /* Build 255 (Mark): on a phone Search is a page with its box at the top, in the header's
+       place (the header steps aside while it is open), rather than a sheet over the player bar.
+       No panel or border round it: the field and the Search button sit straight on the page.
+       Same 60px as the header, so the sticky search tabs (top:60px) sit right under it. It
+       stays put while the results scroll (the header's hide-on-scroll is off for Search). */
+    .search-sheet{
+      top:0; bottom:auto; left:0; right:0; width:auto; margin:0; height:60px; box-sizing:border-box;
+      z-index:300; border:0; border-radius:0; box-shadow:none;
+      background:var(--main-bg, var(--bg));
+      -webkit-backdrop-filter:none; backdrop-filter:none;
+      transform:none; transition:opacity .16s ease;
+    }
+    .search-sheet.open{ transform:none; }
+    .search-sheet-inner{ height:100%; box-sizing:border-box; padding:0 var(--main-pad, 16px); gap:10px; }
+    .search-sheet-inner .search-sheet-field input{ padding:10px 44px 10px 14px; font-size:15px; }
+    body.search-open .sidebar-top{ visibility:hidden; transition:none; }
+    /* Build 255: no tab bar while the keyboard is up (see the kb-open script). */
+    body.kb-open .mobile-nav{ display:none; }
+    body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:60px; }
 
     /* Content clears the tab bar plus the player bar above it. */
     .main, body.album-open .main, body.artist-open .main{
@@ -6759,9 +6796,11 @@
      cost a strip of every screen. -->
 <div class="search-sheet" id="searchSheet" aria-hidden="true">
   <div class="search-sheet-inner">
-    <input type="text" id="searchSheetInput" placeholder="Search or add stream" aria-label="Search">
+    <div class="search-sheet-field">
+      <input type="text" id="searchSheetInput" placeholder="Search or add stream" aria-label="Search">
+      <button type="button" id="searchSheetClear" class="search-sheet-clear" title="Clear" aria-label="Clear search"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
     <button type="button" id="searchSheetGo" title="Search" aria-label="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
-    <button type="button" id="searchSheetClose" title="Close" aria-label="Close search"><i class="fa-solid fa-xmark"></i></button>
   </div>
 </div>
 
@@ -9024,7 +9063,8 @@
   var HDR_SHOW_ABOVE = 80, HDR_HIDE_AFTER = 24;
   function hdrAutoHidePage(){
     var b = document.body.classList;
-    return isMobileLayout() && !b.contains('rotate-lock');
+    // Build 255: not while Search is open; its box takes the header's place and stays put.
+    return isMobileLayout() && !b.contains('rotate-lock') && !b.contains('search-open');
   }
   function hdrScrollY(){
     if(document.body.classList.contains('np-open')) return nowPlayingScreen.scrollTop || 0;
@@ -35092,6 +35132,16 @@
     if(!phone){
       try{ searchSheetInput.focus(); searchSheetInput.select(); }catch(e){}
     }
+    // Build 255 (Mark): on a phone the Search page itself opens at once -- recent searches, or
+    // the "Search for stations..." line when there are none (or the results for whatever the
+    // box still holds) -- without waiting for the box to be tapped. Still no focus (above).
+    // It is a page of its own now, so it takes over from Now Playing rather than sitting on it.
+    if(phone){
+      if(document.body.classList.contains('np-open')) closeNowPlaying(false);
+      searchInput.value = searchSheetInput.value;
+      openSearchFromInput(searchSheetInput);
+    }
+    hdrReset();
     updateMobileNav();
   }
   // clear: true for an explicit dismissal (the close button, Escape, leaving via another
@@ -35119,7 +35169,17 @@
     else openSearchSheet();
   });
   document.getElementById('searchSheetGo').addEventListener('click', submitSearchSheet);
-  document.getElementById('searchSheetClose').addEventListener('click', function(){ closeSearchSheet(true); });
+  // The X inside the box (build 255) empties it and goes back to the recent searches, staying
+  // on the Search page. Pressing it doesn't take the focus away (or bring the keyboard up).
+  var searchSheetClear = document.getElementById('searchSheetClear');
+  searchSheetClear.addEventListener('pointerdown', function(e){ e.preventDefault(); });
+  searchSheetClear.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  searchSheetClear.addEventListener('click', function(){
+    searchSheetInput.value = '';
+    searchInput.value = '';
+    if(searchTypeTimer){ clearTimeout(searchTypeTimer); searchTypeTimer = null; }
+    if(onSearchView) searchLiveNow('');
+  });
   searchSheetInput.addEventListener('keydown', function(e){
     if(e.key === 'Enter') submitSearchSheet();
     else if(e.key === 'Escape') closeSearchSheet(true);
@@ -35133,6 +35193,38 @@
     searchInput.value = searchSheetInput.value;
     searchAsYouType(searchSheetInput.value);
   });
+
+  // ---------- the tab bar steps aside for the keyboard (build 255) ----------
+  // Mark: while typing (the on-screen keyboard up) the tab bar is hidden, so it doesn't ride up
+  // on top of the keyboard and eat what is left of the screen. A text field taking the focus
+  // hides it straight away; it comes back when the field lets go, or when the keyboard is put
+  // away with the field still focused (the phone's Back key), which shows as the viewport
+  // growing back to its full height.
+  (function(){
+    function isEditable(el){
+      if(!el) return false;
+      if(el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+      return el.tagName === 'INPUT' && !/^(button|checkbox|radio|range|submit|reset|file|color|image|hidden)$/i.test(el.type || '');
+    }
+    function viewH(){ return (window.visualViewport && window.visualViewport.height) || window.innerHeight; }
+    var fullH = viewH(), fullW = window.innerWidth, shrunk = false;
+    function setKb(on){ document.body.classList.toggle('kb-open', !!on && isPhoneLayout()); }
+    document.addEventListener('focusin', function(e){
+      if(isEditable(e.target)){ shrunk = viewH() < fullH - 120; setKb(true); }
+    });
+    document.addEventListener('focusout', function(){
+      setTimeout(function(){ if(!isEditable(document.activeElement)){ shrunk = false; setKb(false); } }, 0);
+    });
+    function onResize(){
+      var h = viewH();
+      if(window.innerWidth !== fullW){ fullW = window.innerWidth; fullH = h; }
+      if(!isEditable(document.activeElement)){ fullH = h; shrunk = false; setKb(false); return; }
+      if(h < fullH - 120){ shrunk = true; setKb(true); }
+      else if(shrunk){ shrunk = false; setKb(false); }
+    }
+    window.addEventListener('resize', onResize);
+    if(window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
+  })();
 
   // ---------- the mobile tab bar ----------
   // Each tab is a front end onto the destination the sidebar/drawer already opens, so it

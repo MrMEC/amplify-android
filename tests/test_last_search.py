@@ -35,7 +35,7 @@ async def sheet_search(pg, text):
     await pg.evaluate("(t)=>{var i=document.getElementById('searchSheetInput');i.value=t;document.getElementById('searchSheetGo').click();}", text)
     await pg.wait_for_timeout(1200)
 async def go_home(pg):
-    await pg.evaluate("document.getElementById('searchSheetClose').click()"); await pg.wait_for_timeout(200)
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(300)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
 async def yellow(pg, text=''):
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(300)

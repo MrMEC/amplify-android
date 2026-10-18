@@ -114,11 +114,15 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(600)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(400)
         s0 = await pg.evaluate(STATE)
-        check(s0['heading'] != 'Search' and s0['focused'] != 'searchSheetInput', f"Search tab: box open, no keyboard, page unchanged ({s0['heading']})")
+        check(s0['heading'] == 'Search' and s0['focused'] != 'searchSheetInput', f"Search tab (build 255): the Search page at once, no keyboard ({s0['heading']})")
         await pg.tap('#searchSheetInput'); await pg.wait_for_timeout(150)
         s1 = await pg.evaluate(STATE)
         check(s1['heading'] == 'Search' and s1['focused'] == 'searchSheetInput', f"tapping the box opens the results page straight away {s1['heading']}")
         check(not s1['tabsShown'], 'an empty box: no tabs yet')
+        # build 255: no tab bar while typing; the box sits where the header was, header hidden
+        kb = await pg.evaluate("""(()=>{ var n=document.getElementById('mobileNav'), sh=document.getElementById('searchSheet').getBoundingClientRect(), h=document.querySelector('.sidebar-top');
+          return [getComputedStyle(n).display, Math.round(sh.top), Math.round(sh.height), getComputedStyle(h).visibility, getComputedStyle(document.getElementById('playerBar')).opacity]; })()""")
+        check(kb[0] == 'none' and kb[1] == 0 and kb[2] == 60 and kb[3] == 'hidden' and float(kb[4]) == 0, f'typing: tab bar hidden, box in the header slot, no mini player {kb}')
         check(await pg.evaluate("getComputedStyle(document.getElementById('sectionHeadingRow')).display") == 'none', 'and no heading row on the search page')
         await pg.screenshot(path=f'{shots}/search-open.png')
 
@@ -158,7 +162,8 @@ async def main():
         tb = await pg.evaluate("""(()=>{ var t = document.getElementById('searchTabs').getBoundingClientRect();
           var el = document.elementFromPoint(200, t.top + t.height / 2); return { top: t.top, y: window.scrollY, onTop: !!(el && el.closest('#searchTabs')) }; })()""")
         # build 185: scrolling down slides the header away and the tabs ride up to the top
-        check(tb['y'] > 100 and 0 <= tb['top'] <= 12 and tb['onTop'], f'tabs stay pinned at the top while scrolling down, header slid away (was {t0}, now {tb})')
+        # build 255: the search box replaces the header and stays put, the tabs pinned just under it
+        check(tb['y'] > 100 and 56 <= tb['top'] <= 64 and tb['onTop'], f'tabs stay pinned under the search box while scrolling down (was {t0}, now {tb})')
         await pg.evaluate("window.scrollBy(0, -20)"); await pg.wait_for_timeout(450)
         tb2 = await pg.evaluate("document.getElementById('searchTabs').getBoundingClientRect().top")
         check(58 <= tb2 <= 72, f'a scroll up brings the header back and the tabs sit under it again ({tb2})')

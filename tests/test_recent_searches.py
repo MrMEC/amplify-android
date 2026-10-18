@@ -45,7 +45,7 @@ async def main():
         pitch = r[1]['top'] - r[0]['top']
         check(44 <= pitch <= 52, f'rows close together ({pitch}px apart)')
         gap = r[0]['top'] - g['headBottom']
-        check(12 <= gap <= 22, f'more room under the heading ({gap}px)')
+        check(0 <= gap <= 10, f'less room under the smaller heading (build 255) ({gap}px)')
         check(all(x['del'] and x['del'][0] >= 36 and abs(x['del'][1] - g['clearR']) <= 2 for x in r), f'an X on every row, lined up under Clear {[x["del"] for x in r][:2]} {g["clearR"]}')
         # delete one
         await pg.evaluate("document.querySelectorAll('.recent-search-row')[1].querySelector('.recent-search-del').click()"); await pg.wait_for_timeout(300)
