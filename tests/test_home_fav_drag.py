@@ -119,7 +119,8 @@ async def main():
             await pg.evaluate("document.dispatchEvent(new PointerEvent('pointercancel', {bubbles:true, pointerId:1, pointerType:'touch'})); document.querySelector('#favoritesGrid > .tile').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true}))")
             check(await pg.evaluate('__d.lifted()') == 'Echo', f'{T} a cancelled pointer leaves it held')
             for i in range(1, 13):
-                await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': r0['x'] + (r1['x'] + 10 - r0['x']) * i / 12, 'y': r0['y'] + 6, 'id': 1}]})
+                # build 259: Home's Favorites is two rows (Alpha sits under Echo), so the finger goes to Alpha
+                await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': r0['x'] + (r1['x'] + 10 - r0['x']) * i / 12, 'y': r0['y'] + (r1['y'] + 6 - r0['y']) * i / 12, 'id': 1}]})
                 await pg.wait_for_timeout(30)
             await pg.wait_for_timeout(200)
             await pg.screenshot(path=f'{shots}/favdrag-lifted-{theme}.png')
@@ -155,7 +156,7 @@ async def main():
             cur_row = await pg.evaluate('__d.row()')
             ra = await pg.evaluate("__d.rect('" + cur_row[0] + "')"); rb = await pg.evaluate("__d.rect('" + cur_row[1] + "')")
             await pg.mouse.move(ra['x'], ra['y']); await pg.mouse.down(); await pg.wait_for_timeout(650)
-            await pg.mouse.move(rb['x'] + 15, ra['y'], steps=10); await pg.wait_for_timeout(150); await pg.mouse.up(); await pg.wait_for_timeout(500)
+            await pg.mouse.move(rb['x'] + 15, rb['y'], steps=10); await pg.wait_for_timeout(150); await pg.mouse.up(); await pg.wait_for_timeout(500)
             check((await pg.evaluate('__d.row()'))[:2] == [cur_row[1], cur_row[0]], f'{T} with a mouse too {await pg.evaluate("__d.row()")}')
 
             # ---- Edit and the car show the new order ----
@@ -173,7 +174,7 @@ async def main():
             await pg.evaluate("document.getElementById('favoritesSection').scrollIntoView({block:'start'}); window.scrollBy(0, -70)"); await pg.wait_for_timeout(400)
             check(await pg.evaluate('__d.row()') == ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'], f'{T} A to Z shows the row sorted')
             ra = await pg.evaluate("__d.rect('Bravo')"); rb = await pg.evaluate("__d.rect('Alpha')")
-            await touch_drag(pg, cdp, ra['x'], ra['y'], rb['x'] - 15, ra['y'], steps=10)
+            await touch_drag(pg, cdp, ra['x'], ra['y'], rb['x'] - 15, rb['y'], steps=10)
             check(await pg.evaluate('__d.row()') == ['Bravo', 'Alpha', 'Charlie', 'Delta', 'Echo'] and await pg.evaluate('__d.order()') in ('oldest', 'newest'),
                   f'{T} a drag in A to Z switches to Manual and keeps the new order {await pg.evaluate("__d.row()")} {await pg.evaluate("__d.order()")}')
             check(not errs, f'{T} no page errors {errs[:3]}')

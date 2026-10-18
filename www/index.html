@@ -16243,13 +16243,24 @@
         if(press.x > lastR.right && others[others.length - 1].nextSibling !== t) grid.insertBefore(t, others[others.length - 1].nextSibling);
         else if(press.x < firstR.left && others[0].previousSibling !== t) grid.insertBefore(t, others[0]);
       }
+      // Build 259: the row is two rows on Home (filled down then across), so the cover is
+      // matched in both directions. A neighbour in the held cover's own row swaps once the
+      // finger crosses its middle, as before; one in the other row as soon as the finger is
+      // over it. A single row keeps its generous reach above and below the covers.
+      t.style.transform = 'none';
+      var slot = t.getBoundingClientRect();
+      var oneRow = others.every(function(o){ return Math.abs(o.getBoundingClientRect().top - slot.top) < 4; });
+      var slack = oneRow ? 60 : 0;
       for(var i = 0; i < others.length; i++){
         var o = others[i], r = o.getBoundingClientRect();
-        if(press.x < r.left || press.x > r.right || press.y < r.top - 60 || press.y > r.bottom + 60) continue;
-        var mid = r.left + r.width / 2;
+        if(press.x < r.left || press.x > r.right || press.y < r.top - slack || press.y > r.bottom + slack) continue;
         var tIdx = tiles().indexOf(t), oIdx = tiles().indexOf(o);
-        if(oIdx > tIdx && press.x > mid) grid.insertBefore(t, o.nextSibling);
-        else if(oIdx < tIdx && press.x < mid) grid.insertBefore(t, o);
+        if(Math.abs(r.top - slot.top) < 4){
+          var mid = r.left + r.width / 2;
+          if(oIdx > tIdx && press.x > mid) grid.insertBefore(t, o.nextSibling);
+          else if(oIdx < tIdx && press.x < mid) grid.insertBefore(t, o);
+        } else if(oIdx > tIdx) grid.insertBefore(t, o.nextSibling);
+        else grid.insertBefore(t, o);
         break;
       }
       t.style.transform = 'none';
