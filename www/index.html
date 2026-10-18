@@ -3168,6 +3168,12 @@
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details > .np-sub{ margin:0; align-self:start; }
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details > .np-controls{ grid-row:1 / span 2; }
   .now-playing-screen.np-channel #npCollection.np-epg{ margin-top:0; }
+  /* Build 249 (Mark): the title a size smaller and on up to two lines; More smaller. */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details > .np-name{
+    font-size:15px; line-height:1.25; white-space:normal; overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; text-overflow:clip; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details .np-menu-btn{ width:36px; height:36px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details .np-menu-btn .icon-ellipsis-v{ transform:scale(.95); }
   .now-playing-screen.np-channel .np-video-toggle{ display:none; }
   #npVideoMenuBtn span{ white-space:nowrap; }
   .now-playing-screen.np-channel #npCollection{ margin-top:22px; }
@@ -3438,7 +3444,9 @@
   .epg-info-pic.square img{ width:auto; height:200px; border-radius:8px; }
   .epg-info-pic[hidden]{ display:none; }
   .epg-info-pic img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .epg-info-show{ margin:0; font-size:20px; font-weight:800; line-height:1.25; color:var(--text); overflow-wrap:anywhere; }
+  /* Build 249: the show's name on up to two lines. */
+  .epg-info-show{ margin:0; font-size:20px; font-weight:800; line-height:1.25; color:var(--text); overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
   .epg-info-ep{ margin-top:4px; font-size:15px; font-weight:600; line-height:1.35; color:var(--text); overflow-wrap:anywhere; }
   .epg-info-ep[hidden]{ display:none; }
   .epg-info-meta{ margin-top:6px; font-size:13px; font-weight:600; color:var(--text-dim); font-variant-numeric:tabular-nums; }

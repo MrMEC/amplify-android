@@ -248,6 +248,11 @@ async def run(p, theme, width, big):
       return { shown: !t.hidden && tr.width > 0, loaded: t.querySelector('img').naturalWidth > 0, w: Math.round(tr.width), h: Math.round(tr.height), left: tr.right <= nr.left - 6 && tr.right <= sr.left - 6,
         mid: Math.abs((tr.top + tr.bottom) / 2 - (nr.top + sr.bottom) / 2) <= 4 }; })()""")
     check(th['shown'] and th['loaded'] and th['left'] and th['mid'] and th['h'] <= 48, f'{T} a small picture of what’s on, left of the name and episode, centred on them {th}')
+    # build 249: the title smaller and on up to two lines; a smaller More
+    nm = await pg.evaluate("""(()=>{ var e=document.getElementById('npName'); var keep=e.textContent; e.textContent='Little House on the Prairie Classics and More Westerns All Day';
+      var c=getComputedStyle(e), lh=parseFloat(c.lineHeight); var n=Math.round(e.getBoundingClientRect().height/lh); e.textContent=keep;
+      var m=document.querySelector('#nowPlayingScreen .np-details .np-menu-btn').getBoundingClientRect(); return { fs: parseFloat(c.fontSize), lines: n, more: Math.round(m.width) }; })()""")
+    check((nm['fs'] <= 15 or big) and nm['lines'] == 2 and nm['more'] <= 36, f'{T} the title under the video is smaller and wraps to two lines; More is smaller {nm}')
     await pg.evaluate("document.getElementById('npEpThumb').click()"); await pg.wait_for_timeout(400)
     inf = await pg.evaluate(INFO)
     check(inf['open'] and inf['show'] == 'The Price Is Right' and inf['ep'] == 'Season 12 Episode 4' and inf['meta'].startswith('On now') and inf['pic'] and not inf['watch'], f'{T} the picture opens what’s on: On now, no Watch Now (it’s playing) {inf}')
@@ -255,6 +260,10 @@ async def run(p, theme, width, big):
     await pg.evaluate("document.getElementById('epgInfoClose').click()"); await pg.wait_for_timeout(300)
     await pg.evaluate("document.getElementById('npName').click()"); await pg.wait_for_timeout(400)
     check((await pg.evaluate(INFO))['open'], f'{T} the name opens it too')
+    # build 249: a long show title takes two lines there (and no more)
+    lt = await pg.evaluate("""(()=>{ var e=document.getElementById('epgInfoShow'); var keep=e.textContent; e.textContent='Little House on the Prairie: The Long Winter, Part One and Part Two Special Edition';
+      var lh=parseFloat(getComputedStyle(e).lineHeight); var n=Math.round(e.getBoundingClientRect().height/lh); var ws=getComputedStyle(e).whiteSpace; e.textContent=keep; return [n, ws]; })()""")
+    check(lt[0] == 2, f'{T} the details window: a long show title uses two lines {lt}')
     await pg.evaluate("document.getElementById('epgInfoClose').click()"); await pg.wait_for_timeout(300)
     await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
     q = await pg.evaluate("getComputedStyle(document.getElementById('npQueueMenuBtn')).display")
