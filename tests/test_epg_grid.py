@@ -28,6 +28,13 @@ CHANNELS = [
     {'id': 'link:x', 'name': 'Local News', 'url': 'http://news.example/live.m3u8', 'logo': '', 'cats': [], 'catNames': [], 'src': 'link'},
 ]
 LOG = {'pluto': [], 'plex': [], 'tokens': []}
+# a 16x9 picture for the programs (build 248)
+import zlib, struct
+def _png(w, h, rgb):
+    raw = b''.join(b'\x00' + bytes(rgb) * w for _ in range(h))
+    ch = lambda t, d: struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+    return b'\x89PNG\r\n\x1a\n' + ch(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) + ch(b'IDAT', zlib.compress(raw)) + ch(b'IEND', b'')
+PNG = _png(160, 90, (60, 120, 200))
 state = {'down': False}
 NOW = time.time()
 # Programs placed around the half hour we're in (not just around now), so the one on now still
@@ -44,14 +51,17 @@ def pluto_body(cid):
     tl = []
     for title, ep, off, dur in progs:
         tl.append({'start': iso(BASE + off), 'stop': iso(BASE + off + dur), 'title': title,
-                   'episode': {'name': ep or title, 'description': 'A classic game show. ' * 3, 'rating': 'TV-G', 'series': {'name': title}}})
+                   'episode': {'name': ep or title, 'description': 'A classic game show. ' * 3, 'rating': 'TV-G',
+                               'poster16_9': {'path': 'https://images.pluto.tv/episodes/%s-%d/poster16_9.jpg?fm=jpg' % (cid[-4:], off)},
+                               'thumbnail': {'path': 'https://images.pluto.tv/episodes/%s-%d/thumbnail.jpg' % (cid[-4:], off)},
+                               'series': {'name': title, 'tile': {'path': 'https://images.pluto.tv/series/%s/tile.jpg' % cid[-4:]}}}})
     return {'_id': cid, 'name': 'x', 'timelines': tl}
 
 
 def plex_body(day):
     t0 = int(BASE) - 60
     return {'MediaContainer': {'Metadata': [
-        {'type': 'episode', 'title': 'Markets Open', 'grandparentTitle': 'Reuters Now Live', 'summary': 'Business news.', 'Media': [{'beginsAt': t0, 'endsAt': t0 + 3600}]},
+        {'type': 'episode', 'title': 'Markets Open', 'grandparentTitle': 'Reuters Now Live', 'summary': 'Business news.', 'thumb': 'https://provider-static.plex.tv/epg/images/markets.jpg', 'Media': [{'beginsAt': t0, 'endsAt': t0 + 3600}]},
         {'type': 'episode', 'title': 'World Report', 'grandparentTitle': 'Reuters Now Live', 'Media': [{'beginsAt': t0 + 3600, 'endsAt': t0 + 7200}]},
     ]}}
 
@@ -78,6 +88,13 @@ SEED = """(function(){ if(!localStorage.getItem('__seeded')){ localStorage.setIt
   localStorage.setItem('radioPlayerVideoTab', 'channels'); } })();""" % json.dumps(json.dumps(CHANNELS))
 
 fails = []
+INFO = """(()=>{ var o=document.getElementById('epgInfoOverlay'), p=o.querySelector('.epg-info-panel'); var pic=document.getElementById('epgInfoPic'), img=pic.querySelector('img');
+  var r=p.getBoundingClientRect(); var vis=function(id){ var e=document.getElementById(id); return !e.hidden && getComputedStyle(e).display!=='none'; };
+  return { open: o.classList.contains('open'), channel: document.getElementById('epgInfoChannel').textContent, show: document.getElementById('epgInfoShow').textContent,
+    ep: vis('epgInfoEp') ? document.getElementById('epgInfoEp').textContent : null, meta: document.getElementById('epgInfoMeta').textContent,
+    desc: vis('epgInfoDesc') ? document.getElementById('epgInfoDesc').textContent : null, pic: !pic.hidden && img.naturalWidth > 0, picW: Math.round(pic.getBoundingClientRect().width),
+    watch: vis('epgInfoWatch'), fits: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5 }; })()"""
+
 def check(ok, msg):
     print(('PASS ' if ok else 'FAIL ') + msg)
     if not ok: fails.append(msg)
@@ -92,6 +109,9 @@ async def route(r):
         LOG['pluto'].append((cid, q.get('start', [''])[0], q.get('stop', [''])[0]))
         if state['down']: return await r.fulfill(status=503, headers=cors, body='')
         return await r.fulfill(status=200, content_type='application/json', headers=cors, body=json.dumps(pluto_body(cid)))
+    if u.netloc in ('images.pluto.tv', 'provider-static.plex.tv'):
+        LOG.setdefault('img', []).append(r.request.url)
+        return await r.fulfill(status=200, content_type='image/png', headers=cors, body=PNG)
     if u.netloc == 'epg.provider.plex.tv' and u.path == '/grid':
         q = parse_qs(u.query)
         LOG['plex'].append((q.get('channelGridKey', [''])[0], q.get('date', [''])[0]))
@@ -195,7 +215,20 @@ async def run(p, theme, width, big):
     n0 = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'load'])
     await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('.epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); var bs=r.querySelectorAll('.epg-prog'); bs[bs.length-1].click(); })()" % BUZZR); await pg.wait_for_timeout(800)
     n1 = len([c for c in await pg.evaluate('window.__calls') if c[0] == 'load'])
-    check(n1 == n0 and not await pg.evaluate("document.body.classList.contains('np-open')"), f'{T} tapping a later program does nothing')
+    await pg.wait_for_timeout(500)
+    inf = await pg.evaluate(INFO)
+    check(n1 == n0 and not await pg.evaluate("document.body.classList.contains('np-open')"), f'{T} tapping a later program doesn’t play it')
+    check(inf['open'] and inf['channel'] == 'Buzzr' and inf['show'] == 'Press Your Luck' and inf['desc'] and inf['desc'].startswith('A classic game show.') and inf['pic'] and not inf['watch'] and inf['fits'] and 'On now' not in inf['meta'] and ('PM' in inf['meta'] or 'AM' in inf['meta']) and 'TV-G' in inf['meta'],
+          f'{T} build 248: it opens its details: channel, picture, show, time and rating, description, no Watch Now {inf}')
+    await pg.screenshot(path=f'{SHOTS}/epg-info-{theme}-{width}{"-big" if big else ""}.png')
+    await pg.evaluate("document.getElementById('epgInfoClose').click()"); await pg.wait_for_timeout(300)
+    check(not (await pg.evaluate(INFO))['open'], f'{T} the X closes it')
+    # an episode name shows under the show; a tap outside closes it
+    await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('.epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); var b=Array.from(r.querySelectorAll('.epg-prog')).find(x=>/Match Game/.test(x.textContent)); b.click(); })()" % BUZZR); await pg.wait_for_timeout(400)
+    inf = await pg.evaluate(INFO)
+    check(inf['show'] == 'Match Game' and inf['ep'] == 'Charles Nelson Reilly', f'{T} the episode’s name under the show {inf["show"]!r} / {inf["ep"]!r}')
+    await pg.mouse.click(5, 5); await pg.wait_for_timeout(300)
+    check(not (await pg.evaluate(INFO))['open'], f'{T} a tap outside closes it')
     await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('.epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); r.querySelector('.epg-prog.now').click(); })()" % BUZZR); await pg.wait_for_timeout(1800)
     loads = [c[1] for c in await pg.evaluate('window.__calls') if c[0] == 'load']
     check(len(loads) > n0 and BUZZR in loads[-1], f'{T} tapping what’s on now plays the channel')
@@ -210,6 +243,19 @@ async def run(p, theme, width, big):
       return { fs: parseFloat(getComputedStyle(document.getElementById('npName')).fontSize), gap: Math.round(sb.top - n.bottom), above: Math.round(n.top - f.top), below: Math.round(g.top - sb.bottom) }; })()""")
     check((tg['fs'] <= 17 or big) and 0 <= tg['gap'] <= 4 and abs(tg['above'] - tg['below']) <= 3, f'{T} the title is smaller, the episode right under it, centred between video and guide {tg}')
     check(np['grid'] and np['rows'] == 4 and not np['heading'] and np['gridBelowName'] and np['edge'] == [0, width], f'{T} the full grid below, edge to edge, no heading {np}')
+    # build 248: the picture of what's on, left of the name and episode; it, the name and the episode open the details
+    th = await pg.evaluate("""(()=>{ var t=document.getElementById('npEpThumb'), n=document.getElementById('npName'), s=document.getElementById('npSub'); var tr=t.getBoundingClientRect(), nr=n.getBoundingClientRect(), sr=s.getBoundingClientRect();
+      return { shown: !t.hidden && tr.width > 0, loaded: t.querySelector('img').naturalWidth > 0, w: Math.round(tr.width), h: Math.round(tr.height), left: tr.right <= nr.left - 6 && tr.right <= sr.left - 6,
+        mid: Math.abs((tr.top + tr.bottom) / 2 - (nr.top + sr.bottom) / 2) <= 4 }; })()""")
+    check(th['shown'] and th['loaded'] and th['left'] and th['mid'] and th['h'] <= 48, f'{T} a small picture of what’s on, left of the name and episode, centred on them {th}')
+    await pg.evaluate("document.getElementById('npEpThumb').click()"); await pg.wait_for_timeout(400)
+    inf = await pg.evaluate(INFO)
+    check(inf['open'] and inf['show'] == 'The Price Is Right' and inf['ep'] == 'Season 12 Episode 4' and inf['meta'].startswith('On now') and inf['pic'] and not inf['watch'], f'{T} the picture opens what’s on: On now, no Watch Now (it’s playing) {inf}')
+    await pg.screenshot(path=f'{SHOTS}/epg-info-np-{theme}-{width}{"-big" if big else ""}.png')
+    await pg.evaluate("document.getElementById('epgInfoClose').click()"); await pg.wait_for_timeout(300)
+    await pg.evaluate("document.getElementById('npName').click()"); await pg.wait_for_timeout(400)
+    check((await pg.evaluate(INFO))['open'], f'{T} the name opens it too')
+    await pg.evaluate("document.getElementById('epgInfoClose').click()"); await pg.wait_for_timeout(300)
     await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(300)
     q = await pg.evaluate("getComputedStyle(document.getElementById('npQueueMenuBtn')).display")
     check(q == 'none', f'{T} no View Queue in the playing channel’s menu ({q})')

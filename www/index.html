@@ -3422,6 +3422,40 @@
   .epg-now-mark{ position:absolute; bottom:0; width:0; height:0; transform:translateX(-50%); border-left:7px solid transparent; border-right:7px solid transparent;
     border-top:9px solid var(--epg-line); pointer-events:none; }
   .epg-order-menu{ z-index:6000; }
+  /* Build 248: a later program with details opens them. */
+  button.epg-prog.info{ cursor:pointer; }
+  /* Build 248: a program's details. */
+  .epg-info-overlay{ z-index:6500; }
+  .epg-info-panel{ width:min(420px, 100%); max-height:calc(100dvh - 48px); overflow-y:auto; overscroll-behavior:contain; padding:16px 18px 16px; }
+  .epg-info-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; min-height:32px; }
+  .epg-info-logo{ flex:none; display:flex; align-items:center; justify-content:center; width:56px; height:32px; }
+  .epg-info-logo[hidden]{ display:none; }
+  .epg-info-logo img{ max-width:56px; max-height:32px; object-fit:contain; display:block; }
+  .epg-info-channel{ flex:1; min-width:0; font-size:13.5px; font-weight:700; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-info-close{ flex:none; width:36px; height:36px; margin-right:-8px; border-radius:50%; border:none; background:none; color:var(--text-dim); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .epg-info-pic{ margin:0 -18px 14px; aspect-ratio:16/9; background:var(--panel-2); overflow:hidden; }
+  .epg-info-pic.square{ aspect-ratio:auto; display:flex; justify-content:center; padding:10px 0; }
+  .epg-info-pic.square img{ width:auto; height:200px; border-radius:8px; }
+  .epg-info-pic[hidden]{ display:none; }
+  .epg-info-pic img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .epg-info-show{ margin:0; font-size:20px; font-weight:800; line-height:1.25; color:var(--text); overflow-wrap:anywhere; }
+  .epg-info-ep{ margin-top:4px; font-size:15px; font-weight:600; line-height:1.35; color:var(--text); overflow-wrap:anywhere; }
+  .epg-info-ep[hidden]{ display:none; }
+  .epg-info-meta{ margin-top:6px; font-size:13px; font-weight:600; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .epg-info-desc{ margin:12px 0 0; font-size:14px; line-height:1.5; color:var(--text-dim); overflow-wrap:anywhere; }
+  .epg-info-desc[hidden]{ display:none; }
+  .epg-info-actions{ margin-top:16px; }
+  .epg-info-actions:has(> [hidden]:only-child){ display:none; }
+  .epg-info-watch{ background:var(--accent); color:var(--accent-text, #111); border:1px solid var(--accent); }
+  /* Build 248: under a playing channel's video, the picture of what's on, left of its name. */
+  .np-ep-thumb{ display:none; padding:0; border:0; background:var(--panel-2); border-radius:6px; overflow:hidden; cursor:pointer; }
+  .np-ep-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep{ grid-template-columns:auto minmax(0, 1fr) auto; column-gap:12px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep > .np-ep-thumb{
+    display:block; grid-column:1; grid-row:1 / span 2; align-self:center; width:72px; height:41px; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep > :is(.np-name, .np-onair, .np-sub, .np-cast-note){ grid-column:2; }
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-vplayer .np-details.np-has-ep > .np-controls{ grid-column:3; }
+  .now-playing-screen.np-channel.np-ep-info :is(#npName, #npSub){ cursor:pointer; }
   /* Build 244: sideways on Live TV with nothing playing: the grid alone, over everything, the
      times stuck to the top of the screen. */
   body.epg-land #stationsGrid > .epg{ position:fixed; inset:0; z-index:5000; margin:0; overflow-y:auto; overscroll-behavior:contain;
@@ -6495,6 +6529,8 @@
              the artwork the way the reference does. -->
         <div class="np-hero-foot">
           <div class="np-details">
+            <!-- Build 248: what's on a playing channel: its picture (tap for the details). -->
+            <button type="button" class="np-ep-thumb" id="npEpThumb" hidden aria-label="Program details"><img alt="" referrerpolicy="no-referrer"></button>
             <div class="np-name" id="npName"></div>
             <!-- What a live station is playing, when its stream names it. Hidden otherwise. -->
             <div class="np-onair" id="npOnAir" hidden></div>
@@ -6772,6 +6808,24 @@
   </div>
 </div>
 <!-- Build 230: the sleep timer (Now Playing's menu). -->
+<!-- Build 248: a TV program's details (from the guide, or the channel playing). -->
+<div class="confirm-overlay epg-info-overlay" id="epgInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="epgInfoShow">
+  <div class="confirm-panel epg-info-panel">
+    <div class="epg-info-head">
+      <span class="epg-info-logo" id="epgInfoLogo"></span>
+      <span class="epg-info-channel" id="epgInfoChannel"></span>
+      <button type="button" class="epg-info-close" id="epgInfoClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="epg-info-pic" id="epgInfoPic" hidden><img alt="" referrerpolicy="no-referrer"></div>
+    <h2 class="epg-info-show" id="epgInfoShow"></h2>
+    <div class="epg-info-ep" id="epgInfoEp"></div>
+    <div class="epg-info-meta" id="epgInfoMeta"></div>
+    <p class="epg-info-desc" id="epgInfoDesc"></p>
+    <div class="confirm-actions epg-info-actions">
+      <button type="button" class="epg-info-watch" id="epgInfoWatch" hidden>Watch Now</button>
+    </div>
+  </div>
+</div>
 <div class="confirm-overlay sleep-overlay" id="sleepOverlay" role="dialog" aria-modal="true" aria-labelledby="sleepTitle">
   <div class="confirm-panel sleep-panel">
     <h2 class="confirm-title" id="sleepTitle">Sleep Timer</h2>
@@ -17765,7 +17819,7 @@
       row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', ch.dead ? 'Not working' : '', true, true));
     } else {
       blocks.forEach(function(b){
-        row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0));
+        row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
       });
     }
     return row;
@@ -17776,10 +17830,13 @@
     n.textContent = ch.name || 'Channel';
     return n;
   }
-  function epgBlock(ch, s, e, title, sub, isNow, whole, t0){
+  function epgBlock(ch, s, e, title, sub, isNow, whole, t0, it){
     t0 = t0 == null ? s : t0;
-    var b = document.createElement(isNow ? 'button' : 'div');
-    if(isNow) b.type = 'button';
+    // What's on now plays; a later program with details opens them (build 248); a block with
+    // nothing known about it (no schedule) is only there to read.
+    var tappable = isNow || !!it;
+    var b = document.createElement(tappable ? 'button' : 'div');
+    if(tappable) b.type = 'button';
     b.className = 'epg-prog' + (isNow ? ' now' : '') + (whole ? ' whole' : '');
     var left = EPG_CH_W + (s - (whole ? s : t0)) / EPG_SLOT_MS * EPG_SLOT_W;
     if(whole) left = EPG_CH_W;
@@ -17796,8 +17853,8 @@
       su.textContent = sub;
       b.appendChild(su);
     }
-    // Only what's on now plays; a later program is there to read.
     if(isNow) b.addEventListener('click', function(){ playChannel(ch); });
+    else if(it){ b.classList.add('info'); b.addEventListener('click', function(){ openEpgInfo(ch, it); }); }
     return b;
   }
   // The rows of a channel whose schedule just came in, in every grid on screen.
@@ -17872,6 +17929,103 @@
   document.addEventListener('click', function(e){ if(epgOrderMenu && !epgOrderMenu.contains(e.target)) closeEpgOrderMenu(); });
   window.addEventListener('scroll', closeEpgOrderMenu, { passive: true });
 
+  // ---------- Program details (build 248) ----------
+  // Pluto and Plex give each program pictures and a description. A playing channel shows the
+  // picture of what's on beside its name (the picture, the name and the line under it open the
+  // details); in the guide grid a later program opens them (what's on now still plays at once).
+  function epgImg(url, w){
+    url = String(url || '');
+    if(!url) return '';
+    if(url.charAt(0) === '/'){
+      // A Plex path: from its guide server, signed in.
+      if(typeof plexSignedIn !== 'function' || !plexSignedIn()) return '';
+      url = PLEX_LIVE_BASE + url + (url.indexOf('?') === -1 ? '?' : '&') + 'X-Plex-Token=' + encodeURIComponent(plexAccount.token);
+    }
+    if(w && /^https:\/\/images\.pluto\.tv\//.test(url)){
+      try{ var u = new URL(url); u.searchParams.set('w', String(w)); url = u.toString(); }catch(e){}
+    }
+    return secureUrl(url);
+  }
+  function epgNowItem(st){
+    var url = st && (st.urlToResolve || st.url_resolved || st.url || '');
+    var ch = url ? findVideoChannel(url) : null;
+    if(!ch || !guideSource(ch)) return null;
+    var it = guideNowNext(ch).now;
+    return it ? { ch: ch, it: it } : null;
+  }
+  var npEpThumb = document.getElementById('npEpThumb');
+  function syncNpEpThumb(st){
+    var on = st && isNpChannel(st) ? epgNowItem(st) : null;
+    var pic = on ? (on.it.im || on.it.sq) : '';
+    var src = pic ? epgImg(pic, 240) : '';
+    var details = npDetailsEl();
+    npEpThumb.hidden = !src;
+    if(details) details.classList.toggle('np-has-ep', !!src);
+    if(src){
+      var img = npEpThumb.querySelector('img');
+      if(img.getAttribute('src') !== src){ img.onerror = function(){ npEpThumb.hidden = true; if(details) details.classList.remove('np-has-ep'); }; img.src = src; }
+    }
+    nowPlayingScreen.classList.toggle('np-ep-info', !!on);
+  }
+  function npDetailsEl(){ return npEpThumb.parentNode; }
+  function npOpenEpInfo(e){
+    var st = npTarget();
+    if(!st || !isNpChannel(st)) return;
+    var on = epgNowItem(st);
+    if(!on) return;
+    if(e){ e.stopPropagation(); }
+    openEpgInfo(on.ch, on.it);
+  }
+  npEpThumb.addEventListener('click', npOpenEpInfo);
+  ['npName', 'npSub'].forEach(function(id){
+    document.getElementById(id).addEventListener('click', function(e){
+      if(nowPlayingScreen.classList.contains('np-channel') && nowPlayingScreen.classList.contains('np-ep-info') && !e.target.closest('a, button')) npOpenEpInfo(e);
+    });
+  });
+  var epgInfoOverlay = document.getElementById('epgInfoOverlay');
+  var epgInfoCh = null;
+  function openEpgInfo(ch, it){
+    if(!ch || !it) return;
+    epgInfoCh = ch;
+    var logo = document.getElementById('epgInfoLogo');
+    logo.innerHTML = '';
+    if(ch.logo){
+      var li = document.createElement('img'); li.alt = ''; li.referrerPolicy = 'no-referrer'; li.src = secureUrl(ch.logo);
+      li.onerror = function(){ logo.innerHTML = ''; logo.hidden = true; };
+      logo.appendChild(li); logo.hidden = false;
+    } else logo.hidden = true;
+    document.getElementById('epgInfoChannel').textContent = ch.name || '';
+    var pic = document.getElementById('epgInfoPic'), src = epgImg(it.im || it.sq, 960);
+    pic.hidden = !src;
+    pic.classList.toggle('square', !it.im && !!it.sq);
+    var pimg = pic.querySelector('img');
+    if(src){ pimg.onerror = function(){ pic.hidden = true; }; pimg.src = src; } else pimg.removeAttribute('src');
+    document.getElementById('epgInfoShow').textContent = it.t || it.sub || '';
+    var ep = document.getElementById('epgInfoEp');
+    ep.textContent = it.sub && it.sub !== it.t ? it.sub : '';
+    ep.hidden = !ep.textContent;
+    var now = Date.now(), onNow = it.s <= now && now < it.e;
+    var when = (onNow ? 'On now · ' : '') + guideTime(it.s) + ' – ' + guideTime(it.e);
+    if(!onNow && guideDate(it.s) !== guideDate(now)) when = new Date(it.s).toLocaleDateString([], { weekday: 'short' }) + ' ' + when;
+    document.getElementById('epgInfoMeta').textContent = when + (it.r ? ' · ' + it.r : '');
+    var desc = document.getElementById('epgInfoDesc');
+    desc.textContent = it.d || '';
+    desc.hidden = !it.d;
+    // Watch Now: what's on now, on a channel that isn't already the one playing.
+    var st = channelToStation(ch);
+    var playingIt = !!(currentStation && favKey(currentStation) === favKey(st));
+    document.getElementById('epgInfoWatch').hidden = !(onNow && !playingIt);
+    epgInfoOverlay.classList.add('open');
+    epgInfoOverlay.querySelector('.epg-info-panel').scrollTop = 0;
+  }
+  function closeEpgInfo(){ epgInfoOverlay.classList.remove('open'); epgInfoCh = null; }
+  document.getElementById('epgInfoClose').addEventListener('click', closeEpgInfo);
+  epgInfoOverlay.addEventListener('click', function(e){ if(e.target === epgInfoOverlay) closeEpgInfo(); });
+  document.getElementById('epgInfoWatch').addEventListener('click', function(){ var ch = epgInfoCh; closeEpgInfo(); if(ch) playChannel(ch); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && epgInfoOverlay.classList.contains('open')){ e.stopImmediatePropagation(); closeEpgInfo(); }
+  }, true);
+
   // ---------- TV guide (build 240) ----------
   // Pluto channels publish their schedules (api.pluto.tv/v2/channels/<id>?start&stop, about
   // 40 KB a channel for 12 hours); Plex channels through the guide key saved with them
@@ -17883,6 +18037,7 @@
   var GUIDE_RENEW_MS = 3 * 3600 * 1000;       // renewed after this long...
   var GUIDE_LOW_MS = 2 * 3600 * 1000;         // ...or when less than this is left
   var GUIDE_MAX_ITEMS = 30;
+  var GUIDE_V = 2;
   var guideCache = vload(GUIDE_KEY, {}) || {};
   if(typeof guideCache !== 'object' || Array.isArray(guideCache)) guideCache = {};
   var guideBusy = {}, guideFailedAt = {};
@@ -17937,7 +18092,7 @@
       var c = guideCache[k];
       if(!c || !Array.isArray(c.items)) return;
       var items = c.items.filter(function(it){ return it.e > now; });
-      if(items.length || now - (c.at || 0) < GUIDE_RENEW_MS) out[k] = { at: c.at, items: items };
+      if(items.length || now - (c.at || 0) < GUIDE_RENEW_MS) out[k] = { at: c.at, items: items, v: c.v };
     });
     guideCache = out;
     vsave(GUIDE_KEY, out);
@@ -17947,6 +18102,8 @@
     if(guideBusy[src.key]) return false;
     if(guideFailedAt[src.key] && now - guideFailedAt[src.key] < 10 * 60 * 1000) return false;
     if(!c || !Array.isArray(c.items)) return true;
+    // Build 248: schedules kept from before pictures were saved are fetched again.
+    if(c.v !== GUIDE_V) return true;
     if(now - (c.at || 0) > GUIDE_RENEW_MS) return true;
     // A channel that only publishes a short schedule isn't asked again more than every 30 min.
     if(now - (c.at || 0) < 30 * 60 * 1000) return false;
@@ -17959,8 +18116,14 @@
       var ep = t.episode || {}, series = (ep.series && ep.series.name) || '';
       var title = String(t.title || series || ep.name || '').trim();
       var epName = String(ep.name || '').trim();
+      // Build 248: pictures (Pluto gives every program its episode's and its show's) and the
+      // whole description, for the program's details.
+      var sr = ep.series || {};
+      var pic = function(o){ return (o && o.path) || ''; };
       return { s: Date.parse(t.start), e: Date.parse(t.stop), t: trimGuideText(title, 90),
-        sub: epName && epName !== title ? trimGuideText(epName, 90) : '', d: trimGuideText(ep.description, 160), r: ep.rating || '' };
+        sub: epName && epName !== title ? trimGuideText(epName, 90) : '', d: trimGuideText(ep.description, 500), r: ep.rating || '',
+        im: pic(ep.poster16_9) || pic(ep.featuredImage) || pic(sr.poster16_9) || pic(sr.featuredImage),
+        sq: pic(ep.thumbnail) || pic(sr.tile) };
     });
   }
   function plexGuideItems(d){
@@ -17976,7 +18139,9 @@
         if(e < 1e12) e *= 1000;
         var show = String(m.grandparentTitle || '').trim(), title = String(m.title || '').trim();
         out.push({ s: b, e: e, t: trimGuideText(show || title, 90), sub: show && title !== show ? trimGuideText(title, 90) : '',
-          d: trimGuideText(m.summary, 160), r: m.contentRating || '' });
+          d: trimGuideText(m.summary, 500), r: m.contentRating || '',
+          // Build 248: pictures (an episode's still, else the show's), as Plex gives them.
+          im: String(m.art || m.thumb || m.grandparentArt || '') , sq: String(m.thumb || m.grandparentThumb || m.parentThumb || '') });
       });
     });
     return out;
@@ -18024,7 +18189,7 @@
             var now = Date.now(), byStart = {};
             items = items.filter(function(it){ return it.s && it.e && it.e > it.s && it.e > now - 3600 * 1000 && !byStart[it.s] && (byStart[it.s] = true); });
             items.sort(function(a, b){ return a.s - b.s; });
-            guideCache[job.src.key] = { at: now, items: items.slice(0, GUIDE_MAX_ITEMS) };
+            guideCache[job.src.key] = { at: now, items: items.slice(0, GUIDE_MAX_ITEMS), v: GUIDE_V };
             delete guideFailedAt[job.src.key];
             guideSave();
           }, function(){ guideFailedAt[job.src.key] = Date.now(); }).then(function(){
@@ -30112,6 +30277,7 @@
     }
     // Build 243: a channel with a schedule shows what's on now under its name (the show, when
     // it isn't the channel's own name, and the episode).
+    syncNpEpThumb(st);
     if(isNpChannel(st)){
       var gText = epgNowText(st);
       if(gText){ npSub.classList.remove('np-sub-linked'); npSub.textContent = gText; return; }
