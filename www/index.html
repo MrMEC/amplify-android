@@ -7331,11 +7331,15 @@
   <button type="button" class="np-menu-item" id="rowMenuTags" role="menuitem" style="display:none;">
     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><path d="M8 11.5h5M8 14.5h3"/></svg><span>Info &amp; Tags</span>
   </button>
+  <!-- Build 247: a channel in search results -->
+  <button type="button" class="np-menu-item" id="rowMenuAddChannel" role="menuitem" style="display:none;">
+    <i class="fa-solid fa-plus"></i><span>Add to My Channels</span>
+  </button>
   <button type="button" class="np-menu-item" id="rowMenuRename" role="menuitem" style="display:none;">
     <i class="fa-solid fa-pen"></i><span>Rename</span>
   </button>
   <button type="button" class="np-menu-item" id="rowMenuRemove" role="menuitem" style="display:none;">
-    <i class="fa-solid fa-xmark"></i><span>Remove</span>
+    <i class="fa-solid fa-xmark"></i><span id="rowMenuRemoveLabel">Remove</span>
   </button>
 </div>
 
@@ -17616,7 +17620,7 @@
       txt.appendChild(g);
       fillGuideRow(g, ch);
     }
-    tile.appendChild(buildRowMoreBtn(st, { fav: true, className: 'row-more-btn',
+    tile.appendChild(buildRowMoreBtn(st, (opts && opts.search) ? { fav: true, className: 'row-more-btn', channel: ch } : { fav: true, className: 'row-more-btn',
       onRemove: saved ? function(){ removeVideoChannel(ch.url); } : null,
       onRename: saved ? function(){ promptRenameVideoChannel(ch); } : null }));
     return tile;
@@ -30937,7 +30941,11 @@
     b.addEventListener('click', function(e){
       e.stopPropagation();
       if(rowMenu.classList.contains('open') && rowMenu._anchor === b){ closeRowMenu(); return; }
-      openRowMenu(b, [track], { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename });
+      var mo = { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename };
+      // Build 247: a channel in search results: Add to My Channels, or Remove from My Channels
+      // once it's saved (asked when the menu opens, so it follows a change made a moment ago).
+      if(opts.channel) mo = channelMenuOpts(opts.channel, withFav);
+      openRowMenu(b, [track], mo);
     });
     return b;
   }
@@ -30982,6 +30990,9 @@
     rowMenuRemove.style.display = rowMenuOnRemove ? '' : 'none';
     rowMenuOnRename = (opts && opts.onRename) || null;
     rowMenuRename.style.display = rowMenuOnRename ? '' : 'none';
+    rowMenuOnAddChannel = (opts && opts.onAddChannel) || null;
+    rowMenuAddChannel.style.display = rowMenuOnAddChannel ? '' : 'none';
+    rowMenuRemoveLabel.textContent = (opts && opts.removeLabel) || 'Remove';
     rowMenuTags.style.display = tracks.length === 1 && isLocalTrack(tracks[0]) ? '' : 'none';
     rowMenu._anchor = anchor;
     rowMenu.classList.add('open');
@@ -31002,6 +31013,28 @@
     rowMenuTracks = null;
     rowMenuOnRemove = null;
     rowMenuOnRename = null;
+    rowMenuOnAddChannel = null;
+  }
+  var rowMenuAddChannel = document.getElementById('rowMenuAddChannel');
+  var rowMenuRemoveLabel = document.getElementById('rowMenuRemoveLabel');
+  var rowMenuOnAddChannel = null;
+  rowMenuAddChannel.addEventListener('click', function(e){
+    e.stopPropagation();
+    var fn = rowMenuOnAddChannel; closeRowMenu();
+    if(fn) fn();
+  });
+  function channelMenuOpts(ch, withFav){
+    var saved = findVideoChannel(ch.url);
+    return {
+      fav: withFav,
+      onAddChannel: saved ? null : function(){
+        addVideoChannel(ch);
+        if(onVideoView) renderVideoHome();
+      },
+      onRemove: saved ? function(){ removeVideoChannel(ch.url); } : null,
+      removeLabel: 'Remove from My Channels',
+      onRename: saved ? function(){ var c = findVideoChannel(ch.url); if(c) promptRenameVideoChannel(c); } : null
+    };
   }
   document.getElementById('rowMenuPlayNext').addEventListener('click', function(e){
     e.stopPropagation();
@@ -34094,7 +34127,7 @@
         // straight in the grid were pulled up over each other by the grid's row spacing fix).
         var chList = stationsGrid.querySelector(':scope > .ch-list');
         if(!chList){ chList = document.createElement('div'); chList.className = 'ch-list'; stationsGrid.appendChild(chList); }
-        chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url) }));
+        chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url), search: true }));
       } else if(group.id === 'videos'){
         stationsGrid.appendChild(buildVideoResultRow(item, false));
       } else if(group.id === 'musicVideos'){
@@ -34455,7 +34488,7 @@
     body.appendChild(s2);
     row.appendChild(body);
     // Somewhere to go gets a chevron; something to play gets its More menu (never both).
-    if(playable) row.appendChild(buildRowMoreBtn(playable, { fav: true }));
+    if(playable) row.appendChild(buildRowMoreBtn(playable, kind === 'channels' ? { fav: true, channel: item } : { fav: true }));
     else {
       var chev = document.createElement('span');
       chev.className = 'top-result-chev';
