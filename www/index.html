@@ -768,6 +768,19 @@
     body.home-stacked .home-section, body.home-stacked .recent-section{ margin-bottom:26px; }
   }
 
+  /* Build 257 (Mark): Top Stations on Home is two rows of covers stacked in one scroller, so a
+     sideways swipe moves both rows together. Filled down then across (1 over 2, 3 over 4, ...)
+     so the ranking reads left to right in pairs. Same cover width as the other rows; only
+     while there are covers to lay out (the spinner and the empty line keep the plain row). */
+  body.home-stacked .home-row > #stationsGrid:has(> .tile){
+    display:grid; grid-auto-flow:column; grid-template-rows:repeat(2, auto); grid-template-columns:none;
+    grid-auto-columns:150px; justify-content:start; align-items:start; gap:22px 16px;
+  }
+  body.home-stacked .home-row > #stationsGrid:has(> .tile) > .tile{ width:auto; min-width:0; }
+  @media (max-width: 900px){
+    body.home-stacked .home-row > #stationsGrid:has(> .tile){ grid-auto-columns:min(132px, calc((100vw - 46px - 32px) / 2.35)); }
+  }
+
   /* ---------- a favourite as a card ---------- */
   /* Cover on top, title underneath on a band coloured by that cover, the whole thing one
      rounded object. The band's colour is a heavily blurred copy of the artwork rather than a
@@ -34920,6 +34933,17 @@
       stationsGrid.appendChild(row);
     });
   }
+  // Build 257 (Mark): a song tapped in the results plays and opens Now Playing (Top Results
+  // and the Songs tab alike). Runs after the row's own click has started it; the row's More
+  // button and anything else on the row with its own action are left alone.
+  stationsGrid.addEventListener('click', function(e){
+    if(!onSearchView) return;
+    var row = e.target.closest('.song-row');
+    if(!row || !stationsGrid.contains(row) || e.target.closest('button, a, .row-more-btn, .song-row-more')) return;
+    var item = row._ctxItem;
+    if(!item || !isLocalTrack(item)) return;
+    setTimeout(function(){ openNowPlaying(item); }, 0);
+  });
   // Opening anything from the results remembers what was searched.
   stationsGrid.addEventListener('click', function(e){
     if(!onSearchView || !searchState || !searchState.q) return;
