@@ -3397,7 +3397,13 @@
   }
   .epg-corner{ flex:none; width:80px; height:34px; display:flex; align-items:center; justify-content:center;
     background:var(--epg-bg); border:0; color:var(--text-dim); cursor:pointer; padding:0; }
-  .epg-corner svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+  .epg-corner svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+  /* Build 252: greyed out while nothing is playing. */
+  .epg-corner:disabled{ opacity:.35; cursor:default; }
+  .epg-corner:not(:disabled){ color:var(--text); }
+  /* The playing channel's details hidden (the corner's up arrow): none of its height left. */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed .np-hero-foot{
+    height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
   .epg-head-times{ position:relative; height:34px; }
@@ -17744,11 +17750,12 @@
     var corner = document.createElement('button');
     corner.type = 'button';
     corner.className = 'epg-corner';
-    corner.setAttribute('aria-label', 'Channel order');
-    corner.title = 'Channel order';
-    corner.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h6"/></svg>';
-    corner.addEventListener('click', function(e){ e.stopPropagation(); openEpgOrderMenu(corner); });
+    // Build 252 (Mark): the corner shows / hides the playing channel's details under its video
+    // (an up arrow hides them, a down arrow brings them back); kept from then on; greyed out
+    // while nothing is playing. (The channel order stays in Edit.)
+    corner.addEventListener('click', function(e){ e.stopPropagation(); if(!corner.disabled) setNpFootCollapsed(!npFootCollapsed); });
     head.appendChild(corner);
+    syncEpgFootBtn(corner);
     var track = document.createElement('div');
     track.className = 'epg-head-track';
     var times = document.createElement('div');
@@ -17787,6 +17794,63 @@
     wrap._opts = opts;
     placeEpgNow(wrap, now);
     return wrap;
+  }
+  // ---- the playing channel's details under its video: shown or hidden (build 252)
+  var NP_FOOT_KEY = 'radioPlayerNpDetailsHidden';
+  var npFootCollapsed = (function(){ try{ return localStorage.getItem(NP_FOOT_KEY) === '1'; }catch(e){ return false; } })();
+  var npHeroFoot = document.querySelector('#nowPlayingScreen .np-hero-foot');
+  nowPlayingScreen.classList.toggle('np-foot-collapsed', npFootCollapsed);
+  var EPG_ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
+  var EPG_ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  function syncEpgFootBtn(b){
+    var on = !!currentStation;
+    b.disabled = !on;
+    var want = npFootCollapsed ? 'down' : 'up';
+    if(b.dataset.arrow !== want){ b.dataset.arrow = want; b.innerHTML = npFootCollapsed ? EPG_ARROW_DOWN : EPG_ARROW_UP; }
+    var label = npFootCollapsed ? 'Show channel details' : 'Hide channel details';
+    b.setAttribute('aria-label', label);
+    b.title = on ? label : 'Nothing playing';
+    b.setAttribute('aria-expanded', npFootCollapsed ? 'false' : 'true');
+  }
+  function syncEpgFootBtns(){ document.querySelectorAll('.epg-corner').forEach(syncEpgFootBtn); }
+  var npFootTimer = 0;
+  function setNpFootCollapsed(c){
+    c = !!c;
+    npFootCollapsed = c;
+    try{ localStorage.setItem(NP_FOOT_KEY, c ? '1' : '0'); }catch(e){}
+    syncEpgFootBtns();
+    var foot = npHeroFoot;
+    var shown = nowPlayingScreen.style.display === 'flex' && nowPlayingScreen.classList.contains('np-channel') && !document.body.classList.contains('rotate-lock');
+    var still = !shown || !foot || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    clearTimeout(npFootTimer);
+    if(still){
+      if(foot) ['height', 'paddingTop', 'paddingBottom', 'opacity', 'overflow', 'transition', 'boxSizing'].forEach(function(k){ foot.style[k] = ''; });
+      nowPlayingScreen.classList.toggle('np-foot-collapsed', c);
+      return;
+    }
+    // From its height now to the other end, the grid under it following frame by frame.
+    var fromH = foot.getBoundingClientRect().height;
+    foot.style.transition = 'none';
+    foot.style.height = ''; foot.style.paddingTop = ''; foot.style.paddingBottom = ''; foot.style.opacity = '';
+    nowPlayingScreen.classList.remove('np-foot-collapsed');
+    var fullH = foot.getBoundingClientRect().height;
+    var cs = getComputedStyle(foot), padT = cs.paddingTop, padB = cs.paddingBottom;
+    foot.style.boxSizing = 'border-box';
+    foot.style.overflow = 'hidden';
+    var set = function(h, open){
+      foot.style.height = h + 'px';
+      foot.style.paddingTop = open ? padT : '0px';
+      foot.style.paddingBottom = open ? padB : '0px';
+      foot.style.opacity = open ? '1' : '0';
+    };
+    set(fromH, fromH > 1);
+    void foot.offsetHeight;
+    foot.style.transition = 'height .32s cubic-bezier(.4,0,.2,1), padding .32s cubic-bezier(.4,0,.2,1), opacity .24s ease';
+    set(c ? 0 : fullH, !c);
+    npFootTimer = setTimeout(function(){
+      ['height', 'paddingTop', 'paddingBottom', 'opacity', 'overflow', 'transition', 'boxSizing'].forEach(function(k){ foot.style[k] = ''; });
+      nowPlayingScreen.classList.toggle('np-foot-collapsed', npFootCollapsed);
+    }, 360);
   }
   function placeEpgNow(wrap, now){
     var t0 = Number(wrap.dataset.t0), line = wrap.querySelector('.epg-now'), mark = wrap.querySelector('.epg-now-mark');
@@ -36581,6 +36645,7 @@
       npStation = station;
       renderNowPlayingScreen();
     }
+    if(typeof syncEpgFootBtns === 'function') syncEpgFootBtns();
   }
 
   // What the bar shows while nothing is actually loaded into the audio element -- at first
@@ -36591,6 +36656,7 @@
   // Deliberately lighter than updatePlayerMeta: nothing is actually cued up, so this doesn't
   // touch the OS media session or the seek bar's live state.
   function renderIdlePlayerBar(){
+    setTimeout(function(){ if(typeof syncEpgFootBtns === 'function') syncEpgFootBtns(); }, 0);
     var st = lastPlayedStation();
     if(!st){
       playerBar.classList.add('empty');

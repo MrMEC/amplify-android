@@ -95,6 +95,12 @@ INFO = """(()=>{ var o=document.getElementById('epgInfoOverlay'), p=o.querySelec
     desc: vis('epgInfoDesc') ? document.getElementById('epgInfoDesc').textContent : null, pic: !pic.hidden && img.naturalWidth > 0, picW: Math.round(pic.getBoundingClientRect().width),
     watch: vis('epgInfoWatch'), fits: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5 }; })()"""
 
+CORNER = """(()=>{ var b=document.querySelector(arguments_sel); var cs=getComputedStyle(b); return { disabled: b.disabled, label: b.getAttribute('aria-label'), arrow: b.dataset.arrow, op: parseFloat(cs.opacity) }; })()"""
+async def corner(pg, sel):
+    return await pg.evaluate(CORNER.replace('arguments_sel', repr(sel)))
+FOOT = """(()=>{ var f=document.querySelector('#nowPlayingScreen .np-hero-foot'), g=document.querySelector('#npCollection .epg'); return { h: Math.round(f.getBoundingClientRect().height),
+  gridTop: Math.round(g.getBoundingClientRect().top), collapsed: document.getElementById('nowPlayingScreen').classList.contains('np-foot-collapsed'), saved: localStorage.getItem('radioPlayerNpDetailsHidden') }; })()"""
+
 def check(ok, msg):
     print(('PASS ' if ok else 'FAIL ') + msg)
     if not ok: fails.append(msg)
@@ -152,6 +158,9 @@ async def run(p, theme, width, big):
         await pg.add_style_tag(content='.epg-t{font-size:17.6px !important} .epg-s{font-size:15.5px !important} .epg-time{font-size:17.6px !important} .epg-logo-name{font-size:14.2px !important} .np-name{font-size:30px !important} .np-sub{font-size:19px !important}')
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2500)
     g = await pg.evaluate(GRID)
+    # build 252: the corner is the details' up / down arrow, greyed out while nothing plays
+    c0 = await corner(pg, '#stationsGrid .epg-corner')
+    check(c0['disabled'] and c0['arrow'] == 'up' and c0['op'] < 0.5, f'{T} nothing playing: the corner’s up arrow is greyed out {c0}')
     check(g is not None and len(g['rows']) == 4, f'{T} Live TV is a guide grid with a row per channel {g and len(g["rows"])}')
     order = [r['url'] for r in g['rows']]
     check(order[0] == CHANNELS[1]['url'] and g['rows'][0]['heart'] and not any(r['heart'] for r in g['rows'][1:]), f'{T} the favourite first, with a heart')
@@ -284,6 +293,32 @@ async def run(p, theme, width, big):
     check(not await pg.evaluate("document.body.classList.contains('queue-open') || (document.getElementById('queuePanel') && document.getElementById('queuePanel').classList.contains('open'))"), f'{T} a sideways swipe doesn’t open the queue')
     await pg.evaluate("window.scrollTo(0,0); document.getElementById('nowPlayingScreen').scrollTop = 0"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{SHOTS}/epg-np-{theme}-{width}{"-big" if big else ""}.png')
+    # build 252: the corner's up arrow hides the details under the video, smoothly; the grid grows to match
+    c1 = await corner(pg, '#npCollection .epg-corner')
+    f0 = await pg.evaluate(FOOT)
+    check(not c1['disabled'] and c1['arrow'] == 'up' and c1['label'] == 'Hide channel details' and f0['h'] > 40 and not f0['collapsed'], f'{T} playing: the up arrow is live, the details showing {c1} {f0}')
+    await pg.evaluate("document.querySelector('#npCollection .epg-corner').click()"); await pg.wait_for_timeout(130)
+    fm = await pg.evaluate(FOOT)
+    await pg.wait_for_timeout(450)
+    f1 = await pg.evaluate(FOOT)
+    c2 = await corner(pg, '#npCollection .epg-corner')
+    check(0 < fm['h'] < f0['h'] and f0['gridTop'] > fm['gridTop'] > f1['gridTop'], f'{T} it closes smoothly, the grid moving up with it (mid-way {fm["h"]}px of {f0["h"]})')
+    check(f1['h'] == 0 and f1['collapsed'] and abs(f1['gridTop'] - (f0['gridTop'] - f0['h'])) <= 1 and f1['saved'] == '1' and c2['arrow'] == 'down' and c2['label'] == 'Show channel details',
+          f'{T} closed: no height left, the grid where it was, saved, a down arrow {f1} {c2}')
+    await pg.screenshot(path=f'{SHOTS}/epg-np-collapsed-{theme}-{width}{"-big" if big else ""}.png')
+    await pg.evaluate("document.querySelector('#npCollection .epg-corner').click()"); await pg.wait_for_timeout(600)
+    f2 = await pg.evaluate(FOOT)
+    check(abs(f2['h'] - f0['h']) <= 1 and not f2['collapsed'] and abs(f2['gridTop'] - f0['gridTop']) <= 1 and f2['saved'] == '0', f'{T} the down arrow brings them back {f2}')
+    # kept after a restart
+    await pg.evaluate("document.querySelector('#npCollection .epg-corner').click()"); await pg.wait_for_timeout(600)
+    await pg.reload(); await pg.wait_for_timeout(2500)
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
+    c3 = await corner(pg, '#stationsGrid .epg-corner')
+    await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); r.querySelector('.epg-prog.now').click(); })()" % BUZZR); await pg.wait_for_timeout(1800)
+    f3 = await pg.evaluate(FOOT)
+    check(c3['arrow'] == 'down' and c3['disabled'] and f3['collapsed'] and f3['h'] == 0, f'{T} after a restart: still hidden (down arrow, greyed until something plays) {c3} {f3}')
+    await pg.evaluate("document.querySelector('#npCollection .epg-corner').click()"); await pg.wait_for_timeout(600)
+    check((await pg.evaluate(FOOT))['h'] > 40, f'{T} and shown again')
     # the menu still plays other channels from the grid under the player
     await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('#npCollection .epg-row')).find(x=>x.dataset.chUrl.indexOf('news.example')>=0); r.querySelector('.epg-prog').click(); })()"); await pg.wait_for_timeout(1500)
     check((await pg.evaluate("document.getElementById('npName').textContent")) == 'Local News', f'{T} tapping a channel without a schedule plays it (its block is on now)')
