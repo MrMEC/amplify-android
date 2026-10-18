@@ -97,13 +97,15 @@ async def main():
         check(r['after'] == 'latestPodcastsSection', f'right under Latest Podcasts (after {r["after"]})')
         check(r['names'] == ['Mix', 'Empty', 'Extra 0', 'Extra 1', 'Extra 2', 'Extra 3'], f'every playlist, in the Playlists page order {r["names"]}')
         check(r['subs'][:2] == ['1 item', '0 items'], f'each with how much is in it {r["subs"][:2]}')
-        check(r['inRow'] and len(set(r['tops'])) == 1 and r['lefts'] == sorted(r['lefts']) and r['overflow'] in ('auto', 'scroll') and r['scrolls'],
-              f'side by side in one row that scrolls sideways {r["tops"]} {r["overflow"]}')
+        # build 258: two rows in one sideways scroller, filled down then across (1 over 2, 3 over 4, ...)
+        check(r['inRow'] and len(set(r['tops'])) == 2 and r['tops'][0::2] == [min(r['tops'])] * len(r['tops'][0::2]) and r['lefts'][0::2] == sorted(r['lefts'][0::2])
+              and r['overflow'] in ('auto', 'scroll') and r['scrolls'],
+              f'two rows that scroll sideways together {r["tops"]} {r["lefts"]} {r["overflow"]}')
         await pg.evaluate("document.getElementById('playlistsHomeSection').scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/home-playlists.png')
         await pg.evaluate("document.getElementById('playlistsHomeGrid').scrollBy({ left: 400 })"); await pg.wait_for_timeout(800)
         sl = await pg.evaluate("document.getElementById('playlistsHomeGrid').scrollLeft")
-        check(sl > 100, f'it scrolls ({sl}px)')
+        check(sl > 40, f'it scrolls ({sl}px)')
         # open one
         await pg.evaluate("Array.from(document.querySelectorAll('#playlistsHomeGrid .tile')).filter(function(t){ return /Mix/.test(t.textContent); })[0].click()"); await pg.wait_for_timeout(600)
         check(await pg.evaluate('__h.active()') == 'pl_mix', 'a cover opens its playlist')
