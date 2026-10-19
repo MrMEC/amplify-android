@@ -70,10 +70,11 @@ async def route(r):
 async def rows(pg):
     return await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.ch-row'),function(r){return {name:r.querySelector('.ch-name').textContent,added:r.querySelector('.ch-add').classList.contains('added')};})")
 async def my_tiles(pg):
-    # build 243: the guide grid (outside Edit), else the Edit list's rows
+    # build 243: the guide grid (outside Edit), else the Edit list's rows (build 263: the added
+    # channels; Your Channels' rows above them are another test's)
     return await pg.evaluate("""(()=>{ var r=document.querySelectorAll('#stationsGrid .epg-row');
       if(r.length) return Array.prototype.map.call(r,function(x){var c=x.querySelector('.epg-ch');return {name:(c.getAttribute('aria-label')||'').replace(/, playing$/,''),dead:c.classList.contains('dead')&&!!x.querySelector('.epg-s.ch-dead')};});
-      return Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile'),function(t){var d=t.querySelector('.ch-dead');return {name:t.querySelector('.tile-name').textContent,dead:!!d};}); })()""")
+      return Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile:not(.lc-row)'),function(t){var d=t.querySelector('.ch-dead');return {name:t.querySelector('.tile-name').textContent,dead:!!d};}); })()""")
 TAP = "(n)=>Array.prototype.find.call(document.querySelectorAll('#stationsGrid .epg-ch'),function(c){return (c.getAttribute('aria-label')||'').replace(/, playing$/,'')===n;}).click()"
 async def tab(pg, label):
     await pg.evaluate("(l)=>Array.prototype.find.call(document.querySelectorAll('.ch-tools .home-tab'),function(b){return b.textContent===l;}).click()", label)
@@ -220,7 +221,7 @@ async def main():
         check((await pg.evaluate(names))[0] == 'Link Three', f'switching back to Manual finds the hand order intact {await pg.evaluate(names)}')
         await pg.evaluate(pick, 'az'); await pg.wait_for_timeout(300)
         # (still editing) Rename via the Edit list's More menu (the grid has none, build 243)
-        check(await pg.evaluate("document.querySelectorAll('#stationsGrid .epg-row').length===0 && document.querySelectorAll('#stationsGrid .tile.ch-item .row-more-btn').length===5"), 'the Edit list rows each have a More button')
+        check(await pg.evaluate("document.querySelectorAll('#stationsGrid .epg-row').length===0 && document.querySelectorAll('#stationsGrid .tile.ch-item:not(.lc-row) .row-more-btn').length===5"), 'the Edit list rows each have a More button')
         # Rename via the More menu: the row re-sorts under its new name (A to Z), the Home row
         # follows, and it's kept after a restart. Cancel leaves it alone.
         def more(name):
