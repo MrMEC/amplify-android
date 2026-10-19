@@ -55,7 +55,7 @@ async def pick(pg, name):
     await pg.evaluate("(function(n){ Array.from(document.querySelectorAll('#liveChList .artist-info-row')).filter(function(x){ return x.querySelector('.artist-info-name').textContent===n; })[0].click(); })(%s)" % json.dumps(name))
     await pg.wait_for_timeout(200)
 async def defs(pg): return await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerLiveChannels') || 'null')")
-EDITLIST = """(()=>{ return Array.from(document.querySelectorAll('#stationsGrid > *')).map(function(e){
+EDITLIST = """(()=>{ return Array.from(document.querySelectorAll('#stationsGrid > *, #stationsGrid > .ch-edit-list > *')).map(function(e){
   if(e.classList.contains('ch-group-head')) return 'H:' + e.textContent;
   if(e.id === 'liveChNewBtn') return 'NEW';
   if(e.classList.contains('lc-row')) return 'L:' + e.querySelector('.tile-name').textContent + '|' + ((e.querySelector('.tile-sub')||{}).textContent||'');

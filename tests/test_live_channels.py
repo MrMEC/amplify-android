@@ -200,7 +200,10 @@ async def run(p, theme, width):
     seeks = await pg.evaluate("window.__seeks")
     want_off = time.time() - s_now
     check(len(ld) >= 1 and ('/library/parts/%s/' % x_now[0]) in ld[-1]['url'] and ld[-1]['engine'] != 'vlc', f'{T} tuning in plays the episode on now from Plex {ld[-1:]}')
-    check(seeks and abs(seeks[-1] - want_off) < 6, f'{T} it joins the episode where the schedule is ({seeks[-1:]} vs {want_off:.0f}s)')
+    # build 264: the start goes with the load (no seek after), and it's marked a video with a length
+    la = await pg.evaluate("window.__loads[window.__loads.length-1]")
+    check(abs(la.get('start', 0) - want_off) < 6 and not seeks and la.get('castVideo') is True and la.get('castVod') is True,
+          f'{T} it joins the episode where the schedule is: the load starts there ({la.get("start")} vs {want_off:.0f}s, seeks {seeks})')
     np = await pg.evaluate(NP)
     check(np['open'] and np['channel'] and np['name'] == 'The Office (US)' and np['sub'] == 'S%d E%d · %s' % (x_now[2], x_now[3], x_now[1]),
           f'{T} Now Playing: the channel’s name, the episode under it {np["name"]!r} {np["sub"]!r}')
@@ -228,8 +231,9 @@ async def run(p, theme, width):
     nxt = items[(i_now + 1) % len(items)]
     ld = await pg.evaluate("window.__loads.map(function(a){ return a.url; })")
     seeks = await pg.evaluate("window.__seeks")
+    st0 = await pg.evaluate("window.__loads.length ? (window.__loads[window.__loads.length-1].start || 0) : -1")
     np = await pg.evaluate(NP)
-    check(ld and ('/library/parts/%s/' % nxt[0]) in ld[-1] and not any(s2 > 3 for s2 in seeks), f'{T} when it ends the next episode comes on, from the top {ld[-1:]} {seeks}')
+    check(ld and ('/library/parts/%s/' % nxt[0]) in ld[-1] and not any(s2 > 3 for s2 in seeks) and st0 <= 3, f'{T} when it ends the next episode comes on, from the top {ld[-1:]} {seeks}')
     check(np['open'] and np['sub'] == 'S%d E%d · %s' % (nxt[2], nxt[3], nxt[1]), f'{T} Now Playing follows it {np["sub"]!r}')
 
     # Favourite the channel from Now Playing: the channel is the favourite, not the episode

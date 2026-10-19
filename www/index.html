@@ -3979,6 +3979,10 @@
   .lc-note{ margin:8px 0 0; font-size:12.5px; line-height:1.5; color:var(--text-dim); }
   .lc-note:empty{ display:none; }
   .lc-new-btn{ margin:0 0 14px; }
+  /* Build 264: each list of channels in Edit is its own box, so a row drags only within it. */
+  .tile-grid > .ch-edit-list{ grid-column:1/-1; display:flex; flex-direction:column; min-width:0; }
+  .tile-grid > .ch-edit-list + .ch-group-head{ margin-top:6px; }
+  .tile-grid > .ch-edit-list:empty{ display:none; }
   /* Fix artist info. Each candidate is one row: a small portrait (or a neutral tile), the
      article title, and Wikipedia's one-line description, which is what actually tells a band
      from a blood disorder at a glance. */
@@ -8078,6 +8082,7 @@
   var native = !!(P && typeof P.kvSet === 'function' && typeof P.kvGetAll === 'function');
   var KEYS = ['radioPlayerFavorites', 'radioPlayerFavOrder', 'radioPlayerFavOrderManual', 'radioPlayerFavArtistOrder',
     'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort', 'radioPlayerLiveChannels',
+    'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
     'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent'];
@@ -17626,30 +17631,7 @@
     // Edit mode: your own channels (build 263), then the sort options and one list of the added
     // channels as stacked rows. In Manual the rows drag into order; in A to Z there's nothing to drag.
     if(videoChannelsEditing){
-      appendLiveChEditList();
-      if(!mine.length) return;
-      stationsGrid.appendChild(buildChGroupHead('Added Channels'));
-      appendChannelSortOptions();
-      var manual = channelOrder === 'manual';
-      mine.forEach(function(ch){
-        var row = buildEntityTile({
-          key: 'channel:' + ch.url, reorderId: ch.url, entity: 'video-channel', name: ch.name, row: true,
-          artFrom: channelToStation(ch), draggable: manual, onReorder: manual ? reorderVideoChannelsFromGrid : null
-        });
-        row.classList.add('ch-item');
-        // Build 243: the grid has no menus (Mark), so Favorite, Rename and Remove live here.
-        row.appendChild(buildRowMoreBtn(channelToStation(ch), { fav: true, className: 'row-more-btn',
-          onRemove: function(){ removeVideoChannel(ch.url); },
-          onRename: function(){ promptRenameVideoChannel(ch); } }));
-        if(manual){
-          var grip = document.createElement('span');
-          grip.className = 'ch-grip';
-          grip.setAttribute('aria-hidden', 'true');
-          grip.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"></path></svg>';
-          row.appendChild(grip);
-        }
-        stationsGrid.appendChild(row);
-      });
+      renderChannelsEdit(mine);
       return;
     }
     // Build 243 (Mark's mockups): the guide grid. Channels down the left (favourites first, no
@@ -17902,6 +17884,41 @@
   // show's episodes in order, the shows taking turns, movies by year), 'shuffle' (a fixed
   // shuffle) or 'daily' (a new shuffle each day, fixed for that day, starting at midnight).
   var LIVE_CH_KEY = 'radioPlayerLiveChannels';
+  // Build 264: how the channels are laid out and sorted (Live TV, Edit).
+  var CHANNEL_LAYOUT_KEY = 'radioPlayerChannelLayout', LIVE_CH_ORDER_KEY = 'radioPlayerLiveChOrder';
+  var CHANNEL_MIX_ORDER_KEY = 'radioPlayerChannelMixOrder', CHANNEL_MIX_KEY = 'radioPlayerChannelMix';
+  function chPrefGet(k, def){ try{ var v = localStorage.getItem(k); return v == null ? def : v; }catch(e){ return def; } }
+  function chPrefSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+  var channelLayout = chPrefGet(CHANNEL_LAYOUT_KEY, 'split') === 'mixed' ? 'mixed' : 'split';
+  var liveChOrder = chPrefGet(LIVE_CH_ORDER_KEY, 'manual') === 'az' ? 'az' : 'manual';
+  var channelMixOrder = chPrefGet(CHANNEL_MIX_ORDER_KEY, 'az') === 'manual' ? 'manual' : 'az';
+  var channelMix = (function(){ try{ var v = JSON.parse(chPrefGet(CHANNEL_MIX_KEY, '[]')); return Array.isArray(v) ? v : []; }catch(e){ return []; } })();
+  // Your channels in their order: A to Z, or the order they're kept in (dragged in Edit).
+  function orderedLiveChannels(all){
+    var l = liveChannels(all);
+    if(liveChOrder === 'az') l.sort(channelAzCompare);
+    return l;
+  }
+  // Integrated: everything in one list. In Manual, the order dragged in Edit; a channel that
+  // isn't in it yet (new, or never arranged) takes the place it had with your channels first.
+  function mixedChannelList(added, all){
+    var lv = all ? orderedLiveChannels(true) : orderedLiveChannels();
+    var list = lv.concat(added);
+    if(channelMixOrder === 'az') return list.sort(channelAzCompare);
+    var pos = {};
+    channelMix.forEach(function(u, i){ pos[u] = i; });
+    var known = list.filter(function(c){ return pos[c.url] != null; }).sort(function(a, b){ return pos[a.url] - pos[b.url]; });
+    var fresh = list.filter(function(c){ return pos[c.url] == null; });
+    if(!fresh.length) return known;
+    // Each new one goes in after the channel it followed in the old order.
+    var out = known.slice();
+    fresh.forEach(function(c){
+      var i = list.indexOf(c), after = -1;
+      for(var j = i - 1; j >= 0 && after === -1; j--) after = out.indexOf(list[j]);
+      out.splice(after + 1, 0, c);
+    });
+    return out;
+  }
   var liveChStore = null;
   function liveChDefaultDefs(){
     return [
@@ -18183,26 +18200,177 @@
     return { name: c.name, urlToResolve: c.url, favicon: c.art || '', liveCh: c.url, videoChannel: true, stationuuid: null, tags: '', country: '',
       channel: { id: c.id, name: c.name, url: c.url, logo: c.logo || '', cats: [], src: 'live' } };
   }
-  function appendLiveChEditList(){
-    stationsGrid.appendChild(buildChGroupHead('Your Channels'));
+  // Build 264 (Mark): Edit has the layout (Your Channels First, or Integrate Channels) and an
+  // order for each list (A to Z, or Manual: drag the rows). Each list drags within itself.
+  function buildSortLines(lines){
+    var box = document.createElement('div');
+    box.className = 'ch-sort-opts';
+    lines.forEach(function(g){
+      var line = document.createElement('div');
+      line.className = 'ch-sort-line';
+      if(g.id) line.id = g.id;
+      var label = document.createElement('span');
+      label.className = 'ch-sort-label';
+      label.textContent = g.label;
+      line.appendChild(label);
+      var tabs = document.createElement('div');
+      tabs.className = 'home-tabs ch-sort-tabs';
+      tabs.setAttribute('role', 'radiogroup');
+      tabs.setAttribute('aria-label', g.label);
+      g.opts.forEach(function(o){
+        var b = document.createElement('button');
+        b.type = 'button';
+        var on = g.get() === o[0];
+        b.className = 'home-tab' + (on ? ' active' : '');
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.dataset.opt = o[0];
+        b.textContent = o[1];
+        b.addEventListener('click', function(){
+          if(g.get() === o[0]) return;
+          g.set(o[0]);
+          rerenderVideoKeepingScroll();
+        });
+        tabs.appendChild(b);
+      });
+      line.appendChild(tabs);
+      box.appendChild(line);
+    });
+    return box;
+  }
+  var ORDER_OPTS = [['az', 'A to Z'], ['manual', 'Manual']];
+  function addChGrip(row){
+    var grip = document.createElement('span');
+    grip.className = 'ch-grip';
+    grip.setAttribute('aria-hidden', 'true');
+    grip.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"></path></svg>';
+    row.appendChild(grip);
+  }
+  function buildLiveEditRow(c, o){
+    var def = liveChDefOf(c), st = liveChStationOf(c);
+    var row = buildEntityTile({ key: 'livech:' + c.url, reorderId: c.url, entity: o.entity, name: c.name, row: true,
+      sub: c.empty ? 'Nothing to play yet' : liveChKindText(def), artFrom: st,
+      draggable: o.manual, container: o.container, onReorder: o.onReorder,
+      onClick: function(){ openLiveChEditor(def.id); } });
+    row.classList.add('ch-item', 'lc-row');
+    row.dataset.liveId = def.id;
+    // In Manual the row drags, which takes the tap away from it: a tap that didn't move it still
+    // opens the channel.
+    if(o.manual){
+      var down = null;
+      var place = function(){ return Array.prototype.indexOf.call(row.parentNode ? row.parentNode.children : [], row); };
+      row.addEventListener('pointerdown', function(e){ down = { x: e.clientX, y: e.clientY, i: place() }; });
+      row.addEventListener('click', function(e){
+        if(e.target.closest && e.target.closest('.row-more-btn')) return;
+        var d = down; down = null;
+        if(d && (Math.abs(e.clientX - d.x) > 10 || Math.abs(e.clientY - d.y) > 10 || place() !== d.i)) return;
+        openLiveChEditor(def.id);
+      });
+    }
+    row.appendChild(buildRowMoreBtn(st, { fav: !c.empty, className: 'row-more-btn', renameLabel: 'Edit Channel',
+      onRename: function(){ openLiveChEditor(def.id); },
+      onRemove: function(){ deleteLiveChannel(def.id); } }));
+    if(o.manual) addChGrip(row);
+    return row;
+  }
+  function buildAddedEditRow(ch, o){
+    var row = buildEntityTile({
+      key: 'channel:' + ch.url, reorderId: ch.url, entity: o.entity, name: ch.name, row: true,
+      artFrom: channelToStation(ch), draggable: o.manual, container: o.container, onReorder: o.onReorder
+    });
+    row.classList.add('ch-item');
+    // Build 243: the grid has no menus (Mark), so Favorite, Rename and Remove live here.
+    row.appendChild(buildRowMoreBtn(channelToStation(ch), { fav: true, className: 'row-more-btn',
+      onRemove: function(){ removeVideoChannel(ch.url); },
+      onRename: function(){ promptRenameVideoChannel(ch); } }));
+    if(o.manual) addChGrip(row);
+    return row;
+  }
+  function newChannelBtn(){
     var add = document.createElement('button');
     add.type = 'button';
     add.className = 'settings-data-btn lc-new-btn';
     add.id = 'liveChNewBtn';
     add.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i><span>New Channel</span>';
     add.addEventListener('click', function(){ openLiveChEditor(null); });
-    stationsGrid.appendChild(add);
-    liveChannels(true).forEach(function(c){
-      var def = liveChDefOf(c), st = liveChStationOf(c);
-      var row = buildEntityTile({ key: 'livech:' + c.url, entity: 'live-channel', name: c.name, row: true,
-        sub: c.empty ? 'Nothing to play yet' : liveChKindText(def), artFrom: st,
-        onClick: function(){ openLiveChEditor(def.id); } });
-      row.classList.add('ch-item', 'lc-row');
-      row.dataset.liveId = def.id;
-      row.appendChild(buildRowMoreBtn(st, { fav: !c.empty, className: 'row-more-btn',
-        onRename: function(){ openLiveChEditor(def.id); },
-        onRemove: function(){ deleteLiveChannel(def.id); } }));
-      stationsGrid.appendChild(row);
+    return add;
+  }
+  function chEditList(cls){
+    var d = document.createElement('div');
+    d.className = 'ch-edit-list ' + cls;
+    stationsGrid.appendChild(d);
+    return d;
+  }
+  // Your channels in the order their rows were dragged into.
+  function reorderLiveChFromGrid(){
+    var ids = Array.prototype.map.call(stationsGrid.querySelectorAll('.ch-live-list .lc-row'), function(el){ return el.dataset.liveId; });
+    var defs = liveChDefs(), byId = {};
+    defs.forEach(function(d){ byId[d.id] = d; });
+    var re = ids.map(function(id){ return byId[id]; }).filter(Boolean);
+    if(re.length !== defs.length) return;
+    liveChStore = re;
+    saveLiveChDefs();
+  }
+  function reorderMixFromGrid(){
+    var urls = Array.prototype.map.call(stationsGrid.querySelectorAll('.ch-mix-list .ch-item'), function(el){ return el.dataset.reorderId; });
+    if(!urls.length) return;
+    channelMix = urls;
+    chPrefSet(CHANNEL_MIX_KEY, JSON.stringify(channelMix));
+  }
+  function renderChannelsEdit(mine){
+    stationsGrid.appendChild(buildSortLines([{ id: 'chLayoutLine', label: 'Layout', opts: [['split', 'Your Channels First'], ['mixed', 'Integrate Channels']],
+      get: function(){ return channelLayout; },
+      set: function(v){
+        channelLayout = v; chPrefSet(CHANNEL_LAYOUT_KEY, v); refreshChannelGrids();
+      } }]));
+    if(channelLayout === 'mixed'){
+      stationsGrid.appendChild(buildSortLines([{ id: 'chMixOrderLine', label: 'Order', opts: ORDER_OPTS, get: function(){ return channelMixOrder; },
+        set: function(v){
+          if(channelMixOrder === 'manual') reorderMixFromGrid();
+          // Manual starts from the order showing (A to Z) the first time; after that it's the
+          // order dragged by hand.
+          if(v === 'manual' && !channelMix.length){ channelMix = mixedChannelList(mine, true).map(function(c){ return c.url; }); chPrefSet(CHANNEL_MIX_KEY, JSON.stringify(channelMix)); }
+          channelMixOrder = v; chPrefSet(CHANNEL_MIX_ORDER_KEY, v); refreshChannelGrids();
+        } }]));
+      stationsGrid.appendChild(newChannelBtn());
+      var mixManual = channelMixOrder === 'manual';
+      var box = chEditList('ch-mix-list');
+      mixedChannelList(mine, true).forEach(function(c){
+        var o = { entity: 'mix-channel', manual: mixManual, container: box, onReorder: mixManual ? function(){ reorderMixFromGrid(); refreshChannelGrids(); } : null };
+        box.appendChild(isLiveChUrl(c.url) ? buildLiveEditRow(c, o) : buildAddedEditRow(c, o));
+      });
+      return;
+    }
+    stationsGrid.appendChild(buildChGroupHead('Your Channels'));
+    stationsGrid.appendChild(buildSortLines([{ id: 'chLiveOrderLine', label: 'Order', opts: ORDER_OPTS, get: function(){ return liveChOrder; },
+      set: function(v){
+        // Leaving Manual: the order the rows were just dragged into is kept; coming back to
+        // Manual finds it again (as for the added channels).
+        if(liveChOrder === 'manual') reorderLiveChFromGrid();
+        liveChOrder = v; chPrefSet(LIVE_CH_ORDER_KEY, v); refreshChannelGrids();
+      } }]));
+    stationsGrid.appendChild(newChannelBtn());
+    var liveManual = liveChOrder === 'manual';
+    var lbox = chEditList('ch-live-list');
+    orderedLiveChannels(true).forEach(function(c){
+      lbox.appendChild(buildLiveEditRow(c, { entity: 'live-channel', manual: liveManual, container: lbox,
+        onReorder: liveManual ? function(){ reorderLiveChFromGrid(); refreshChannelGrids(); } : null }));
+    });
+    if(!mine.length) return;
+    stationsGrid.appendChild(buildChGroupHead('Added Channels'));
+    appendChannelSortOptions();
+    var manual = channelOrder === 'manual';
+    var abox = chEditList('ch-added-list');
+    mine.forEach(function(ch){
+      abox.appendChild(buildAddedEditRow(ch, { entity: 'video-channel', manual: manual, container: abox, onReorder: manual ? reorderVideoChannelsFromGrid : null }));
+    });
+  }
+  // Any guide on screen (under a playing channel) takes the new order.
+  function refreshChannelGrids(){
+    document.querySelectorAll('.epg').forEach(function(wrap){
+      if(wrap.closest('#stationsGrid')) return;
+      var fresh = buildEpgGrid(epgAllChannels(visibleVideoChannels()), wrap._opts || {});
+      wrap.parentNode.replaceChild(fresh, wrap);
     });
   }
   function deleteLiveChannel(id){
@@ -18474,7 +18642,18 @@
     return split.favs.concat(split.rest);
   }
   // Build 262: your own channels first, then the added ones in their usual order.
-  function epgAllChannels(list){ return liveChannels().concat(epgChannelOrder(list)); }
+  // Build 264 (Mark): the layout is chosen in Edit. Your Channels First: your channels (A to Z,
+  // or the order dragged in Edit), then the added ones (their own A to Z / Manual). Integrate
+  // Channels: one list of both, A to Z or in an order dragged by hand. Favourites lead each
+  // list, as before. list: the added channels to show (visibleVideoChannels()).
+  function epgAllChannels(list){
+    if(channelLayout === 'mixed'){
+      var sm = splitFavChannels(mixedChannelList(list));
+      return sm.favs.concat(sm.rest);
+    }
+    var sl = splitFavChannels(orderedLiveChannels());
+    return sl.favs.concat(sl.rest, epgChannelOrder(list));
+  }
   // The programs as half-hour blocks: each start and end moved to the nearest half hour, kept in
   // order without overlapping; one that rounds away to nothing is left out.
   function epgBlocks(ch, t0, t1){
@@ -19120,9 +19299,8 @@
   }
   // The channels with a schedule, favourites first (as on Live TV).
   function guideChannels(){
-    var mine = visibleVideoChannels().filter(function(ch){ return !!guideSource(ch); });
-    var split = splitFavChannels(mine);
-    return liveChannels().concat(split.favs, split.rest);
+    // Build 264: in the order the Live TV guide has them.
+    return epgAllChannels(visibleVideoChannels()).filter(function(ch){ return !!guideSource(ch); });
   }
   function renderGuidePage(keepScroll){
     if(!onGuideView) return;
@@ -20936,6 +21114,20 @@
     if(ac && !/^(aac|mp3|mp2|ac3|eac3|opus|vorbis|flac|pcm|alac)$/.test(ac)) why.push(ac.toUpperCase() + ' audio');
     return { ok: !why.length, why: why.join(', '), info: info };
   }
+  // Build 264: while casting, a Plex video the Chromecast can't take as it is (an MKV or AVI
+  // file, HEVC, AC3 or DTS sound...) goes through Plex's conversion (HLS, H.264/AAC), which every
+  // Chromecast plays. Without the server's details, the file's extension decides.
+  function castConnected(){ return !!(audio && audio.castInfo && audio.castInfo.connected); }
+  function plexCastFriendly(info, t){
+    if(!info){
+      var ext = (/\.([a-z0-9]+)(?:\?|$)/i.exec(String((t && (t.plexPart || t.fileName)) || '')) || [])[1] || '';
+      return /^(mp4|m4v|mov|webm)$/i.test(ext);
+    }
+    var okC = !info.ct || /^(mp4|m4v|mov|webm)$/.test(info.ct);
+    var okV = (info.vc === 'h264' && (info.depth || 8) <= 8) || info.vc === 'vp8' || info.vc === 'vp9' || !info.vc;
+    var okA = !info.ac || /^(aac|mp3|opus|vorbis|flac)$/.test(info.ac);
+    return okC && okV && okA;
+  }
   function plexBaseIsLocal(){
     var s = plexServer();
     if(!s || !plexAccount.base) return false;
@@ -20980,7 +21172,8 @@
     }).then(function(m){
       var dec = m ? plexCanDirectPlay(m) : { ok: true, why: '', info: null };
       var pref = plexModes[t.id];
-      var convert = !!t._plexForce || pref === 'transcode' || (pref !== 'direct' && !dec.ok);
+      var convert = !!t._plexForce || pref === 'transcode' || (pref !== 'direct' && !dec.ok)
+        || (pref !== 'direct' && castConnected() && !plexCastFriendly(dec.info, t));
       t._plexWhy = dec.why;
       t._plexInfo = dec.info;
       t._plexMeta = !!m;
@@ -21002,6 +21195,21 @@
       return [];
     });
   }
+  // Build 264: a Chromecast picked while such a Plex video plays: it starts again through the
+  // conversion (a channel of your own tunes in again; a video carries on from where it was).
+  var castWasOn = castConnected();
+  window.addEventListener('amplify-cast', function(){
+    var on = castConnected(), was = castWasOn;
+    castWasOn = on;
+    if(!on || was) return;
+    var t = currentStation;
+    if(!t || !isLocalVideo(t) || !(t.plex || t.plexTwin) || t._plexMode === 'transcode' || !uiIsPlaying) return;
+    if(plexCastFriendly(t._plexInfo, t)) return;
+    if(t.liveCh){ tuneLiveChannel(t.liveCh, { follow: true }); return; }
+    noteVideoPosition(true);
+    t._plexSubs = null; t._plexRetried = false;
+    playLocalVideo(t);
+  });
   // Progress back to Plex: every 30 seconds while playing, on pause, and watched once it is.
   var plexReported = {};
   function plexReport(id, paused){
@@ -22249,20 +22457,27 @@
         audio._loadExtra.engine = 'vlc'; audio._loadExtra.hw = vlcHardware();
         // VLC opens straight at the resume point, rather than starting at 0 and jumping.
         var rp = videoProgress[t.id];
-        if(t.liveCh){
-          // Build 262: a channel of your own opens where the schedule is now.
-          var lo = liveOffsetSec(t);
-          if(lo > 3) audio._loadExtra.start = lo;
-        } else if(rp && !rp.watched && rp.pos > 5 && t.videoKind !== 'music') audio._loadExtra.start = rp.pos;
+        if(!t.liveCh && rp && !rp.watched && rp.pos > 5 && t.videoKind !== 'music') audio._loadExtra.start = rp.pos;
+      }
+      // Build 262: a channel of your own opens where the schedule is now. Build 264: the start
+      // goes with the load for every player (the phone's, VLC, the Chromecast), and it's cast
+      // as video.
+      // Build 264: a video has a length, even through Plex's conversion (an .m3u8): the
+      // Chromecast starts it where asked and says when it ends.
+      audio._loadExtra.castVod = true;
+      if(t.liveCh){
+        var lo = liveOffsetSec(t);
+        if(lo > 3) audio._loadExtra.start = lo;
+        audio._loadExtra.castVideo = true;
       }
     }catch(e){}
     tryPlayUrl(t.uri).then(function(){
       if(!stillWanted()) return;
       var p = videoProgress[t.id];
-      // Build 262: a channel of your own joins the video where the schedule is now (not where
-      // it was last watched).
-      if(t.liveCh) p = t._useVlc ? null : { pos: liveOffsetSec(t), watched: false };
-      if(p && !p.watched && p.pos > (t.liveCh ? 3 : 5) && t.videoKind !== 'music' && !t._useVlc){
+      // Build 262: a channel of your own joins the video where the schedule is now (build 264:
+      // the load starts there, so nothing to seek).
+      if(t.liveCh) p = null;
+      if(p && !p.watched && p.pos > 5 && t.videoKind !== 'music' && !t._useVlc){
         var at = p.pos;
         var seek = function(){ try{ audio.currentTime = at; }catch(e){} audio.removeEventListener('loadedmetadata', seek); };
         if(audio.readyState >= 1) seek(); else audio.addEventListener('loadedmetadata', seek);
@@ -32008,7 +32223,7 @@
     b.addEventListener('click', function(e){
       e.stopPropagation();
       if(rowMenu.classList.contains('open') && rowMenu._anchor === b){ closeRowMenu(); return; }
-      var mo = { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename };
+      var mo = { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename, renameLabel: opts.renameLabel };
       // Build 247: a channel in search results: Add to My Channels, or Remove from My Channels
       // once it's saved (asked when the menu opens, so it follows a change made a moment ago).
       if(opts.channel) mo = channelMenuOpts(opts.channel, withFav);
@@ -32057,6 +32272,7 @@
     rowMenuRemove.style.display = rowMenuOnRemove ? '' : 'none';
     rowMenuOnRename = (opts && opts.onRename) || null;
     rowMenuRename.style.display = rowMenuOnRename ? '' : 'none';
+    rowMenuRename.lastElementChild.textContent = (opts && opts.renameLabel) || 'Rename';
     rowMenuOnAddChannel = (opts && opts.onAddChannel) || null;
     rowMenuAddChannel.style.display = rowMenuOnAddChannel ? '' : 'none';
     rowMenuRemoveLabel.textContent = (opts && opts.removeLabel) || 'Remove';

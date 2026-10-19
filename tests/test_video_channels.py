@@ -181,8 +181,10 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/ch-my.png')
         lbls = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .grid-section-label'),function(l){return l.textContent;}).filter(function(x){return !/^Continue Watching/.test(x);})"
         EDIT = "document.getElementById('videoReorderHeaderBtn').click()"
-        opts = "Array.prototype.map.call(document.querySelectorAll('.ch-sort-opts .home-tab'),function(b){return b.textContent+(b.classList.contains('active')?'*':'');})"
-        pick = "(v)=>document.querySelector('.ch-sort-opts [data-opt='+v+']').click()"
+        # build 264: the added channels' Order is the last of Edit's options (Layout and Your
+        # Channels' Order come first)
+        opts = "(function(){ var a=document.querySelectorAll('.ch-sort-opts'); return a.length ? Array.prototype.map.call(a[a.length-1].querySelectorAll('.home-tab'),function(b){return b.textContent+(b.classList.contains('active')?'*':'');}) : []; })()"
+        pick = "(v)=>{ var a=document.querySelectorAll('.ch-sort-opts'); a[a.length-1].querySelector('[data-opt='+v+']').click(); }"
         names = "Array.prototype.map.call(document.querySelectorAll('#stationsGrid .tile[data-entity=video-channel] .tile-name'),function(n){return n.textContent;})"
         hdr = await pg.evaluate("(()=>{var s=document.getElementById('videoSortHeaderBtn'), r=document.getElementById('videoReorderHeaderBtn');return [getComputedStyle(s).display, r.textContent.trim(), !!document.querySelector('.ch-sort-opts')];})()")
         check(hdr == ['none', 'Edit', False], f'no sort options outside edit mode; the edit button reads Edit {hdr}')
@@ -191,17 +193,17 @@ async def main():
 
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         check(await pg.evaluate(opts) == ['A to Z*', 'Manual'], f'editing shows the order options, A to Z ticked (no category choice with the grid) {await pg.evaluate(opts)}')
-        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile.tile-draggable').length")
+        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .ch-added-list .tile.tile-draggable').length")
         check(drag == 0 and await pg.evaluate(names) == ['ABC News Live', 'BBC News', 'Link One', 'Link Three', 'PBS'], f'in A to Z the list is sorted and nothing drags ({drag})')
         await pg.screenshot(path=f'{SHOTS}/ch-edit-az.png')
         await pg.evaluate(pick, 'manual'); await pg.wait_for_timeout(300)
-        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid > .tile.tile-row.tile-draggable').length")
-        grips = await pg.evaluate("document.querySelectorAll('#stationsGrid .ch-grip').length")
+        drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .ch-added-list > .tile.tile-row.tile-draggable').length")
+        grips = await pg.evaluate("document.querySelectorAll('#stationsGrid .ch-added-list .ch-grip').length")
         check(drag == 5 and grips == 5, f'Manual makes the stacked rows draggable, with grips ({drag}, {grips})')
         check(await pg.evaluate(names) == ['PBS', 'ABC News Live', 'BBC News', 'Link One', 'Link Three'], f'Manual starts from the order kept by hand (here, the order added) {await pg.evaluate(names)}')
         await pg.screenshot(path=f'{SHOTS}/ch-edit-manual.png')
         # Drag Link Three to the top (moving the row is what a drag does), then One List, then Done.
-        await pg.evaluate("(()=>{var g=document.getElementById('stationsGrid'); var t=Array.prototype.find.call(g.querySelectorAll('.tile[data-entity=video-channel]'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}); var first=g.querySelector('.tile[data-entity=video-channel]'); g.insertBefore(t, first);})()")
+        await pg.evaluate("(()=>{var g=document.getElementById('stationsGrid'); var t=Array.prototype.find.call(g.querySelectorAll('.tile[data-entity=video-channel]'),function(x){return x.querySelector('.tile-name').textContent==='Link Three';}); var first=g.querySelector('.tile[data-entity=video-channel]'); first.parentNode.insertBefore(t, first);})()")
         await pg.evaluate(EDIT); await pg.wait_for_timeout(300)
         t = [x['name'] for x in await my_tiles(pg)]
         check(await pg.evaluate(lbls) == [] and t == ['Link Three', 'PBS', 'ABC News Live', 'BBC News', 'Link One'], f'Manual: your dragged order in the grid, no labels {t}')
