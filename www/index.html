@@ -9201,6 +9201,8 @@
     // lastPlayedStation().
     var target = station || currentStation || lastPlayedStation();
     if(!target) return;
+    // Build 262: a channel of your own opens on whatever is playing on it.
+    if(target.liveCh && currentStation && currentStation.liveCh === target.liveCh) target = currentStation;
     var closing = npClosing();
     // Tapped again while it was dropping: bring it back up from where it is.
     if(closing){ clearTimeout(npSheetTimer); npSheetTimer = null; npSheetDone = null; }
@@ -11396,6 +11398,8 @@
   });
   npFavBtn.addEventListener('click', function(){
     var st = npTarget();
+    // Build 262: on one of your own channels the heart is the channel's, not the video's.
+    if(st && st.liveCh){ var lch = findVideoChannel(st.liveCh); if(lch) st = channelToStation(lch); }
     if(st) toggleFavorite(st);
   });
   playerNowTrigger.addEventListener('click', function(){ openNowPlaying(currentStation, true); });
@@ -12231,6 +12235,8 @@
   // are equally available from a browser File and from Android's MediaStore -- so the same
   // IDs survive the eventual port rather than having to be regenerated.
   function favKey(s){
+    // Build 262: one of your own channels, whatever is on it.
+    if(s && s.liveCh) return 'livech:' + s.liveCh;
     if(s && s.type === 'video') return 'video:' + (s.id || s.uri || s.name);
     if(s && s.type === 'local') return s.localId || ('local:' + (s.name || ''));
     // A podcast episode's identity is the feed's own guid -- stable across re-fetching the
@@ -17364,18 +17370,29 @@
   var videoChannelsEditing = false;
 
   function findVideoChannel(url){
+    // Build 262: your own channels (amplify-live:...) are found here too.
+    if(isLiveChUrl(url)) return liveChannelByUrl(url);
     for(var i = 0; i < videoChannels.length; i++) if(videoChannels[i].url === url) return videoChannels[i];
     return null;
   }
   function channelToStation(ch){
-    return {
+    var st = {
       name: ch.name, urlToResolve: ch.url, favicon: ch.logo || '', tags: (ch.cats || []).join(','),
       country: ch.country || '', codec: '', bitrate: '', stationuuid: null, videoChannel: true,
       channel: { id: ch.id || '', name: ch.name || '', url: ch.url, logo: ch.logo || '',
         country: ch.country || '', cats: ch.cats || [], src: ch.src || 'link' }
     };
+    // Build 262: one of your own channels (its poster as its picture; playing it tunes in).
+    if(isLiveChUrl(ch.url)){
+      var lc = liveChannelByUrl(ch.url);
+      st.liveCh = ch.url;
+      st.favicon = (lc && lc.art) || '';
+      if(lc){ st.name = lc.name; st.channel.name = lc.name; }
+    }
+    return st;
   }
   function playChannel(ch){
+    if(ch && isLiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true }); return; }
     var st = channelToStation(ch);
     playStation(st);
     openNowPlaying(st, true);
@@ -17442,7 +17459,7 @@
   }
   // Called from the playback outcome: a channel that failed is marked, one that played is cleared.
   function markChannelWorking(station, ok){
-    if(!station || !station.urlToResolve) return;
+    if(!station || !station.urlToResolve || isLiveChUrl(station.urlToResolve)) return;
     var ch = findVideoChannel(station.urlToResolve);
     if(!ch || !!ch.dead === !ok) return;
     ch.dead = !ok;
@@ -17519,6 +17536,11 @@
     videoSortHeaderBtnEl.style.display = 'none';
     updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing, 'Edit');
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
+    // Build 262: your own channels head the guide even with no channels added.
+    if(!mine.length && !videoChannelsEditing && liveChannels().length){
+      stationsGrid.appendChild(buildEpgGrid(epgAllChannels(mine)));
+      return;
+    }
     if(!mine.length){
       var empty = document.createElement('div');
       empty.className = 'empty-state';
@@ -17555,7 +17577,7 @@
     // Build 243 (Mark's mockups): the guide grid. Channels down the left (favourites first, no
     // headings), half-hour columns across; schedules are fetched in the background and the rows
     // fill in as they arrive.
-    stationsGrid.appendChild(buildEpgGrid(epgChannelOrder(mine)));
+    stationsGrid.appendChild(buildEpgGrid(epgAllChannels(mine)));
     guideRefresh(mine.filter(function(ch){ return !!guideSource(ch); }));
     return;
     var split = splitFavChannels(mine);
@@ -17688,6 +17710,8 @@
   window.addEventListener('scroll', closeChannelSortMenu, { passive: true });
   // Now Playing is in channel mode for a TV channel: one played from Video, or one in My Channels.
   function isNpChannel(st){
+    // Build 262: tuned in to one of your own channels (a video playing as a channel).
+    if(st && st.liveCh) return true;
     if(!st || !isLiveStream(st)) return false;
     var url = st.urlToResolve || st.url_resolved || st.url || '';
     return !!(st.videoChannel || (url && findVideoChannel(url)));
@@ -17722,12 +17746,13 @@
     // Build 243: a channel in My Channels has the guide grid under it (no heading).
     if(findVideoChannel(url)){
       var mineList = visibleVideoChannels();
+      var gridList = epgAllChannels(mineList);
       npCollectionGrid.innerHTML = '';
       npCollectionGrid.classList.remove('np-ch-list');
       npCollection.classList.add('np-epg');
       npCollectionHeading.textContent = '';
-      npCollection.style.display = mineList.length ? '' : 'none';
-      npCollectionGrid.appendChild(buildEpgGrid(epgChannelOrder(mineList), { np: true }));
+      npCollection.style.display = gridList.length ? '' : 'none';
+      npCollectionGrid.appendChild(buildEpgGrid(gridList, { np: true }));
       guideRefresh(mineList.filter(function(ch){ return !!guideSource(ch); }));
       return;
     }
@@ -17782,6 +17807,182 @@
       onRename: saved ? function(){ promptRenameVideoChannel(ch); } : null }));
     return tile;
   }
+  // ---------- Your own channels (build 262) ----------
+  // Shows and movies from the library played as "live" channels, like NostalgiaTV / ErsatzTV:
+  // The Office, MadTV and Seinfeld (from Plex, or the phone), and Movies (the phone's own
+  // movies). A channel's videos are laid end to end from a fixed starting date and repeat, so
+  // the time now always points at one video and a place in it: the guide shows the real
+  // schedule, and tuning in starts that video part-way through, like joining a show already on.
+  // When it ends the next one starts. Nothing runs in the background; the schedule is worked
+  // out from the library whenever it's needed. These viewings don't go to the videos' own
+  // progress (Continue Watching keeps the channel, as for any channel), and they sit at the top
+  // of the Live TV guide (Mark), before the channels added from Add Channels.
+  function liveChDefs(){
+    return [
+      { id: 'office', name: 'The Office', show: 'The Office' },
+      { id: 'madtv', name: 'MADtv', show: 'MadTV' },
+      { id: 'seinfeld', name: 'Seinfeld', show: 'Seinfeld' },
+      { id: 'movies', name: 'Movies', movies: 'phone' }
+    ];
+  }
+  function isLiveChUrl(u){ return typeof u === 'string' && u.indexOf('amplify-live:') === 0; }
+  function liveChEpoch(){ return new Date(2026, 0, 1, 0, 0, 0).getTime(); }
+  var liveChCache = null;
+  function liveChState(){
+    if(typeof videoFiles === 'undefined' || !Array.isArray(videoFiles)) return null;
+    var lib = vlib();
+    if(!liveChCache || liveChCache.lib !== lib) liveChCache = { lib: lib, lineups: {}, chans: null, items: {} };
+    return liveChCache;
+  }
+  // The library's show for a name: the same name, or with "(US)" / a year after it.
+  function liveChShow(lib, name){
+    var want = showKeyOf(name), best = null, rank = 9;
+    lib.shows.forEach(function(s){
+      var k = s.key, r = 9;
+      if(k === want) r = 0;
+      else if(k.indexOf(want) === 0 && /^(us|usa|\d{4}|us\d{4})$/.test(k.slice(want.length))) r = 1;
+      if(r < rank || (r === rank && r < 9 && best && s.episodes.length > best.episodes.length)){ rank = r; best = s; }
+    });
+    return rank < 9 ? best : null;
+  }
+  function liveChHash(s){
+    var h = 2166136261;
+    for(var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  // A channel's videos in order, each with its length (only videos whose length is known).
+  function liveChLineup(def){
+    var st = liveChState();
+    if(!st) return { items: [], starts: [], total: 0, show: null };
+    if(st.lineups[def.id]) return st.lineups[def.id];
+    var lib = st.lib, show = null, items = [];
+    function timed(v){ return (v.duration || 0) > 60; }
+    if(def.show){
+      show = liveChShow(lib, def.show);
+      if(show){
+        // Specials (season 0) only when there's nothing else.
+        items = show.episodes.filter(function(e){ return e.season > 0 && timed(e); });
+        if(!items.length) items = show.episodes.filter(timed);
+      }
+    } else if(def.movies){
+      // The phone's own movies, in a fixed shuffled order (the same every day, so the guide
+      // never moves under you; a movie added later just slots in).
+      items = lib.movies.filter(function(m){ return !m.plex && timed(m); });
+      items.sort(function(a, b){ return (liveChHash(a.id + '|amplify') - liveChHash(b.id + '|amplify')) || (a.id < b.id ? -1 : 1); });
+    }
+    var starts = [], total = 0;
+    items.forEach(function(v){ starts.push(total); total += Math.round(v.duration * 1000); });
+    var lu = { items: items, starts: starts, total: total, show: show };
+    st.lineups[def.id] = lu;
+    return lu;
+  }
+  function liveChDefOf(ch){
+    var id = ch && ch.url ? String(ch.url).slice('amplify-live:'.length) : '';
+    var defs = liveChDefs();
+    for(var i = 0; i < defs.length; i++) if(defs[i].id === id) return defs[i];
+    return null;
+  }
+  // The channels, as My Channels entries; one with nothing to play isn't shown.
+  function liveChannels(){
+    var st = liveChState();
+    if(!st) return [];
+    if(st.chans) return st.chans;
+    st.chans = liveChDefs().map(function(def){
+      var lu = liveChLineup(def);
+      if(!lu.items.length) return null;
+      var art = '';
+      try{ art = lu.show ? showPosterUrl(lu.show) : videoPosterUrl(lu.items[0]); }catch(e){}
+      return { id: 'live:' + def.id, name: lu.show ? lu.show.title : def.name, url: 'amplify-live:' + def.id,
+        logo: '', art: art || '', cats: [], src: 'live', live: true };
+    }).filter(Boolean);
+    return st.chans;
+  }
+  function liveChannelByUrl(url){
+    var list = liveChannels();
+    for(var i = 0; i < list.length; i++) if(list[i].url === url) return list[i];
+    return null;
+  }
+  // What's on a channel at time t: the video, and when it started and ends.
+  function liveChSlot(ch, t){
+    var def = liveChDefOf(ch);
+    var lu = def ? liveChLineup(def) : null;
+    if(!lu || !lu.total) return null;
+    var off = ((t - liveChEpoch()) % lu.total + lu.total) % lu.total;
+    var lo = 0, hi = lu.starts.length - 1;
+    while(lo < hi){
+      var mid = (lo + hi + 1) >> 1;
+      if(lu.starts[mid] <= off) lo = mid; else hi = mid - 1;
+    }
+    var s = t - (off - lu.starts[lo]);
+    var v = lu.items[lo];
+    return { v: v, s: s, e: s + Math.round(v.duration * 1000), i: lo };
+  }
+  // The schedule as guide programs, from an hour back to 13 hours ahead (worked out again each
+  // half hour, or when the library changes).
+  function liveChItems(ch){
+    var st = liveChState();
+    if(!st) return [];
+    var now = Date.now(), from = epgStart(now) - 3600 * 1000, to = from + 14 * 3600 * 1000;
+    var key = ch.url + '|' + from;
+    if(st.items[key]) return st.items[key];
+    var out = [], slot = liveChSlot(ch, from), guard = 0;
+    while(slot && slot.s < to && guard++ < 500){
+      out.push(liveChProgram(st.lib, slot));
+      slot = liveChSlot(ch, slot.e);
+    }
+    st.items[key] = out;
+    return out;
+  }
+  function liveChProgram(lib, slot){
+    var v = slot.v, ep = v.kind === 'episode';
+    var show = ep ? lib.showsByKey[v.showKey] : null;
+    var im = '', sq = '';
+    try{ im = ep ? episodeImageUrl(v) : movieBackdropUrl(v); sq = videoPosterUrl(v); }catch(e){}
+    return { s: slot.s, e: slot.e, t: ep ? (v.epTitle || ('Episode ' + v.episode)) : (v.title || ''),
+      sub: ep ? episodeCode(v) : String(v.year || ''), code: ep ? episodeCode(v) : '',
+      d: trimGuideText(ep ? ((show && show.plexSummary) || '') : (v.summary || ''), 500), r: '',
+      im: im || '', sq: sq || '', raw: true, vid: v.id };
+  }
+  // How far into its video a tuned-in channel should be now (seconds).
+  function liveOffsetSec(t){
+    if(!t || !t._liveItemStart) return 0;
+    var off = (Date.now() - t._liveItemStart) / 1000;
+    var dur = t.duration || 0;
+    if(dur && off > dur - 10) off = Math.max(0, dur - 10);
+    return Math.max(0, off);
+  }
+  // What a tuned-in channel shows under its name: the episode, or the movie.
+  function liveTrackText(t){
+    if(!t) return '';
+    if(t.videoKind === 'episode') return subtitleForVideo(t);
+    return [t.liveTitle, t.year].filter(Boolean).join(' · ');
+  }
+  // Tunes in: plays what's on now from where it is. after: the video that just ended (when
+  // the schedule still says it's on, it ended early, so the next one starts from the top).
+  function tuneLiveChannel(url, opts){
+    opts = opts || {};
+    var ch = liveChannelByUrl(url);
+    if(!ch) return false;
+    var now = Date.now(), slot = liveChSlot(ch, now);
+    if(!slot) return false;
+    if(opts.after && slot.v.id === opts.after){
+      var nx = liveChSlot(ch, slot.e);
+      if(!nx) return false;
+      slot = { v: nx.v, s: now, e: now + Math.round(nx.v.duration * 1000) };
+    }
+    var t = videoToTrack(slot.v);
+    t.liveCh = ch.url;
+    t.urlToResolve = ch.url;
+    t.name = ch.name;
+    if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
+    t._liveItemStart = slot.s;
+    Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
+    playStation(t);
+    if(opts.open) openNowPlaying(t, true);
+    else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
+    return true;
+  }
+
   // ---------- Live TV guide grid (build 243, Mark's mockups) ----------
   // One grid for the Live TV tab and under a playing channel: the channels fixed down the left
   // (logo, a heart for a favourite), then half-hour columns from the half hour we're in, 12 hours
@@ -17795,11 +17996,23 @@
     var split = splitFavChannels(list);
     return split.favs.concat(split.rest);
   }
+  // Build 262: your own channels first, then the added ones in their usual order.
+  function epgAllChannels(list){ return liveChannels().concat(epgChannelOrder(list)); }
   // The programs as half-hour blocks: each start and end moved to the nearest half hour, kept in
   // order without overlapping; one that rounds away to nothing is left out.
   function epgBlocks(ch, t0, t1){
     var out = [], prevEnd = t0;
+    // Build 262: your own channels' videos keep their real times (a 22-minute episode rounded
+    // to half hours would vanish every other time).
+    var exact = isLiveChUrl(ch && ch.url);
     guideItemsFor(ch).slice().sort(function(a, b){ return a.s - b.s; }).forEach(function(it){
+      if(exact){
+        var xs = Math.max(it.s, prevEnd), xe = Math.min(it.e, t1);
+        if(xe - xs < 60000) return;
+        out.push({ s: xs, e: xe, it: it });
+        prevEnd = xe;
+        return;
+      }
       var s = Math.round(it.s / EPG_SLOT_MS) * EPG_SLOT_MS, e = Math.round(it.e / EPG_SLOT_MS) * EPG_SLOT_MS;
       s = Math.max(s, prevEnd);
       e = Math.min(e, t1);
@@ -17815,6 +18028,7 @@
     if(!ch || !guideSource(ch)) return '';
     var it = guideNowNext(ch).now;
     if(!it) return '';
+    if(it.code) return it.code + (it.t ? ' · ' + it.t : '');
     var parts = [];
     if(it.t && alphaSortKey(it.t) !== alphaSortKey(ch.name || '')) parts.push(it.t);
     if(it.sub) parts.push(it.sub);
@@ -18079,7 +18293,7 @@
         try{ localStorage.setItem(CHANNEL_ORDER_KEY, o[0]); }catch(e){}
         saveVideoChannels();
         document.querySelectorAll('.epg').forEach(function(wrap){
-          var fresh = buildEpgGrid(epgChannelOrder(visibleVideoChannels()), wrap._opts || {});
+          var fresh = buildEpgGrid(epgAllChannels(visibleVideoChannels()), wrap._opts || {});
           wrap.parentNode.replaceChild(fresh, wrap);
         });
       });
@@ -18098,9 +18312,12 @@
   // Pluto and Plex give each program pictures and a description. A playing channel shows the
   // picture of what's on beside its name (the picture, the name and the line under it open the
   // details); in the guide grid a later program opens them (what's on now still plays at once).
-  function epgImg(url, w){
+  function epgImg(url, w, raw){
     url = String(url || '');
     if(!url) return '';
+    // Build 262: your own channels' pictures are the library's (the phone's files, or the Plex
+    // server at home over plain http), used as they are.
+    if(raw) return url;
     if(url.charAt(0) === '/'){
       // A Plex path: from its guide server, signed in.
       if(typeof plexSignedIn !== 'function' || !plexSignedIn()) return '';
@@ -18122,7 +18339,7 @@
   function syncNpEpThumb(st){
     var on = st && isNpChannel(st) ? epgNowItem(st) : null;
     var pic = on ? (on.it.sq || on.it.im) : '';   // square (build 250): the square picture first
-    var src = pic ? epgImg(pic, 240) : '';
+    var src = pic ? epgImg(pic, 240, on && on.it.raw) : '';
     var details = npDetailsEl();
     npEpThumb.hidden = !src;
     if(details) details.classList.toggle('np-has-ep', !!src);
@@ -18160,7 +18377,7 @@
       logo.appendChild(li); logo.hidden = false;
     } else logo.hidden = true;
     document.getElementById('epgInfoChannel').textContent = ch.name || '';
-    var pic = document.getElementById('epgInfoPic'), src = epgImg(it.im || it.sq, 960);
+    var pic = document.getElementById('epgInfoPic'), src = epgImg(it.im || it.sq, 960, it.raw);
     pic.hidden = !src;
     pic.classList.toggle('square', !it.im && !!it.sq);
     var pimg = pic.querySelector('img');
@@ -18208,6 +18425,8 @@
   var guideBusy = {}, guideFailedAt = {};
   function guideSource(ch){
     if(!ch || !ch.url) return null;
+    // Build 262: your own channels' schedules are worked out on the phone, nothing to fetch.
+    if(isLiveChUrl(ch.url)) return { kind: 'live', key: 'live:' + ch.url.slice('amplify-live:'.length) };
     if(ch.src === 'pluto' || isPlutoUrl(ch.url)){
       var id = plutoChannelId(ch.url);
       return id ? { kind: 'pluto', key: 'pluto:' + id, id: id } : null;
@@ -18216,6 +18435,7 @@
     return null;
   }
   function guideItemsFor(ch){
+    if(ch && isLiveChUrl(ch.url)) return liveChItems(ch);
     var src = guideSource(ch), c = src && guideCache[src.key];
     return c && Array.isArray(c.items) ? c.items : [];
   }
@@ -18264,6 +18484,7 @@
   }
   function guideNeedsFetch(src){
     var c = guideCache[src.key], now = Date.now();
+    if(src.kind === 'live') return false;
     if(guideBusy[src.key]) return false;
     if(guideFailedAt[src.key] && now - guideFailedAt[src.key] < 10 * 60 * 1000) return false;
     if(!c || !Array.isArray(c.items)) return true;
@@ -18338,7 +18559,7 @@
     var queue = [], seen = {};
     (channels || []).forEach(function(ch){
       var src = guideSource(ch);
-      if(!src || seen[src.key]) return;
+      if(!src || src.kind === 'live' || seen[src.key]) return;
       seen[src.key] = true;
       if(force && !guideBusy[src.key]) delete guideFailedAt[src.key];
       if(force ? !guideBusy[src.key] : guideNeedsFetch(src)) queue.push({ src: src, ch: ch });
@@ -18382,7 +18603,7 @@
     }
   }
   function guideChannelByKey(key){
-    var list = visibleVideoChannels();
+    var list = liveChannels().concat(visibleVideoChannels());
     for(var i = 0; i < list.length; i++){ var src = guideSource(list[i]); if(src && src.key === key) return list[i]; }
     return null;
   }
@@ -18424,7 +18645,7 @@
   function guideChannels(){
     var mine = visibleVideoChannels().filter(function(ch){ return !!guideSource(ch); });
     var split = splitFavChannels(mine);
-    return split.favs.concat(split.rest);
+    return liveChannels().concat(split.favs, split.rest);
   }
   function renderGuidePage(keepScroll){
     if(!onGuideView) return;
@@ -18437,7 +18658,7 @@
       return;
     }
     list.forEach(function(ch){ stationsGrid.appendChild(buildGuideCard(ch)); });
-    var others = visibleVideoChannels().length - list.length;
+    var others = visibleVideoChannels().filter(function(ch){ return !guideSource(ch); }).length;
     if(others > 0){
       var n = document.createElement('div');
       n.className = 'guide-foot';
@@ -21533,13 +21754,20 @@
         audio._loadExtra.engine = 'vlc'; audio._loadExtra.hw = vlcHardware();
         // VLC opens straight at the resume point, rather than starting at 0 and jumping.
         var rp = videoProgress[t.id];
-        if(rp && !rp.watched && rp.pos > 5 && t.videoKind !== 'music') audio._loadExtra.start = rp.pos;
+        if(t.liveCh){
+          // Build 262: a channel of your own opens where the schedule is now.
+          var lo = liveOffsetSec(t);
+          if(lo > 3) audio._loadExtra.start = lo;
+        } else if(rp && !rp.watched && rp.pos > 5 && t.videoKind !== 'music') audio._loadExtra.start = rp.pos;
       }
     }catch(e){}
     tryPlayUrl(t.uri).then(function(){
       if(!stillWanted()) return;
       var p = videoProgress[t.id];
-      if(p && !p.watched && p.pos > 5 && t.videoKind !== 'music' && !t._useVlc){
+      // Build 262: a channel of your own joins the video where the schedule is now (not where
+      // it was last watched).
+      if(t.liveCh) p = t._useVlc ? null : { pos: liveOffsetSec(t), watched: false };
+      if(p && !p.watched && p.pos > (t.liveCh ? 3 : 5) && t.videoKind !== 'music' && !t._useVlc){
         var at = p.pos;
         var seek = function(){ try{ audio.currentTime = at; }catch(e){} audio.removeEventListener('loadedmetadata', seek); };
         if(audio.readyState >= 1) seek(); else audio.addEventListener('loadedmetadata', seek);
@@ -21582,7 +21810,7 @@
   var lastVideoSave = 0;
   function noteVideoPosition(force){
     var t = currentStation;
-    if(!t || !isLocalVideo(t) || attemptInProgress) return;
+    if(!t || !isLocalVideo(t) || attemptInProgress || t.liveCh) return;
     var now = Date.now();
     if(!force && now - lastVideoSave < 4000) return;
     lastVideoSave = now;
@@ -21598,6 +21826,16 @@
   document.addEventListener('visibilitychange', function(){ if(document.hidden){ noteVideoPosition(true); vsave(VIDEO_PROGRESS_KEY, videoProgress); } });
   function onLocalVideoEnded(stopHere){
     var t = currentStation;
+    // Build 262: on one of your own channels the next video comes on (its place in the video
+    // isn't kept, so it stays out of Continue Watching).
+    if(t && t.liveCh){
+      if(t.plex) plexStopSession();
+      if(!stopHere && tuneLiveChannel(t.liveCh, { after: t.id, follow: true })) return;
+      setPlayingUI(false);
+      syncSeekBar();
+      updateMediaSessionState();
+      return;
+    }
     var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
     setVideoProgress(t.id, dur, dur);
     vsave(VIDEO_PROGRESS_KEY, videoProgress);
@@ -26310,6 +26548,7 @@
   var seekDragging = false;
   function npSeekApplies(){
     var st = npTarget();
+    if(st && st.liveCh) return false;   // build 262: a channel of your own is live
     return !!(st && (isLocalTrack(st) || isPodcastTrack(st) || isLocalVideo(st) || isChartSong(st)));
   }
   // Skip back/forward live inside .np-controls now, immediately either side of Play (see the
@@ -26317,7 +26556,7 @@
   // shown or hidden individually rather than through a wrapping container.
   function syncNpPodcastControls(){
     var st = npTarget();
-    var show = !!(st && (isPodcastTrack(st) || isLocalVideo(st)));
+    var show = !!(st && !st.liveCh && (isPodcastTrack(st) || isLocalVideo(st)));
     npSkipBackBtn.style.display = show ? '' : 'none';
     npSkipFwdBtn.style.display = show ? '' : 'none';
     // A video skips 10 seconds either way; a podcast back 15, forward 30.
@@ -30397,7 +30636,7 @@
   // also the one thing you could not tap to reach them. It is the link now.
   function renderNpName(st){
     npName.innerHTML = '';
-    var artist = (isLocalTrack(st) || isChartSong(st)) ? null : stationArtistLink(st);
+    var artist = (isLocalTrack(st) || isChartSong(st) || st.liveCh) ? null : stationArtistLink(st);
     var label = isLocalTrack(st) ? (st.name || '') : stripExclusively(st.name);
     if(isPodcastTrack(st)) label = stripEpisodeNumber(label);
     npName.classList.toggle('np-name-linked', !!artist);
@@ -30420,6 +30659,8 @@
       npSub.appendChild(document.createTextNode((st.artist ? ' \u00b7 ' : '') + '30-Second Preview'));
       return;
     }
+    // Build 262: tuned in to one of your own channels: the episode or movie that's on.
+    if(st.liveCh){ npSub.classList.remove('np-sub-linked'); syncNpEpThumb(st); npSub.textContent = isLocalVideo(st) ? liveTrackText(st) : epgNowText(st); return; }
     if(isLocalVideo(st)){ npSub.classList.remove('np-sub-linked'); npSub.textContent = subtitleForVideo(st); return; }
     npSub.classList.toggle('np-sub-linked', isLocalTrack(st));
     // A podcast episode's subtitle names the show it belongs to -- the same way in as an
@@ -36291,6 +36532,9 @@
   // so a stream keeps the directory click-ping and the .m3u/.pls fallback below while a
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
+    // Build 262: one of your own channels (a favourite, Continue Watching, the hero, the last
+    // thing played): tuned in to what's on it now.
+    if(track && track.liveCh && !track._liveTuned) return tuneLiveChannel(track.liveCh);
     if(isArtistRadio(track)) return playArtistRadio(track);
     if(isPlaylistRadio(track)) return playPlaylistRadio(track);
     if(isCustomStation(track)) return playCustomStation(track);
@@ -36454,6 +36698,7 @@
     updatePlayerMeta(station, barSubFor(station));
     setPlayingUI(true);
     // A video of your own, or a TV channel, goes to Continue Watching, not Continue Listening.
+    if(station.liveCh){ recordChannelWatch(station); return; }   // build 262: the channel, not the video
     if(isLocalVideo(station)){ refreshContinueWatching(); return; }
     if(isNpChannel(station)){ recordChannelWatch(station); return; }
     // A preview (build 225): kept in Continue Listening (and the hero) like anything played; it
@@ -36654,6 +36899,7 @@
     return station && station.country ? displayCountry(station.country) : '';
   }
   function subtitleFor(station){
+    if(station && station.liveCh && isLocalVideo(station)) return liveTrackText(station);   // build 262
     if(isLocalVideo(station)) return subtitleForVideo(station);
     if(isLocalTrack(station)) return subtitleForLocal(station);
     if(isPodcastTrack(station)) return subtitleForPodcast(station);
@@ -36883,6 +37129,8 @@
   }
   function heroRefOf(st){
     if(!st) return null;
+    // Build 262: one of your own channels is kept as the channel.
+    if(st.liveCh){ var lch = findVideoChannel(st.liveCh); if(!lch) return null; st = channelToStation(lch); }
     if(isLocalTrack(st)) return { k: favKey(st), r: 'song', id: favKey(st) };
     if(isLocalVideo(st)) return { k: favKey(st), r: 'video', id: st.id };
     var it = {};
@@ -37497,6 +37745,7 @@
     }
     window.__amplifyCarForYou = function(id){ return carNet.forYou[id] || null; };
     function carStation(s){
+      if(s && s.liveCh) return null;   // build 262: your own channels are video only
       if(!s || trackType(s) !== 'stream' || s.type === 'artist' || s.type === 'album' || s.type === 'playlistRadio' || s.type === 'customStation') return null;
       if(!s.urlToResolve || isBlacklisted(s)) return null;
       var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
