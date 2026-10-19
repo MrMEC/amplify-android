@@ -3965,6 +3965,20 @@
   /* The cover dialog can be opened from on top of another dialog (a custom search's edit
      modal), so it has to stack above the other .settings-overlay panels. */
   #artUrlOverlay{ z-index:502; }
+  /* Build 263: the channel editor. Its list of shows and movies scrolls inside the dialog. */
+  #liveChPanel{ width:min(400px, 100%); max-height:calc(100dvh - 40px); overflow-y:auto; box-sizing:border-box; }
+  .lc-opts{ display:flex; flex-wrap:wrap; gap:6px; }
+  .lc-opts .home-tab{ padding:7px 13px; }
+  .lc-pane[hidden]{ display:none; }
+  .lc-list{ max-height:min(36vh, 300px); margin-top:8px; }
+  .lc-list .artist-info-row{ padding:6px 8px; }
+  .lc-list .artist-info-thumb{ width:32px; height:48px; border-radius:4px; }
+  .lc-list .artist-info-row .fa-check{ visibility:hidden; }
+  .lc-list .artist-info-row[aria-selected="true"] .fa-check{ visibility:visible; }
+  .lc-select{ width:100%; padding:10px 12px; font-size:13px; }
+  .lc-note{ margin:8px 0 0; font-size:12.5px; line-height:1.5; color:var(--text-dim); }
+  .lc-note:empty{ display:none; }
+  .lc-new-btn{ margin:0 0 14px; }
   /* Fix artist info. Each candidate is one row: a small portrait (or a neutral tile), the
      article title, and Wikipedia's one-line description, which is what actually tells a band
      from a blood disorder at a glance. */
@@ -6679,6 +6693,10 @@
                   <button type="button" class="np-menu-item" id="npTracksBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M13 15h4M7 11h2M11 11h6"/></svg><span>Subtitles &amp; Audio</span>
                   </button>
+                  <!-- Build 263: one of your own channels: the video that's on, from its start. -->
+                  <button type="button" class="np-menu-item" id="npLiveRestartBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5v14"/><path class="fill" d="M18 5.5v13L9 12z"/></svg><span>Start from the Beginning</span>
+                  </button>
                   <!-- A Plex video: play the original file, or let Plex convert it (build 132). -->
                   <button type="button" class="np-menu-item" id="npPlexModeBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h12l-3-3M20 16H8l3 3"/></svg><span id="npPlexModeLabel">Let Plex Convert It</span>
@@ -7063,6 +7081,61 @@
     </div>
   </div>
 </div>
+<!-- Build 263: make or change one of your own channels (Live TV, Edit). -->
+<div class="settings-overlay" id="liveChOverlay" role="dialog" aria-modal="true" aria-labelledby="liveChTitle">
+  <div class="settings-panel" id="liveChPanel">
+    <div class="settings-header">
+      <h2 id="liveChTitle">New Channel</h2>
+      <button class="settings-close" id="liveChCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="art-url-body">
+      <div class="cs-field">
+        <label for="liveChName">Name</label>
+        <input type="text" class="cs-field-input" id="liveChName" autocomplete="off" maxlength="60">
+      </div>
+      <div class="cs-field">
+        <label>Picture</label>
+        <div class="cs-cover-row">
+          <button type="button" class="cs-cover-thumb tile-art" id="liveChArtBtn" title="Change picture" aria-label="Change picture"></button>
+          <button type="button" class="art-url-search-btn" id="liveChArtChange">Change</button>
+        </div>
+      </div>
+      <div class="cs-field">
+        <label id="liveChKindLabel">Plays</label>
+        <div class="lc-opts" id="liveChKind" role="radiogroup" aria-labelledby="liveChKindLabel"></div>
+      </div>
+      <div class="cs-field lc-pane" id="liveChPanePick">
+        <input type="search" class="cs-field-input" id="liveChSearch" placeholder="Find shows and movies" autocomplete="off" aria-label="Find shows and movies">
+        <div class="artist-info-list lc-list" id="liveChList" role="listbox" aria-multiselectable="true" aria-label="Shows and movies"></div>
+      </div>
+      <div class="cs-field lc-pane" id="liveChPaneMovies">
+        <label id="liveChFromLabel">From</label>
+        <div class="lc-opts" id="liveChFrom" role="radiogroup" aria-labelledby="liveChFromLabel"></div>
+      </div>
+      <div class="cs-field lc-pane" id="liveChPaneGenre">
+        <label for="liveChGenre">Genre</label>
+        <select class="settings-select lc-select" id="liveChGenre"></select>
+        <p class="lc-note" id="liveChGenreNote" hidden>Genres come from Plex. If none are listed, use Sync Now in Settings, under Plex.</p>
+      </div>
+      <div class="cs-field lc-pane" id="liveChPaneDecade">
+        <label for="liveChDecade">Decade</label>
+        <select class="settings-select lc-select" id="liveChDecade"></select>
+      </div>
+      <div class="cs-field">
+        <label id="liveChOrderLabel">Order</label>
+        <div class="lc-opts" id="liveChOrder" role="radiogroup" aria-labelledby="liveChOrderLabel"></div>
+      </div>
+      <p class="lc-note" id="liveChSummary"></p>
+    </div>
+    <div class="art-url-actions">
+      <button class="art-url-trash-btn" id="liveChDeleteBtn" title="Delete this channel" aria-label="Delete this channel">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+      <button class="art-url-save-btn" id="liveChSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="settings-overlay" id="artUrlOverlay">
   <div class="settings-panel" id="artUrlPanel">
     <div class="settings-header">
@@ -8004,7 +8077,7 @@
   var P = cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer;
   var native = !!(P && typeof P.kvSet === 'function' && typeof P.kvGetAll === 'function');
   var KEYS = ['radioPlayerFavorites', 'radioPlayerFavOrder', 'radioPlayerFavOrderManual', 'radioPlayerFavArtistOrder',
-    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort',
+    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort', 'radioPlayerLiveChannels',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
     'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent'];
@@ -11373,6 +11446,7 @@
     npDeleteBtn.style.display = vidItem ? 'none' : '';
     npPlaylistBtn.style.display = vidItem ? 'none' : '';
     npTagsBtn.style.display = (local && !vidItem) ? '' : 'none';
+    syncNpLiveRestart(st);
     syncNpTracksBtn(st);
     // Next and Previous are meaningless on a station, so they are hidden rather than left
     // sitting there permanently greyed out.
@@ -17531,7 +17605,8 @@
   function renderChannelsTab(){
     videoRefreshHeaderBtnEl.style.display = 'none';
     var mine = visibleVideoChannels();
-    videoReorderHeaderBtnEl.style.display = mine.length > 1 ? '' : 'none';
+    // Build 263: Edit is always there: it's where your own channels are made and changed.
+    videoReorderHeaderBtnEl.style.display = '';
     // Sorting lives in edit mode (Mark: options only while editing), so no Sort button here.
     videoSortHeaderBtnEl.style.display = 'none';
     updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing, 'Edit');
@@ -17541,16 +17616,19 @@
       stationsGrid.appendChild(buildEpgGrid(epgAllChannels(mine)));
       return;
     }
-    if(!mine.length){
+    if(!mine.length && !videoChannelsEditing){
       var empty = document.createElement('div');
       empty.className = 'empty-state';
-      empty.textContent = 'No channels yet. Tap \u201cAdd Channels\u201d to find free TV channels.';
+      empty.textContent = 'No channels yet. Tap \u201cAdd Channels\u201d to find free TV channels, or Edit to make your own.';
       stationsGrid.appendChild(empty);
       return;
     }
-    // Edit mode: the sort options, then one list of everything as stacked rows. In Manual
-    // the rows drag into order; in A to Z there's nothing to drag.
+    // Edit mode: your own channels (build 263), then the sort options and one list of the added
+    // channels as stacked rows. In Manual the rows drag into order; in A to Z there's nothing to drag.
     if(videoChannelsEditing){
+      appendLiveChEditList();
+      if(!mine.length) return;
+      stationsGrid.appendChild(buildChGroupHead('Added Channels'));
       appendChannelSortOptions();
       var manual = channelOrder === 'manual';
       mine.forEach(function(ch){
@@ -17807,23 +17885,55 @@
       onRename: saved ? function(){ promptRenameVideoChannel(ch); } : null }));
     return tile;
   }
-  // ---------- Your own channels (build 262) ----------
-  // Shows and movies from the library played as "live" channels, like NostalgiaTV / ErsatzTV:
-  // The Office, MadTV and Seinfeld (from Plex, or the phone), and Movies (the phone's own
-  // movies). A channel's videos are laid end to end from a fixed starting date and repeat, so
-  // the time now always points at one video and a place in it: the guide shows the real
-  // schedule, and tuning in starts that video part-way through, like joining a show already on.
-  // When it ends the next one starts. Nothing runs in the background; the schedule is worked
-  // out from the library whenever it's needed. These viewings don't go to the videos' own
-  // progress (Continue Watching keeps the channel, as for any channel), and they sit at the top
-  // of the Live TV guide (Mark), before the channels added from Add Channels.
-  function liveChDefs(){
+  // ---------- Your own channels (build 262; editable from build 263) ----------
+  // Shows and movies from the library played as "live" channels, like NostalgiaTV / ErsatzTV.
+  // A channel's videos are laid end to end from a fixed starting date and repeat, so the time
+  // now always points at one video and a place in it: the guide shows the real schedule, and
+  // tuning in starts that video part-way through, like joining a show already on. When it ends
+  // the next one starts. Nothing runs in the background; the schedule is worked out from the
+  // library whenever it's needed. These viewings don't go to the videos' own progress
+  // (Continue Watching keeps the channel), and the channels sit at the top of the Live TV guide
+  // (Mark), before the ones added from Add Channels.
+  // Build 263 (phase 2): the channels are saved (radioPlayerLiveChannels) and made, changed and
+  // deleted in Live TV's Edit. Each one is { id, name ('' = named from what it plays), src,
+  // order }; src is { kind: 'pick', shows: [show names], movies: [video ids] } (shows and
+  // movies picked from the library), { kind: 'movies', from: 'phone' | 'plex' | 'all' },
+  // { kind: 'genre', genre } or { kind: 'decade', decade: 1990 }; order is 'sequence' (each
+  // show's episodes in order, the shows taking turns, movies by year), 'shuffle' (a fixed
+  // shuffle) or 'daily' (a new shuffle each day, fixed for that day, starting at midnight).
+  var LIVE_CH_KEY = 'radioPlayerLiveChannels';
+  var liveChStore = null;
+  function liveChDefaultDefs(){
     return [
-      { id: 'office', name: 'The Office', show: 'The Office' },
-      { id: 'madtv', name: 'MADtv', show: 'MadTV' },
-      { id: 'seinfeld', name: 'Seinfeld', show: 'Seinfeld' },
-      { id: 'movies', name: 'Movies', movies: 'phone' }
+      { id: 'office', name: '', src: { kind: 'pick', shows: ['The Office'], movies: [] }, order: 'sequence' },
+      { id: 'madtv', name: '', src: { kind: 'pick', shows: ['MadTV'], movies: [] }, order: 'sequence' },
+      { id: 'seinfeld', name: '', src: { kind: 'pick', shows: ['Seinfeld'], movies: [] }, order: 'sequence' },
+      { id: 'movies', name: 'Movies', src: { kind: 'movies', from: 'phone' }, order: 'shuffle' }
     ];
+  }
+  function liveChValidDef(d){
+    if(!d || typeof d !== 'object' || !d.id || !d.src || typeof d.src !== 'object') return false;
+    return ['pick', 'movies', 'genre', 'decade'].indexOf(d.src.kind) !== -1;
+  }
+  function liveChDefs(){
+    if(liveChStore) return liveChStore;
+    var v = null;
+    try{ v = JSON.parse(localStorage.getItem(LIVE_CH_KEY) || 'null'); }catch(e){ v = null; }
+    if(!Array.isArray(v)){
+      v = liveChDefaultDefs();
+      try{ localStorage.setItem(LIVE_CH_KEY, JSON.stringify(v)); }catch(e){}
+    }
+    liveChStore = v.filter(liveChValidDef);
+    return liveChStore;
+  }
+  function saveLiveChDefs(){
+    try{ localStorage.setItem(LIVE_CH_KEY, JSON.stringify(liveChDefs())); }catch(e){}
+    liveChCache = null;
+  }
+  function liveChDefById(id){
+    var defs = liveChDefs();
+    for(var i = 0; i < defs.length; i++) if(defs[i].id === id) return defs[i];
+    return null;
   }
   function isLiveChUrl(u){ return typeof u === 'string' && u.indexOf('amplify-live:') === 0; }
   function liveChEpoch(){ return new Date(2026, 0, 1, 0, 0, 0).getTime(); }
@@ -17831,7 +17941,7 @@
   function liveChState(){
     if(typeof videoFiles === 'undefined' || !Array.isArray(videoFiles)) return null;
     var lib = vlib();
-    if(!liveChCache || liveChCache.lib !== lib) liveChCache = { lib: lib, lineups: {}, chans: null, items: {} };
+    if(!liveChCache || liveChCache.lib !== lib) liveChCache = { lib: lib, lineups: {}, items: {}, sets: {} };
     return liveChCache;
   }
   // The library's show for a name: the same name, or with "(US)" / a year after it.
@@ -17850,64 +17960,126 @@
     for(var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return h >>> 0;
   }
+  function liveChTimed(v){ return (v.duration || 0) > 60; }
+  // A show's episodes for a channel: specials (season 0) only when there's nothing else.
+  function liveChEpisodes(s){
+    var eps = s.episodes.filter(function(e){ return e.season > 0 && liveChTimed(e); });
+    return eps.length ? eps : s.episodes.filter(liveChTimed);
+  }
+  function liveChYear(x){ var y = parseInt(x && x.year, 10); return y > 1800 ? y : 0; }
+  function liveChHasGenre(x, g){
+    g = String(g || '').toLowerCase();
+    return !!g && (x.genres || []).some(function(y){ return String(y).toLowerCase() === g; });
+  }
+  // What a channel plays: its shows and its movies (before ordering).
+  function liveChSources(def, lib){
+    var src = def.src || {}, shows = [], movies = [];
+    if(src.kind === 'pick'){
+      var seen = {};
+      (src.shows || []).forEach(function(n){ var s = liveChShow(lib, n); if(s && !seen[s.key]){ seen[s.key] = 1; shows.push(s); } });
+      (src.movies || []).forEach(function(id){ var m = lib.byId[id]; if(m && m.kind === 'movie') movies.push(m); });
+    } else if(src.kind === 'movies'){
+      var from = src.from || 'phone';
+      movies = lib.movies.filter(function(m){
+        return from === 'all' ? true : from === 'plex' ? !!(m.plex || m.plexTwin) : !m.plex;
+      });
+    } else if(src.kind === 'genre'){
+      shows = lib.shows.filter(function(s){ return liveChHasGenre(s, src.genre); });
+      movies = lib.movies.filter(function(m){ return liveChHasGenre(m, src.genre); });
+    } else if(src.kind === 'decade'){
+      var d0 = parseInt(src.decade, 10) || 0;
+      var inDec = function(x){ var y = liveChYear(x); return y && y >= d0 && y < d0 + 10; };
+      shows = lib.shows.filter(inDec);
+      movies = lib.movies.filter(inDec);
+    }
+    return { shows: shows, movies: movies.filter(liveChTimed) };
+  }
+  function liveChShuffled(items, seed){
+    return items.slice().sort(function(a, b){
+      return (liveChHash(a.id + '|' + seed) - liveChHash(b.id + '|' + seed)) || (a.id < b.id ? -1 : 1);
+    });
+  }
+  function liveChDayKey(t){ return guideDate(t); }
+  function liveChDayStart(t){ var d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
   // A channel's videos in order, each with its length (only videos whose length is known).
-  function liveChLineup(def){
+  // day: the date for a daily shuffle ('' otherwise).
+  function liveChLineup(def, day){
     var st = liveChState();
     if(!st) return { items: [], starts: [], total: 0, show: null };
-    if(st.lineups[def.id]) return st.lineups[def.id];
-    var lib = st.lib, show = null, items = [];
-    function timed(v){ return (v.duration || 0) > 60; }
-    if(def.show){
-      show = liveChShow(lib, def.show);
-      if(show){
-        // Specials (season 0) only when there's nothing else.
-        items = show.episodes.filter(function(e){ return e.season > 0 && timed(e); });
-        if(!items.length) items = show.episodes.filter(timed);
+    var key = def.id + '|' + (day || '');
+    if(st.lineups[key]) return st.lineups[key];
+    var lib = st.lib, set = liveChSources(def, lib), items = [];
+    if(def.order === 'shuffle' || def.order === 'daily'){
+      set.shows.forEach(function(s){ items = items.concat(liveChEpisodes(s)); });
+      items = liveChShuffled(items.concat(set.movies), def.id + (def.order === 'daily' ? '|' + day : ''));
+    } else {
+      // In order: the shows take turns (an episode of each, in order), the movies (by year,
+      // then title) taking a turn of their own.
+      var lists = set.shows.map(liveChEpisodes).filter(function(l){ return l.length; });
+      var mv = set.movies.slice().sort(function(a, b){ return (liveChYear(a) - liveChYear(b)) || alphaCompare(alphaSortKey(a.title || ''), alphaSortKey(b.title || '')); });
+      if(mv.length) lists.push(mv);
+      for(var i = 0, more = true; more; i++){
+        more = false;
+        lists.forEach(function(l){ if(i < l.length){ items.push(l[i]); more = true; } });
       }
-    } else if(def.movies){
-      // The phone's own movies, in a fixed shuffled order (the same every day, so the guide
-      // never moves under you; a movie added later just slots in).
-      items = lib.movies.filter(function(m){ return !m.plex && timed(m); });
-      items.sort(function(a, b){ return (liveChHash(a.id + '|amplify') - liveChHash(b.id + '|amplify')) || (a.id < b.id ? -1 : 1); });
     }
     var starts = [], total = 0;
     items.forEach(function(v){ starts.push(total); total += Math.round(v.duration * 1000); });
-    var lu = { items: items, starts: starts, total: total, show: show };
-    st.lineups[def.id] = lu;
+    var lu = { items: items, starts: starts, total: total, show: set.shows.length === 1 && !set.movies.length ? set.shows[0] : null, set: set };
+    st.lineups[key] = lu;
     return lu;
+  }
+  // The name a channel goes by when none is given: the show (or movie), or what it plays.
+  function liveChAutoName(def, set){
+    var src = def.src || {};
+    if(src.kind === 'movies') return 'Movies';
+    if(src.kind === 'genre') return String(src.genre || 'Genre');
+    if(src.kind === 'decade') return (parseInt(src.decade, 10) || 0) + 's';
+    var names = (set ? set.shows.map(function(s){ return s.title; }).concat(set.movies.map(function(m){ return m.title; })) : [])
+      .concat(set ? [] : (src.shows || []));
+    if(!names.length) names = (src.shows || []).slice();
+    if(!names.length) return 'New Channel';
+    if(names.length === 1) return names[0];
+    if(names.length === 2) return names[0] + ' & ' + names[1];
+    return names[0] + ' & More';
   }
   function liveChDefOf(ch){
     var id = ch && ch.url ? String(ch.url).slice('amplify-live:'.length) : '';
-    var defs = liveChDefs();
-    for(var i = 0; i < defs.length; i++) if(defs[i].id === id) return defs[i];
-    return null;
+    return liveChDefById(id);
   }
-  // The channels, as My Channels entries; one with nothing to play isn't shown.
-  function liveChannels(){
-    var st = liveChState();
-    if(!st) return [];
-    if(st.chans) return st.chans;
-    st.chans = liveChDefs().map(function(def){
-      var lu = liveChLineup(def);
-      if(!lu.items.length) return null;
-      var art = '';
-      try{ art = lu.show ? showPosterUrl(lu.show) : videoPosterUrl(lu.items[0]); }catch(e){}
-      return { id: 'live:' + def.id, name: lu.show ? lu.show.title : def.name, url: 'amplify-live:' + def.id,
-        logo: '', art: art || '', cats: [], src: 'live', live: true };
-    }).filter(Boolean);
-    return st.chans;
+  function liveChLineupAt(def, t){ return liveChLineup(def, def.order === 'daily' ? liveChDayKey(t) : ''); }
+  function liveChEntry(def){
+    var lu = liveChLineupAt(def, Date.now());
+    var url = 'amplify-live:' + def.id;
+    var custom = getCustomArtUrl('livech:' + url) || '';
+    var art = custom;
+    if(!art){
+      try{ art = lu.show ? showPosterUrl(lu.show) : (lu.items[0] ? videoPosterUrl(lu.items[0]) : ''); }catch(e){}
+    }
+    return { id: 'live:' + def.id, name: def.name || liveChAutoName(def, lu.set), url: url,
+      logo: custom, art: art || '', cats: [], src: 'live', live: true, empty: !lu.items.length };
+  }
+  // The channels, as My Channels entries; one with nothing to play isn't in the guide.
+  function liveChannels(all){
+    if(!liveChState()) return [];
+    return liveChDefs().map(liveChEntry).filter(function(c){ return all || !c.empty; });
   }
   function liveChannelByUrl(url){
-    var list = liveChannels();
-    for(var i = 0; i < list.length; i++) if(list[i].url === url) return list[i];
-    return null;
+    var def = liveChDefById(String(url || '').slice('amplify-live:'.length));
+    if(!def || !liveChState()) return null;
+    var c = liveChEntry(def);
+    return c.empty ? null : c;
   }
-  // What's on a channel at time t: the video, and when it started and ends.
+  // What's on a channel at time t: the video, and when it started and ends. A daily shuffle
+  // starts again at midnight with the day's order (whatever was on then is cut off).
   function liveChSlot(ch, t){
     var def = liveChDefOf(ch);
-    var lu = def ? liveChLineup(def) : null;
+    if(!def) return null;
+    var daily = def.order === 'daily';
+    var lu = liveChLineupAt(def, t);
     if(!lu || !lu.total) return null;
-    var off = ((t - liveChEpoch()) % lu.total + lu.total) % lu.total;
+    var base = daily ? liveChDayStart(t) : liveChEpoch();
+    var off = ((t - base) % lu.total + lu.total) % lu.total;
     var lo = 0, hi = lu.starts.length - 1;
     while(lo < hi){
       var mid = (lo + hi + 1) >> 1;
@@ -17915,31 +18087,42 @@
     }
     var s = t - (off - lu.starts[lo]);
     var v = lu.items[lo];
-    return { v: v, s: s, e: s + Math.round(v.duration * 1000), i: lo };
+    var e = s + Math.round(v.duration * 1000);
+    if(daily){
+      var next = liveChDayStart(base + 36 * 3600 * 1000);
+      if(e > next) e = next;
+    }
+    return { v: v, s: s, e: e, i: lo };
   }
   // The schedule as guide programs, from an hour back to 13 hours ahead (worked out again each
-  // half hour, or when the library changes).
+  // half hour, or when the library or the channels change).
   function liveChItems(ch){
     var st = liveChState();
     if(!st) return [];
     var now = Date.now(), from = epgStart(now) - 3600 * 1000, to = from + 14 * 3600 * 1000;
     var key = ch.url + '|' + from;
     if(st.items[key]) return st.items[key];
+    var def = liveChDefOf(ch), lu0 = def ? liveChLineupAt(def, from) : null;
+    var multi = !!(lu0 && !lu0.show);
     var out = [], slot = liveChSlot(ch, from), guard = 0;
     while(slot && slot.s < to && guard++ < 500){
-      out.push(liveChProgram(st.lib, slot));
+      out.push(liveChProgram(st.lib, slot, multi));
       slot = liveChSlot(ch, slot.e);
     }
     st.items[key] = out;
     return out;
   }
-  function liveChProgram(lib, slot){
+  function liveChProgram(lib, slot, multi){
     var v = slot.v, ep = v.kind === 'episode';
     var show = ep ? lib.showsByKey[v.showKey] : null;
     var im = '', sq = '';
     try{ im = ep ? episodeImageUrl(v) : movieBackdropUrl(v); sq = videoPosterUrl(v); }catch(e){}
-    return { s: slot.s, e: slot.e, t: ep ? (v.epTitle || ('Episode ' + v.episode)) : (v.title || ''),
-      sub: ep ? episodeCode(v) : String(v.year || ''), code: ep ? episodeCode(v) : '',
+    // A channel of several shows says which show each episode is (the show as the title, the
+    // episode under it).
+    var epName = ep ? (v.epTitle || ('Episode ' + v.episode)) : '';
+    var many = ep && multi;
+    return { s: slot.s, e: slot.e, t: ep ? (many ? (v.show || epName) : epName) : (v.title || ''),
+      sub: ep ? (many ? episodeCode(v) + ' \u00b7 ' + epName : episodeCode(v)) : String(v.year || ''), code: ep && !many ? episodeCode(v) : '',
       d: trimGuideText(ep ? ((show && show.plexSummary) || '') : (v.summary || ''), 500), r: '',
       im: im || '', sq: sq || '', raw: true, vid: v.id };
   }
@@ -17954,7 +18137,7 @@
   // What a tuned-in channel shows under its name: the episode, or the movie.
   function liveTrackText(t){
     if(!t) return '';
-    if(t.videoKind === 'episode') return subtitleForVideo(t);
+    if(t.videoKind === 'episode') return (t.liveShow ? t.liveShow + ' \u00b7 ' : '') + subtitleForVideo(t);
     return [t.liveTitle, t.year].filter(Boolean).join(' · ');
   }
   // Tunes in: plays what's on now from where it is. after: the video that just ended (when
@@ -17975,6 +18158,7 @@
     t.urlToResolve = ch.url;
     t.name = ch.name;
     if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
+    else{ var ldef = liveChDefOf(ch), llu = ldef ? liveChLineupAt(ldef, now) : null; if(llu && !llu.show) t.liveShow = slot.v.show || ''; }
     t._liveItemStart = slot.s;
     Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
     playStation(t);
@@ -17982,6 +18166,299 @@
     else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
     return true;
   }
+
+  // ---------- your own channels: Edit and the channel editor (build 263) ----------
+  // Live TV's Edit lists your own channels first (tap one to change it), with New Channel; the
+  // editor is a dialog: a name (blank = named from what it plays), a picture (the art dialog
+  // every cover uses), what it plays (Shows & Movies picked from the library, All Movies from
+  // the phone, Plex or both, a Genre, or a Decade) and the order (In Order, Shuffle, Daily
+  // Shuffle). Deleting asks first.
+  function liveChKindText(def){
+    var src = def.src || {};
+    var k = src.kind === 'movies' ? 'All movies' + ({ phone: ' on the phone', plex: ' on Plex', all: '' })[src.from || 'phone']
+      : src.kind === 'genre' ? 'Genre: ' + (src.genre || '') : src.kind === 'decade' ? 'The ' + (parseInt(src.decade, 10) || 0) + 's' : 'Shows & movies';
+    return k + ' · ' + ({ sequence: 'In order', shuffle: 'Shuffled', daily: 'Daily shuffle' })[def.order || 'sequence'];
+  }
+  function liveChStationOf(c){
+    return { name: c.name, urlToResolve: c.url, favicon: c.art || '', liveCh: c.url, videoChannel: true, stationuuid: null, tags: '', country: '',
+      channel: { id: c.id, name: c.name, url: c.url, logo: c.logo || '', cats: [], src: 'live' } };
+  }
+  function appendLiveChEditList(){
+    stationsGrid.appendChild(buildChGroupHead('Your Channels'));
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'settings-data-btn lc-new-btn';
+    add.id = 'liveChNewBtn';
+    add.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i><span>New Channel</span>';
+    add.addEventListener('click', function(){ openLiveChEditor(null); });
+    stationsGrid.appendChild(add);
+    liveChannels(true).forEach(function(c){
+      var def = liveChDefOf(c), st = liveChStationOf(c);
+      var row = buildEntityTile({ key: 'livech:' + c.url, entity: 'live-channel', name: c.name, row: true,
+        sub: c.empty ? 'Nothing to play yet' : liveChKindText(def), artFrom: st,
+        onClick: function(){ openLiveChEditor(def.id); } });
+      row.classList.add('ch-item', 'lc-row');
+      row.dataset.liveId = def.id;
+      row.appendChild(buildRowMoreBtn(st, { fav: !c.empty, className: 'row-more-btn',
+        onRename: function(){ openLiveChEditor(def.id); },
+        onRemove: function(){ deleteLiveChannel(def.id); } }));
+      stationsGrid.appendChild(row);
+    });
+  }
+  function deleteLiveChannel(id){
+    var url = 'amplify-live:' + id;
+    liveChStore = liveChDefs().filter(function(d){ return d.id !== id; });
+    saveLiveChDefs();
+    try{ clearCustomArtUrl('livech:' + url); }catch(e){}
+    // Gone from Favorites and Continue Watching too.
+    var favBefore = favorites.length;
+    favorites = favorites.filter(function(f){ return !(f && f.liveCh === url); });
+    if(favorites.length !== favBefore){ saveFavorites(); renderFavoritesList(); }
+    if(channelHistory.some(function(h){ return h.url === url; })){
+      channelHistory = channelHistory.filter(function(h){ return h.url !== url; });
+      vsave(CHANNEL_HISTORY_KEY, channelHistory);
+      refreshContinueWatching();
+    }
+    if(onVideoView) rerenderVideoKeepingScroll();
+  }
+
+  var liveChEd = null;
+  var liveChOverlayEl = document.getElementById('liveChOverlay');
+  function lcEl(id){ return document.getElementById(id); }
+  function lcPills(box, opts, cur, onPick){
+    box.innerHTML = '';
+    opts.forEach(function(o){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'home-tab' + (cur === o[0] ? ' active' : '');
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', cur === o[0] ? 'true' : 'false');
+      b.dataset.opt = o[0];
+      b.textContent = o[1];
+      b.addEventListener('click', function(){ onPick(o[0]); });
+      box.appendChild(b);
+    });
+  }
+  function lcGenres(lib){
+    var seen = {}, out = [];
+    lib.shows.concat(lib.movies).forEach(function(x){
+      (x.genres || []).forEach(function(g){ var k = String(g).toLowerCase(); if(!seen[k]){ seen[k] = 1; out.push(String(g)); } });
+    });
+    return out.sort(function(a, b){ return alphaCompare(alphaSortKey(a), alphaSortKey(b)); });
+  }
+  function lcDecades(lib){
+    var seen = {};
+    lib.shows.concat(lib.movies).forEach(function(x){ var y = liveChYear(x); if(y) seen[Math.floor(y / 10) * 10] = 1; });
+    return Object.keys(seen).map(Number).sort(function(a, b){ return a - b; });
+  }
+  function openLiveChEditor(id){
+    var def = id ? liveChDefById(id) : null;
+    liveChEd = def ? { id: def.id, isNew: false, name: def.name || '', src: JSON.parse(JSON.stringify(def.src)), order: def.order || 'sequence' }
+      : { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), isNew: true, name: '', src: { kind: 'pick', shows: [], movies: [] }, order: 'sequence' };
+    lcEl('liveChTitle').textContent = def ? 'Edit Channel' : 'New Channel';
+    lcEl('liveChName').value = liveChEd.name;
+    lcEl('liveChSearch').value = '';
+    lcEl('liveChDeleteBtn').style.visibility = def ? '' : 'hidden';
+    renderLiveChEditor();
+    liveChOverlayEl.classList.add('open');
+    lcEl('liveChPanel').scrollTop = 0;
+    lcEl('liveChList').scrollTop = 0;
+  }
+  function closeLiveChEditor(saved){
+    if(!liveChEd) return;
+    // A new channel that wasn't saved leaves no picture behind.
+    if(!saved && liveChEd.isNew){ try{ clearCustomArtUrl('livech:amplify-live:' + liveChEd.id); }catch(e){} }
+    liveChEd = null;
+    liveChOverlayEl.classList.remove('open');
+  }
+  // The editor's channel as it stands (what Save would keep).
+  function liveChEdDef(){
+    var src = liveChEd.src, out = { kind: src.kind };
+    if(src.kind === 'pick'){ out.shows = (src.shows || []).slice(); out.movies = (src.movies || []).slice(); }
+    else if(src.kind === 'movies') out.from = src.from || 'phone';
+    else if(src.kind === 'genre') out.genre = src.genre || '';
+    else if(src.kind === 'decade') out.decade = parseInt(src.decade, 10) || 0;
+    return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order };
+  }
+  function renderLiveChEditor(){
+    var ed = liveChEd, lib = vlib(), src = ed.src;
+    lcPills(lcEl('liveChKind'), [['pick', 'Shows & Movies'], ['movies', 'All Movies'], ['genre', 'Genre'], ['decade', 'Decade']], src.kind, function(k){
+      if(k === src.kind) return;
+      ed.src = k === 'pick' ? { kind: 'pick', shows: [], movies: [] } : k === 'movies' ? { kind: 'movies', from: 'phone' }
+        : k === 'genre' ? { kind: 'genre', genre: lcGenres(vlib())[0] || '' } : { kind: 'decade', decade: lcDecades(vlib())[0] || 1990 };
+      renderLiveChEditor();
+    });
+    lcEl('liveChPanePick').hidden = src.kind !== 'pick';
+    lcEl('liveChPaneMovies').hidden = src.kind !== 'movies';
+    lcEl('liveChPaneGenre').hidden = src.kind !== 'genre';
+    lcEl('liveChPaneDecade').hidden = src.kind !== 'decade';
+    if(src.kind === 'pick') renderLiveChPickList();
+    if(src.kind === 'movies') lcPills(lcEl('liveChFrom'), [['phone', 'Phone'], ['plex', 'Plex'], ['all', 'Both']], src.from || 'phone', function(v){ src.from = v; renderLiveChEditor(); });
+    if(src.kind === 'genre'){
+      var gs = lcGenres(lib), gsel = lcEl('liveChGenre');
+      gsel.innerHTML = '';
+      gs.forEach(function(g){ var o = document.createElement('option'); o.value = g; o.textContent = g; gsel.appendChild(o); });
+      if(src.genre && gs.indexOf(src.genre) === -1){ var o2 = document.createElement('option'); o2.value = src.genre; o2.textContent = src.genre; gsel.appendChild(o2); }
+      gsel.value = src.genre || '';
+      gsel.disabled = !gs.length && !src.genre;
+      lcEl('liveChGenreNote').hidden = gs.length > 0;
+    }
+    if(src.kind === 'decade'){
+      var ds = lcDecades(lib), dsel = lcEl('liveChDecade');
+      if(src.decade && ds.indexOf(src.decade) === -1){ ds.push(src.decade); ds.sort(function(a, b){ return a - b; }); }
+      dsel.innerHTML = '';
+      ds.forEach(function(d){ var o = document.createElement('option'); o.value = String(d); o.textContent = 'The ' + d + 's'; dsel.appendChild(o); });
+      dsel.value = String(src.decade || '');
+    }
+    lcPills(lcEl('liveChOrder'), [['sequence', 'In Order'], ['shuffle', 'Shuffle'], ['daily', 'Daily Shuffle']], ed.order, function(v){ ed.order = v; renderLiveChEditor(); });
+    syncLiveChEditorBits();
+  }
+  // The name's hint, the picture, what the channel would hold, and whether Save is ready.
+  function syncLiveChEditorBits(){
+    var ed = liveChEd, lib = vlib(), d = liveChEdDef();
+    var set = liveChSources(d, lib);
+    lcEl('liveChName').placeholder = liveChAutoName(d, set);
+    var nShows = set.shows.length, nMovies = set.movies.length, secs = 0;
+    set.shows.forEach(function(s){ liveChEpisodes(s).forEach(function(e){ secs += e.duration || 0; }); });
+    set.movies.forEach(function(m){ secs += m.duration || 0; });
+    var bits = [];
+    if(nShows) bits.push(nShows + (nShows === 1 ? ' show' : ' shows'));
+    if(nMovies) bits.push(nMovies + (nMovies === 1 ? ' movie' : ' movies'));
+    var hrs = Math.round(secs / 3600);
+    lcEl('liveChSummary').textContent = !secs
+      ? (d.src.kind === 'pick' ? 'Pick the shows and movies it plays.' : 'Nothing in your library fits this yet.')
+      : bits.join(' and ') + ', ' + (hrs >= 1 ? 'about ' + hrs + (hrs === 1 ? ' hour' : ' hours') : 'under an hour') + ' before it repeats.';
+    lcEl('liveChSaveBtn').disabled = !secs;
+    // The picture: the one chosen, else the first show's or movie's poster.
+    var thumb = lcEl('liveChArtBtn'), url = getCustomArtUrl('livech:amplify-live:' + ed.id) || '';
+    if(!url){ try{ url = set.shows[0] ? showPosterUrl(set.shows[0]) : (set.movies[0] ? videoPosterUrl(set.movies[0]) : ''); }catch(e){ url = ''; } }
+    if(thumb.dataset.src !== url){
+      thumb.dataset.src = url;
+      thumb.innerHTML = '';
+      if(url){ var im = document.createElement('img'); im.alt = ''; im.src = url; im.onerror = function(){ im.remove(); }; thumb.appendChild(im); }
+    }
+  }
+  function renderLiveChPickList(){
+    var ed = liveChEd, lib = vlib(), box = lcEl('liveChList');
+    var q = alphaSortKey(String(lcEl('liveChSearch').value || '').trim());
+    var chosenShows = {}, chosenMovies = {};
+    (ed.src.shows || []).forEach(function(n){ var s = liveChShow(lib, n); if(s) chosenShows[s.key] = n; });
+    (ed.src.movies || []).forEach(function(id){ chosenMovies[id] = 1; });
+    var shows = lib.shows.slice().sort(function(a, b){ return alphaCompare(alphaSortKey(a.title), alphaSortKey(b.title)); });
+    var movies = lib.movies.slice().sort(function(a, b){ return alphaCompare(alphaSortKey(a.title || ''), alphaSortKey(b.title || '')); });
+    function match(t){ return !q || alphaSortKey(t || '').indexOf(q) !== -1; }
+    box.innerHTML = '';
+    function row(name, desc, pic, on, toggle){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'artist-info-row';
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      var th;
+      if(pic){ th = document.createElement('img'); th.loading = 'lazy'; th.alt = ''; th.src = pic; th.onerror = function(){ th.removeAttribute('src'); }; }
+      else th = document.createElement('span');
+      th.className = 'artist-info-thumb';
+      b.appendChild(th);
+      var tx = document.createElement('span');
+      tx.className = 'artist-info-text';
+      var nm = document.createElement('span'); nm.className = 'artist-info-name'; nm.textContent = name;
+      var ds = document.createElement('span'); ds.className = 'artist-info-desc'; ds.textContent = desc;
+      tx.appendChild(nm); tx.appendChild(ds);
+      b.appendChild(tx);
+      var ck = document.createElement('i'); ck.className = 'fa-solid fa-check'; ck.setAttribute('aria-hidden', 'true');
+      b.appendChild(ck);
+      b.addEventListener('click', function(){
+        var now = toggle();
+        b.setAttribute('aria-selected', now ? 'true' : 'false');
+        syncLiveChEditorBits();
+      });
+      box.appendChild(b);
+    }
+    var n = 0;
+    shows.forEach(function(s){
+      if(!match(s.title)) return;
+      n++;
+      var eps = s.episodes.length, pic = '';
+      try{ pic = showPosterUrl(s); }catch(e){}
+      row(s.title, 'TV show · ' + eps + (eps === 1 ? ' episode' : ' episodes'), pic, !!chosenShows[s.key], function(){
+        var list = ed.src.shows || (ed.src.shows = []);
+        if(chosenShows[s.key]){
+          var was = chosenShows[s.key];
+          ed.src.shows = list.filter(function(x){ return x !== was; });
+          delete chosenShows[s.key];
+          return false;
+        }
+        list.push(s.title); chosenShows[s.key] = s.title;
+        return true;
+      });
+    });
+    movies.forEach(function(m){
+      if(!match(m.title)) return;
+      n++;
+      var pic = '';
+      try{ pic = videoPosterUrl(m); }catch(e){}
+      row(m.title || 'Movie', ['Movie', m.year, m.plex ? 'Plex' : ''].filter(Boolean).join(' · '), pic, !!chosenMovies[m.id], function(){
+        var list = ed.src.movies || (ed.src.movies = []);
+        if(chosenMovies[m.id]){ ed.src.movies = list.filter(function(x){ return x !== m.id; }); delete chosenMovies[m.id]; return false; }
+        list.push(m.id); chosenMovies[m.id] = 1;
+        return true;
+      });
+    });
+    if(!n){
+      var e = document.createElement('div');
+      e.className = 'artist-info-empty';
+      e.textContent = (lib.shows.length || lib.movies.length) ? 'Nothing matches that.' : 'Your shows and movies show up here once they’re in Watch (from Plex or a folder on the phone).';
+      box.appendChild(e);
+    }
+  }
+  lcEl('liveChSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChPickList(); });
+  lcEl('liveChName').addEventListener('input', function(){ if(liveChEd) liveChEd.name = lcEl('liveChName').value; });
+  lcEl('liveChGenre').addEventListener('change', function(){ if(liveChEd){ liveChEd.src.genre = lcEl('liveChGenre').value; syncLiveChEditorBits(); } });
+  lcEl('liveChDecade').addEventListener('change', function(){ if(liveChEd){ liveChEd.src.decade = parseInt(lcEl('liveChDecade').value, 10) || 0; syncLiveChEditorBits(); } });
+  function liveChChangePicture(){
+    if(!liveChEd) return;
+    var d = liveChEdDef();
+    openArtUrlDialogFor({ key: 'livech:amplify-live:' + d.id, title: 'Channel Picture', name: (d.name || liveChAutoName(d, liveChSources(d, vlib()))) + ' TV',
+      refresh: function(){ if(liveChEd){ lcEl('liveChArtBtn').dataset.src = '-'; syncLiveChEditorBits(); } if(onVideoView) rerenderVideoKeepingScroll(); } });
+  }
+  lcEl('liveChArtBtn').addEventListener('click', liveChChangePicture);
+  lcEl('liveChArtChange').addEventListener('click', liveChChangePicture);
+  lcEl('liveChCloseBtn').addEventListener('click', function(){ closeLiveChEditor(false); });
+  liveChOverlayEl.addEventListener('click', function(e){ if(e.target === liveChOverlayEl) closeLiveChEditor(false); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && liveChEd && liveChOverlayEl.classList.contains('open') && !document.querySelector('#artUrlOverlay.open, #confirmOverlay.open')){
+      e.stopImmediatePropagation(); closeLiveChEditor(false);
+    }
+  }, true);
+  lcEl('liveChSaveBtn').addEventListener('click', function(){
+    if(!liveChEd || lcEl('liveChSaveBtn').disabled) return;
+    var d = liveChEdDef(), cur = liveChDefById(d.id);
+    if(cur){ cur.name = d.name; cur.src = d.src; cur.order = d.order; }
+    else liveChDefs().push(d);
+    saveLiveChDefs();
+    closeLiveChEditor(true);
+    if(onVideoView) rerenderVideoKeepingScroll();
+    try{ var st = npTarget(); if(st && isNpChannel(st) && nowPlayingScreen.style.display === 'flex') renderNpChannels(st); }catch(e){}
+  });
+  lcEl('liveChDeleteBtn').addEventListener('click', function(){
+    if(!liveChEd || liveChEd.isNew) return;
+    var d = liveChEdDef(), name = d.name || liveChAutoName(d, liveChSources(d, vlib()));
+    confirmThen({ title: 'Delete ' + quoteName(name) + '?', message: 'It goes from Live TV. The shows and movies stay in your library.', ok: 'Delete' }, function(){
+      var id = liveChEd ? liveChEd.id : d.id;
+      closeLiveChEditor(true);
+      deleteLiveChannel(id);
+    });
+  });
+  // Now Playing's menu: the video that's on, from its start (the channel then carries on from it).
+  var npLiveRestartBtn = document.getElementById('npLiveRestartBtn');
+  function syncNpLiveRestart(st){ npLiveRestartBtn.style.display = st && st.liveCh && isLocalVideo(st) ? '' : 'none'; }
+  npLiveRestartBtn.addEventListener('click', function(){
+    closeNpMenu();
+    var st = npTarget();
+    if(!st || !st.liveCh || !npIsCurrent()) return;
+    try{ audio.currentTime = 0; }catch(e){}
+    if(audio.paused) togglePlayPause();
+  });
 
   // ---------- Live TV guide grid (build 243, Mark's mockups) ----------
   // One grid for the Live TV tab and under a playing channel: the channels fixed down the left
@@ -19232,6 +19709,17 @@
   }
 
   // Backup: channels go into Export and come back with Import (matched by stream link).
+  // Build 263: your own channels from a backup; one already here (the same id) is kept as it is.
+  function importLiveChannels(list){
+    var n = 0;
+    (Array.isArray(list) ? list : []).forEach(function(d){
+      if(!liveChValidDef(d) || liveChDefById(d.id)) return;
+      liveChDefs().push({ id: String(d.id), name: String(d.name || ''), src: d.src, order: ['sequence', 'shuffle', 'daily'].indexOf(d.order) !== -1 ? d.order : 'sequence' });
+      n++;
+    });
+    if(n){ saveLiveChDefs(); if(typeof refreshVideoPages === 'function') refreshVideoPages(); }
+    return n;
+  }
   function importVideoChannels(list){
     var n = 0;
     (Array.isArray(list) ? list : []).forEach(function(c){ if(c && c.url && addVideoChannel(c)) n++; });
@@ -20227,10 +20715,14 @@
   function plexMovieRec(m){
     var pp = plexPart(m);
     return plexWatchBits(m, { k: String(m.ratingKey), t: m.title || '', y: m.year ? String(m.year) : '', s: String(m.summary || '').slice(0, 1500),
-      th: m.thumb || '', a: m.art || '', p: pp.p, w: pp.w, h: pp.h, f: pp.f });
+      th: m.thumb || '', a: m.art || '', p: pp.p, w: pp.w, h: pp.h, f: pp.f, g: plexGenres(m) });
   }
   function plexShowRec(x){
-    return { k: String(x.ratingKey), t: x.title || '', y: x.year ? String(x.year) : '', s: String(x.summary || '').slice(0, 1500), th: x.thumb || '', a: x.art || '' };
+    return { k: String(x.ratingKey), t: x.title || '', y: x.year ? String(x.year) : '', s: String(x.summary || '').slice(0, 1500), th: x.thumb || '', a: x.art || '', g: plexGenres(x) };
+  }
+  // Build 263: a title's genres (for genre channels), as Plex tags them.
+  function plexGenres(m){
+    return (Array.isArray(m && m.Genre) ? m.Genre : []).map(function(g){ return String((g && g.tag) || '').trim(); }).filter(Boolean).slice(0, 6);
   }
   function plexEpRec(e){
     var pp = plexPart(e);
@@ -20256,7 +20748,7 @@
       return plexApi('/library/sections');
     }).then(function(d){
       var dirs = ((d && d.MediaContainer) || {}).Directory || [];
-      var lib = { serverId: s.id, at: Date.now(), movies: [], shows: [], episodes: [], sections: [] };
+      var lib = { serverId: s.id, at: Date.now(), movies: [], shows: [], episodes: [], sections: [], gv: 1 };
       var chain = Promise.resolve();
       // Every movie and show library is fetched and tagged with its section, so a library
       // switched off in Settings (build 131) leaves Video at once and comes back without a sync.
@@ -20366,7 +20858,7 @@
     movies.forEach(function(m){ localMovie[showKeyOf(m.title) + '|' + (m.year || '')] = m; });
     // A title both on the phone and on Plex shows once, the phone's copy; it remembers its Plex
     // twin (build 133), so a format the phone can't decode is played through Plex's conversion.
-    function twin(local, r){ if(local && !local.plex && !local.plexKey){ local.plexTwin = true; local.plexKey = r.k; local.plexPart = r.p; } }
+    function twin(local, r){ if(local && !local.plex && !local.plexKey){ local.plexTwin = true; local.plexKey = r.k; local.plexPart = r.p; if(r.g && !(local.genres && local.genres.length)) local.genres = r.g; } }
     plexLib.movies.forEach(function(r){
       if(!r.p || !plexIncluded(r)) return;
       var lm = localMovie[showKeyOf(r.t) + '|' + (r.y || '')];
@@ -20375,7 +20867,7 @@
       var item = { type: 'video', id: id, uri: plexMediaUrl(r.p), fileName: r.f || r.t, relPath: '', size: 0,
         addedAt: (r.ad || 0) * 1000, duration: r.d || 0, width: r.w || 0, height: r.h || 0, still: '', subs: [],
         plex: true, plexKey: r.k, plexPart: r.p, summary: r.s || '',
-        kind: 'movie', title: ed.title || r.t, year: ed.year != null ? ed.year : (r.y || ''),
+        kind: 'movie', title: ed.title || r.t, year: ed.year != null ? ed.year : (r.y || ''), genres: r.g || [],
         poster: plexImg(r.th, 400, 600), backdrop: plexImg(r.a, 1280, 720) };
       movies.push(item);
       byId[id] = item;
@@ -20398,6 +20890,8 @@
       if(!s.poster && sr.th) s.poster = plexImg(sr.th, 400, 600);
       if(!s.backdrop && sr.a) s.backdrop = plexImg(sr.a, 1280, 720);
       if(!s.plexSummary && sr.s) s.plexSummary = sr.s;
+      if(!s.year && sr.y) s.year = sr.y;
+      if(!(s.genres && s.genres.length) && sr.g && sr.g.length) s.genres = sr.g;
       var id = plexId(r.k), ed = videoEdits[id] || {};
       var item = { type: 'video', id: id, uri: plexMediaUrl(r.p), fileName: r.f || r.t, relPath: '', size: 0,
         addedAt: (r.ad || 0) * 1000, duration: r.d || 0, width: r.w || 0, height: r.h || 0, still: '',
@@ -20670,7 +21164,8 @@
     if(!plexServer()) return;
     plexLibReady.then(function(){ return plexConnect(); }).then(function(){
       invalidateVideoLib();
-      if(!plexLib || !plexLib.sections || plexLib.serverId !== plexServer().id || Date.now() - (plexLib.at || 0) > PLEX_STALE_MS) return plexSync({ quiet: true });
+      // Build 263: a library saved before genres were kept is synced again once (genre channels).
+      if(!plexLib || !plexLib.sections || plexLib.serverId !== plexServer().id || Date.now() - (plexLib.at || 0) > PLEX_STALE_MS || !plexLib.gv) return plexSync({ quiet: true });
       plexMergeProgress();
       renderPlexSettings();
       refreshVideoPages();
@@ -36145,7 +36640,7 @@
 
   // ---------- export / import (favorites, recent stations, custom cover art, custom searches) ----------
   // What a backup holds, for the Export dialog.
-  var EXPORT_CONTENTS_NOTE = 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions, podcast categories & video channels are all in it.';
+  var EXPORT_CONTENTS_NOTE = 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions, podcast categories, video channels & your own channels are all in it.';
   exportFavBtn.addEventListener('click', function(){
     var payload = {
       favorites: favorites,
@@ -36158,6 +36653,7 @@
       podcastSubscriptions: podcastSubs,
       podcastCategories: podcastCategories,
       videoChannels: videoChannels,
+      liveChannels: liveChDefs(),
       videoLibrary: exportVideoLibrary(),
       exportedAt: new Date().toISOString()
     };
@@ -36299,7 +36795,7 @@
           carryCover('foryouart:', s.id, match.id);
         });
         if(searchAdded) saveCustomSearches();
-        var channelsAdded = importVideoChannels(data.videoChannels);
+        var channelsAdded = importVideoChannels(data.videoChannels) + importLiveChannels(data.liveChannels);
         importVideoLibrary(data.videoLibrary);
 
         // Playlists are matched by name (case-insensitive): a name that doesn't exist here
