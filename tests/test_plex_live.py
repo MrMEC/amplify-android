@@ -91,7 +91,8 @@ async def main():
         await pg.goto('http://127.0.0.1:8806/index.html'); await pg.wait_for_timeout(2000)
         await open_add(pg)
         t = await pg.evaluate(TABS)
-        check('Plex' not in t and not LOG['list'], f'signed out: no Plex tab and Plex not asked {t}')
+        pb = await pg.evaluate("!!document.getElementById('addChPlexBtn')")
+        check(pb and not LOG['list'], f'signed out: only the sign-in Plex button (build 268), Plex not asked {t}')
 
         # ---- signed in ----
         await ctx.add_init_script(SIGNED_IN)
@@ -178,7 +179,8 @@ async def main():
         await pg.reload(); await pg.wait_for_timeout(2000)
         await open_add(pg)
         t = await pg.evaluate(TABS)
-        check('Plex' not in t, f'signed out again: no Plex tab {t}')
+        pb = await pg.evaluate("!!document.getElementById('addChPlexBtn')")
+        check(pb, f'signed out again: the sign-in Plex button, not the tab {t}')
 
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
