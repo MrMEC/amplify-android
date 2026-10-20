@@ -782,17 +782,21 @@
   }
   /* Build 258 (Mark): Playlists on Home the same way -- two rows, one scroller, both rows move
      together, playlist covers' width. Build 259: Favorites too (its cards keep their own
-     width); Top Artists went back to its single row of portraits. */
+     width); Top Artists went back to its single row of portraits. Build 265: Top 100 too
+     (1 over 2, 3 over 4, ...). */
   body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile),
+  body.home-stacked .home-row > #top100HomeGrid:has(> .tile),
   body.home-stacked .home-row > #favoritesGrid:has(> .tile){
     display:grid; grid-auto-flow:column; grid-template-rows:repeat(2, auto); grid-template-columns:none;
     grid-auto-columns:150px; justify-content:start; align-items:start; gap:22px 16px;
   }
   body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile) > .tile,
+  body.home-stacked .home-row > #top100HomeGrid:has(> .tile) > .tile,
   body.home-stacked .home-row > #favoritesGrid:has(> .tile) > .tile{ width:auto; min-width:0; }
   body.home-stacked .home-row > #favoritesGrid:has(> .tile){ grid-auto-columns:226px; gap:16px 16px; }
   @media (max-width: 900px){
     body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile),
+    body.home-stacked .home-row > #top100HomeGrid:has(> .tile),
     body.home-stacked .home-row > #favoritesGrid:has(> .tile){ grid-auto-columns:min(132px, calc((100vw - 46px - 32px) / 2.35)); }
   }
 
@@ -1363,6 +1367,49 @@
   .confirm-actions button{ flex:1; min-height:44px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
   .confirm-cancel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); }
   .confirm-ok{ background:var(--danger); color:#fff; border:1px solid var(--danger); }
+  /* ---------- Tour (build 265) ---------- */
+  /* The welcome tour: one card in the dialogs' style (.confirm-panel), stepping through the
+     main features. When a step's feature is on screen (a tab, the menu button, the mini
+     player) a ring picks it out and everything else dims; otherwise the whole page dims. */
+  .tour-overlay{ display:none; position:fixed; inset:0; z-index:5040; background:rgba(0,0,0,.6);
+    align-items:center; justify-content:center; padding:24px 20px;
+    padding-top:max(24px, env(safe-area-inset-top)); padding-bottom:max(24px, env(safe-area-inset-bottom)); }
+  .tour-overlay.open{ display:flex; }
+  .tour-overlay.spotlit{ background:transparent; }
+  .tour-spot{ position:fixed; display:none; border-radius:14px; pointer-events:none;
+    box-shadow:0 0 0 3px var(--accent), 0 0 0 9999px rgba(0,0,0,.6);
+    transition:left .3s ease, top .3s ease, width .3s ease, height .3s ease; }
+  .tour-overlay.spotlit .tour-spot{ display:block; }
+  .tour-panel{ position:relative; width:min(360px, 100%); max-height:100%; overflow-y:auto; overscroll-behavior:contain;
+    padding:18px 20px 16px; display:flex; flex-direction:column; }
+  .tour-top{ display:flex; align-items:center; justify-content:space-between; margin:0 -6px 10px 0; }
+  .tour-count{ font-size:12.5px; font-weight:700; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .tour-close{ width:40px; height:40px; margin:-8px -8px -8px 0; border:0; border-radius:50%; background:none;
+    color:var(--text-dim); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+  .tour-close svg, .tour-icon svg{ fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; }
+  .tour-close svg{ width:20px; height:20px; stroke-width:2.2; }
+  .tour-icon{ width:56px; height:56px; border-radius:16px; background:var(--accent); color:var(--accent-text);
+    display:flex; align-items:center; justify-content:center; margin:0 0 14px; flex-shrink:0; }
+  .tour-icon svg{ width:30px; height:30px; stroke-width:1.9; }
+  .tour-panel .confirm-title{ margin-bottom:6px; }
+  .tour-msg{ margin:0 0 16px; font-size:14.5px; line-height:1.5; color:var(--text-dim); }
+  .tour-body{ animation:tourIn .28s ease; }
+  @keyframes tourIn{ from{ opacity:0; transform:translateX(14px); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){ .tour-body{ animation:none; } .tour-spot{ transition:none; } }
+  .tour-choice{ margin:-4px 0 16px; padding:12px; border-radius:12px; background:var(--panel-2); border:1px solid var(--border); }
+  .tour-choice-q{ margin:0 0 10px; font-size:13.5px; font-weight:700; color:var(--text); line-height:1.35; }
+  .tour-choice-opts{ display:flex; gap:8px; }
+  .tour-choice-opts button{ flex:1; min-height:40px; border-radius:10px; border:1px solid var(--border); background:var(--panel);
+    color:var(--text); font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .tour-choice-opts button.on{ background:var(--accent); border-color:var(--accent); color:var(--accent-text); }
+  .tour-dots{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:0 0 14px; }
+  .tour-dot{ width:6px; height:6px; border-radius:3px; background:var(--border); transition:width .2s ease, background .2s ease; }
+  .tour-dot.on{ width:18px; background:var(--accent); }
+  .tour-actions button{ min-height:44px; }
+  .tour-actions .confirm-cancel:disabled{ opacity:.4; cursor:default; }
+  .tour-never{ align-self:center; margin:12px 0 0; padding:6px 10px; border:0; background:none; color:var(--text-dim);
+    font:inherit; font-size:13px; font-weight:600; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  .tour-never[hidden]{ display:none; }
   /* ---------- Sleep timer (build 230) ---------- */
   #npSleepBtn{ white-space:nowrap; }
   /* The menu is a dark panel in both themes on Now Playing, so the time left follows its text. */
@@ -6890,6 +6937,28 @@
   </button>
 </nav>
 
+<!-- Build 265: the welcome tour (see the Tour module). -->
+<div class="tour-overlay" id="tourOverlay" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourMsg">
+  <div class="tour-spot" id="tourSpot"></div>
+  <div class="confirm-panel tour-panel" id="tourPanel">
+    <div class="tour-top">
+      <span class="tour-count" id="tourCount"></span>
+      <button type="button" class="tour-close" id="tourClose" aria-label="Close the tour" title="Close"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="tour-body" id="tourBody">
+      <div class="tour-icon" id="tourIcon"></div>
+      <h2 class="confirm-title" id="tourTitle"></h2>
+      <p class="tour-msg" id="tourMsg"></p>
+      <div id="tourExtra"></div>
+    </div>
+    <div class="tour-dots" id="tourDots" aria-hidden="true"></div>
+    <div class="confirm-actions tour-actions">
+      <button type="button" class="confirm-cancel" id="tourBack">Back</button>
+      <button type="button" class="notice-ok" id="tourNext">Next</button>
+    </div>
+    <button type="button" class="tour-never" id="tourNever">Don’t show this again</button>
+  </div>
+</div>
 <!-- Build 234: every message the app gives (see setStatus / showNotice), in place of the old
      line at the top of the page. -->
 <div class="confirm-overlay notice-overlay" id="noticeOverlay" role="alertdialog" aria-modal="true" aria-labelledby="noticeMsg">
@@ -6978,6 +7047,19 @@
         <option value="400">400</option>
         <option value="500">500</option>
       </select>
+    </div>
+    <!-- Build 265: whether artist radio stations (Exclusively channels) show in the Library. -->
+    <div class="settings-row">
+      <span class="settings-label" id="libArtistRadioLabel">Artist radio in Library</span>
+      <select class="settings-select" id="libArtistRadioSelect" aria-labelledby="libArtistRadioLabel">
+        <option value="on">Show</option>
+        <option value="off">Hide</option>
+      </select>
+    </div>
+    <!-- Build 265: the welcome tour, any time. -->
+    <div class="settings-row settings-row--stack">
+      <span class="settings-label">Tour of Amplify</span>
+      <button type="button" class="settings-data-btn settings-wide-btn" id="tourOpenBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Show the tour</button>
     </div>
     <!-- Build 231: volume leveling, evening out loud and quiet songs and stations (Android app). -->
     <div class="settings-row" id="levelingRow" style="display:none;">
@@ -8085,7 +8167,8 @@
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
-    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent'];
+    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent',
+    'radioPlayerLibArtistRadio', 'radioPlayerTourDone'];
   var MIRROR = {};
   if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
   var atLoad = {};
@@ -15789,7 +15872,9 @@
       homeTabs.style.display = 'none';
       sectionHeadingRow.style.display = 'none';
       homeTopHeading.style.display = '';
-      favoritesSection.style.display = '';
+      // Build 265 (Mark): Favorites, Continue Listening and My Stations stay off Home while
+      // they have nothing in them (a first-time listener sees no empty rows).
+      favoritesSection.style.display = (favoritesSection.dataset.empty && !favoritesEditing) ? 'none' : '';
       topArtistsSection.style.display = topArtistsShown ? '' : 'none';
       madeForYouSection.style.display = madeForYouShown ? '' : 'none';
       top100Section.style.display = hot100Shown ? '' : 'none';
@@ -15797,8 +15882,8 @@
       if(typeof renderNpHero === 'function') renderNpHero();
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
       playlistsHomeSection.style.display = playlistsHomeShown ? '' : 'none';
-      recentSection.style.display = '';
-      forYouSection.style.display = '';
+      recentSection.style.display = recentSection.dataset.empty ? 'none' : '';
+      forYouSection.style.display = forYouSection.dataset.empty ? 'none' : '';
       cwHomeSection.style.display = cwHomeSection.dataset.empty ? 'none' : '';
       channelsHomeSection.style.display = channelsHomeSection.dataset.empty ? 'none' : '';
       stationsGrid.style.display = '';
@@ -15937,8 +16022,13 @@
     forYouGrid.innerHTML = '';
     if(!customSearches.length){
       forYouGrid.innerHTML = '<div class="empty-state">Save a search from its results to see it here.</div>';
+      forYouSection.dataset.empty = '1';
+      if(document.body.classList.contains('home-stacked')) forYouSection.style.display = 'none';
       return;
     }
+    var wasEmpty = !!forYouSection.dataset.empty;
+    delete forYouSection.dataset.empty;
+    if(wasEmpty && document.body.classList.contains('home-stacked')) forYouSection.style.display = '';
     customSearches.forEach(function(item){
       forYouGrid.appendChild(buildEntityTile({
         key: 'foryou-home-' + item.id,
@@ -16085,6 +16175,7 @@
     // One list, in the order things were played: songs, stations and podcast episodes
     // together (Recent Songs used to be a list of its own).
     recentGrid.innerHTML = '';
+    if(!recentStations.length) recentSection.dataset.empty = '1'; else delete recentSection.dataset.empty;
     if(!recentStations.length){
       recentGrid.innerHTML = '<div class="empty-state">Songs, stations and podcasts you play will show up here.</div>';
     } else {
@@ -16233,6 +16324,7 @@
   function renderFavoritesSection(){
     favoritesGrid.innerHTML = '';
     var homeFavs = favoritesInOrder().filter(isHomeFavorite);
+    if(!homeFavs.length) favoritesSection.dataset.empty = '1'; else delete favoritesSection.dataset.empty;
     if(!homeFavs.length){
       favoritesGrid.innerHTML = '<div class="empty-state">Tap the heart on any station to save it here.</div>';
     } else {
@@ -17333,7 +17425,7 @@
     resetStationsGrid();
 
     var rows = [
-      { id: 'artists', label: 'Artists', count: buildArtistIndex().length },
+      { id: 'artists', label: 'Artists', count: libraryArtistIndex().length },
       { id: 'albums', label: 'Albums', count: buildAlbumIndex().length },
       { id: 'songs', label: 'Songs', count: libraryTracks.length }
     ];
@@ -27709,6 +27801,30 @@
       return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name));
     });
   }
+  // Build 265 (Mark): whether artist radio stations (the directory's Exclusively channels) show
+  // in the Library. Off: the Library's Artists list, its count and the car's Library artists
+  // keep to artists with songs; a station-only artist's page is still reachable from Search,
+  // Favorites and Made for You. On (the default until the listener picks) is how it always was.
+  var LIB_ARTIST_RADIO_KEY = 'radioPlayerLibArtistRadio';
+  function libArtistRadioOn(){
+    try{ return localStorage.getItem(LIB_ARTIST_RADIO_KEY) !== 'off'; }catch(e){ return true; }
+  }
+  function libArtistRadioChosen(){
+    try{ return localStorage.getItem(LIB_ARTIST_RADIO_KEY) !== null; }catch(e){ return false; }
+  }
+  function setLibArtistRadio(on){
+    try{ localStorage.setItem(LIB_ARTIST_RADIO_KEY, on ? 'on' : 'off'); }catch(e){}
+    var sel = document.getElementById('libArtistRadioSelect');
+    if(sel) sel.value = on ? 'on' : 'off';
+    if(typeof renderLibraryList === 'function') renderLibraryList();
+    if(onMyLibraryHomeView) openMyLibraryHome();
+    else if(activeLibrarySection === 'artists' && !activeArtistKey && !activeAlbumKey) renderArtistsView();
+  }
+  // The artists the Library lists.
+  function libraryArtistIndex(){
+    var all = buildArtistIndex();
+    return libArtistRadioOn() ? all : all.filter(function(e){ return e.tracks.length > 0; });
+  }
   // Top Artists and the car menu look up many artists in one go; building the whole index
   // for each of them was most of a big library's start-up time. One index serves a burst.
   var artistIndexBurst = null, artistIndexSig = '';
@@ -28677,7 +28793,7 @@
     // The three rows always render, whatever storage is doing. Artists is mostly network-
     // sourced and stays useful even when the local library cannot be opened at all, and a
     // section that shows its structure while it settles can never look permanently stuck.
-    var artistCount = buildArtistIndex().length;
+    var artistCount = libraryArtistIndex().length;
     var rows = [
       { id: 'artists', label: 'Artists', count: artistCount },
       { id: 'albums', label: 'Albums', count: buildAlbumIndex().length },
@@ -29455,8 +29571,9 @@
   function renderArtistsView(){
     resetArtistPortraitWatch();
     resetStationsGrid();
-    var entries = buildArtistIndex();
-    var pending = (artistStations === null) && !artistStationsFailed;
+    var entries = libraryArtistIndex();
+    // With artist radio left out, the list is the library's own: nothing to wait for.
+    var pending = libArtistRadioOn() && (artistStations === null) && !artistStationsFailed;
 
     if(!entries.length){
       stationsGrid.innerHTML = pending
@@ -38860,7 +38977,7 @@
           (albumsOf[ak] = albumsOf[ak] || []).push(al);
         });
       });
-      var artists = buildArtistIndex().map(function(entry){
+      var artists = libraryArtistIndex().map(function(entry){
         var own = albumsOf[entry.key] || [];
         var stations = compact((entry.stations || []).map(carStation));
         if(!own.length && !stations.length) return null;
@@ -39123,6 +39240,225 @@
         getPopularPodcasts().then(function(){ scheduleCarCatalog(); })['catch'](function(){});
       }, 20000);
     }, 4000);
+  })();
+
+  // ---------- Tour (build 265) ----------
+  // Mark: a dismissible tour of Amplify's main features for a first-time listener, in order of
+  // importance. It opens at every launch until it is dismissed: "Don't show this again", or
+  // Done on the last card. The X only closes it for now. Settings > Tour of Amplify opens it
+  // any time. The Library card also asks whether artist radio stations show in the Library.
+  (function(){
+    var TOUR_DONE_KEY = 'radioPlayerTourDone';
+    var ov = document.getElementById('tourOverlay');
+    if(!ov) return;
+    var spot = document.getElementById('tourSpot'), body = document.getElementById('tourBody');
+    var icon = document.getElementById('tourIcon'), title = document.getElementById('tourTitle');
+    var msg = document.getElementById('tourMsg'), extra = document.getElementById('tourExtra');
+    var dots = document.getElementById('tourDots'), count = document.getElementById('tourCount');
+    var back = document.getElementById('tourBack'), next = document.getElementById('tourNext');
+    var never = document.getElementById('tourNever'), closeBtn = document.getElementById('tourClose');
+    function svg(d){ return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + d + '</svg>'; }
+    function navBtn(n){ return document.querySelector('.mobile-nav-btn[data-nav="' + n + '"]'); }
+    var STEPS = [
+      { icon: svg('<path d="M4.5 9.5a10.5 10.5 0 0 1 15 0"/><path d="M7.5 12.6a6.2 6.2 0 0 1 9 0"/><circle cx="12" cy="16" r="1.6"/><path d="M12 17.6V21"/>'),
+        title: 'Welcome to Amplify',
+        text: 'Radio stations, your own music, podcasts and TV, all in one place. Here is a quick look at what it can do.' },
+      { icon: svg('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/>'),
+        title: 'Search',
+        text: 'Find any station, artist, song, album, podcast or TV channel as you type. Paste a stream link to play it.',
+        target: function(){ return navBtn('search'); } },
+      { icon: svg('<path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/>'),
+        title: 'Favorites',
+        text: 'Tap the heart on a station, artist radio, playlist or custom station. Your favorites lead Home, sit in the menu and show in Android Auto.',
+        target: function(){ return document.getElementById('favoritesSection'); } },
+      { icon: svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5v4h4"/><path d="M12 8v4.5l3 2"/>'),
+        title: 'Continue Listening',
+        text: 'Everything you play lands on Home, so you can pick up a station, song or episode right where you left off.',
+        target: function(){ return document.getElementById('recentSection'); } },
+      { icon: svg('<rect x="3.5" y="4" width="3.5" height="16" rx="1"/><rect x="9" y="4" width="3.5" height="16" rx="1"/><path d="m15.2 5.3 3.3-1 3 15.1-3.3 1z"/>'),
+        title: 'Your Library',
+        text: 'Your own music by artist, album and song, with playlists and genres. Artists with three or more songs get their own Radio.',
+        target: function(){ return navBtn('library'); },
+        choice: true },
+      { icon: svg('<path d="M12 3.5l2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.5l-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/>'),
+        title: 'My Stations',
+        text: 'Search for a genre, a city or anything else, then tap Save as Custom Station. It keeps the results as one station on Home.',
+        target: function(){ return document.getElementById('forYouSection'); } },
+      { icon: svg('<rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M10 9.2v5.6l4.6-2.8z"/>'),
+        title: 'Now Playing',
+        text: 'Tap the mini player for Now Playing. Its menu has the queue, a sleep timer, Add to Playlist and more. Tap the artwork for Immersive View.',
+        target: function(){ var b = document.getElementById('playerBar'); return b && !b.classList.contains('empty') ? b : null; } },
+      { icon: svg('<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v4"/><path d="M8.5 21.5h7"/>'),
+        title: 'Podcasts',
+        text: 'Browse and follow shows. New episodes from the ones you follow appear under Latest Podcasts on Home.',
+        target: function(){ return navBtn('podcasts'); } },
+      { icon: svg('<rect x="3" y="5.5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7"/><path d="m9 2.5 3 3 3-3"/>'),
+        title: 'Live TV',
+        text: 'The Watch tab has Live TV with a full TV guide. Add free channels from the directory and favorite the ones you watch.',
+        target: function(){ return navBtn('video'); } },
+      { icon: svg('<rect x="3" y="5.5" width="18" height="12.5" rx="2"/><path d="M12 9v5.5M9.2 11.7h5.6"/>'),
+        title: 'Your Own Channels',
+        text: 'In Live TV, Edit then New Channel turns your shows and movies, from the phone or Plex, into a channel that plays around the clock.',
+        target: function(){ return navBtn('video'); } },
+      { icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>'),
+        title: 'Movies & TV Shows',
+        text: 'Your movies and shows from the phone and Plex, with posters, episodes and resume where you stopped.',
+        target: function(){ return navBtn('video'); } },
+      { icon: svg('<rect x="8.5" y="5" width="7" height="10" rx="1"/><path d="m6 6.5-3 1v6l3 1M18 6.5l3 1v6l-3 1"/><path d="M8.5 19h7"/>'),
+        title: 'Cover Flow',
+        text: 'Turn the phone sideways in your Library to flip through your albums. Tap the middle cover to see its songs.' },
+      { icon: svg('<path d="M4 19V9M9.3 19V5M14.7 19v-7M20 19v-11"/>'),
+        title: 'Top 100 and Made for You',
+        text: 'Home also has this week’s Top 100 as music videos, Top Stations, and Made for You picks based on what you play.' },
+      { icon: svg('<path d="M3 17.5a3.5 3.5 0 0 1 3.5 3.5M3 13.5A7.5 7.5 0 0 1 10.5 21"/><path d="M3 9.5V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/>'),
+        title: 'Cast and Android Auto',
+        text: 'Send stations, videos and channels to a Chromecast from Now Playing. In the car, Android Auto has your favorites, library and stations.' },
+      { icon: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+        title: 'Settings',
+        text: 'The menu holds Settings: theme and accent color, equalizer, Plex, backups and whether artist radio shows in your Library. This tour is there too.',
+        target: function(){ return document.getElementById('hamburgerBtn') || document.getElementById('settingsFab'); } }
+    ];
+    var at = 0, openNow = false;
+    function tourDone(){ try{ return localStorage.getItem(TOUR_DONE_KEY) === '1'; }catch(e){ return false; } }
+    function shown(el){
+      if(!el) return null;
+      var r = el.getBoundingClientRect();
+      if(r.width < 8 || r.height < 8) return null;
+      if(r.bottom <= 0 || r.top >= window.innerHeight || r.right <= 0 || r.left >= window.innerWidth) return null;
+      // A whole Home section can be taller than the screen; the ring keeps to what is visible.
+      var top = Math.max(r.top, 0), bottom = Math.min(r.bottom, window.innerHeight);
+      if(bottom - top < 8) return null;
+      return { left: r.left, top: top, width: r.width, height: bottom - top };
+    }
+    function place(){
+      if(!openNow) return;
+      var st = STEPS[at];
+      var r = st.target ? shown(st.target()) : null;
+      // A ring over most of the screen hides nothing and frames nothing.
+      if(r && r.height > window.innerHeight * 0.55) r = null;
+      ov.classList.toggle('spotlit', !!r);
+      if(r){
+        // Kept 3px inside the screen, so the whole ring shows round a tab at the edge.
+        var pad = 6, m = 3;
+        var x0 = Math.max(m, r.left - pad), y0 = Math.max(m, r.top - pad);
+        var x1 = Math.min(window.innerWidth - m, r.left + r.width + pad), y1 = Math.min(window.innerHeight - m, r.top + r.height + pad);
+        spot.style.left = Math.round(x0) + 'px';
+        spot.style.top = Math.round(y0) + 'px';
+        spot.style.width = Math.round(x1 - x0) + 'px';
+        spot.style.height = Math.round(y1 - y0) + 'px';
+      }
+    }
+    function buildChoice(){
+      var box = document.createElement('div');
+      box.className = 'tour-choice';
+      var q = document.createElement('p');
+      q.className = 'tour-choice-q';
+      q.id = 'tourChoiceQ';
+      q.textContent = 'Show artist radio stations in your Library?';
+      box.appendChild(q);
+      var opts = document.createElement('div');
+      opts.className = 'tour-choice-opts';
+      opts.setAttribute('role', 'radiogroup');
+      opts.setAttribute('aria-labelledby', 'tourChoiceQ');
+      [['on', 'Show'], ['off', 'Hide']].forEach(function(o){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.dataset.val = o[0];
+        b.textContent = o[1];
+        b.setAttribute('role', 'radio');
+        function sync(){
+          var on = libArtistRadioOn() ? 'on' : 'off';
+          Array.prototype.forEach.call(opts.children, function(x){
+            x.classList.toggle('on', x.dataset.val === on);
+            x.setAttribute('aria-checked', x.dataset.val === on ? 'true' : 'false');
+          });
+        }
+        b.addEventListener('click', function(){ setLibArtistRadio(o[0] === 'on'); sync(); });
+        opts.appendChild(b);
+        if(o[0] === 'off') setTimeout(sync, 0);
+      });
+      box.appendChild(opts);
+      var note = document.createElement('p');
+      note.className = 'tour-msg';
+      note.style.margin = '10px 0 0';
+      note.style.fontSize = '13px';
+      note.textContent = 'These are the directory’s stations for hundreds of artists. You can change this later in Settings.';
+      box.appendChild(note);
+      return box;
+    }
+    function render(){
+      var st = STEPS[at];
+      count.textContent = (at + 1) + ' of ' + STEPS.length;
+      icon.innerHTML = st.icon;
+      title.textContent = st.title;
+      msg.textContent = st.text;
+      extra.innerHTML = '';
+      if(st.choice) extra.appendChild(buildChoice());
+      dots.innerHTML = '';
+      STEPS.forEach(function(x, i){
+        var d = document.createElement('span');
+        d.className = 'tour-dot' + (i === at ? ' on' : '');
+        dots.appendChild(d);
+      });
+      back.disabled = at === 0;
+      next.textContent = at === STEPS.length - 1 ? 'Done' : (at === 0 ? 'Start' : 'Next');
+      // Done on the last card is the dismissal, so the link would only repeat it.
+      never.hidden = at === STEPS.length - 1;
+      body.style.animation = 'none';
+      void body.offsetWidth;
+      body.style.animation = '';
+      place();
+    }
+    function openTour(from){
+      at = typeof from === 'number' ? from : 0;
+      openNow = true;
+      ov.classList.add('open');
+      render();
+    }
+    function closeTour(dismiss){
+      if(dismiss){ try{ localStorage.setItem(TOUR_DONE_KEY, '1'); }catch(e){} }
+      openNow = false;
+      ov.classList.remove('open', 'spotlit');
+    }
+    next.addEventListener('click', function(){
+      if(at >= STEPS.length - 1){ closeTour(true); return; }
+      at++; render();
+    });
+    back.addEventListener('click', function(){ if(at > 0){ at--; render(); } });
+    never.addEventListener('click', function(){ closeTour(true); });
+    closeBtn.addEventListener('click', function(){ closeTour(false); });
+    document.addEventListener('keydown', function(e){
+      if(!openNow) return;
+      if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closeTour(false); }
+      else if(e.key === 'ArrowRight'){ e.preventDefault(); next.click(); }
+      else if(e.key === 'ArrowLeft'){ e.preventDefault(); back.click(); }
+    }, true);
+    window.addEventListener('resize', function(){ if(openNow) place(); });
+    // Settings: Tour of Amplify, and Artist radio in Library.
+    var tourBtn = document.getElementById('tourOpenBtn');
+    if(tourBtn) tourBtn.addEventListener('click', function(){ closeSettings(); openTour(0); });
+    var arSel = document.getElementById('libArtistRadioSelect');
+    if(arSel){
+      arSel.value = libArtistRadioOn() ? 'on' : 'off';
+      arSel.addEventListener('change', function(){ setLibArtistRadio(arSel.value === 'on'); });
+    }
+    window.__amplifyTour = { open: openTour, close: closeTour, step: function(){ return at; }, steps: STEPS.length };
+    // At launch, once the page has settled and nothing else (a message, a dialog, the phone
+    // turned sideways) is in front. Headless test browsers skip it unless asked for, so the
+    // older tests' pages stay clear.
+    var auto = !navigator.webdriver;
+    try{ if(localStorage.getItem('amplifyTourTest') === '1') auto = true; }catch(e){}
+    if(!auto || tourDone()) return;
+    var tries = 0;
+    function tryOpen(){
+      if(tourDone() || openNow) return;
+      var busy = document.querySelector('.confirm-overlay.open, .settings-overlay.open') ||
+        document.body.classList.contains('rotate-lock') || document.body.classList.contains('np-open');
+      if(busy && tries++ < 40){ setTimeout(tryOpen, 1500); return; }
+      if(busy) return;
+      openTour(0);
+    }
+    setTimeout(tryOpen, 1200);
   })();
 
   if(!storageWorks) setStatus('Heads up: this browser is blocking local storage, so Favorites / Recent / volume won\'t be remembered next time you open this file.', true);
