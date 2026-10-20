@@ -2654,6 +2654,15 @@
     transition: opacity .15s ease;
   }
   .np-name-link:hover, .np-name-link:focus-visible{ opacity:.84; }
+  /* Build 267: a long title cut to three lines ends in "... More"; open, it ends in "Less". */
+  .np-name-gap{ white-space:pre; }
+  .np-name-more{
+    display:inline; background:none; border:0; padding:4px 2px; margin:-4px -2px; font:inherit;
+    font-size:.72em; font-weight:700; letter-spacing:0; color:inherit; cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1.5px;
+    vertical-align:baseline; -webkit-tap-highlight-color:transparent; white-space:nowrap;
+  }
+  .np-name-more:hover, .np-name-more:focus-visible{ opacity:.84; }
   .np-sub .np-sub-link{ color:rgba(255,255,255,.88); text-align:center; }
   .np-sub .np-sub-link:hover, .np-sub .np-sub-link:focus-visible{ color:#fff; }
   /* Artist and album on a local track's Now Playing line are navigation, so they read as
@@ -31467,12 +31476,110 @@
     var label = isLocalTrack(st) ? (st.name || '') : stripExclusively(st.name);
     if(isPodcastTrack(st)) label = stripEpisodeNumber(label);
     npName.classList.toggle('np-name-linked', !!artist);
+    // Build 267: the words sit in their own box so a long title can be cut to three lines.
+    var holder;
     if(!artist){
-      npName.textContent = label;
-      return;
+      holder = document.createElement('span');
+      npName.appendChild(holder);
+    } else {
+      holder = npLink(label, function(){ openArtistPage(artist.key); }, 'np-name-link');
+      npName.appendChild(holder);
     }
-    npName.appendChild(npLink(label, function(){ openArtistPage(artist.key); }, 'np-name-link'));
+    holder.classList.add('np-name-text');
+    holder.textContent = label;
+    var key = favKey(st) + '|' + label;
+    if(npNameFit.key !== key){ npNameFit.key = key; npNameFit.open = false; }
+    npNameFit.label = label;
+    npNameFit.holder = holder;
+    fitNpName();
   }
+
+  // ---------- long titles (build 267) ----------
+  // Mark: a long title (a station named with its whole tag list) pushed the controls down the
+  // screen. On the portrait Now Playing screen the title is cut to three lines, ending in
+  // "... More"; More shows the whole title, ending in "Less", which cuts it back. Cut by
+  // measuring (the longest start of the title that still fits three lines with "... More"
+  // after it), so More sits exactly where the ellipsis is. Landscape and the channel / video
+  // layouts keep their own one- and two-line rules, so they get the whole title as before.
+  var NP_NAME_LINES = 3;
+  var npNameFit = { key: '', open: false, label: '', holder: null, w: 0 };
+  function npNameToggle(open){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'np-name-more';
+    b.textContent = open ? 'Less' : 'More';
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    b.setAttribute('aria-label', open ? 'Show less of the title' : 'Show the whole title');
+    b.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      npNameFit.open = !open;
+      fitNpName(true);
+    });
+    // The swipe-to-close and artwork taps on this screen listen for presses; this one is ours.
+    ['pointerdown', 'touchstart', 'mousedown'].forEach(function(t){
+      b.addEventListener(t, function(e){ e.stopPropagation(); }, { passive: true });
+    });
+    return b;
+  }
+  function npNameClampable(){
+    if(document.body.classList.contains('rotate-lock')) return false;
+    if(nowPlayingScreen.classList.contains('np-channel') || nowPlayingScreen.classList.contains('np-vplayer')) return false;
+    return true;
+  }
+  function fitNpName(focusToggle){
+    var f = npNameFit, h = f.holder;
+    if(!h || !h.isConnected) return;
+    var old = npName.querySelector(':scope > .np-name-more');
+    if(old) old.remove();
+    var oldGap = npName.querySelector(':scope > .np-name-gap');
+    if(oldGap) oldGap.remove();
+    h.textContent = f.label;
+    npName.classList.remove('np-name-cut', 'np-name-open');
+    if(!npNameClampable()) return;
+    var w = npName.clientWidth;
+    if(!w) return; // not on screen yet; the size watcher calls back once it is
+    f.w = w;
+    var lh = parseFloat(getComputedStyle(npName).lineHeight) || 30;
+    var max = lh * NP_NAME_LINES + lh * 0.4;
+    if(npName.getBoundingClientRect().height <= max) return;
+    function addToggle(open){
+      var gap = document.createElement('span');
+      gap.className = 'np-name-gap';
+      gap.textContent = open ? ' ' : '\u2026 ';
+      npName.appendChild(gap);
+      var t = npNameToggle(open);
+      npName.appendChild(t);
+      return t;
+    }
+    var t;
+    if(f.open){
+      npName.classList.add('np-name-open');
+      t = addToggle(true);
+    } else {
+      npName.classList.add('np-name-cut');
+      t = addToggle(false);
+      var text = f.label, lo = 0, hi = text.length;
+      while(lo < hi){
+        var mid = Math.ceil((lo + hi) / 2);
+        h.textContent = text.slice(0, mid).replace(/[\s,;:|\-\u2013\u2014]+$/, '');
+        if(npName.getBoundingClientRect().height <= max) lo = mid; else hi = mid - 1;
+      }
+      // Ending on a whole word reads better, unless that would throw away most of a line.
+      var cut = text.slice(0, lo), sp = cut.search(/\s\S*$/);
+      if(sp > 0 && lo - sp < 18 && lo < text.length && /\S/.test(text.charAt(lo))) cut = cut.slice(0, sp);
+      h.textContent = cut.replace(/[\s,;:|\-\u2013\u2014]+$/, '');
+    }
+    if(focusToggle && t){ try{ t.focus({ preventScroll: true }); }catch(e){} }
+  }
+  if(typeof ResizeObserver === 'function'){
+    new ResizeObserver(function(){
+      var w = npName.clientWidth;
+      if(w && w !== npNameFit.w) fitNpName();
+      else if(!w) npNameFit.w = 0;
+    }).observe(npName);
+  }
+  window.addEventListener('resize', function(){ npNameFit.w = 0; requestAnimationFrame(fitNpName); });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ npNameFit.w = 0; fitNpName(); });
 
   function renderNpSub(st){
     npSub.innerHTML = '';
