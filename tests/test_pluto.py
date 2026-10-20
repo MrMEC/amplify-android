@@ -113,7 +113,7 @@ async def main():
         check(await pg.evaluate("localStorage.getItem('radioPlayerPluto')") is None, 'build 186\'s saved list is thrown away')
         await open_add(pg)
         t = await pg.evaluate(TABS)
-        check(t == ['Recommended', 'All', 'Pluto', 'Link'], f'tabs Recommended, All, Pluto, Link (no account needed) {t}')
+        check(t == ['Recommended', 'All', 'Pluto', 'Plex', 'Link'], f'tabs Recommended, All, Pluto, Plex (sign-in button since build 268), Link {t}')
         check(LOG['list'] == 0, 'Pluto not asked until its tab is opened')
         await tab(pg, 'Pluto')
         r = await pg.evaluate(ROWS)
