@@ -81,7 +81,7 @@ async def run(b, theme, w, big):
     tag = f'{theme}-{w}' + ('-big' if big else '')
     await pg.evaluate(f'__e.open({json.dumps(EP)})'); await pg.wait_for_timeout(1500)
     s = await pg.evaluate(STATE)
-    print({k: s[k] for k in s if k != 'text'})
+    print(repr(s["text"]))
     check(s['shown'] and s['heading'] == 'About This Episode', f'[{tag}] the episode shows its description section')
     check('thanks for listening' in s['text'], f'[{tag}] the full description replaces the shortened copy')
     check('<' not in s['text'] and '&amp;' not in s['text'] and '1984 & the making' in s['text'], f'[{tag}] HTML shown as plain text')

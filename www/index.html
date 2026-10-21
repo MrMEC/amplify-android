@@ -10194,7 +10194,7 @@
           .replace(/<br\s*\/?>/gi, '\n')
           .replace(/<\/(p|div|h[1-6]|ul|ol|blockquote)\s*>/gi, '\n\n')
           .replace(/<li\b[^>]*>/gi, '\n• ')
-          .replace(/<\/li\s*>/gi, '\n') + '</body>', 'text/html');
+          .replace(/<\/li\s*>/gi, '') + '</body>', 'text/html');
         s = doc.body.textContent || '';
       }catch(e){ s = s.replace(/<[^>]*>/g, ' '); }
     }
