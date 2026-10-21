@@ -2690,14 +2690,15 @@
     transition: opacity .15s ease;
   }
   .np-name-link:hover, .np-name-link:focus-visible{ opacity:.84; }
-  /* Build 267: a long title cut to three lines ends in "... More"; open, it ends in "Less". */
-  .np-name-gap{ white-space:pre; }
+  /* Build 267: a long title cut to three lines ends in an ellipsis. Build 271 (Mark): no "More"
+     word; the ellipsis itself is the link that shows the whole title (its tap area is padded out
+     well past the dots, so a finger finds it). */
   .np-name-more{
-    display:inline; background:none; border:0; padding:4px 2px; margin:-4px -2px; font:inherit;
-    font-size:.72em; font-weight:700; letter-spacing:0; color:inherit; cursor:pointer;
-    text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1.5px;
+    display:inline; position:relative; background:none; border:0; padding:0; margin:0; font:inherit;
+    letter-spacing:0; color:inherit; cursor:pointer; text-decoration:none;
     vertical-align:baseline; -webkit-tap-highlight-color:transparent; white-space:nowrap;
   }
+  .np-name-more::after{ content:''; position:absolute; left:-14px; right:-16px; top:-10px; bottom:-10px; }
   .np-name-more:hover, .np-name-more:focus-visible{ opacity:.84; }
   .np-sub .np-sub-link{ color:rgba(255,255,255,.88); text-align:center; }
   .np-sub .np-sub-link:hover, .np-sub .np-sub-link:focus-visible{ color:#fff; }
@@ -3678,6 +3679,16 @@
   .ch-sort-line{ display:flex; align-items:center; gap:12px; }
   .ch-sort-label{ flex:0 0 52px; font-size:12.5px; font-weight:700; color:var(--text-dim); }
   .ch-sort-tabs.home-tabs{ margin:0; flex-wrap:nowrap; }
+  /* Build 271 (Mark): a line whose pills don't fit (Layout: Your Channels First / Integrate
+     Channels) scrolls sideways, label and all, running off both screen edges like the other
+     sideways rows. */
+  .ch-sort-line{ overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; }
+  .ch-sort-line::-webkit-scrollbar{ display:none; }
+  .ch-sort-line > *{ flex-shrink:0; }
+  @media (max-width: 900px){
+    .ch-sort-line{ margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad)); padding-left:var(--main-pad); padding-right:var(--main-pad); }
+    .ch-sort-line::after{ content:''; flex:0 0 1px; }
+  }
   .fav-artists-block .ch-sort-opts{ display:flex; flex-direction:column; gap:10px; margin:2px 0 12px; }
   .tile-grid > .video-tabs + .grid-section-label, .tile-grid > .video-tabs + .grid-section-label.ch-row-label{ margin-top:4px; }
   .tile-grid > .video-tabs.vd-seasons{ margin:4px 0 -18px; }
@@ -3890,6 +3901,11 @@
     color:var(--accent); cursor:pointer;
   }
   .podcast-more-link:hover{ text-decoration:underline; }
+  /* Build 271: a show's description printed on its page, under the publisher. */
+  .podcast-show-desc{
+    align-self:stretch; margin-top:4px; font-size:14px; line-height:1.55; color:var(--text-dim);
+    white-space:pre-line; overflow-wrap:anywhere; text-align:left;
+  }
   .art-url-input-row{ display:flex; align-items:center; gap:8px; }
   .art-url-input{
     flex:1; min-width:0; box-sizing:border-box; padding:10px 12px; border-radius:10px; border:1px solid var(--border);
@@ -23712,12 +23728,11 @@
         // The header may already be off-screen (a fast tap back to Podcasts, or on to a
         // different show) by the time this resolves.
         if(!header.isConnected || activeShowCollectionId !== show.collectionId) return;
-        var more = document.createElement('button');
-        more.type = 'button';
-        more.className = 'podcast-more-link';
-        more.textContent = 'More';
-        more.addEventListener('click', function(){ openPodcastDescriptionModal(show, text); });
-        header.appendChild(more);
+        // Build 271 (Mark): the description itself, in full, where the More link was.
+        var desc = document.createElement('div');
+        desc.className = 'podcast-show-desc';
+        desc.textContent = episodeDescText(text);
+        if(desc.textContent) header.appendChild(desc);
       });
     }
   }
@@ -31719,17 +31734,17 @@
   // layouts keep their own one- and two-line rules, so they get the whole title as before.
   var NP_NAME_LINES = 3;
   var npNameFit = { key: '', open: false, label: '', holder: null, w: 0 };
-  function npNameToggle(open){
+  function npNameToggle(){
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'np-name-more';
-    b.textContent = open ? 'Less' : 'More';
-    b.setAttribute('aria-expanded', open ? 'true' : 'false');
-    b.setAttribute('aria-label', open ? 'Show less of the title' : 'Show the whole title');
+    b.textContent = '\u2026';
+    b.setAttribute('aria-expanded', 'false');
+    b.setAttribute('aria-label', 'Show the whole title');
     b.addEventListener('click', function(e){
       e.preventDefault(); e.stopPropagation();
-      npNameFit.open = !open;
-      fitNpName(true);
+      npNameFit.open = true;
+      fitNpName();
     });
     // The swipe-to-close and artwork taps on this screen listen for presses; this one is ours.
     ['pointerdown', 'touchstart', 'mousedown'].forEach(function(t){
@@ -31747,8 +31762,6 @@
     if(!h || !h.isConnected) return;
     var old = npName.querySelector(':scope > .np-name-more');
     if(old) old.remove();
-    var oldGap = npName.querySelector(':scope > .np-name-gap');
-    if(oldGap) oldGap.remove();
     h.textContent = f.label;
     npName.classList.remove('np-name-cut', 'np-name-open');
     if(!npNameClampable()) return;
@@ -31758,22 +31771,14 @@
     var lh = parseFloat(getComputedStyle(npName).lineHeight) || 30;
     var max = lh * NP_NAME_LINES + lh * 0.4;
     if(npName.getBoundingClientRect().height <= max) return;
-    function addToggle(open){
-      var gap = document.createElement('span');
-      gap.className = 'np-name-gap';
-      gap.textContent = open ? ' ' : '\u2026 ';
-      npName.appendChild(gap);
-      var t = npNameToggle(open);
-      npName.appendChild(t);
-      return t;
-    }
+    // Build 271 (Mark): open shows the whole title with nothing after it (no "Less").
     var t;
     if(f.open){
       npName.classList.add('np-name-open');
-      t = addToggle(true);
     } else {
       npName.classList.add('np-name-cut');
-      t = addToggle(false);
+      t = npNameToggle();
+      npName.appendChild(t);
       var text = f.label, lo = 0, hi = text.length;
       while(lo < hi){
         var mid = Math.ceil((lo + hi) / 2);

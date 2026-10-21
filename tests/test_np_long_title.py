@@ -1,5 +1,5 @@
-"""Build 267: a long title on Now Playing is cut to three lines ending in "... More"; More shows the whole
-title ending in "Less", and Less cuts it back. Short titles are untouched, the controls stay put, a title
+"""Build 267: a long title on Now Playing is cut to three lines. Build 271 (Mark): it ends in an ellipsis that
+is itself the link (no "More" word); tapping it shows the whole title, with nothing after it (no "Less"). Short titles are untouched, the controls stay put, a title
 that is a link (an artist's station) keeps working, and landscape keeps its own two-line rule.
 Run: python3 tests/test_np_long_title.py (screenshots in /tmp/claude-0/t/shots)"""
 import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
@@ -87,31 +87,28 @@ async def main():
             s = await pg.evaluate(STATE)
             print(tag, s)
             check(s['lines'] == 3, f'{tag}: the long title takes three lines')
-            check(s['more'] == 'More' and s['gap'].startswith('…'), f'{tag}: it ends in "... More"')
+            check(s['more'] == '\u2026' and s['gap'] == '', f'{tag}: it ends in an ellipsis that is the link, no More word {s["more"]!r}')
+            hit = await pg.evaluate("(()=>{ const m = document.querySelector('#npName .np-name-more'), r = m.getBoundingClientRect(); const a = getComputedStyle(m, '::after'); return { w: r.width + parseFloat(a.left) * -1 + parseFloat(a.right) * -1, h: r.height - parseFloat(a.top) - parseFloat(a.bottom), x: r.right + 10, y: r.top + r.height / 2 }; })()")
+            check(hit['w'] >= 40 and hit['h'] >= 40, f'{tag}: the ellipsis has a finger-sized tap area {hit}')
+            hit_xy = hit
             check(LONG.startswith(s['text']) and len(s['text']) < len(LONG) - 10 and len(s['text']) > 40, f'{tag}: the cut keeps as much of the title as fits ({len(s["text"])} chars)')
-            check(s['moreRight'] <= s['nameRight'] + 1 and s['moreBottom'] >= s['nameBottom'] - s['moreH'] - 4, f'{tag}: More sits at the end of the third line')
+            check(s['moreRight'] <= s['nameRight'] + 1 and s['moreBottom'] >= s['nameBottom'] - s['moreH'] - 4, f'{tag}: the ellipsis sits at the end of the third line')
             check(s['ctrlTop'] - short_ctrl < 200, f'{tag}: the controls stay well up the screen ({short_ctrl} -> {s["ctrlTop"]})')
             await pg.screenshot(path=f'{OUT}/nplong-{tag}-cut.png')
             closed_ctrl = s['ctrlTop']
 
-            # More: the whole title, ending in Less
-            await pg.click('#npName .np-name-more'); await pg.wait_for_timeout(300)
+            # a finger tap just past the dots (inside the padded area) shows the whole title, nothing after it
+            await pg.touchscreen.tap(hit_xy['x'], hit_xy['y']); await pg.wait_for_timeout(300)
             s = await pg.evaluate(STATE)
-            check(s['text'] == LONG and s['more'] == 'Less' and s['lines'] > 3, f'{tag}: More shows the whole title, ending in Less {s["lines"]} lines')
+            check(s['text'] == LONG and s['more'] is None and s['lines'] > 3, f'{tag}: tapping the ellipsis shows the whole title, no Less ({s["lines"]} lines)')
             np_open = await pg.evaluate("document.body.classList.contains('np-open')")
-            check(np_open, f'{tag}: tapping More leaves Now Playing open')
+            check(np_open, f'{tag}: tapping the ellipsis leaves Now Playing open')
             await pg.screenshot(path=f'{OUT}/nplong-{tag}-open.png')
 
-            # Less: back to three lines
-            await pg.click('#npName .np-name-more'); await pg.wait_for_timeout(300)
-            s = await pg.evaluate(STATE)
-            check(s['lines'] == 3 and s['more'] == 'More' and abs(s['ctrlTop'] - closed_ctrl) < 2, f'{tag}: Less cuts it back to three lines')
-
             # next station starts cut again
-            await pg.click('#npName .np-name-more'); await pg.wait_for_timeout(200)
             await play(pg, station('long2', LONG + ' Two'))
             s = await pg.evaluate(STATE)
-            check(s['more'] == 'More' and s['lines'] == 3, f'{tag}: a new item starts cut again')
+            check(s['more'] == '\u2026' and s['lines'] == 3, f'{tag}: a new item starts cut again')
 
             if not big and w == 412:
                 # landscape keeps its own two-line clamp with the whole title
@@ -122,7 +119,7 @@ async def main():
                 await pg.screenshot(path=f'{OUT}/nplong-landscape.png')
                 await pg.set_viewport_size({'width': 412, 'height': 900}); await pg.wait_for_timeout(1200)
                 s = await pg.evaluate(STATE)
-                check(s['more'] == 'More' and s['lines'] == 3, 'back upright: cut to three lines again')
+                check(s['more'] == '\u2026' and s['lines'] == 3, 'back upright: cut to three lines again')
             check(not errs, f'{tag}: no page errors {errs[:2]}')
             await ctx.close()
         await b.close()
