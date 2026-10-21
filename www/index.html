@@ -12775,6 +12775,7 @@
   // (re-checked after ART_CACHE_TTL_MS in case a station's site changes).
   var ART_CACHE_KEY = 'radioPlayerArtCache';
   var ART_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  var ART_MISS_TTL_MS = 24 * 60 * 60 * 1000; // a lookup that found nothing: tried again after a day
   var ART_MIN_SIZE = 32; // px — anything smaller is treated the same as "not found"
   var ART_CONCURRENCY = 4; // avoid firing dozens of lookups at once for a big grid
 
@@ -12799,6 +12800,10 @@
     var entry = loadArtCache()[key];
     if(!entry) return undefined;
     if(Date.now() - entry.ts > ART_CACHE_TTL_MS) return undefined;
+    // Build 272 (Mark: many covers gone): "found nothing" was kept for 30 days, so one lookup
+    // that failed on a slow or missing connection left a station on its placeholder for a
+    // month. A miss is now tried again after a day.
+    if(!entry.url && Date.now() - entry.ts > ART_MISS_TTL_MS) return undefined;
     return entry;
   }
   function saveArtCacheEntry(key, url){
@@ -12914,6 +12919,17 @@
       return arrived.length;
     });
   })['catch'](function(err){ console.warn('Cover art store unavailable', err); return 0; });
+  // Build 272 (Mark: many covers gone): covers uploaded from the phone live only in IndexedDB,
+  // which answers after the page has drawn. repaintCustomArt only found station tiles, so a
+  // custom station's or playlist's own cover (keys foryouart: / playlistart:, which no tile
+  // carries) stayed on its placeholder. Every art box drawn before the covers arrived now asks
+  // again once they have (whenCustomArtLoaded), if it is still the same box.
+  var customArtLoaded = false;
+  customArtReady.then(function(){ customArtLoaded = true; }, function(){ customArtLoaded = true; });
+  function whenCustomArtLoaded(fn){
+    if(customArtLoaded || !customArtReady) return;
+    customArtReady.then(fn, function(){});
+  }
   // Covers that arrived from IndexedDB after the page drew: shown wherever they belong.
   function repaintCustomArt(keys){
     keys.forEach(function(k){
@@ -13162,6 +13178,9 @@
       paint(customUrl);
       return; // user-supplied art is authoritative -- never overridden by the lookup chain
     }
+    whenCustomArtLoaded(function(){
+      if(artRenderCurrent(container, token) && customArtFor(station)) renderStationArt(container, station);
+    });
     // A favourite custom station wears its cover (or its generated one).
     if(isCustomStation(station)){
       container.innerHTML = '';
@@ -13221,7 +13240,9 @@
 
     var cached = getArtCacheEntry(key);
     if(cached !== undefined){
-      paint(cached.url);
+      // Build 272: a remembered miss still shows the station's own logo when it loads (a broken
+      // one just removes itself), rather than going straight to the placeholder.
+      paint(cached.url || station.favicon);
       return;
     }
     if(station.favicon) paint(station.favicon);
@@ -24060,7 +24081,14 @@
   function playlistArtKey(id){ return 'playlistart:' + id; }
   function renderPlaylistCoverArt(art, item){
     var url = getCustomArtUrl(playlistArtKey(item.id));
-    if(!url){ applyPlaceholderArt(art, 'playlist-' + item.id); return; }
+    if(!url){
+      applyPlaceholderArt(art, 'playlist-' + item.id);
+      var t0 = beginArtRender(art);
+      whenCustomArtLoaded(function(){
+        if(artRenderCurrent(art, t0) && getCustomArtUrl(playlistArtKey(item.id))){ art.innerHTML = ''; renderPlaylistCoverArt(art, item); }
+      });
+      return;
+    }
     var img = document.createElement('img');
     img.alt = '';
     img.setAttribute('referrerpolicy', 'no-referrer');
@@ -24846,7 +24874,14 @@
   function customSearchArtKey(id){ return 'foryouart:' + id; }
   function renderCustomSearchCoverArt(art, item){
     var url = getCustomArtUrl(customSearchArtKey(item.id));
-    if(!url){ applyPlaceholderArt(art, 'foryou-' + item.id); return; }
+    if(!url){
+      applyPlaceholderArt(art, 'foryou-' + item.id);
+      var t0 = beginArtRender(art);
+      whenCustomArtLoaded(function(){
+        if(artRenderCurrent(art, t0) && getCustomArtUrl(customSearchArtKey(item.id))){ art.innerHTML = ''; renderCustomSearchCoverArt(art, item); }
+      });
+      return;
+    }
     var img = document.createElement('img');
     img.alt = '';
     img.setAttribute('referrerpolicy', 'no-referrer');
