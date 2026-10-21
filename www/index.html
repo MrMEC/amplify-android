@@ -3262,6 +3262,13 @@
   }
 
   .np-related{ width:100%; margin-top:40px; flex-shrink:0; }
+  /* Build 269: a podcast episode's description, in full, between the controls and More Episodes. */
+  .np-related.np-ep-desc{ margin-top:30px; }
+  .np-ep-desc .np-related-heading{ margin-bottom:10px; }
+  .np-ep-desc-text{
+    font-size:14.5px; line-height:1.55; color:var(--text); opacity:.88;
+    white-space:pre-line; overflow-wrap:anywhere; text-align:left; user-select:text; -webkit-user-select:text;
+  }
   /* ---------- Now Playing for a TV channel ----------
      The picture is the headline: the top area is just the video's own box (16:9 under the
      top buttons), the name sits right under it on one line, the controls follow, and the
@@ -6880,6 +6887,11 @@
 
       <!-- Everything below the artwork sits on the tint the artwork faded into. -->
       <div class="np-below">
+        <!-- Build 269: a podcast episode's full description, above More Episodes. -->
+        <div class="np-related np-ep-desc" id="npEpDesc" style="display:none;">
+          <div class="np-related-heading">About This Episode</div>
+          <div class="np-ep-desc-text" id="npEpDescText"></div>
+        </div>
         <div class="np-related" id="npCollection" style="display:none;">
           <div class="np-related-heading" id="npCollectionHeading"></div>
           <div class="np-related-grid" id="npCollectionGrid"></div>
@@ -10168,6 +10180,46 @@
     p['catch'](function(){ delete npMoreEpisodesCache[collectionId]; });
     return p;
   }
+  // Build 269 (Mark): the episode's description, in full, between the progress bar and More
+  // Episodes. What the playing item carries is shown at once, but copies kept in Continue
+  // Listening, Latest Podcasts and the Home hero are cut short, so the show's episode list
+  // (the same lookup More Episodes uses) replaces it with the full text when it has more.
+  var npEpDesc = document.getElementById('npEpDesc');
+  var npEpDescText = document.getElementById('npEpDescText');
+  function episodeDescText(raw){
+    var s = String(raw || '');
+    if(/<[a-z\/!]|&[#a-z0-9]+;/i.test(s)){
+      try{
+        var doc = new DOMParser().parseFromString('<body>' + s
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/(p|div|h[1-6]|ul|ol|blockquote)\s*>/gi, '\n\n')
+          .replace(/<li\b[^>]*>/gi, '\n• ')
+          .replace(/<\/li\s*>/gi, '\n') + '</body>', 'text/html');
+        s = doc.body.textContent || '';
+      }catch(e){ s = s.replace(/<[^>]*>/g, ' '); }
+    }
+    return s.replace(/\r\n?/g, '\n').replace(/[ \t ]+/g, ' ').replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n').trim();
+  }
+  function renderNpEpisodeDesc(station, requestId){
+    function show(text){
+      npEpDescText.textContent = text;
+      npEpDesc.style.display = text ? '' : 'none';
+    }
+    if(!npEpDesc) return;
+    if(!station || !isPodcastTrack(station) || isNpChannel(station)){ show(''); return; }
+    var text = episodeDescText(station.description);
+    show(text);
+    if(station.collectionId == null) return;
+    showEpisodesFor(station.collectionId).then(function(eps){
+      if(requestId !== npRelatedRequestId) return;
+      var me = (eps || []).filter(function(e){
+        return e.guid === station.guid || (station.episodeUrl && e.episodeUrl === station.episodeUrl);
+      })[0];
+      var full = me ? episodeDescText(me.description) : '';
+      if(full.length > text.length){ text = full; show(text); }
+    }, function(){});
+  }
   function renderNpMoreEpisodes(station, requestId){
     var headingEl = npRelated.querySelector('.np-related-heading');
     if(headingEl) headingEl.textContent = 'More Episodes';
@@ -11049,6 +11101,7 @@
 
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
+    renderNpEpisodeDesc(station, requestId);
     if(isNpChannel(station) || isLocalVideo(station) || isChartSong(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
     if(isLocalTrack(station)){
       renderNpLibraryRelated(station);
