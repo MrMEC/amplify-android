@@ -6089,6 +6089,19 @@
     .np-float .np-back{ left:var(--main-pad); }
     body.np-open .np-below, body.np-sheet .np-below{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
   }
+  /* ---------- Build 276: bigger names on Home (Mark) ----------
+     Station, song and artist names (and the line under them) in every Home row except Continue
+     Watching. Cover tiles were 10px / 9.5px. */
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .tile:not(.tile-row):not(.fav-card) .tile-name{ font-size:13px; line-height:1.3; margin-top:8px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .tile:not(.tile-row):not(.fav-card) .tile-sub{ font-size:11.5px; margin-top:2px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .fav-card .tile-name{ font-size:14.5px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .fav-card .tile-sub{ font-size:12.5px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .tile.tile-row .tile-name{ font-size:15px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .tile.tile-row .tile-sub{ font-size:13px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .song-row .song-row-title{ font-size:15.5px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .song-row .song-row-sub{ font-size:14px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .yt-title{ font-size:14.5px; }
+  body.home-view :is(.home-section:not(#continueWatchingHomeSection), .recent-section, #stationsGrid) .yt-date{ font-size:12.5px; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
