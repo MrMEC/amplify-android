@@ -113,7 +113,7 @@ final class VideoControls extends FrameLayout {
     liveTag.setText("LIVE");
     liveTag.setTextColor(Color.WHITE);
     liveTag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-    liveTag.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+    liveTag.setTypeface(poppinsBold(context));
     liveTag.setLetterSpacing(0.06f);
     GradientDrawable lb = new GradientDrawable();
     lb.setColor(0xFFE5322D);
@@ -185,7 +185,7 @@ final class VideoControls extends FrameLayout {
     stop.setText("Stop");
     stop.setTextColor(Color.WHITE);
     stop.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-    stop.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+    stop.setTypeface(poppinsBold(context));
     stop.setLetterSpacing(0.02f);
     stop.setGravity(Gravity.CENTER);
     stop.setIncludeFontPadding(false);
@@ -215,11 +215,25 @@ final class VideoControls extends FrameLayout {
     setAlpha(0f);
   }
 
+  // Build 273: the app's typeface (Poppins), as on the page; the system bold if it can't load.
+  private static android.graphics.Typeface poppins;
+  static android.graphics.Typeface poppinsBold(Context context) {
+    if (poppins == null) {
+      try {
+        poppins = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.poppins_bold);
+      } catch (Exception e) {
+        poppins = null;
+      }
+      if (poppins == null) poppins = android.graphics.Typeface.DEFAULT_BOLD;
+    }
+    return poppins;
+  }
+
   private TextView timeLabel(Context context) {
     TextView t = new TextView(context);
     t.setTextColor(Color.WHITE);
     t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-    t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+    t.setTypeface(poppinsBold(context));
     t.setShadowLayer(3f, 0f, 1f, 0x80000000);
     t.setText("0:00");
     return t;
