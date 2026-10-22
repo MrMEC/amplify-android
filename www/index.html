@@ -12399,6 +12399,8 @@
     // Build 235: a favourite custom station follows its name, and goes when it is deleted.
     try{
       if(typeof favorites !== 'undefined' && favorites.some(isCustomStation)){
+        // Build 278: one whose id isn't known here is first linked to its custom station by name.
+        try{ relinkFavorites(saveCustomSearches.importMaps || null); }catch(e){}
         var changed = false;
         favorites = favorites.filter(function(f){
           if(!isCustomStation(f)) return true;
@@ -24187,13 +24189,22 @@
   var PLAYLIST_COVER_IMG_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg>';
   var playlistCoverBtn = document.getElementById('playlistCoverBtn');
   function playlistArtKey(id){ return 'playlistart:' + id; }
-  function renderPlaylistCoverArt(art, item){
+  function playlistCoverUrl(item){
     var url = getCustomArtUrl(playlistArtKey(item.id));
+    if(url) return url;
+    var item2 = findStationPlaylistById(item.id) || item;
+    var label = String(item2.label || item2.name || '').trim().toLowerCase();
+    if(!label) return null;
+    var twin = stationPlaylists.filter(function(c){ return c.id !== item.id && String(c.label || '').trim().toLowerCase() === label && getCustomArtUrl(playlistArtKey(c.id)); })[0];
+    return twin ? getCustomArtUrl(playlistArtKey(twin.id)) : null;
+  }
+  function renderPlaylistCoverArt(art, item){
+    var url = playlistCoverUrl(item);
     if(!url){
       applyPlaceholderArt(art, 'playlist-' + item.id);
       var t0 = beginArtRender(art);
       whenCustomArtLoaded(function(){
-        if(artRenderCurrent(art, t0) && getCustomArtUrl(playlistArtKey(item.id))){ art.innerHTML = ''; renderPlaylistCoverArt(art, item); }
+        if(artRenderCurrent(art, t0) && playlistCoverUrl(item)){ art.innerHTML = ''; renderPlaylistCoverArt(art, item); }
       });
       return;
     }
@@ -24980,13 +24991,24 @@
   var customSearchCoverField = document.getElementById('customSearchCoverField');
   var customSearchCoverBtn = document.getElementById('customSearchCoverBtn');
   function customSearchArtKey(id){ return 'foryouart:' + id; }
-  function renderCustomSearchCoverArt(art, item){
+  // Build 278: a custom station with no cover of its own wears the one saved for a custom
+  // station of the same name (an older import could leave a copy under another id holding it).
+  function customSearchCoverUrl(item){
     var url = getCustomArtUrl(customSearchArtKey(item.id));
+    if(url) return url;
+    var item2 = findCustomSearchById(item.id) || item;
+    var label = String(item2.label || item2.name || '').trim().toLowerCase();
+    if(!label) return null;
+    var twin = customSearches.filter(function(c){ return c.id !== item.id && String(c.label || '').trim().toLowerCase() === label && getCustomArtUrl(customSearchArtKey(c.id)); })[0];
+    return twin ? getCustomArtUrl(customSearchArtKey(twin.id)) : null;
+  }
+  function renderCustomSearchCoverArt(art, item){
+    var url = customSearchCoverUrl(item);
     if(!url){
       applyPlaceholderArt(art, 'foryou-' + item.id);
       var t0 = beginArtRender(art);
       whenCustomArtLoaded(function(){
-        if(artRenderCurrent(art, t0) && getCustomArtUrl(customSearchArtKey(item.id))){ art.innerHTML = ''; renderCustomSearchCoverArt(art, item); }
+        if(artRenderCurrent(art, t0) && customSearchCoverUrl(item)){ art.innerHTML = ''; renderCustomSearchCoverArt(art, item); }
       });
       return;
     }
@@ -37711,7 +37733,10 @@
           carryCover('foryouart:', s.id, match.id);
           if(s.id != null) importIdMaps.search[s.id] = match.id;
         });
+        saveCustomSearches.importMaps = importIdMaps;
+        relinkFavorites(importIdMaps);
         if(searchAdded) saveCustomSearches();
+        saveCustomSearches.importMaps = null;
         var channelsAdded = importVideoChannels(data.videoChannels) + importLiveChannels(data.liveChannels);
         importVideoLibrary(data.videoLibrary);
 
