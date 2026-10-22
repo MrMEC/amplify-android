@@ -380,10 +380,12 @@ public final class PodcastFeeds {
   }
 
   static String plain(String html) {
-    String s = html.replaceAll("(?s)<[^>]*>", " ");
+    // Block tags become a space, inline ones (b, a, span...) nothing, so "<b>Ilja</b>." stays "Ilja.".
+    String s = html.replaceAll("(?i)<\\s*(br|/?p|/?div|/?li|/?ul|/?ol|/?h[1-6]|/?tr|/?td)\\b[^>]*>", " ");
+    s = s.replaceAll("(?s)<[^>]*>", "");
     s = s.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
         .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'");
-    return s.replaceAll("\\s+", " ").trim();
+    return s.replaceAll("\\s+", " ").replaceAll(" ([.,;:!?])", "$1").trim();
   }
 
   static int duration(String s) {
