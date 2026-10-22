@@ -1,0 +1,17 @@
+name: JVM tests
+# Build 274: plain-Java tests that need jars from Maven (kxml2, org.json). Runs on test branches.
+on:
+  push:
+    branches: ['tests-*']
+  workflow_dispatch:
+jobs:
+  jvm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: PodcastFeeds
+        run: sh tests/java/run_podcast_feeds.sh
