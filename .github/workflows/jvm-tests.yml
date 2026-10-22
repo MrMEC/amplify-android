@@ -14,4 +14,10 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: PodcastFeeds
-        run: sh tests/java/run_podcast_feeds.sh
+        shell: bash
+        run: |
+          set +e
+          sh tests/java/run_podcast_feeds.sh > out.txt 2>&1; rc=$?
+          # The output as one annotation (readable through the checks API).
+          grep -v '^ *[\[\]{}"]' out.txt | tail -c 3800 | python3 -c "import sys; t=sys.stdin.read(); print('::notice title=PodcastFeeds::' + t.replace('%','%25').replace('\r','').replace('\n','%0A'))"
+          exit $rc
