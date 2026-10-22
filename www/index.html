@@ -12640,6 +12640,42 @@
   // one of its stations at random, with Previous/Next going through the rest.
   function customStationRecord(item){ return { type: 'customStation', searchId: item.id, name: item.label || 'Custom Station', stationuuid: 'customstation:' + item.id }; }
   function isCustomStation(s){ return !!(s && s.type === 'customStation'); }
+  // Build 278 (Mark: covers missing on some Favorites -- "80's 80's", "Positively Radio",
+  // "Relaxing Calm"): importing a backup gives each custom station and playlist a new id here
+  // and moves its cover to that id, but the favourites in the file kept the old ids. Such a
+  // favourite pointed at a custom station that doesn't exist on this phone, so it showed a
+  // placeholder (and would say it "no longer exists" when played). A favourite or recent entry
+  // whose custom station / playlist is missing is linked again: through the import's id map
+  // when there is one, otherwise to the one with the same name. A copy that then duplicates
+  // one already in the list is dropped. Returns whether anything changed.
+  function relinkFavoriteRecords(list, maps){
+    var changed = false, seen = {}, out = [];
+    function norm(x){ return String(x || '').trim().toLowerCase(); }
+    list.forEach(function(s){
+      if(isCustomStation(s) && !findCustomSearchById(s.searchId)){
+        var cid = maps && maps.search && maps.search[s.searchId];
+        var cs = (cid && findCustomSearchById(cid)) || customSearches.filter(function(c){ return norm(c.label) === norm(s.name); })[0];
+        if(cs){ s = customStationRecord(cs); changed = true; }
+      } else if(isPlaylistRadio(s) && !findStationPlaylistById(s.playlistId)){
+        var pid = maps && maps.playlist && maps.playlist[s.playlistId];
+        var pl = (pid && findStationPlaylistById(pid)) || stationPlaylists.filter(function(x){ return norm(x.label) === norm(s.name); })[0];
+        if(pl){ s = playlistRadioRecord(pl); changed = true; }
+      }
+      var k = favKey(s);
+      if(seen[k]){ changed = true; return; }
+      seen[k] = 1;
+      out.push(s);
+    });
+    return changed ? out : null;
+  }
+  function relinkFavorites(maps){
+    var any = false;
+    var f = relinkFavoriteRecords(favorites, maps);
+    if(f){ favorites.length = 0; Array.prototype.push.apply(favorites, f); saveFavorites(); any = true; }
+    var r = relinkFavoriteRecords(recentStations, maps);
+    if(r){ recentStations.length = 0; Array.prototype.push.apply(recentStations, r); saveRecent(); any = true; }
+    return any;
+  }
   function playlistRadioItems(id){
     var pl = id ? findStationPlaylistById(id) : null;
     return pl ? (pl.stations || []).filter(function(t){ return queueable(t); }) : [];
@@ -37660,6 +37696,7 @@
         // Custom searches are deduped by label+query (case-insensitive), since an id
         // generated on another device carries no meaning here -- a fresh id is minted
         // for anything genuinely new.
+        var importIdMaps = { search: {}, playlist: {} }; // build 278: file id -> id here
         var importedCustomSearches = Array.isArray(data.customSearches) ? data.customSearches : [];
         var searchAdded = 0;
         importedCustomSearches.forEach(function(s){
@@ -37672,6 +37709,7 @@
             searchAdded++;
           }
           carryCover('foryouart:', s.id, match.id);
+          if(s.id != null) importIdMaps.search[s.id] = match.id;
         });
         if(searchAdded) saveCustomSearches();
         var channelsAdded = importVideoChannels(data.videoChannels) + importLiveChannels(data.liveChannels);
@@ -37694,9 +37732,11 @@
             var created = { id: makeStationPlaylistId(), label: p.label, stations: stations };
             stationPlaylists.push(created);
             carryCover('playlistart:', p.id, created.id);
+            if(p.id != null) importIdMaps.playlist[p.id] = created.id;
             playlistsAdded++;
           } else {
             carryCover('playlistart:', p.id, existingPlaylist.id);
+            if(p.id != null) importIdMaps.playlist[p.id] = existingPlaylist.id;
             stations.forEach(function(s){
               if(!existingPlaylist.stations.some(function(es){ return favKey(es) === favKey(s); })){
                 existingPlaylist.stations.push(s);
@@ -37706,6 +37746,9 @@
           }
         });
         if(importedPlaylists.length) saveStationPlaylists();
+        // Build 278: the imported favourites and recents follow their custom stations and
+        // playlists to the ids they have here.
+        relinkFavorites(importIdMaps);
         // existingCustomArt is the live map, so every merge above is already in memory;
         // this writes it through once for station art and covers together.
         if(artAdded || artReplaced) persistCustomArtMap();
@@ -39081,6 +39124,7 @@
   // ---------- init ----------
   migrateLegacyMyStations();
   cleanupRetired();
+  try{ relinkFavorites(null); }catch(e){} // build 278
   renderGenreNav();
   renderCustomSearchList();
   renderStationPlaylistList();
