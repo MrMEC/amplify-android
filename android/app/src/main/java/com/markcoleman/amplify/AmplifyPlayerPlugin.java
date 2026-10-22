@@ -2217,6 +2217,30 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     call.resolve(r);
   }
 
+  // Build 274: followed podcasts' newest episodes from their own feeds (see PodcastFeeds).
+  // podcastFeedsGet: what the hourly background refresh last saved. podcastRefresh: read every
+  // feed now (several at once) and answer with the result.
+  @PluginMethod
+  public void podcastFeedsGet(PluginCall call) {
+    new Thread(() -> {
+      try {
+        call.resolve(JSObject.fromJSONObject(PodcastFeeds.read(getContext())));
+      } catch (Exception e) {
+        call.reject(String.valueOf(e.getMessage()));
+      }
+    }).start();
+  }
+  @PluginMethod
+  public void podcastRefresh(PluginCall call) {
+    new Thread(() -> {
+      try {
+        call.resolve(JSObject.fromJSONObject(PodcastFeeds.refreshAll(getContext())));
+      } catch (Exception e) {
+        call.reject(String.valueOf(e.getMessage()));
+      }
+    }).start();
+  }
+
   /** Export: writes {name, text, mime} into Downloads and says where it went (build 48). */
   @PluginMethod
   public void saveToDownloads(PluginCall call) {

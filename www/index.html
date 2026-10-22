@@ -25967,21 +25967,138 @@
     });
   }
   function mergeRecentEpisodes(sub, eps){
-    var recent = trimRecentEpisodes(eps);
-    var newest = eps[0] || null;
-    var changed = false;
-    if(newest && (!sub.latestEpisode || (newest.guid !== sub.latestEpisode.guid &&
-        (new Date(newest.releaseDate).getTime() || 0) >= (new Date(sub.latestEpisode.releaseDate).getTime() || 0)))){
-      sub.latestEpisode = newest; changed = true;
-    }
-    var was = (sub.recentEpisodes || []).map(function(e){ return e.guid; }).join('|');
-    if(recent.map(function(e){ return e.guid; }).join('|') !== was){ sub.recentEpisodes = recent; changed = true; }
+    // Build 274: added to the show's list (see takeShowEpisodes), not replacing it.
+    var changed = takeShowEpisodes(sub, eps || []);
     if(changed){ savePodcastSubs(); scheduleLatestPodcastsRedraw(); }
     return changed;
   }
-  function backfillPodcastShowMeta(mode){
-    if(podcastRefreshInFlight) return;
+
+  // ---------- Build 274: episodes straight from each show's own feed (Android) ----------
+  // Mark had to open the app and wait for the newest episodes. Android now reads every followed
+  // show's RSS feed about once an hour in the background (PodcastRefreshWorker) and saves the
+  // result; the page shows it the moment it starts or comes back to the front, then reads the
+  // feeds again natively (all at once, not paced like Apple's directory, and without the hours
+  // Apple's copy can trail a feed by). Apple's lookup is still used for a show's artwork and for
+  // any show whose feed can't be read, and on desktop.
+  var podcastNative = (function(){
+    try{
+      var C = window.Capacitor;
+      var P = C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.AmplifyPlayer;
+      return (P && typeof P.podcastRefresh === 'function' && typeof P.podcastFeedsGet === 'function') ? P : null;
+    }catch(e){ return null; }
+  })();
+  var PODCAST_NATIVE_AUTO_MS = 5 * 60 * 1000;
+  function podcastEpTime(e){ return e && e.releaseDate ? (new Date(e.releaseDate).getTime() || 0) : 0; }
+  function episodeFromFeedSlim(sub, x){
+    return { type: 'podcast', guid: x.g, collectionId: sub.collectionId, collectionName: sub.collectionName || '',
+      artistName: sub.artistName || '', name: x.n || 'Untitled episode', favicon: x.f || sub.artworkUrl || '',
+      releaseDate: x.d || '', duration: x.t || 0, episodeUrl: x.u || '', description: x.s || '', isVideo: !!x.v };
+  }
+  // New episodes first, then what the show already had; one copy of each (by guid, or by title,
+  // since the feed and Apple can disagree on an episode's address), newest first.
+  function unionRecentEpisodes(sub, eps){
+    var seenG = {}, seenN = {}, all = [];
+    function add(e){
+      if(!e || !e.guid) return;
+      var n = String(e.name || '').trim().toLowerCase();
+      if(seenG[e.guid] || (n && seenN[n])) return;
+      seenG[e.guid] = 1; if(n) seenN[n] = 1; all.push(e);
+    }
+    (eps || []).forEach(add);
+    (sub.recentEpisodes || []).forEach(add);
+    all.sort(function(a, b){ return podcastEpTime(b) - podcastEpTime(a); });
+    return all;
+  }
+  // Takes a show's newly fetched episodes into its recent list and latest episode. Returns
+  // whether anything changed (the caller saves and redraws once).
+  function takeShowEpisodes(sub, eps){
+    var merged = trimRecentEpisodes(unionRecentEpisodes(sub, eps));
+    var changed = false;
+    var newest = merged[0] || (eps && eps[0]) || null;
+    if(newest && (!sub.latestEpisode || (newest.guid !== sub.latestEpisode.guid && podcastEpTime(newest) >= podcastEpTime(sub.latestEpisode)))){
+      sub.latestEpisode = newest; changed = true;
+    }
+    var was = (sub.recentEpisodes || []).map(function(e){ return e.guid; }).join('|');
+    if(!sub.recentEpisodes || merged.map(function(e){ return e.guid; }).join('|') !== was){ sub.recentEpisodes = merged; changed = true; }
+    return changed;
+  }
+  function podcastsChangedRedraw(){
+    savePodcastSubs();
+    if(onPodcastsView && podcastTab === 'latest') renderPodcastsGrid();
+    scheduleLatestPodcastsRedraw();
+  }
+  // res: { at, ok, total, shows: { collectionId: { ok, feedUrl, eps: [slim episode, ...] } } }
+  function applyFeedResults(res){
+    var shows = res && res.shows;
+    if(!shows) return false;
+    var any = false;
+    podcastSubs.forEach(function(sub){
+      var r = shows[sub.collectionId];
+      if(!r) return;
+      if(r.feedUrl && !sub.feedUrl){ sub.feedUrl = r.feedUrl; any = true; }
+      if(!Array.isArray(r.eps)) return;
+      var eps = r.eps.map(function(x){ return episodeFromFeedSlim(sub, x); }).filter(function(e){ return e.guid && e.episodeUrl; });
+      if(takeShowEpisodes(sub, eps)) any = true;
+    });
+    if(any) podcastsChangedRedraw();
+    return any;
+  }
+  function notePodcastFeedsAt(res){
+    if(!res || !res.at || !res.total || (res.ok || 0) * 2 < res.total) return;
+    if(res.at > lastPodcastRefreshAt()){ try{ localStorage.setItem(PODCAST_REFRESHED_AT_KEY, String(res.at)); }catch(e){} }
+  }
+  // What the background refresh saved, then (if that's over 5 minutes old) a fresh read.
+  function podcastsFromBackground(){
+    if(!podcastNative){ backfillPodcastShowMeta('auto'); return; }
+    podcastNative.podcastFeedsGet().then(function(res){
+      applyFeedResults(res);
+      notePodcastFeedsAt(res);
+    })['catch'](function(){}).then(function(){ backfillPodcastShowMeta('auto'); });
+  }
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) podcastsFromBackground(); });
+  function setPodcastRefreshing(on){
+    if(!podcastRefreshHeaderBtn) return;
+    podcastRefreshHeaderBtn.classList.toggle('refreshing', !!on);
+    podcastRefreshHeaderBtn.disabled = !!on;
+  }
+  function backfillPodcastShowMetaNative(mode){
     var force = mode === 'manual'
+      || (mode === 'auto' && Date.now() - lastPodcastRefreshAt() > PODCAST_NATIVE_AUTO_MS);
+    var gaps = podcastSubs.some(function(s){ return !s.latestEpisode || !s.recentEpisodes; });
+    if(!force && !gaps){
+      var noArt = {}, n = 0;
+      podcastSubs.forEach(function(s){ if(!s.artworkUrl){ noArt[s.collectionId] = 1; n++; } });
+      if(n) backfillPodcastShowMeta(mode, noArt);
+      return;
+    }
+    if(!podcastSubs.length) return;
+    podcastRefreshInFlight = true;
+    setPodcastRefreshing(true);
+    var rest = null;
+    podcastNative.podcastRefresh().then(function(res){
+      applyFeedResults(res);
+      notePodcastFeedsAt(res);
+      var shows = (res && res.shows) || {};
+      rest = {};
+      podcastSubs.forEach(function(s){
+        var r = shows[s.collectionId];
+        if(!s.artworkUrl || !r || (!r.ok && !(r.eps && r.eps.length))) rest[s.collectionId] = 1;
+      });
+    }, function(){
+      rest = {};
+      podcastSubs.forEach(function(s){ rest[s.collectionId] = 1; });
+    }).then(function(){
+      podcastRefreshInFlight = false;
+      setPodcastRefreshing(false);
+      if(rest && Object.keys(rest).length) backfillPodcastShowMeta(mode, rest);
+    });
+  }
+  // onlyIds (build 274): just these shows, through Apple's lookup (the ones Android's feed read
+  // couldn't cover).
+  function backfillPodcastShowMeta(mode, onlyIds){
+    if(podcastRefreshInFlight) return;
+    if(podcastNative && !onlyIds){ backfillPodcastShowMetaNative(mode); return; }
+    var force = !!onlyIds || mode === 'manual'
       || (mode === 'auto' && Date.now() - lastPodcastRefreshAt() > PODCAST_AUTO_REFRESH_MS);
     var pending = 0, failed = 0, total = 0;
     function settle(){
@@ -25990,7 +26107,7 @@
       podcastRefreshInFlight = false;
       // A full pass counts as done only if most of it actually got through; a pass that ran
       // into a throttled API should be tried again next time rather than trusted for 15 minutes.
-      if(force && failed * 2 <= total){
+      if(force && !onlyIds && failed * 2 <= total){
         try{ localStorage.setItem(PODCAST_REFRESHED_AT_KEY, String(Date.now())); }catch(e){}
       }
       if(podcastRefreshHeaderBtn){
@@ -25999,6 +26116,7 @@
       }
     }
     podcastSubs.forEach(function(sub){
+      if(onlyIds && !onlyIds[sub.collectionId]) return;
       if(!force && sub.artworkUrl && sub.latestEpisode && sub.recentEpisodes) return;
       pending++;
       total++;
@@ -26015,19 +26133,9 @@
           }
           var eps = (res.episodes || []).map(episodeFromItunes).filter(function(e){ return e && e.guid; });
           eps.sort(function(a, b){ return (new Date(b.releaseDate).getTime() || 0) - (new Date(a.releaseDate).getTime() || 0); });
-          var fetched = eps[0] || null;
-          if(fetched && (!sub.latestEpisode || fetched.guid !== sub.latestEpisode.guid)){
-            sub.latestEpisode = fetched;
-            changed = true;
-          }
-          if(res.episodes){
-            var recent = trimRecentEpisodes(eps);
-            var was = (sub.recentEpisodes || []).map(function(e){ return e.guid; }).join('|');
-            if(!sub.recentEpisodes || recent.map(function(e){ return e.guid; }).join('|') !== was){
-              sub.recentEpisodes = recent;
-              changed = true;
-            }
-          }
+          // Build 274: added to what the show already has (the feed may know newer episodes than
+          // Apple), never replacing it with Apple's possibly older list.
+          if(res.episodes && takeShowEpisodes(sub, eps)) changed = true;
           if(!changed) return;
           savePodcastSubs();
           var tileArt = stationsGrid.querySelector('.tile[data-key="podcastshow:' + sub.collectionId + '"] .tile-art');
@@ -38970,7 +39078,8 @@
   // the home page's Latest Podcasts row current, see renderLatestPodcastsSection) unless that
   // was already done in the last 15 minutes -- reloading the page shouldn't mean another full
   // round of lookups every time.
-  backfillPodcastShowMeta('auto');
+  // Build 274: on Android, what the hourly background refresh saved is shown first.
+  podcastsFromBackground();
   renderLibraryList();
   renderFavoritesList();
   renderRecentList();

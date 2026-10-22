@@ -19,6 +19,8 @@ public class MainActivity extends BridgeActivity {
     CrashLog.install(this);
     registerPlugin(AmplifyPlayerPlugin.class);
     super.onCreate(bundle);
+    // Build 274: followed podcasts are refreshed in the background about once an hour.
+    PodcastRefreshWorker.schedule(this);
     // Build 237: while a Favorites cover on Home is held to drag it, the WebView's own long
     // press is skipped (see AmplifyPlayerPlugin.holdTouch); otherwise it behaves as before.
     try {
