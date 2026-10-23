@@ -31420,13 +31420,16 @@
     var shown = {};
     videoHistory().forEach(function(x){ if(x && x.k && x.day !== day) shown[x.k] = 1; });
     var all = buildArtistIndex().filter(videoArtistEligible);
-    var left = all.filter(function(e){ return !shown[e.key]; });
+    // One known to have no videos doesn't count as waiting for a turn (else the history would
+    // never start over).
+    function knownEmpty(e){ var r = ytStore && ytStore[e.key]; return !!r && ytFresh(r) && !artistHasVideos(e.key); }
+    var left = all.filter(function(e){ return !shown[e.key] && !knownEmpty(e); });
     if(!left.length && all.length){
       var recent = videoHistory().slice(-30);
       try{ localStorage.setItem(VIDEO_HIST_KEY, JSON.stringify(recent)); }catch(e){}
       var keep = {}; recent.forEach(function(x){ keep[x.k] = 1; });
-      left = all.filter(function(e){ return !keep[e.key]; });
-      if(!left.length) left = all;
+      left = all.filter(function(e){ return !keep[e.key] && !knownEmpty(e); });
+      if(!left.length) left = all.filter(function(e){ return !knownEmpty(e); });
     }
     return mfySeeded(left, 'vid|' + day);
   }
@@ -31434,49 +31437,42 @@
   function dailyVideoArtistKeys(){
     return dailyVideoOrder(mfyDay()).filter(function(e){ return artistHasVideos(e.key); }).map(function(e){ return e.key; });
   }
-  function setDailyVideoArtist(key, day){
-    if(!dailyState || dailyState.day !== day) return;
-    dailyState.videoKey = key;
-    dailySave();
-    if(key) noteVideoArtist(key, day);
-  }
-  // Today's artist if it can be told at once; otherwise null, and the search runs in the
-  // background and fills it in (Home is drawn again then).
+  // Today's artist: the first in the day's order whose videos are known (YouTube, or files on the
+  // phone). Artists not looked up yet are looked up quietly in the background (videoDiscovery),
+  // so over the days every artist in the library comes round, without Home waiting on the network.
   function pickDailyVideoArtist(day){
     var cur = dailyState && dailyState.day === day && dailyState.videoKey;
     if(cur && findArtistEntry(cur) && videoArtistEligible(findArtistEntry(cur)) && artistHasVideos(cur)) return cur;
-    if(dailyVideoSearching) return null;
     var order = dailyVideoOrder(day);
+    scheduleVideoDiscovery(order);
     for(var i = 0; i < order.length; i++){
-      var e = order[i], rec = ytStore && ytStore[e.key];
-      if(artistHasVideos(e.key)){ noteVideoArtist(e.key, day); return e.key; }
-      if(!rec || !ytFresh(rec)) break;   // not looked up yet: the search takes it from here
+      if(artistHasVideos(order[i].key)){ noteVideoArtist(order[i].key, day); return order[i].key; }
     }
-    searchDailyVideoArtist(day, order.slice(i));
     return null;
   }
-  function searchDailyVideoArtist(day, order){
-    if(dailyVideoSearching || !order || !order.length) return;
+  // Up to VIDEO_SEARCH_MAX artists not looked up yet, once a session, half a minute after the
+  // app opens, one at a time; stops at the first that can't be asked (no connection). If today
+  // had no artist yet and one turns up, it's today's.
+  var videoDiscoveryDone = false;
+  function scheduleVideoDiscovery(order){
+    if(videoDiscoveryDone || dailyVideoSearching) return;
     dailyVideoSearching = true;
-    var tries = 0;
-    (function next(i){
-      if(i >= order.length || tries >= VIDEO_SEARCH_MAX || !dailyState || dailyState.day !== day || dailyState.videoKey){
-        dailyVideoSearching = false;
-        return;
-      }
-      var e = order[i], rec = ytStore && ytStore[e.key];
-      if(artistHasVideos(e.key)){
-        dailyVideoSearching = false;
-        setDailyVideoArtist(e.key, day);
-        try{ renderDailyHome(); }catch(err){}
-        return;
-      }
-      if(rec && ytFresh(rec)){ next(i + 1); return; }   // known to have none
-      tries++;
-      Promise.resolve(loadArtistVideos(e))['catch'](function(){ return null; }).then(function(){
-        setTimeout(function(){ next(artistHasVideos(e.key) ? i : i + 1); }, 400);
-      });
-    })(0);
+    setTimeout(function(){
+      var todo = (order || []).filter(function(e){ var r = ytStore && ytStore[e.key]; return !r || !ytFresh(r); }).slice(0, VIDEO_SEARCH_MAX);
+      (function next(i){
+        if(i >= todo.length){ videoDiscoveryDone = true; dailyVideoSearching = false; afterDiscovery(); return; }
+        Promise.resolve(loadArtistVideos(todo[i]))['catch'](function(){ return null; }).then(function(){
+          var r2 = ytStore && ytStore[todo[i].key];
+          if(!r2 || !ytFresh(r2)){ dailyVideoSearching = false; afterDiscovery(); return; }   // no connection: another time
+          setTimeout(function(){ next(i + 1); }, 1500);
+        });
+      })(0);
+    }, 30000);
+  }
+  function afterDiscovery(){
+    if(!dailyState || dailyState.videoKey || dailyState.day !== mfyDay()) return;
+    var k = pickDailyVideoArtist(dailyState.day);
+    if(k){ dailyState.videoKey = k; dailySave(); try{ renderDailyHome(); }catch(e){} }
   }
   var dailyBuildSeq = 0;
   function buildDailyLists(){
