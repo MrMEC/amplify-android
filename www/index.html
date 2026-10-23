@@ -3318,6 +3318,11 @@
     -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
   }
   body:not(.rotate-lock) .now-playing-screen.np-channel .np-art img{ object-fit:contain; }
+  /* Build 283 (Mark: a thin coloured line under the video): the cover behind the video reached
+     below the picture's 16:9 box, so its bottom edge showed under it. It now ends with the box,
+     and isn't drawn at all while a video is showing. */
+  body:not(.rotate-lock) .now-playing-screen:is(.np-channel, .np-vplayer) .np-art{ bottom:auto; height:min(56.25vw, 52vh); }
+  .now-playing-screen:is(.np-video-on, .np-vplayer) .np-art{ visibility:hidden; }
   body:not(.rotate-lock) .now-playing-screen:is(.np-channel, .np-vplayer) .np-hero-foot{
     position:relative; top:auto; margin-top:12px; padding:0 12px 0 20px;
   }
@@ -3582,7 +3587,7 @@
   .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
   .epg-logo{ display:flex; align-items:center; justify-content:center; width:60px; height:28px; }
   .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
-  .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+  .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:normal; word-break:normal; hyphens:none; max-width:100%; }
   .epg-heart{ color:var(--accent); font-size:11px; }
   .epg-prog{ position:absolute; top:0; height:50px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
     display:flex; flex-direction:column; justify-content:center; gap:1px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:visible; }
@@ -19224,7 +19229,28 @@
     var n = document.createElement('span');
     n.className = 'epg-logo-name';
     n.textContent = ch.name || 'Channel';
+    requestAnimationFrame(function(){ fitEpgLogoName(n); });
     return n;
+  }
+  // Build 283 (Mark): a channel's name never breaks inside a word ("Animatio / n"): it gets
+  // smaller until every word fits across and the whole name fits in two lines.
+  function fitEpgLogoName(n){
+    if(!n || !n.isConnected) return;
+    n.style.fontSize = '';
+    var size = parseFloat(getComputedStyle(n).fontSize) || 10.5;
+    var box = n.parentNode, wmax = box ? box.clientWidth : n.clientWidth;
+    function fits(){
+      // Each word on its own must fit across; then the clamp must not cut anything off.
+      var words = String(n.textContent).split(/\s+/), probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-weight:700;font-size:' + size + 'px';
+      document.body.appendChild(probe);
+      var widest = 0;
+      words.forEach(function(w){ probe.textContent = w; widest = Math.max(widest, probe.getBoundingClientRect().width); });
+      probe.remove();
+      return widest <= wmax + 0.5 && n.scrollHeight <= n.clientHeight + 1;
+    }
+    var guard = 0;
+    while(size > 6.5 && !fits() && guard++ < 16){ size -= 0.5; n.style.fontSize = size + 'px'; }
   }
   function epgBlock(ch, s, e, title, sub, isNow, whole, t0, it){
     t0 = t0 == null ? s : t0;
