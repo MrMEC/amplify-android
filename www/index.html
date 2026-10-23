@@ -2767,7 +2767,7 @@
      so it can never inflate .np-details' measured width and force an early wrap. */
   /* Below the controls now, on the artwork, so it is drawn in white like everything else
      down there rather than in the page's border colour. */
-  .np-seek{ width:100%; max-width:360px; margin:18px auto 0; }
+  .np-seek{ width:100%; max-width:360px; margin:28px auto 0; }
   .np-seek-range{
     -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:999px;
     background:rgba(255,255,255,.28); outline:none; cursor:pointer; display:block;
@@ -2781,7 +2781,7 @@
   }
   .np-seek-range:disabled{ cursor:default; opacity:.55; }
   .np-seek-times{
-    display:flex; justify-content:space-between; margin-top:7px;
+    display:flex; justify-content:space-between; margin-top:4px;
     font-size:11.5px; color:rgba(255,255,255,.7); font-variant-numeric:tabular-nums;
   }
   /* Same rotate-arrow glyph podcastRefreshHeaderBtn's Refresh button uses (see .refresh-glyph),
@@ -5751,7 +5751,7 @@
 
   /* The line under the Now Playing controls that shows what plays next. */
   .np-upnext{
-    display:flex; align-items:center; gap:8px; width:100%; max-width:360px; margin:14px auto 0; box-sizing:border-box;
+    display:flex; align-items:center; gap:8px; width:100%; max-width:360px; margin:7px auto 0; box-sizing:border-box;
     padding:10px 12px; border-radius:12px; cursor:pointer; text-align:left; font-family:inherit;
     background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.12); color:#fff;
     backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
@@ -28464,14 +28464,16 @@
     var ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    var fillX = w * Math.max(0, Math.min(1, (Number(npSeekRange.value) || 0) / 1000));
+    // The dot's centre: the range keeps the 16px thumb inside the track, so it runs 8px..w-8px.
+    var p = Math.max(0, Math.min(1, (Number(npSeekRange.value) || 0) / 1000));
+    var fillX = 8 + p * Math.max(0, w - 16);
     if(fillX < 2 || npWave.amp < 0.01) return;
     var col = npWaveColour(now);
     var base = h;                       // the bar's line is the canvas's bottom edge
     var waves = [
-      { len: 0.62, speed: 0.9, amp: 1.0, alpha: 0.55, phase: 0 },
-      { len: 0.38, speed: -1.4, amp: 0.78, alpha: 0.5, phase: 1.7 },
-      { len: 0.24, speed: 2.1, amp: 0.56, alpha: 0.45, phase: 3.1 }
+      { len: 0.62, speed: 1.1, amp: 1.0, alpha: 0.55, phase: 0 },
+      { len: 0.38, speed: 1.7, amp: 0.78, alpha: 0.5, phase: 1.7 },
+      { len: 0.24, speed: 2.4, amp: 0.56, alpha: 0.45, phase: 3.1 }
     ];
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, fillX, h); ctx.clip();
@@ -28480,14 +28482,19 @@
       var L = Math.max(60, w * wv.len), k = Math.PI * 2 / L, ph = wv.phase + npWave.t * wv.speed;
       ctx.globalAlpha = wv.alpha;
       ctx.beginPath();
-      ctx.moveTo(0, base);
-      for(var x = 0; x <= fillX + 2; x += 2){
-        // Taller towards the dot, low at the start; a slow swell so it breathes.
-        var env = 0.6 + 0.4 * Math.min(1, x / Math.max(1, fillX));
-        var y = (0.5 + 0.5 * Math.sin(x * k + ph)) * (0.55 + 0.45 * Math.sin(npWave.t * 0.7 + wv.phase));
-        ctx.lineTo(x, base - Math.max(0, y) * (h - 3) * wv.amp * env * npWave.amp);
+      for(var i = 0; i <= Math.ceil(fillX / 2); i++){
+        // Measured back from the dot, so the waves are anchored to it and flow out of it to the
+        // left; every layer narrows to nothing right at the dot, so it all springs from there.
+        var x = Math.max(0, fillX - i * 2), d = fillX - x;
+        var near = Math.min(1, d / 46); near = near * near * (3 - 2 * near);
+        var far = Math.min(1, x / 24);
+        var env = near * far * (1 - 0.3 * Math.min(1, d / Math.max(1, w)));
+        var y = (0.5 + 0.5 * Math.sin(d * k - ph)) * (0.55 + 0.45 * Math.sin(npWave.t * 0.7 + wv.phase));
+        var py = base - Math.max(0, y) * (h - 3) * wv.amp * env * npWave.amp;
+        if(i === 0) ctx.moveTo(x, base); else ctx.lineTo(x, py);
+        if(x === 0) break;
       }
-      ctx.lineTo(fillX + 2, base); ctx.closePath(); ctx.fill();
+      ctx.lineTo(0, base); ctx.closePath(); ctx.fill();
     });
     // Brighter close to the bar, fading out upward.
     ctx.globalAlpha = 1;
