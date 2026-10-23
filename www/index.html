@@ -16552,7 +16552,9 @@
   // blurred copy needs no pixel access and is by construction the picture's own palette.
   function paintFavWash(art, wash){
     var img = art.querySelector('img');
-    var src = img && (img.currentSrc || img.src);
+    // Build 291: the address it has now (currentSrc can still be one that failed before the
+    // copy kept on the phone replaced it).
+    var src = img && (img.getAttribute('src') ? img.src : img.currentSrc);
     src = secureUrl(src);
     if(src){
       wash.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
