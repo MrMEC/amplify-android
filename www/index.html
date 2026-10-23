@@ -20934,6 +20934,11 @@
       var g = guessFromFilename(f.name);
       var key = '', title = '';
       var nameKey = g.artist ? artistMatchKey(g.artist) : '';
+      // Build 289: "A feat. B - Song" belongs to A when A is in the library.
+      if(g.artist && hasFeaturedCredit(g.artist)){
+        var leadKey = artistMatchKey(String(g.artist).split(/\s+(?:feat\.?|ft\.?|featuring)\s+|\s*[\(\[]\s*(?:feat|ft|featuring)\b/i)[0]);
+        if(known(leadKey)) nameKey = leadKey;
+      }
       if(known(nameKey)){ key = nameKey; title = g.title; }
       else {
         var parts = dirOfRelPath(f.relPath).split('/');
@@ -30910,8 +30915,22 @@
   }
   function ytFresh(rec){ return !!rec && rec.fv === YT_FV && Date.now() - (rec.ts || 0) < (rec.channels && rec.channels.length ? YT_TTL_MS : YT_MISS_TTL_MS); }
   // Resolves to the stored record { channels, chTs, ts, videos, mv }, or null (nothing known).
+  // Build 289 (Mark: videos turning up for "Ne-Yo feat. Peedi Crakk"): a song's combined credit
+  // ("A feat. B", "A ft. B", "A featuring B") is not an act with a channel of its own; the lookup
+  // dropped the "feat." part and so filed Ne-Yo's own videos under it. Such a credit has no
+  // YouTube videos (anything kept for it before is cleared).
+  function hasFeaturedCredit(name){
+    return /\s(?:feat\.?|ft\.?|featuring)\s/i.test(String(name || '')) || /[\(\[]\s*(?:feat|ft|featuring)\b/i.test(String(name || ''));
+  }
   function loadArtistVideos(entry){
     var k = entry.key, rec = ytStore[k];
+    if(hasFeaturedCredit(entry.name)){
+      if(!rec || (rec.videos && rec.videos.length) || (rec.channels && rec.channels.length)){
+        ytStore[k] = { channels: [], chTs: Date.now(), ts: Date.now(), videos: [], mv: false, fv: YT_FV };
+        ytSave();
+      }
+      return Promise.resolve(ytStore[k]);
+    }
     if(ytFresh(rec)) return Promise.resolve(rec);
     if(ytPending[k]) return ytPending[k];
     var now = Date.now();
@@ -31235,9 +31254,11 @@
   }
   // An artist with music videos for the day: YouTube videos already looked up (favourite
   // artists) or video files of theirs on the phone.
+  // Build 289 (Mark): only favourite artists, and never a song's combined credit ("A feat. B").
   function dailyVideoArtistKeys(){
     var out = [];
     buildArtistIndex().forEach(function(e){
+      if(hasFeaturedCredit(e.name) || !isFavorite(artistFavRecord(e))) return;
       var rec = ytStore && ytStore[e.key];
       if((rec && rec.videos && rec.videos.length) || musicVideosFor(e.key).length) out.push(e.key);
     });
@@ -31294,9 +31315,10 @@
     if(!dailyState) dailyState = dailyLoad();
     // A new day, or a library that has grown a lot since (music added for the first time).
     if(!dailyState || dailyState.day !== mfyDay() || libraryTracks.length > (dailyState.lib || 0) * 1.5 + 20) buildDailyLists();
-    else if(!dailyState.videoKey){
+    else if(!dailyState.videoKey || dailyVideoArtistKeys().indexOf(dailyState.videoKey) === -1){
+      // Build 289: also when today's artist no longer qualifies (not a favourite, or a combined credit).
       var vk = pickDailyVideoArtist(dailyState.day);
-      if(vk){ dailyState.videoKey = vk; dailySave(); }
+      if(vk !== dailyState.videoKey){ dailyState.videoKey = vk; dailySave(); }
     }
     return true;
   }
