@@ -6154,6 +6154,18 @@
   .ch-sheet-item i{ width:20px; text-align:center; color:var(--text-dim); }
   .ch-sheet-item.danger, .ch-sheet-item.danger i{ color:#e5484d; }
   .ch-sheet-item:active{ background:var(--panel-2); }
+  /* ---------- Build 294 (Mark): Now Playing's progress bar, Samsung-style wave ----------
+     A soft glow of flowing waves in the cover's colour rides on the played part of the bar,
+     drawn on a canvas under the slider (npWave); it flattens out and stops when nothing plays.
+     The dot has a white ring. */
+  .np-seek-track{ position:relative; }
+  .np-seek-wave{ position:absolute; left:0; right:0; bottom:50%; width:100%; height:26px; pointer-events:none; z-index:0;
+    filter:blur(1.2px); }
+  .np-seek-track > .np-seek-range{ position:relative; z-index:1; }
+  .now-playing-screen .np-seek-range::-webkit-slider-thumb, body.rotate-lock .now-playing-screen .np-seek-range::-webkit-slider-thumb{
+    width:16px; height:16px; box-sizing:border-box; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); }
+  .now-playing-screen .np-seek-range::-moz-range-thumb, body.rotate-lock .now-playing-screen .np-seek-range::-moz-range-thumb{
+    width:16px; height:16px; box-sizing:border-box; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -6957,7 +6969,10 @@
               </div>
             </div>
             <div class="np-seek" id="npSeek" style="display:none;">
-              <input type="range" class="np-seek-range" id="npSeekRange" min="0" max="1000" value="0" step="1" aria-label="Seek">
+              <div class="np-seek-track">
+                <canvas class="np-seek-wave" id="npSeekWave" aria-hidden="true"></canvas>
+                <input type="range" class="np-seek-range" id="npSeekRange" min="0" max="1000" value="0" step="1" aria-label="Seek">
+              </div>
               <div class="np-seek-times">
                 <span id="npSeekElapsed">0:00</span>
                 <span id="npSeekTotal">0:00</span>
@@ -28423,8 +28438,88 @@
     var pct = (Number(npSeekRange.value) || 0) / 10;
     npSeekRange.style.setProperty('--seek-pct', pct + '%');
   }
+  // ---------- Build 294: the wave on the progress bar ----------
+  // Three soft sine waves in the cover's colour (--np-vivid), each its own length and speed,
+  // layered and fading upward, drawn over the played part only. They run while something plays
+  // and Now Playing (with its bar) is on screen; on a pause they ease flat and the drawing stops.
+  var npWaveCanvas = document.getElementById('npSeekWave');
+  var npWave = { raf: 0, t: 0, amp: 0, last: 0, colour: '', colourAt: 0 };
+  var npWaveReduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function npWaveVisible(){
+    return !!npWaveCanvas && !document.hidden && nowPlayingScreen.style.display === 'flex' &&
+      npSeek.style.display !== 'none' && npSeek.offsetParent !== null && npWaveCanvas.clientWidth > 0;
+  }
+  function npWaveWanted(){ return npWaveVisible() && !!uiIsPlaying && npIsCurrent(); }
+  function npWaveColour(now){
+    if(!npWave.colour || now - npWave.colourAt > 1000){
+      var c = getComputedStyle(npSeekRange).getPropertyValue('--np-vivid').trim() || getComputedStyle(nowPlayingScreen).getPropertyValue('--np-vivid').trim();
+      npWave.colour = c || '#ffffff'; npWave.colourAt = now;
+    }
+    return npWave.colour;
+  }
+  function npWaveDraw(now){
+    var cv = npWaveCanvas, dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if(cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    var fillX = w * Math.max(0, Math.min(1, (Number(npSeekRange.value) || 0) / 1000));
+    if(fillX < 2 || npWave.amp < 0.01) return;
+    var col = npWaveColour(now);
+    var base = h;                       // the bar's line is the canvas's bottom edge
+    var waves = [
+      { len: 0.62, speed: 0.9, amp: 0.95, alpha: 0.30, phase: 0 },
+      { len: 0.38, speed: -1.4, amp: 0.7, alpha: 0.26, phase: 1.7 },
+      { len: 0.24, speed: 2.1, amp: 0.5, alpha: 0.22, phase: 3.1 }
+    ];
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, fillX, h); ctx.clip();
+    ctx.fillStyle = col;
+    waves.forEach(function(wv){
+      var L = Math.max(60, w * wv.len), k = Math.PI * 2 / L, ph = wv.phase + npWave.t * wv.speed;
+      ctx.globalAlpha = wv.alpha;
+      ctx.beginPath();
+      ctx.moveTo(0, base);
+      for(var x = 0; x <= fillX + 2; x += 2){
+        // Taller towards the dot, low at the start; a slow swell so it breathes.
+        var env = 0.35 + 0.65 * Math.min(1, x / Math.max(1, fillX));
+        var y = (0.5 + 0.5 * Math.sin(x * k + ph)) * (0.55 + 0.45 * Math.sin(npWave.t * 0.7 + wv.phase));
+        ctx.lineTo(x, base - Math.max(0, y) * (h - 3) * wv.amp * env * npWave.amp);
+      }
+      ctx.lineTo(fillX + 2, base); ctx.closePath(); ctx.fill();
+    });
+    // Brighter close to the bar, fading out upward.
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'destination-in';
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, 'rgba(0,0,0,0.15)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, fillX + 2, h);
+    ctx.restore();
+  }
+  function npWaveFrame(now){
+    npWave.raf = 0;
+    if(!npWaveVisible()){ npWave.last = 0; return; }
+    var dt = npWave.last ? Math.min(0.1, (now - npWave.last) / 1000) : 0;
+    npWave.last = now;
+    var want = npWaveWanted() ? 1 : 0;
+    // Eases in over about half a second, flat again in about the same on a pause.
+    npWave.amp += (want - npWave.amp) * Math.min(1, dt * 5);
+    if(!npWaveReduced) npWave.t += dt;
+    npWaveDraw(now);
+    if(want || npWave.amp > 0.01) npWave.raf = requestAnimationFrame(npWaveFrame);
+    else { npWave.amp = 0; npWave.last = 0; npWaveDraw(now); }
+  }
+  function npWaveSync(){
+    if(!npWaveCanvas || npWave.raf) return;
+    if(npWaveVisible() && (npWaveWanted() || npWave.amp > 0.01)) npWave.raf = requestAnimationFrame(npWaveFrame);
+    else if(npWaveVisible()) npWaveDraw(performance.now());
+  }
+  setInterval(npWaveSync, 700);
+  document.addEventListener('visibilitychange', npWaveSync);
   function syncSeekBar(){
     vctlSync();
+    npWaveSync();
     syncNpPodcastControls();
     if(!npSeekApplies()){
       npSeek.style.display = 'none';
@@ -39619,6 +39714,7 @@
     if(typeof playCountTick === 'function') playCountTick();
     uiIsPlaying = isPlaying;
     document.body.classList.toggle('ui-playing', !!isPlaying);
+    if(typeof npWaveSync === 'function') npWaveSync();
     if(coverFlow) coverFlow.syncPlaying();
     if(typeof syncImmersiveMotion === 'function') syncImmersiveMotion();
     playPauseBtn.innerHTML = isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
