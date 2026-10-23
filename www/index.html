@@ -6159,8 +6159,8 @@
      drawn on a canvas under the slider (npWave); it flattens out and stops when nothing plays.
      The dot has a white ring. */
   .np-seek-track{ position:relative; }
-  .np-seek-wave{ position:absolute; left:0; right:0; bottom:50%; width:100%; height:26px; pointer-events:none; z-index:0;
-    filter:blur(1.2px); }
+  .np-seek-wave{ position:absolute; left:0; right:0; bottom:50%; width:100%; height:30px; pointer-events:none; z-index:0;
+    filter:blur(0.8px); }
   .np-seek-track > .np-seek-range{ position:relative; z-index:1; }
   .now-playing-screen .np-seek-range::-webkit-slider-thumb, body.rotate-lock .now-playing-screen .np-seek-range::-webkit-slider-thumb{
     width:16px; height:16px; box-sizing:border-box; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); }
@@ -28469,9 +28469,9 @@
     var col = npWaveColour(now);
     var base = h;                       // the bar's line is the canvas's bottom edge
     var waves = [
-      { len: 0.62, speed: 0.9, amp: 0.95, alpha: 0.30, phase: 0 },
-      { len: 0.38, speed: -1.4, amp: 0.7, alpha: 0.26, phase: 1.7 },
-      { len: 0.24, speed: 2.1, amp: 0.5, alpha: 0.22, phase: 3.1 }
+      { len: 0.62, speed: 0.9, amp: 1.0, alpha: 0.55, phase: 0 },
+      { len: 0.38, speed: -1.4, amp: 0.78, alpha: 0.5, phase: 1.7 },
+      { len: 0.24, speed: 2.1, amp: 0.56, alpha: 0.45, phase: 3.1 }
     ];
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, fillX, h); ctx.clip();
@@ -28483,7 +28483,7 @@
       ctx.moveTo(0, base);
       for(var x = 0; x <= fillX + 2; x += 2){
         // Taller towards the dot, low at the start; a slow swell so it breathes.
-        var env = 0.35 + 0.65 * Math.min(1, x / Math.max(1, fillX));
+        var env = 0.6 + 0.4 * Math.min(1, x / Math.max(1, fillX));
         var y = (0.5 + 0.5 * Math.sin(x * k + ph)) * (0.55 + 0.45 * Math.sin(npWave.t * 0.7 + wv.phase));
         ctx.lineTo(x, base - Math.max(0, y) * (h - 3) * wv.amp * env * npWave.amp);
       }
@@ -28493,7 +28493,7 @@
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'destination-in';
     var g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, 'rgba(0,0,0,0.15)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+    g.addColorStop(0, 'rgba(0,0,0,0.35)'); g.addColorStop(1, 'rgba(0,0,0,1)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, fillX + 2, h);
     ctx.restore();
   }
