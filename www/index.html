@@ -3581,8 +3581,9 @@
   .epg-head-times{ position:relative; height:34px; }
   .epg-time{ position:absolute; top:0; height:34px; display:flex; align-items:center; padding-left:11px; font-size:13px; font-weight:600;
     color:var(--text-dim); white-space:nowrap; }
-  .epg-row{ position:relative; height:50px; margin-top:3px; }
-  .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:50px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
+  /* Build 286 (Mark): roomier rows (5 on a phone instead of 6). */
+  .epg-row{ position:relative; height:62px; margin-top:4px; }
+  .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:62px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--text); }
   .epg-ch::before{ content:''; position:absolute; inset:0 4px 0 4px; background:var(--epg-cell); border-radius:5px; z-index:-1; }
   .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
@@ -3590,7 +3591,7 @@
   .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
   .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:normal; word-break:normal; hyphens:none; max-width:100%; }
   .epg-heart{ color:var(--accent); font-size:11px; }
-  .epg-prog{ position:absolute; top:0; height:50px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
+  .epg-prog{ position:absolute; top:0; height:62px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
     display:flex; flex-direction:column; justify-content:center; gap:1px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:visible; }
   button.epg-prog{ cursor:pointer; }
   .epg-prog.now{ background:var(--epg-cell-now); }
@@ -19003,7 +19004,7 @@
   // channel with no schedule is one block across. The accent line marks now. Tapping the block
   // that's on now plays the channel; other blocks do nothing.
   // Build 244 (Mark): denser, closer to his mockup: narrower half hours, a slimmer channel column, shorter rows.
-  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 124, EPG_CH_W = 80, EPG_ROW_H = 50, EPG_HEAD_H = 34, EPG_GAP = 4;
+  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 124, EPG_CH_W = 80, EPG_ROW_H = 62, EPG_HEAD_H = 34, EPG_GAP = 4;
   function epgStart(now){ return Math.floor(now / EPG_SLOT_MS) * EPG_SLOT_MS; }
   function epgChannelOrder(list){
     var split = splitFavChannels(list);
@@ -19044,7 +19045,47 @@
       out.push({ s: s, e: e, it: it });
       prevEnd = e;
     });
+    return exact ? epgGroupShort(out) : out;
+  }
+  // Build 286 (Mark): on your own channels a block is at least half an hour wide. Back-to-back
+  // videos shorter than that share one block ("The Simpsons · 2 episodes", S7 E20 · S9 E2), and
+  // the few minutes left of one already on when the guide starts join the next. Playback is as
+  // before; only the guide groups them.
+  function epgGroupShort(list){
+    var out = [], i = 0;
+    while(i < list.length){
+      var g = [list[i]], e = list[i].e;
+      while(e - g[0].s < EPG_SLOT_MS && i + g.length < list.length && list[i + g.length].s - e < 60000){
+        e = list[i + g.length].e; g.push(list[i + g.length]);
+      }
+      // A short one left at the very end joins the block before it.
+      if(e - g[0].s < EPG_SLOT_MS && i + g.length >= list.length && out.length && g[0].s - out[out.length - 1].e < 60000){
+        var last = out[out.length - 1];
+        last.group = (last.group || [last]).concat(g); last.e = e;
+        epgLabelGroup(last);
+        break;
+      }
+      var b = { s: g[0].s, e: e, it: g[0].it };
+      if(g.length > 1){ b.group = g; epgLabelGroup(b); }
+      out.push(b);
+      i += g.length;
+    }
     return out;
+  }
+  function epgLabelGroup(b){
+    var items = b.group.map(function(x){ return x.it || x; });
+    function code(it){ return it.code || String(it.sub || '').split(' \u00b7 ')[0] || ''; }
+    var titles = [];
+    items.forEach(function(it){ var t = it.t || ''; if(titles.indexOf(t) === -1) titles.push(t); });
+    var eps = items.filter(function(it){ return /^S\d+ E\d+/.test(code(it)); }).length;
+    var allCodes = items.every(function(it){ return it.code; });
+    // A channel of one show (each title is the episode's own name): "2 episodes". Several shows:
+    // the show, or the shows; then how many when they're all episodes of one.
+    if(allCodes) b.title = items.length + ' episodes';
+    else if(titles.length === 1) b.title = titles[0] + (eps === items.length ? ' \u00b7 ' + items.length + ' episodes' : '');
+    else b.title = titles.join(' / ');
+    b.sub = items.map(code).filter(Boolean).join(' \u00b7 ');
+    b.it = items[0];
   }
   function epgNowText(st){
     var url = st && (st.urlToResolve || st.url_resolved || st.url || '');
@@ -19226,7 +19267,8 @@
       row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', ch.dead ? 'Not working' : '', true, true));
     } else {
       blocks.forEach(function(b){
-        row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
+        if(b.group) row.appendChild(epgBlock(ch, b.s, b.e, b.title, b.sub, b.s <= now && now < b.e, false, t0, b.it));
+        else row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
       });
     }
     return row;
