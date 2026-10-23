@@ -19059,8 +19059,28 @@
     if(it.sub) parts.push(it.sub);
     return parts.join(' · ');
   }
+  // Build 288 (Mark: show times unreadable): a half hour is as wide as the screen allows: about
+  // 1.75 half hours across a phone held upright (it was a fixed 124px), 2.25 sideways, so a
+  // 22-minute show is a readable block. Worked out each time a guide is drawn, and the guides
+  // are drawn again when the phone turns.
+  function epgSlotWidth(){
+    var vw = window.innerWidth || 390, land = vw > (window.innerHeight || 0);
+    return Math.round(Math.min(360, Math.max(170, (vw - EPG_CH_W) / (land ? 2.25 : 1.75))));
+  }
+  var epgResizeTimer = 0;
+  window.addEventListener('resize', function(){
+    clearTimeout(epgResizeTimer);
+    epgResizeTimer = setTimeout(function(){
+      if(epgSlotWidth() === EPG_SLOT_W || !document.querySelector('.epg')) return;
+      try{
+        if(typeof onVideoView !== 'undefined' && onVideoView && stationsGrid.querySelector(':scope > .epg')) rerenderVideoKeepingScroll();
+        refreshChannelGrids();
+      }catch(e){}
+    }, 250);
+  });
   function buildEpgGrid(channels, opts){
     opts = opts || {};
+    EPG_SLOT_W = epgSlotWidth();
     var now = Date.now(), t0 = epgStart(now), t1 = t0 + EPG_SLOTS * EPG_SLOT_MS;
     var wrap = document.createElement('div');
     wrap.className = 'epg' + (opts.np ? ' epg-np' : '');
