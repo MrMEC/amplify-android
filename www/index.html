@@ -4362,7 +4362,7 @@
      behind it instead of stopping at a line. Centred in the content column rather than in the
      window: the bar belongs to what is playing, and that is what the column holds. */
   /* ---------- floating video while browsing (build 155) ---------- */
-  .video-mini{ position:fixed; right:12px; bottom:120px; z-index:52; width:208px; border-radius:14px; overflow:hidden;
+  .video-mini{ position:fixed; right:12px; bottom:120px; z-index:2000; /* build 282: above the header and the tab bar (Mark) */ width:208px; border-radius:14px; overflow:hidden;
     background:#000; box-shadow:0 14px 36px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08);
     touch-action:none; user-select:none; -webkit-user-select:none; }
   .video-mini[hidden]{ display:none; }
@@ -6123,7 +6123,7 @@
   .ch-start-card .ch-logo{ width:46px; height:46px; font-size:19px; }
   .ch-start-card.mine .ch-logo{ background:var(--accent); color:var(--accent-text); }
   /* A channel's options, from its logo in the guide */
-  .ch-sheet-overlay{ position:fixed; inset:0; z-index:900; background:rgba(0,0,0,.5); display:none; }
+  .ch-sheet-overlay{ position:fixed; inset:0; z-index:2100; background:rgba(0,0,0,.5); display:none; }
   .ch-sheet-overlay.open{ display:block; }
   .ch-sheet{ position:absolute; left:0; right:0; bottom:0; max-width:560px; margin:0 auto; background:var(--panel); color:var(--text);
     border-radius:18px 18px 0 0; padding:8px 0 calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 30px rgba(0,0,0,.35); }
@@ -11016,13 +11016,9 @@
   // Anywhere on screen, kept wholly on it (a turn of the phone or a bigger picture can't push it off).
   function moveVideoMini(x, y){
     var mw = videoMini.offsetWidth || 200, mh = videoMini.offsetHeight || 150, m = 4;
-    // Build 280 (Mark: the header covered it): never above the bottom of the app's header
-    // (its full height even while it's slid away, since it comes back).
+    // Build 282 (Mark): it sits above the header and the tab bar, so it may go anywhere on screen
+    // (build 280 kept it below the header instead).
     var topMin = m;
-    try{
-      var hdr = document.querySelector('.sidebar-top');
-      if(hdr && getComputedStyle(hdr).position === 'fixed') topMin = Math.max(m, hdr.getBoundingClientRect().bottom, hdr.offsetHeight) + 6;
-    }catch(e){}
     x = Math.max(m, Math.min(x, window.innerWidth - mw - m));
     y = Math.max(topMin, Math.min(y, window.innerHeight - mh - m));
     videoMini.style.left = Math.round(x) + 'px';
