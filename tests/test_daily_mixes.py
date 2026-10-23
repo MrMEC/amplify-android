@@ -18,7 +18,7 @@ HOOK = ("window.__d = { n: function(){ return libraryTracks.length; }, home: fun
         " plays: function(){ var p = {}; ['Prince', 'Madonna', 'Kay', 'Earth, Wind & Fire', 'Rick James', 'Lee'].forEach(function(n, i){ p[artistMatchKey(n)] = { name: n, count: [40, 30, 20, 12, 6, 3][i], last: Date.now() - i * 1000 }; }); saveArtistPlays(p);"
         "   var sp = {}; libraryTracks.filter(function(t){ return /^Madonna 0[1-6]$/.test(t.name); }).forEach(function(t){ sp[favKey(t)] = [5, Date.now()]; });"
         "   localStorage.setItem('radioPlayerSongPlays', JSON.stringify(sp)); },"
-        " vid: function(){ var k = artistMatchKey('Kay'); ytStore[k] = { channels: ['UC' + 'k'.repeat(22)], chTs: Date.now(), ts: Date.now(), fv: YT_FV, mv: true,"
+        " vid: function(){ var k = artistMatchKey('Kay'); var fe = findArtistEntry(k); if(fe && !isFavorite(artistFavRecord(fe))) toggleFavorite(artistFavRecord(fe)); /* build 289: Artist Videos only from favourite artists */ ytStore[k] = { channels: ['UC' + 'k'.repeat(22)], chTs: Date.now(), ts: Date.now(), fv: YT_FV, mv: true,"
         "   videos: [{ id: 'kayVid00001', title: 'Kay - One (Official Video)', published: '2024-01-01' }, { id: 'kayVid00002', title: 'Kay - Two (Official Video)', published: '2023-01-01' }, { id: 'kayVid00003', title: 'Kay - Three (Official Video)', published: '2022-01-01' }] }; ytSave(); },"
         " yesterday: function(){ var s = JSON.parse(localStorage.getItem('radioPlayerDailyMixes')); s.day = '2000-1-1'; localStorage.setItem('radioPlayerDailyMixes', JSON.stringify(s)); dailyState = null; },"
         " closeNp: function(){ try{ closeNowPlaying(); }catch(e){} },"
