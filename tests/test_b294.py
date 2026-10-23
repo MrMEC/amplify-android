@@ -13,6 +13,9 @@ src = src.replace('" stopPlay:', '''" w294: { play: function(){ var t = libraryT
   "     openNowPlaying(currentStation); setPlayingUI(true); syncSeekBar(); }, 600); },"
   "   pause: function(){ setPlayingUI(false); }, resume: function(){ setPlayingUI(true); },"
   "   px: function(){ var c = document.getElementById('npSeekWave'); var ctx = c.getContext('2d'); var d = ctx.getImageData(0, 0, c.width, c.height).data; var n = 0, sum = 0; for(var i = 3; i < d.length; i += 4){ if(d[i] > 8) n++; sum = (sum * 31 + d[i]) % 1000003; } return { lit: n, sig: sum, w: c.width, h: c.height }; },"
+  "   colH: function(cssX){ var c = document.getElementById('npSeekWave'), dpr = c.width / c.clientWidth, x = Math.round(cssX * dpr); var d = c.getContext('2d').getImageData(x, 0, 1, c.height).data; for(var y = 0; y < c.height; y++) if(d[y * 4 + 3] > 8) return (c.height - y) / dpr; return 0; },"
+  "   dotX: function(){ var c = document.getElementById('npSeekWave'), r = document.getElementById('npSeekRange'); return 8 + (r.value / 1000) * (c.clientWidth - 16); },"
+  "   gap: function(){ var a = document.getElementById('npSeek').getBoundingClientRect(), t = document.querySelector('.np-seek-range').getBoundingClientRect(), u = document.getElementById('npUpNext').getBoundingClientRect(); return { below: Math.round(u.top - t.bottom) }; },"
   "   litRight: function(){ var c = document.getElementById('npSeekWave'); var d = c.getContext('2d').getImageData(Math.round(c.width * 0.8), 0, Math.round(c.width * 0.2), c.height).data; var n = 0; for(var i = 3; i < d.length; i += 4) if(d[i] > 8) n++; return n; },"
   "   thumb: function(){ var cs = getComputedStyle(document.getElementById('npSeekRange'), '::-webkit-slider-thumb'); return { border: cs.borderTopWidth + ' ' + cs.borderTopStyle + ' ' + cs.borderTopColor, w: cs.width }; },"
   "   vivid: function(){ return getComputedStyle(nowPlayingScreen).getPropertyValue('--np-vivid').trim(); } },"
@@ -37,6 +40,13 @@ async def main():
         print('playing', a, b2, await pg.evaluate("__d.w294.vivid()"))
         check(a['lit'] > 500 and b2['lit'] > 500, f'playing: a wave is drawn over the bar {a["lit"]}')
         check(a['sig'] != b2['sig'], 'and it moves')
+        await pg.wait_for_timeout(300)
+        dx = await pg.evaluate("__d.w294.dotX()")
+        hs = [await pg.evaluate(f"__d.w294.colH({dx + o})") for o in (2, -2, -60, -120)]
+        print('heights at dot+2, dot-2, dot-60, dot-120:', hs)
+        check(hs[0] == 0 and hs[1] < 4, f'the wave springs from the dot: nothing past it, flat right at it {hs[:2]}')
+        check(max(hs[2], hs[3]) > 8, f'and it rises away from the dot {hs[2:]}')
+        print('gap from bar to Next card:', await pg.evaluate("__d.w294.gap()"))
         check(await pg.evaluate("__d.w294.litRight()") == 0, 'only over the played part (65%): nothing past it')
         t = await pg.evaluate("__d.w294.thumb()"); print(t)
         print('ring checked in the screenshot (the thumb pseudo-element isn\'t readable)')
