@@ -1,11 +1,11 @@
-"""Build 286 (Mark): 1) roomier guide rows: 5 rows visible on a phone (was 6); 2) on your own channels
+"""Build 287 (Mark: don't group): your channels' blocks follow each video's real times again; build 286's rows stay. (Was build 286: 1) roomier guide rows: 5 rows visible on a phone (was 6); 2) on your own channels
 no block is narrower than half an hour: short back-to-back videos share one block ("2 episodes" on a
 one-show channel, "The Office (US) / Seinfeld" or "Seinfeld · 2 episodes" on a mix), with their codes
 underneath; a block still plays (the one on now) or opens its details.
 Run: python3 tests/test_b286.py (screenshots in /tmp/claude-0/t/shots)"""
 import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__)))
 src = open(_nos.path.join(_nos.path.dirname(_nos.path.abspath(__file__)), 'test_live_channels_editor.py')).read()
-src = src[:src.index('async def run2(')].replace('PORT = 8863', 'PORT = 8885').replace("srv-livech2'", "srv-b286'")
+src = src[:src.index('async def run2(')].replace('PORT = 8863', 'PORT = 8886').replace("srv-livech2'", "srv-b287'")
 exec(src)
 import json, sys
 DEFS = [{'id': 'office', 'name': '', 'src': {'kind': 'pick', 'shows': ['The Office'], 'movies': []}, 'order': 'sequence'},
@@ -34,21 +34,15 @@ async def main():
             print(T, vis)
             check(vis['h'] == 62 and vis['pitch'] == 66 and 6 * 53 / vis['pitch'] < 5, f'{T} rows 25% taller (66px apart, was 53): where 6 fitted, under 5 now {vis}')
             rows = await pg.evaluate(ROWS)
-            slot = 124 - 4
-            for r in rows:
-                if not r['url'].startswith('amplify-live:'): continue
-                narrow = [x for x in r['blocks'] if x['w'] < slot - 1]
-                check(not narrow, f'{T} {r["ch"]}: every block at least half an hour wide {narrow[:3]}')
             byid = {r['url'].split(':')[1]: r for r in rows if r['url'].startswith('amplify-live:')}
-            print(T, json.dumps(byid['office']['blocks'][:4]), json.dumps(byid['mix']['blocks'][:4]))
-            o = byid['office']['blocks']
-            check(any(x['t'] == '2 episodes' and x['s'].startswith('S') and ' · ' in x['s'] for x in o), f'{T} The Office: 22-minute episodes share blocks, "2 episodes" with both codes {o[:3]}')
-            mx = byid['mix']['blocks']
-            check(all(x['t'] and x['s'] for x in mx) and any(' / ' in x['t'] or '· 2 episodes' in x['t'] for x in mx), f'{T} the mix names its shows {mx[:3]}')
-            md = byid['madtv']['blocks']
-            check(all(not x['t'].endswith('episodes') for x in md[1:-1]), f'{T} MADtv\'s 44-minute episodes stay one per block (only the end of the one on now, and the piece cut off at the far end, join their neighbour) {md[:2]}')
+            o = byid['office']['blocks']; print(T, json.dumps(o[:5]))
+            check(o and not any('episodes' in (x['t'] or '') or ' / ' in (x['t'] or '') for r in byid.values() for x in r['blocks']), f'{T} no grouped blocks on any of your channels')
+            mid = o[1:-1]
+            check(mid and all(x['t'].startswith('Office S') and abs(x['w'] - (22 / 30 * 124 - 4)) <= 2 for x in mid), f'{T} The Office: one block per 22-minute episode, as wide as its real length {mid[:3]}')
+            mx = byid['mix']['blocks'][1:-1]
+            check(mx and all(abs(x['w'] - (22 / 30 * 124 - 4)) <= 2 or abs(x['w'] - (23 / 30 * 124 - 4)) <= 2 for x in mx), f'{T} the mix: one block per episode {mx[:3]}')
             check(sum(1 for x in o if x['now']) == 1 and all(x['btn'] for x in o), f'{T} one block on now; blocks still tappable')
-            await pg.screenshot(path=f'{SHOTS}/b286-guide-{width}.png')
+            await pg.screenshot(path=f'{SHOTS}/b287-guide-{width}.png')
             # the block on now plays the channel
             await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(r => r.dataset.chUrl === 'amplify-live:office').querySelector('.epg-prog.now').click()"); await pg.wait_for_timeout(1500)
             cur = await pg.evaluate("window.__cur || (document.getElementById('playerName')||{}).textContent")
