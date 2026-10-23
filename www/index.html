@@ -3551,7 +3551,8 @@
   /* Build 189: Favorites / My Channels headings on Live TV, sized like the list heading under a
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
   /* ---------- Build 243: the Live TV guide grid (Mark's mockups) ---------- */
-  :root{ --epg-bg:#1b1c20; --epg-cell:#2a2b31; --epg-cell-now:#32333a; --epg-line:var(--accent); }
+  /* Build 285 (Mark): in dark mode the channel and show blocks are solid black on the grid's own grey. */
+  :root{ --epg-bg:#1b1c20; --epg-cell:#000000; --epg-cell-now:#000000; --epg-line:var(--accent); }
   html[data-theme="light"]{ --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; }
   @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; } }
   .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1); }
