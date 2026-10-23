@@ -13315,7 +13315,13 @@
 
     var customUrl = customArtFor(station);
     if(customUrl){
-      paint(customUrl);
+      // Build 290: kept on the phone, fetched by the app when the web view can't load it.
+      var cimg = document.createElement('img');
+      cimg.alt = '';
+      cimg.referrerPolicy = 'no-referrer';
+      container.appendChild(cimg);
+      setCustomCoverImg(cimg, customUrl, function(){ cimg.remove(); },
+        function(){ if(artRenderCurrent(container, token)) renderStationArt(container, station); });
       return; // user-supplied art is authoritative -- never overridden by the lookup chain
     }
     whenCustomArtLoaded(function(){
@@ -16599,7 +16605,7 @@
     // chain -- so the band has to follow it rather than be decided once at build time.
     if(typeof MutationObserver === 'function'){
       new MutationObserver(function(){ paintFavWash(art, wash); })
-        .observe(art, { childList: true, subtree: true });
+        .observe(art, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
     }
     return tile;
   }
@@ -24617,9 +24623,10 @@
     var img = document.createElement('img');
     img.alt = '';
     img.setAttribute('referrerpolicy', 'no-referrer');
-    img.onerror = function(){ img.remove(); applyPlaceholderArt(art, 'playlist-' + item.id); };
-    img.src = secureUrl(url);
     art.appendChild(img);
+    var t1 = beginArtRender(art);
+    setCustomCoverImg(img, url, function(){ img.remove(); applyPlaceholderArt(art, 'playlist-' + item.id); },
+      function(){ if(artRenderCurrent(art, t1)){ art.innerHTML = ''; renderPlaylistCoverArt(art, item); } });
   }
   function syncPlaylistCoverBtn(pl){
     if(!pl || !stationPlaylistStationsEditing){ playlistCoverBtn.style.display = 'none'; return; }
@@ -25397,6 +25404,126 @@
   var customSearchCoverField = document.getElementById('customSearchCoverField');
   var customSearchCoverBtn = document.getElementById('customSearchCoverBtn');
   function customSearchArtKey(id){ return 'foryouart:' + id; }
+  // ---------- Build 290 (Mark: custom covers keep failing to show) ----------
+  // A cover set by hand is a picture on someone else's server. On the phone some of those
+  // (Google Play's image server for every cover that failed) don't always load in the app's web
+  // view, and a picture that failed once stayed a placeholder. Now each one is kept on the phone
+  // the first time it loads (fetched by the app itself, which a picky server answers like any
+  // app) and shown from that copy from then on; a picture the web view can't load is fetched by
+  // the app instead; and one that can't be had at all is tried again when the app comes back to
+  // the front or the connection returns.
+  var COVER_DB = 'amplifyCoverCache', COVER_STORE = 'img';
+  var coverDbP = null, coverMem = {}, coverFetching = {}, coverRetries = [], coverWarmQ = [], coverWarmBusy = false;
+  function coverDb(){
+    if(coverDbP) return coverDbP;
+    coverDbP = new Promise(function(resolve, reject){
+      try{
+        var r = indexedDB.open(COVER_DB, 1);
+        r.onupgradeneeded = function(){ r.result.createObjectStore(COVER_STORE); };
+        r.onsuccess = function(){ resolve(r.result); };
+        r.onerror = function(){ reject(r.error); };
+      }catch(e){ reject(e); }
+    });
+    return coverDbP;
+  }
+  function coverGet(url){
+    return coverDb().then(function(db){
+      return new Promise(function(resolve){
+        try{ var q = db.transaction(COVER_STORE, 'readonly').objectStore(COVER_STORE).get(url); q.onsuccess = function(){ resolve(q.result || null); }; q.onerror = function(){ resolve(null); }; }
+        catch(e){ resolve(null); }
+      });
+    })['catch'](function(){ return null; });
+  }
+  function coverPut(url, blob){
+    coverDb().then(function(db){ try{ db.transaction(COVER_STORE, 'readwrite').objectStore(COVER_STORE).put(blob, url); }catch(e){} })['catch'](function(){});
+  }
+  function coverCacheable(url){ return typeof url === 'string' && /^https?:\/\//i.test(url); }
+  // The picture's bytes, fetched by the app itself on the phone (else the page's fetch).
+  function coverDownload(url){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && H && typeof H.request === 'function');
+    var MAX = 4 * 1024 * 1024;
+    if(native){
+      return Promise.resolve(H.request({ url: url, method: 'GET', responseType: 'blob', connectTimeout: 10000, readTimeout: 15000,
+        headers: { 'Accept': 'image/avif,image/webp,image/*,*/*;q=0.8' } })).then(function(r){
+        if(!r || r.status < 200 || r.status >= 300 || typeof r.data !== 'string' || !r.data) return null;
+        var bin = atob(r.data.replace(/^data:[^,]*,/, ''));
+        if(!bin.length || bin.length > MAX) return null;
+        var bytes = new Uint8Array(bin.length);
+        for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        var h = r.headers || {}, type = h['Content-Type'] || h['content-type'] || '';
+        return new Blob([bytes], type && /^image\//i.test(type) ? { type: type } : undefined);
+      })['catch'](function(){ return null; });
+    }
+    return fetch(secureUrl(url), { mode: 'cors' }).then(function(r){ return r.ok ? r.blob() : null; })
+      .then(function(b){ return b && b.size && b.size <= MAX ? b : null; })['catch'](function(){ return null; });
+  }
+  // An object URL for the kept copy (fetched now if there isn't one yet), or null.
+  function coverLocal(url){
+    if(coverMem[url]) return Promise.resolve(coverMem[url]);
+    if(coverFetching[url]) return coverFetching[url];
+    var p = coverGet(url).then(function(b){
+      if(b) return b;
+      return coverDownload(url).then(function(nb){ if(nb) coverPut(url, nb); return nb; });
+    }).then(function(b){
+      delete coverFetching[url];
+      if(!b) return null;
+      if(!coverMem[url]) coverMem[url] = URL.createObjectURL(b);
+      return coverMem[url];
+    }, function(){ delete coverFetching[url]; return null; });
+    coverFetching[url] = p;
+    return p;
+  }
+  // A cover that loaded from its address is kept too, a few at a time in the background.
+  function coverWarm(url){
+    if(coverMem[url] || coverWarmQ.indexOf(url) !== -1) return;
+    coverWarmQ.push(url);
+    if(coverWarmBusy) return;
+    coverWarmBusy = true;
+    (function next(){
+      var u = coverWarmQ.shift();
+      if(!u){ coverWarmBusy = false; return; }
+      coverLocal(u).then(function(){ setTimeout(next, 250); });
+    })();
+  }
+  function coverRetryLater(url, retry){
+    if(typeof retry !== 'function') return;
+    coverRetries.push({ url: url, retry: retry });
+    if(coverRetries.length > 300) coverRetries.shift();
+  }
+  function coverRetryNow(){
+    if(!coverRetries.length) return;
+    var list = coverRetries; coverRetries = [];
+    list.forEach(function(x){ coverLocal(x.url).then(function(l){ if(l){ try{ x.retry(); }catch(e){} } else coverRetries.push(x); }); });
+  }
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) coverRetryNow(); });
+  window.addEventListener('online', coverRetryNow);
+  setInterval(coverRetryNow, 90000);
+  // Shows a custom cover in img: the kept copy when there is one; otherwise the address, then the
+  // app's own fetch if that fails; onFail (the placeholder) only when neither works, with
+  // retry() called once the picture can be had.
+  function setCustomCoverImg(img, url, onFail, retry){
+    img.onload = null;
+    if(!coverCacheable(url)){ img.onerror = onFail || null; img.src = url; return; }
+    if(coverMem[url]){ img.onerror = onFail || null; img.src = coverMem[url]; return; }
+    coverGet(url).then(function(b){
+      if(b){
+        if(!coverMem[url]) coverMem[url] = URL.createObjectURL(b);
+        img.onerror = onFail || null;
+        img.src = coverMem[url];
+        return;
+      }
+      img.onerror = function(){
+        img.onerror = null;
+        coverLocal(url).then(function(local){
+          if(local){ img.onerror = onFail || null; img.src = local; }
+          else { if(onFail) onFail(); coverRetryLater(url, retry); }
+        });
+      };
+      img.onload = function(){ img.onload = null; coverWarm(url); };
+      img.src = secureUrl(url);
+    });
+  }
   // Build 278: a custom station with no cover of its own wears the one saved for a custom
   // station of the same name (an older import could leave a copy under another id holding it).
   function customSearchCoverUrl(item){
@@ -25421,9 +25548,10 @@
     var img = document.createElement('img');
     img.alt = '';
     img.setAttribute('referrerpolicy', 'no-referrer');
-    img.onerror = function(){ img.remove(); applyPlaceholderArt(art, 'foryou-' + item.id); };
-    img.src = secureUrl(url);
     art.appendChild(img);
+    var t1 = beginArtRender(art);
+    setCustomCoverImg(img, url, function(){ img.remove(); applyPlaceholderArt(art, 'foryou-' + item.id); },
+      function(){ if(artRenderCurrent(art, t1)){ art.innerHTML = ''; renderCustomSearchCoverArt(art, item); } });
   }
   function syncCustomSearchCoverThumb(item){
     customSearchCoverBtn.innerHTML = '';
@@ -29418,7 +29546,16 @@
     function paintLater(url){ paint(url, true); }
 
     var custom = getCustomArtUrl(key);
-    if(custom){ paint(custom); return; }
+    if(custom){
+      // Build 290: kept on the phone, fetched by the app when the web view can't load it.
+      var cimg = document.createElement('img');
+      cimg.alt = '';
+      cimg.referrerPolicy = 'no-referrer';
+      container.appendChild(cimg);
+      setCustomCoverImg(cimg, custom, function(){ cimg.remove(); },
+        function(){ if(artRenderCurrent(container, token)) renderArtistArt(container, entry); });
+      return;
+    }
 
     // The path almost every tile takes after the first pass: already worked out, painted
     // with no await and no lookup of any kind.
@@ -31252,22 +31389,94 @@
       { id: 'mix:again', title: 'Hear It Again', songs: dailySpread(mfySeeded(again, 'again4|' + day)).map(favKey) }
     ];
   }
-  // An artist with music videos for the day: YouTube videos already looked up (favourite
-  // artists) or video files of theirs on the phone.
-  // Build 289 (Mark): only favourite artists, and never a song's combined credit ("A feat. B").
-  function dailyVideoArtistKeys(){
-    var out = [];
-    buildArtistIndex().forEach(function(e){
-      if(hasFeaturedCredit(e.name) || !isFavorite(artistFavRecord(e))) return;
-      var rec = ytStore && ytStore[e.key];
-      if((rec && rec.videos && rec.videos.length) || musicVideosFor(e.key).length) out.push(e.key);
-    });
-    return out;
+  // ---------- Artist Videos: the day's artist (build 290, Mark) ----------
+  // Any artist in the library (not only favourites; never a song's combined credit "A feat. B"
+  // or Unknown Artist), and never one shown before until every artist has had a turn: every pick
+  // is kept (radioPlayerVideoArtistHistory). The day's order is a shuffle of the artists not
+  // shown yet; going down it, the first with music videos is the one: videos already known
+  // (YouTube, or files on the phone) count at once; an artist whose videos haven't been looked
+  // up yet is looked up then (a few at a time, in the background), and one known to have none is
+  // passed over.
+  var VIDEO_HIST_KEY = 'radioPlayerVideoArtistHistory', VIDEO_SEARCH_MAX = 15;
+  var dailyVideoSearching = false;
+  function videoHistory(){
+    try{ var v = JSON.parse(localStorage.getItem(VIDEO_HIST_KEY) || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; }
   }
+  function noteVideoArtist(key, day){
+    var h = videoHistory().filter(function(x){ return x && x.k !== key; });
+    h.push({ k: key, day: day });
+    try{ localStorage.setItem(VIDEO_HIST_KEY, JSON.stringify(h.slice(-5000))); }catch(e){}
+  }
+  function artistHasVideos(key){
+    var rec = ytStore && ytStore[key];
+    return !!((rec && rec.videos && rec.videos.length) || musicVideosFor(key).length);
+  }
+  function videoArtistEligible(e){
+    return !!e && e.tracks && e.tracks.length > 0 && e.name !== UNKNOWN_ARTIST && !hasFeaturedCredit(e.name);
+  }
+  // The day's order: library artists not shown on an earlier day, shuffled for the day. When all
+  // have been shown, the history starts over (the last month's still kept out).
+  function dailyVideoOrder(day){
+    var shown = {};
+    videoHistory().forEach(function(x){ if(x && x.k && x.day !== day) shown[x.k] = 1; });
+    var all = buildArtistIndex().filter(videoArtistEligible);
+    var left = all.filter(function(e){ return !shown[e.key]; });
+    if(!left.length && all.length){
+      var recent = videoHistory().slice(-30);
+      try{ localStorage.setItem(VIDEO_HIST_KEY, JSON.stringify(recent)); }catch(e){}
+      var keep = {}; recent.forEach(function(x){ keep[x.k] = 1; });
+      left = all.filter(function(e){ return !keep[e.key]; });
+      if(!left.length) left = all;
+    }
+    return mfySeeded(left, 'vid|' + day);
+  }
+  // Kept for the tests and the Diagnostics: the artists that could be today's right now.
+  function dailyVideoArtistKeys(){
+    return dailyVideoOrder(mfyDay()).filter(function(e){ return artistHasVideos(e.key); }).map(function(e){ return e.key; });
+  }
+  function setDailyVideoArtist(key, day){
+    if(!dailyState || dailyState.day !== day) return;
+    dailyState.videoKey = key;
+    dailySave();
+    if(key) noteVideoArtist(key, day);
+  }
+  // Today's artist if it can be told at once; otherwise null, and the search runs in the
+  // background and fills it in (Home is drawn again then).
   function pickDailyVideoArtist(day){
-    var keys = dailyVideoArtistKeys();
-    if(dailyState && dailyState.videoKey && keys.indexOf(dailyState.videoKey) !== -1) return dailyState.videoKey;
-    return keys.length ? mfySeeded(keys, 'vid|' + day)[0] : null;
+    var cur = dailyState && dailyState.day === day && dailyState.videoKey;
+    if(cur && findArtistEntry(cur) && videoArtistEligible(findArtistEntry(cur)) && artistHasVideos(cur)) return cur;
+    if(dailyVideoSearching) return null;
+    var order = dailyVideoOrder(day);
+    for(var i = 0; i < order.length; i++){
+      var e = order[i], rec = ytStore && ytStore[e.key];
+      if(artistHasVideos(e.key)){ noteVideoArtist(e.key, day); return e.key; }
+      if(!rec || !ytFresh(rec)) break;   // not looked up yet: the search takes it from here
+    }
+    searchDailyVideoArtist(day, order.slice(i));
+    return null;
+  }
+  function searchDailyVideoArtist(day, order){
+    if(dailyVideoSearching || !order || !order.length) return;
+    dailyVideoSearching = true;
+    var tries = 0;
+    (function next(i){
+      if(i >= order.length || tries >= VIDEO_SEARCH_MAX || !dailyState || dailyState.day !== day || dailyState.videoKey){
+        dailyVideoSearching = false;
+        return;
+      }
+      var e = order[i], rec = ytStore && ytStore[e.key];
+      if(artistHasVideos(e.key)){
+        dailyVideoSearching = false;
+        setDailyVideoArtist(e.key, day);
+        try{ renderDailyHome(); }catch(err){}
+        return;
+      }
+      if(rec && ytFresh(rec)){ next(i + 1); return; }   // known to have none
+      tries++;
+      Promise.resolve(loadArtistVideos(e))['catch'](function(){ return null; }).then(function(){
+        setTimeout(function(){ next(artistHasVideos(e.key) ? i : i + 1); }, 400);
+      });
+    })(0);
   }
   var dailyBuildSeq = 0;
   function buildDailyLists(){
@@ -31315,10 +31524,10 @@
     if(!dailyState) dailyState = dailyLoad();
     // A new day, or a library that has grown a lot since (music added for the first time).
     if(!dailyState || dailyState.day !== mfyDay() || libraryTracks.length > (dailyState.lib || 0) * 1.5 + 20) buildDailyLists();
-    else if(!dailyState.videoKey || dailyVideoArtistKeys().indexOf(dailyState.videoKey) === -1){
-      // Build 289: also when today's artist no longer qualifies (not a favourite, or a combined credit).
+    else{
+      // Build 290: today's artist, or a new one when there's none yet or it no longer qualifies.
       var vk = pickDailyVideoArtist(dailyState.day);
-      if(vk !== dailyState.videoKey){ dailyState.videoKey = vk; dailySave(); }
+      if(vk !== dailyState.videoKey && (vk || dailyState.videoKey)){ dailyState.videoKey = vk; dailySave(); }
     }
     return true;
   }
