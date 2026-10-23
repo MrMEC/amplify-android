@@ -824,6 +824,9 @@
   body.home-stacked .home-row > #top100HomeGrid:has(> .tile) > .tile,
   body.home-stacked .home-row > #favoritesGrid:has(> .tile) > .tile{ width:auto; min-width:0; }
   body.home-stacked .home-row > #favoritesGrid:has(> .tile){ grid-auto-columns:226px; gap:16px 16px; }
+  /* Build 293 (Mark): Playlists and Top 100's two rows closer together. */
+  body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile),
+  body.home-stacked .home-row > #top100HomeGrid:has(> .tile){ row-gap:10px; }
   @media (max-width: 900px){
     body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile),
     body.home-stacked .home-row > #top100HomeGrid:has(> .tile),
@@ -1550,11 +1553,15 @@
   .nph-bg img, .nph-mid img, .nph-art img{ width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
   /* The blur, in three steps from the top down: sharp, softly blurred, heavily blurred (a
      little darker, so white text reads on any picture). No colour fade. */
-  .nph-bg{ filter:blur(26px) saturate(1.35) brightness(.72); transform:scale(1.18); }
-  .nph-mid{ filter:blur(9px) saturate(1.2) brightness(.88); transform:scale(1.06);
-    -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 48%, transparent 76%); mask-image:linear-gradient(to bottom, #000 0%, #000 48%, transparent 76%); }
-  .nph-art{ -webkit-mask-image:linear-gradient(to bottom, #000 0%, #000 30%, transparent 56%);
-    mask-image:linear-gradient(to bottom, #000 0%, #000 30%, transparent 56%); }
+  /* Build 293 (Mark: too harsh): lighter blur, and each step fades over a longer, eased curve
+     instead of a short straight one, so sharp turns to soft without a visible edge. */
+  .nph-bg{ filter:blur(14px) saturate(1.3) brightness(.74); transform:scale(1.1); }
+  .nph-mid{ filter:blur(5px) saturate(1.15) brightness(.9); transform:scale(1.03);
+    --nph-mid-mask:linear-gradient(to bottom, #000 0%, #000 34%, rgba(0,0,0,.94) 42%, rgba(0,0,0,.8) 50%, rgba(0,0,0,.6) 58%, rgba(0,0,0,.38) 66%, rgba(0,0,0,.19) 74%, rgba(0,0,0,.06) 82%, transparent 90%);
+    -webkit-mask-image:var(--nph-mid-mask); mask-image:var(--nph-mid-mask); }
+  .nph-art{
+    --nph-art-mask:linear-gradient(to bottom, #000 0%, #000 20%, rgba(0,0,0,.95) 27%, rgba(0,0,0,.83) 34%, rgba(0,0,0,.64) 41%, rgba(0,0,0,.42) 48%, rgba(0,0,0,.23) 55%, rgba(0,0,0,.09) 62%, transparent 70%);
+    -webkit-mask-image:var(--nph-art-mask); mask-image:var(--nph-art-mask); }
   .nph-scrim{ display:none; }
   /* A channel's logo stays whole on top; the blurred copies under it fill the card (cover), so
      the foot of the card is the logo's colours blurred, not a dark backing. */
