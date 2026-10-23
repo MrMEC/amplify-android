@@ -6101,6 +6101,40 @@
   body.home-view :is(.home-section:not(#favoritesSection), .recent-section, #stationsGrid) .song-row .song-row-sub{ font-size:14px; }
   body.home-view :is(.home-section:not(#favoritesSection), .recent-section, #stationsGrid) .yt-title{ font-size:14.5px; }
   body.home-view :is(.home-section:not(#favoritesSection), .recent-section, #stationsGrid) .yt-date{ font-size:12.5px; }
+  /* ---------- Build 280: Live TV, one way to add and change channels (Mark) ---------- */
+  /* The header's Add keeps its word on a phone (it says what's behind it). */
+  @media (max-width: 640px){ .clear-search-btn.show-label .btn-text{ display:inline; margin-left:6px; } }
+  .clear-search-btn.dots-btn{ font-size:18px; line-height:1; letter-spacing:1px; padding-left:12px; padding-right:12px; }
+  .ch-sort-menu .ch-menu-label{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); padding:10px 12px 3px; }
+  .ch-sort-menu .ch-menu-sep{ height:1px; background:var(--border); margin:5px 4px; }
+  /* My Shows & Movies (Add Channels' first tab) */
+  .ch-custom-card{ display:flex; align-items:center; gap:12px; width:100%; margin:6px 0 10px; padding:12px; border-radius:12px; border:1px solid var(--border);
+    background:var(--panel-2); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .ch-custom-card .ch-logo{ background:var(--accent); color:var(--accent-text); font-size:20px; }
+  .ch-mine-head{ font-size:13px; font-weight:700; color:var(--text-dim); margin:16px 0 2px; }
+  .ch-row.ch-mine .ch-logo img{ object-fit:cover; padding:0; }
+  .ch-row .ch-logo .ch-mono{ font-size:16px; font-weight:800; color:#fff; }
+  /* An empty guide: the two ways in */
+  .ch-start{ grid-column:1/-1; display:flex; flex-direction:column; gap:12px; padding:22px 0 10px; }
+  .ch-start-title{ font-size:18px; font-weight:700; color:var(--text); text-align:center; }
+  .ch-start-sub{ font-size:13px; color:var(--text-dim); text-align:center; margin:-6px 0 6px; }
+  .ch-start-card{ display:flex; align-items:center; gap:14px; width:100%; padding:16px; border-radius:14px; border:1px solid var(--border);
+    background:var(--panel-2); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .ch-start-card .ch-logo{ width:46px; height:46px; font-size:19px; }
+  .ch-start-card.mine .ch-logo{ background:var(--accent); color:var(--accent-text); }
+  /* A channel's options, from its logo in the guide */
+  .ch-sheet-overlay{ position:fixed; inset:0; z-index:900; background:rgba(0,0,0,.5); display:none; }
+  .ch-sheet-overlay.open{ display:block; }
+  .ch-sheet{ position:absolute; left:0; right:0; bottom:0; max-width:560px; margin:0 auto; background:var(--panel); color:var(--text);
+    border-radius:18px 18px 0 0; padding:8px 0 calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 30px rgba(0,0,0,.35); }
+  .ch-sheet-grab{ width:38px; height:4px; border-radius:2px; background:var(--border); margin:2px auto 10px; }
+  .ch-sheet-head{ display:flex; align-items:center; gap:12px; padding:0 20px 10px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+  .ch-sheet-head .ch-logo{ width:46px; height:46px; }
+  .ch-sheet-tag{ display:inline-block; font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:8px; background:var(--panel-2); color:var(--text-dim); margin-left:6px; vertical-align:2px; }
+  .ch-sheet-item{ display:flex; align-items:center; gap:16px; width:100%; padding:13px 22px; border:0; background:none; color:var(--text); font:inherit; font-size:15px; text-align:left; cursor:pointer; }
+  .ch-sheet-item i{ width:20px; text-align:center; color:var(--text-dim); }
+  .ch-sheet-item.danger, .ch-sheet-item.danger i{ color:#e5484d; }
+  .ch-sheet-item:active{ background:var(--panel-2); }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -7773,6 +7807,14 @@
   </button>
 </div>
 
+<!-- Build 280: a channel's options, from its logo in the Live TV guide. -->
+<div class="ch-sheet-overlay" id="chSheetOverlay">
+  <div class="ch-sheet" id="chSheet" role="dialog" aria-modal="true" aria-labelledby="chSheetName">
+    <div class="ch-sheet-grab"></div>
+    <div class="ch-sheet-head"><div class="ch-logo" id="chSheetLogo"></div><div class="ch-text"><div class="ch-name" id="chSheetName"></div><div class="ch-sub" id="chSheetSub"></div></div></div>
+    <div id="chSheetItems"></div>
+  </div>
+</div>
 <audio id="audio" preload="none"></audio>
 
 <script>
@@ -10974,8 +11016,15 @@
   // Anywhere on screen, kept wholly on it (a turn of the phone or a bigger picture can't push it off).
   function moveVideoMini(x, y){
     var mw = videoMini.offsetWidth || 200, mh = videoMini.offsetHeight || 150, m = 4;
+    // Build 280 (Mark: the header covered it): never above the bottom of the app's header
+    // (its full height even while it's slid away, since it comes back).
+    var topMin = m;
+    try{
+      var hdr = document.querySelector('.sidebar-top');
+      if(hdr && getComputedStyle(hdr).position === 'fixed') topMin = Math.max(m, hdr.getBoundingClientRect().bottom, hdr.offsetHeight) + 6;
+    }catch(e){}
     x = Math.max(m, Math.min(x, window.innerWidth - mw - m));
-    y = Math.max(m, Math.min(y, window.innerHeight - mh - m));
+    y = Math.max(topMin, Math.min(y, window.innerHeight - mh - m));
     videoMini.style.left = Math.round(x) + 'px';
     videoMini.style.top = Math.round(y) + 'px';
     videoMini.style.right = 'auto';
@@ -17909,6 +17958,10 @@
     if(videoTab !== 'channels') videoChannelsEditing = false;
     appendVideoTabs();
     videoAddHeaderBtnEl.title = videoTab === 'channels' ? 'Add channels' : 'Add a folder of videos';
+    // Build 280: on Live TV it says "Add", on a phone too.
+    videoAddHeaderBtnEl.classList.toggle('show-label', videoTab === 'channels');
+    videoAddHeaderBtnEl.lastElementChild.textContent = videoTab === 'channels' ? 'Add' : 'Add Folder';
+    if(videoTab !== 'channels') syncVideoMenuBtn();
     videoAddHeaderBtnEl.setAttribute('aria-label', videoAddHeaderBtnEl.title);
     if(videoTab === 'channels') renderChannelsTab();
     else if(videoTab === 'continue') renderVideoContinueTab();
@@ -17940,7 +17993,7 @@
     videoReorderHeaderBtnEl.style.display = '';
     // Sorting lives in edit mode (Mark: options only while editing), so no Sort button here.
     videoSortHeaderBtnEl.style.display = 'none';
-    updateReorderHeaderBtn(videoReorderHeaderBtnEl, videoChannelsEditing, 'Edit');
+    syncVideoMenuBtn();
     videoReorderHeaderBtnEl.classList.toggle('editing', videoChannelsEditing);
     // Build 262: your own channels head the guide even with no channels added.
     if(!mine.length && !videoChannelsEditing && liveChannels().length){
@@ -17948,10 +18001,8 @@
       return;
     }
     if(!mine.length && !videoChannelsEditing){
-      var empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.textContent = 'No channels yet. Tap \u201cAdd Channels\u201d to find free TV channels, or Edit to make your own.';
-      stationsGrid.appendChild(empty);
+      // Build 280: the two ways in, as cards.
+      stationsGrid.appendChild(buildChannelsStart());
       return;
     }
     // Edit mode: your own channels (build 263), then the sort options and one list of the added
@@ -18643,52 +18694,36 @@
     channelMix = urls;
     chPrefSet(CHANNEL_MIX_KEY, JSON.stringify(channelMix));
   }
+  // Build 280 (Mark): Arrange Channels, from the guide's ⋯ menu (it was Edit, with the layout
+  // and order options, now in the menu, and New Channel, now Add Channels' first tab). The
+  // lists show the order the guide uses; dragging a row makes that list's order Manual.
   function renderChannelsEdit(mine){
-    stationsGrid.appendChild(buildSortLines([{ id: 'chLayoutLine', label: 'Layout', opts: [['split', 'Your Channels First'], ['mixed', 'Integrate Channels']],
-      get: function(){ return channelLayout; },
-      set: function(v){
-        channelLayout = v; chPrefSet(CHANNEL_LAYOUT_KEY, v); refreshChannelGrids();
-      } }]));
     if(channelLayout === 'mixed'){
-      stationsGrid.appendChild(buildSortLines([{ id: 'chMixOrderLine', label: 'Order', opts: ORDER_OPTS, get: function(){ return channelMixOrder; },
-        set: function(v){
-          if(channelMixOrder === 'manual') reorderMixFromGrid();
-          // Manual starts from the order showing (A to Z) the first time; after that it's the
-          // order dragged by hand.
-          if(v === 'manual' && !channelMix.length){ channelMix = mixedChannelList(mine, true).map(function(c){ return c.url; }); chPrefSet(CHANNEL_MIX_KEY, JSON.stringify(channelMix)); }
-          channelMixOrder = v; chPrefSet(CHANNEL_MIX_ORDER_KEY, v); refreshChannelGrids();
-        } }]));
-      stationsGrid.appendChild(newChannelBtn());
-      var mixManual = channelMixOrder === 'manual';
       var box = chEditList('ch-mix-list');
       mixedChannelList(mine, true).forEach(function(c){
-        var o = { entity: 'mix-channel', manual: mixManual, container: box, onReorder: mixManual ? function(){ reorderMixFromGrid(); refreshChannelGrids(); } : null };
+        var o = { entity: 'mix-channel', manual: true, container: box, onReorder: function(){
+          reorderMixFromGrid(); channelMixOrder = 'manual'; chPrefSet(CHANNEL_MIX_ORDER_KEY, 'manual'); refreshChannelGrids(); } };
         box.appendChild(isLiveChUrl(c.url) ? buildLiveEditRow(c, o) : buildAddedEditRow(c, o));
       });
       return;
     }
-    stationsGrid.appendChild(buildChGroupHead('Your Channels'));
-    stationsGrid.appendChild(buildSortLines([{ id: 'chLiveOrderLine', label: 'Order', opts: ORDER_OPTS, get: function(){ return liveChOrder; },
-      set: function(v){
-        // Leaving Manual: the order the rows were just dragged into is kept; coming back to
-        // Manual finds it again (as for the added channels).
-        if(liveChOrder === 'manual') reorderLiveChFromGrid();
-        liveChOrder = v; chPrefSet(LIVE_CH_ORDER_KEY, v); refreshChannelGrids();
-      } }]));
-    stationsGrid.appendChild(newChannelBtn());
-    var liveManual = liveChOrder === 'manual';
-    var lbox = chEditList('ch-live-list');
-    orderedLiveChannels(true).forEach(function(c){
-      lbox.appendChild(buildLiveEditRow(c, { entity: 'live-channel', manual: liveManual, container: lbox,
-        onReorder: liveManual ? function(){ reorderLiveChFromGrid(); refreshChannelGrids(); } : null }));
-    });
+    var live = orderedLiveChannels(true);
+    if(live.length){
+      stationsGrid.appendChild(buildChGroupHead('Your Channels'));
+      var lbox = chEditList('ch-live-list');
+      live.forEach(function(c){
+        lbox.appendChild(buildLiveEditRow(c, { entity: 'live-channel', manual: true, container: lbox,
+          onReorder: function(){ reorderLiveChFromGrid(); liveChOrder = 'manual'; chPrefSet(LIVE_CH_ORDER_KEY, 'manual'); refreshChannelGrids(); } }));
+      });
+    }
     if(!mine.length) return;
     stationsGrid.appendChild(buildChGroupHead('Added Channels'));
-    appendChannelSortOptions();
-    var manual = channelOrder === 'manual';
     var abox = chEditList('ch-added-list');
     mine.forEach(function(ch){
-      abox.appendChild(buildAddedEditRow(ch, { entity: 'video-channel', manual: manual, container: abox, onReorder: manual ? reorderVideoChannelsFromGrid : null }));
+      abox.appendChild(buildAddedEditRow(ch, { entity: 'video-channel', manual: true, container: abox, onReorder: function(){
+        reorderVideoChannelsFromGrid(); channelOrder = 'manual';
+        try{ localStorage.setItem(CHANNEL_ORDER_KEY, 'manual'); }catch(e){}
+        saveVideoChannels(); refreshChannelGrids(); } }));
     });
   }
   // Any guide on screen (under a playing channel) takes the new order.
@@ -19171,7 +19206,11 @@
       heart.setAttribute('aria-hidden', 'true');
       cell.appendChild(heart);
     }
-    cell.addEventListener('click', function(){ playChannel(ch); });
+    // Build 280 (Mark): on the Live TV page the logo opens the channel's options (Watch Now, Edit,
+    // Favorite, Move, Remove); under a playing channel it still just plays it.
+    cell.addEventListener('click', function(){
+      if(cell.closest('#stationsGrid') && onVideoView) openChSheet(ch); else playChannel(ch);
+    });
     row.appendChild(cell);
     var blocks = src ? epgBlocks(ch, t0, t1) : [];
     var now = Date.now();
@@ -19728,11 +19767,14 @@
     var hidden = videoChannels.filter(function(c){ return !channelVisible(c); });
     if(re.length + hidden.length === videoChannels.length){ videoChannels = re.concat(hidden); saveVideoChannels(); }
   }
-  videoReorderHeaderBtnEl.addEventListener('click', function(){
-    videoChannelsEditing = !videoChannelsEditing;
-    // Only a manual order is read back from the rows; in A to Z they're just sorted.
-    if(!videoChannelsEditing && channelOrder === 'manual') reorderVideoChannelsFromGrid();
-    renderVideoHome();
+  videoReorderHeaderBtnEl.addEventListener('click', function(e){
+    // Build 280: on Live TV it's the ⋯ menu; while arranging it's Done.
+    if(videoTab === 'channels' && !videoChannelsEditing){
+      e.stopPropagation();
+      if(channelSortMenu && channelSortMenu.id === 'guideMenu') closeChannelSortMenu(); else openGuideMenu();
+      return;
+    }
+    setChannelsArranging(!videoChannelsEditing);
   });
   videoAddHeaderBtnEl.addEventListener('click', function(){
     if(videoTab === 'channels'){ pushView(); openAddChannelsPage(); }
@@ -19876,7 +19918,7 @@
   }
 
   // ---- the Add Channels page
-  var addChannelsTab = 'recommended';
+  var addChannelsTab = 'mine'; // build 280: your shows and movies first
   var addChannelsState = { q: '', country: '', cat: '', shown: 60, linkUrl: '', linkList: null };
   // Each list names countries its own way (iptv-org: "US"; Free-TV: "USA"), so each tab keeps
   // its own country choice, starting from the phone's region.
@@ -20011,7 +20053,7 @@
       tabs.className = 'home-tabs scroll-tabs';
       // Short labels. Plex only while signed in to Plex.
       if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
-      var tabList = [['recommended', 'Recommended'], ['all', 'All']];
+      var tabList = [['mine', 'My Shows & Movies'], ['recommended', 'Recommended'], ['all', 'All']];
       tabList.push(['pluto', 'Pluto']);
       if(plexSignedIn()) tabList.push(['plex', 'Plex']);
       // Build 268: signed out, a Plex button in the same place opens a how-to dialog instead
@@ -20038,12 +20080,14 @@
       stationsGrid.appendChild(tools);
       revealActiveTab(tabs);
       if(addChannelsTab === 'link') buildLinkTools(tools);
+      else if(addChannelsTab === 'mine') buildMineTools(tools);
       else buildBrowseTools(tools);
     }
     var body = document.createElement('div');
     body.className = 'ch-list';
     stationsGrid.appendChild(body);
     if(addChannelsTab === 'link'){ renderLinkResults(body); return; }
+    if(addChannelsTab === 'mine'){ renderMineChannels(body); return; }
     body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; })
       : addChannelsTab === 'plex' ? loadPlexLive() : addChannelsTab === 'pluto' ? loadPluto() : loadFreeTv();
@@ -20092,6 +20136,310 @@
     selHost.style.display = 'contents';
     row.appendChild(selHost);
     tools.appendChild(row);
+  }
+  // ---------- Build 280 (Mark): My Shows & Movies, Add Channels' first tab ----------
+  // Your own channels are added the way free channels are: browse, tap + (a check once it's on
+  // Live TV, tap it again to take it off). One show, all the movies on the phone or on Plex, a
+  // genre or a decade each make a channel with what it plays as its name and picture; Build a
+  // Custom Channel opens the editor for mixes.
+  function buildMineTools(tools){
+    var row = document.createElement('div');
+    row.className = 'ch-tools-row';
+    var input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'cs-field-input';
+    input.placeholder = 'Search your shows and movies';
+    input.value = addChannelsState.mineQ || '';
+    input.setAttribute('aria-label', 'Search your shows and movies');
+    input.addEventListener('input', function(){
+      addChannelsState.mineQ = input.value;
+      clearTimeout(addChannelsSearchTimer);
+      addChannelsSearchTimer = setTimeout(function(){ renderAddChannels(true); }, 200);
+    });
+    row.appendChild(input);
+    tools.appendChild(row);
+  }
+  // The channel of yours that plays exactly this (one show, all movies from a place, a genre, a decade).
+  function liveChSimpleMatch(src, lib){
+    var defs = liveChDefs();
+    for(var i = 0; i < defs.length; i++){
+      var d = defs[i], ds = d.src || {};
+      if(ds.kind !== src.kind) continue;
+      if(src.kind === 'pick'){
+        if((ds.movies || []).length || (ds.shows || []).length !== 1) continue;
+        var a = liveChShow(lib, ds.shows[0]);
+        if(a && a.key === src.showKey) return d;
+      } else if(src.kind === 'movies'){ if((ds.from || 'phone') === src.from) return d; }
+      else if(src.kind === 'genre'){ if(String(ds.genre || '').toLowerCase() === String(src.genre).toLowerCase()) return d; }
+      else if(src.kind === 'decade'){ if((parseInt(ds.decade, 10) || 0) === src.decade) return d; }
+    }
+    return null;
+  }
+  function mineLogo(pic, mono, color){
+    var logo = document.createElement('div');
+    logo.className = 'ch-logo';
+    if(pic){
+      var img = document.createElement('img');
+      img.loading = 'lazy'; img.alt = ''; img.src = pic;
+      img.onerror = function(){ img.remove(); logo.style.background = color; logo.innerHTML = '<span class="ch-mono"></span>'; logo.firstChild.textContent = mono; };
+      logo.appendChild(img);
+    } else {
+      logo.style.background = color;
+      logo.innerHTML = '<span class="ch-mono"></span>';
+      logo.firstChild.textContent = mono;
+    }
+    return logo;
+  }
+  var MINE_COLORS = ['#3a5f8f', '#8f3a3a', '#4f8f3a', '#6a3a8f', '#8f6a3a', '#3a8f86', '#8f3a6e'];
+  function mineColor(t){ var h = 0; String(t).split('').forEach(function(c){ h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return MINE_COLORS[h % MINE_COLORS.length]; }
+  function mineMono(t){ var w = String(t || '').replace(/^the\s+/i, '').split(/\s+/).filter(Boolean); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
+  function mineRow(item){
+    var row = document.createElement('div');
+    row.className = 'ch-row ch-mine';
+    row.dataset.mine = item.id;
+    row.appendChild(mineLogo(item.pic, item.mono || mineMono(item.name), mineColor(item.name)));
+    var text = document.createElement('div');
+    text.className = 'ch-text';
+    var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = item.name; text.appendChild(n);
+    var sb = document.createElement('div'); sb.className = 'ch-sub'; text.appendChild(sb);
+    row.appendChild(text);
+    var add = document.createElement('button');
+    add.type = 'button';
+    function paint(){
+      var d = liveChSimpleMatch(item.src, vlib());
+      add.className = 'ch-add' + (d ? ' added' : '');
+      add.innerHTML = d ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-plus"></i>';
+      add.title = d ? 'On Live TV (tap to take it off)' : 'Add to Live TV';
+      add.setAttribute('aria-label', add.title + ': ' + item.name);
+      sb.textContent = item.sub + (d ? ' · On Live TV' : '');
+    }
+    paint();
+    function toggle(ev){
+      if(ev) ev.stopPropagation();
+      var lib = vlib(), d = liveChSimpleMatch(item.src, lib);
+      if(d){
+        confirmThen({ title: 'Remove ' + quoteName(item.name) + ' from Live TV?', message: 'The shows and movies stay in your library.', ok: 'Remove' }, function(){
+          deleteLiveChannel(d.id); paint();
+        });
+        return;
+      }
+      var src = item.src, out = { kind: src.kind };
+      if(src.kind === 'pick'){ out.shows = [item.name]; out.movies = []; }
+      else if(src.kind === 'movies') out.from = src.from;
+      else if(src.kind === 'genre') out.genre = src.genre;
+      else if(src.kind === 'decade') out.decade = src.decade;
+      liveChDefs().push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: item.chName || '', src: out,
+        order: src.kind === 'pick' ? 'sequence' : 'shuffle' });
+      saveLiveChDefs();
+      paint();
+    }
+    add.addEventListener('click', toggle);
+    row.addEventListener('click', toggle);
+    row.appendChild(add);
+    return row;
+  }
+  function renderMineChannels(host){
+    var lib = vlib();
+    var q = alphaSortKey(String(addChannelsState.mineQ || '').trim());
+    function match(t){ return !q || alphaSortKey(t || '').indexOf(q) !== -1; }
+    var card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'ch-custom-card';
+    card.id = 'chCustomBtn';
+    card.innerHTML = '<div class="ch-logo"><i class="fa-solid fa-plus" aria-hidden="true"></i></div><div class="ch-text"><div class="ch-name">Build a Custom Channel</div><div class="ch-sub">Mix several shows and movies, a genre or a decade</div></div>';
+    card.addEventListener('click', function(){ openLiveChEditor(null); });
+    host.appendChild(card);
+    if(!lib.shows.length && !lib.movies.length){
+      var e0 = document.createElement('div');
+      e0.className = 'empty-state';
+      e0.textContent = 'Your shows and movies show up here once they’re in Watch: add a folder of videos in Movies or TV Shows, or sign in to Plex in Settings.';
+      host.appendChild(e0);
+      setResultCount(null);
+      return;
+    }
+    var n = 0;
+    function head(t){ var h = document.createElement('div'); h.className = 'ch-mine-head'; h.textContent = t; host.appendChild(h); }
+    function where(eps){
+      var px = 0; eps.forEach(function(e){ if(e.plex) px++; });
+      return !px ? 'Phone' : px === eps.length ? 'Plex' : 'Phone & Plex';
+    }
+    var shows = lib.shows.slice().sort(function(a, b){ return alphaCompare(alphaSortKey(a.title), alphaSortKey(b.title)); }).filter(function(s){ return match(s.title); });
+    if(shows.length){
+      head('Shows');
+      shows.forEach(function(sh){
+        var pic = ''; try{ pic = showPosterUrl(sh); }catch(e){}
+        var k = sh.episodes.length;
+        host.appendChild(mineRow({ id: 'show:' + sh.key, name: sh.title, pic: pic, src: { kind: 'pick', showKey: sh.key },
+          sub: where(sh.episodes) + ' · ' + k + (k === 1 ? ' episode' : ' episodes') }));
+        n++;
+      });
+    }
+    var coll = [];
+    var phoneM = lib.movies.filter(function(m){ return !m.plex; }).length, plexM = lib.movies.filter(function(m){ return m.plex; }).length;
+    if(phoneM) coll.push({ id: 'movies:phone', name: 'All Movies on the Phone', chName: 'Movies', mono: '▶', src: { kind: 'movies', from: 'phone' }, sub: phoneM + (phoneM === 1 ? ' movie' : ' movies') });
+    if(plexM) coll.push({ id: 'movies:plex', name: 'All Movies on Plex', chName: 'Plex Movies', mono: '▶', src: { kind: 'movies', from: 'plex' }, sub: plexM + (plexM === 1 ? ' movie' : ' movies') });
+    function titles(def){
+      try{ var set = liveChSources(def, lib); var c = set.shows.length + set.movies.length; return c + (c === 1 ? ' title' : ' titles'); }catch(e){ return ''; }
+    }
+    lcGenres(lib).forEach(function(g){
+      coll.push({ id: 'genre:' + g, name: g, src: { kind: 'genre', genre: g }, sub: 'Genre · ' + titles({ src: { kind: 'genre', genre: g } }) });
+    });
+    lcDecades(lib).forEach(function(d){
+      coll.push({ id: 'decade:' + d, name: 'The ' + d + 's', mono: String(d).slice(2) + 's', src: { kind: 'decade', decade: d }, sub: 'Decade · ' + titles({ src: { kind: 'decade', decade: d } }) });
+    });
+    coll = coll.filter(function(c){ return match(c.name); });
+    if(coll.length){
+      head('Collections');
+      coll.forEach(function(c){ host.appendChild(mineRow(c)); n++; });
+    }
+    if(!n){
+      var e1 = document.createElement('div');
+      e1.className = 'empty-state';
+      e1.textContent = 'Nothing matches that.';
+      host.appendChild(e1);
+    }
+    setResultCount(null);
+  }
+
+  // ---------- Build 280: a channel's options, from its logo in the guide ----------
+  var chSheetOverlay = document.getElementById('chSheetOverlay');
+  function closeChSheet(){ chSheetOverlay.classList.remove('open'); }
+  chSheetOverlay.addEventListener('click', function(e){ if(e.target === chSheetOverlay) closeChSheet(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && chSheetOverlay.classList.contains('open')){ e.stopImmediatePropagation(); closeChSheet(); } }, true);
+  function openChSheet(ch){
+    var mine = isLiveChUrl(ch.url);
+    var def = mine ? liveChDefById(ch.url.slice('amplify-live:'.length)) : null;
+    var st = mine ? liveChStationOf(ch) : channelToStation(ch);
+    var logo = document.getElementById('chSheetLogo');
+    logo.innerHTML = '';
+    var pic = ch.logo || ch.art || '';
+    if(pic){ var img = document.createElement('img'); img.alt = ''; img.referrerPolicy = 'no-referrer'; img.src = secureUrl(pic); img.onerror = function(){ img.remove(); }; logo.appendChild(img); }
+    var nm = document.getElementById('chSheetName');
+    nm.textContent = ch.name || 'Channel';
+    if(mine){ var tag = document.createElement('span'); tag.className = 'ch-sheet-tag'; tag.textContent = 'Your channel'; nm.appendChild(tag); }
+    document.getElementById('chSheetSub').textContent = mine && def ? liveChKindText(def) : (channelRowName(ch) || '');
+    var box = document.getElementById('chSheetItems');
+    box.innerHTML = '';
+    function item(icon, label, fn, cls){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ch-sheet-item' + (cls ? ' ' + cls : '');
+      b.innerHTML = '<i class="' + icon + '" aria-hidden="true"></i><span></span>';
+      b.lastChild.textContent = label;
+      b.addEventListener('click', function(){ closeChSheet(); fn(); });
+      box.appendChild(b);
+    }
+    if(!ch.empty) item('fa-solid fa-play', 'Watch Now', function(){ playChannel(ch); });
+    if(mine && def) item('fa-solid fa-pen', 'Edit Channel', function(){ openLiveChEditor(def.id); });
+    else if(!mine) item('fa-solid fa-pen', 'Rename', function(){ var c = findVideoChannel(ch.url); if(c) promptRenameVideoChannel(c); });
+    if(!ch.empty){
+      var fav = isFavorite(st);
+      item(fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart', fav ? 'Remove from Favorites' : 'Add to Favorites', function(){ toggleFavorite(st); if(onVideoView) rerenderVideoKeepingScroll(); });
+    }
+    item('fa-solid fa-arrows-up-down', 'Move', function(){ setChannelsArranging(true); });
+    item('fa-solid fa-trash', 'Remove from Live TV', function(){
+      var name = ch.name || 'this channel';
+      confirmThen({ title: 'Remove ' + quoteName(name) + ' from Live TV?', message: mine ? 'The shows and movies stay in your library.' : '', ok: 'Remove' }, function(){
+        if(mine && def) deleteLiveChannel(def.id); else removeVideoChannel(ch.url);
+        if(onVideoView) rerenderVideoKeepingScroll();
+      });
+    }, 'danger');
+    chSheetOverlay.classList.add('open');
+  }
+
+  // ---------- Build 280: the guide's ⋯ menu (replaces Edit) ----------
+  // Arrange Channels (drag them into order), the layout, and the order. Arranging is the old Edit
+  // list without the options: a drag makes that list's order Manual and keeps it.
+  function setChannelsArranging(on){
+    videoChannelsEditing = !!on;
+    if(!on && channelOrder === 'manual') reorderVideoChannelsFromGrid();
+    if(onVideoView) renderVideoHome();
+    window.scrollTo(0, 0);
+  }
+  function syncVideoMenuBtn(){
+    var b = videoReorderHeaderBtnEl;
+    if(videoTab === 'channels' && !videoChannelsEditing){
+      b.innerHTML = '<span aria-hidden="true">⋯</span>';
+      b.title = 'Guide options';
+      b.classList.add('dots-btn');
+      b.setAttribute('aria-haspopup', 'true');
+    } else {
+      updateReorderHeaderBtn(b, videoChannelsEditing, 'Edit');
+      b.classList.remove('dots-btn');
+      b.removeAttribute('aria-haspopup');
+    }
+    b.setAttribute('aria-label', b.title);
+  }
+  function openGuideMenu(){
+    closeChannelSortMenu();
+    var m = document.createElement('div');
+    m.className = 'ch-sort-menu';
+    m.id = 'guideMenu';
+    m.setAttribute('role', 'menu');
+    function label(t){ var l = document.createElement('div'); l.className = 'ch-menu-label'; l.textContent = t; m.appendChild(l); }
+    function opt(text, on, fn, icon){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'np-menu-item' + (on ? ' on' : '');
+      b.setAttribute('role', icon ? 'menuitem' : 'menuitemradio');
+      if(!icon) b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (icon ? '<i class="' + icon + '"></i>' : (on ? '<i class="fa-solid fa-check"></i>' : '')) + '</span><span></span>';
+      b.lastChild.textContent = text;
+      b.addEventListener('click', function(e){ e.stopPropagation(); closeChannelSortMenu(); fn(); });
+      m.appendChild(b);
+    }
+    opt('Arrange Channels', false, function(){ setChannelsArranging(true); }, 'fa-solid fa-arrows-up-down');
+    var sep = document.createElement('div'); sep.className = 'ch-menu-sep'; m.appendChild(sep);
+    label('Layout');
+    [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
+      opt(o[1], channelLayout === o[0], function(){
+        if(channelLayout === o[0]) return;
+        channelLayout = o[0]; chPrefSet(CHANNEL_LAYOUT_KEY, o[0]); refreshChannelGrids(); renderVideoHome();
+      });
+    });
+    label('Order');
+    var cur = channelLayout === 'mixed' ? channelMixOrder : (liveChOrder === 'az' && channelOrder === 'az' ? 'az' : 'manual');
+    ORDER_OPTS.forEach(function(o){
+      opt(o[1], cur === o[0], function(){ setGuideOrder(o[0]); });
+    });
+    document.body.appendChild(m);
+    var r = videoReorderHeaderBtnEl.getBoundingClientRect();
+    m.style.top = Math.round(r.bottom + 8) + 'px';
+    m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+    channelSortMenu = m;
+    videoReorderHeaderBtnEl.setAttribute('aria-expanded', 'true');
+  }
+  function setGuideOrder(v){
+    if(channelLayout === 'mixed'){
+      if(v === 'manual' && !channelMix.length){ channelMix = mixedChannelList(visibleVideoChannels(), true).map(function(c){ return c.url; }); chPrefSet(CHANNEL_MIX_KEY, JSON.stringify(channelMix)); }
+      channelMixOrder = v; chPrefSet(CHANNEL_MIX_ORDER_KEY, v);
+    } else {
+      liveChOrder = v; chPrefSet(LIVE_CH_ORDER_KEY, v);
+      channelOrder = v;
+      try{ localStorage.setItem(CHANNEL_ORDER_KEY, v); }catch(e){}
+      saveVideoChannels();
+    }
+    refreshChannelGrids();
+    renderVideoHome();
+  }
+  // An empty guide: the two ways to get channels.
+  function buildChannelsStart(){
+    var box = document.createElement('div');
+    box.className = 'ch-start';
+    box.innerHTML = '<div class="ch-start-title">Build your TV guide</div><div class="ch-start-sub">Channels play around the clock, side by side in one guide.</div>';
+    [['mine', 'mine', 'fa-solid fa-film', 'From My Shows & Movies', 'Turn shows and movies on your phone or Plex into 24/7 channels'],
+     ['recommended', 'free', 'fa-solid fa-tower-broadcast', 'Free Live TV', 'News, sports and more from free channels, Pluto, Plex or a link']].forEach(function(c){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ch-start-card ' + c[1];
+      b.dataset.tab = c[0];
+      b.innerHTML = '<div class="ch-logo"><i class="' + c[2] + '" aria-hidden="true"></i></div><div class="ch-text"><div class="ch-name"></div><div class="ch-sub" style="white-space:normal"></div></div>';
+      b.querySelector('.ch-name').textContent = c[3];
+      b.querySelector('.ch-sub').textContent = c[4];
+      b.addEventListener('click', function(){ addChannelsTab = c[0]; pushView(); openAddChannelsPage(); });
+      box.appendChild(b);
+    });
+    return box;
   }
   function fillBrowseSelects(list){
     var host = stationsGrid.querySelector('.ch-select-host');
@@ -39944,7 +40292,7 @@
         target: function(){ return navBtn('video'); } },
       { icon: svg('<rect x="3" y="5.5" width="18" height="12.5" rx="2"/><path d="M12 9v5.5M9.2 11.7h5.6"/>'),
         title: 'Your Own Channels',
-        text: 'In Live TV, Edit then New Channel turns your shows and movies, from the phone or Plex, into a channel that plays around the clock.',
+        text: 'In Live TV, Add then My Shows & Movies turns your shows and movies, from the phone or Plex, into channels that play around the clock. Tap a channel’s logo in the guide to change it.',
         target: function(){ return navBtn('video'); } },
       { icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>'),
         title: 'Movies & TV Shows',
