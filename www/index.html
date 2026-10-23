@@ -19045,47 +19045,7 @@
       out.push({ s: s, e: e, it: it });
       prevEnd = e;
     });
-    return exact ? epgGroupShort(out) : out;
-  }
-  // Build 286 (Mark): on your own channels a block is at least half an hour wide. Back-to-back
-  // videos shorter than that share one block ("The Simpsons · 2 episodes", S7 E20 · S9 E2), and
-  // the few minutes left of one already on when the guide starts join the next. Playback is as
-  // before; only the guide groups them.
-  function epgGroupShort(list){
-    var out = [], i = 0;
-    while(i < list.length){
-      var g = [list[i]], e = list[i].e;
-      while(e - g[0].s < EPG_SLOT_MS && i + g.length < list.length && list[i + g.length].s - e < 60000){
-        e = list[i + g.length].e; g.push(list[i + g.length]);
-      }
-      // A short one left at the very end joins the block before it.
-      if(e - g[0].s < EPG_SLOT_MS && i + g.length >= list.length && out.length && g[0].s - out[out.length - 1].e < 60000){
-        var last = out[out.length - 1];
-        last.group = (last.group || [last]).concat(g); last.e = e;
-        epgLabelGroup(last);
-        break;
-      }
-      var b = { s: g[0].s, e: e, it: g[0].it };
-      if(g.length > 1){ b.group = g; epgLabelGroup(b); }
-      out.push(b);
-      i += g.length;
-    }
     return out;
-  }
-  function epgLabelGroup(b){
-    var items = b.group.map(function(x){ return x.it || x; });
-    function code(it){ return it.code || String(it.sub || '').split(' \u00b7 ')[0] || ''; }
-    var titles = [];
-    items.forEach(function(it){ var t = it.t || ''; if(titles.indexOf(t) === -1) titles.push(t); });
-    var eps = items.filter(function(it){ return /^S\d+ E\d+/.test(code(it)); }).length;
-    var allCodes = items.every(function(it){ return it.code; });
-    // A channel of one show (each title is the episode's own name): "2 episodes". Several shows:
-    // the show, or the shows; then how many when they're all episodes of one.
-    if(allCodes) b.title = items.length + ' episodes';
-    else if(titles.length === 1) b.title = titles[0] + (eps === items.length ? ' \u00b7 ' + items.length + ' episodes' : '');
-    else b.title = titles.join(' / ');
-    b.sub = items.map(code).filter(Boolean).join(' \u00b7 ');
-    b.it = items[0];
   }
   function epgNowText(st){
     var url = st && (st.urlToResolve || st.url_resolved || st.url || '');
@@ -19267,8 +19227,7 @@
       row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', ch.dead ? 'Not working' : '', true, true));
     } else {
       blocks.forEach(function(b){
-        if(b.group) row.appendChild(epgBlock(ch, b.s, b.e, b.title, b.sub, b.s <= now && now < b.e, false, t0, b.it));
-        else row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
+        row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
       });
     }
     return row;
