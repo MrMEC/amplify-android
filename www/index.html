@@ -24193,7 +24193,20 @@
     if(t.videoKind === 'music'){
       var mvs = musicVideosFor(t.artistKey);
       var others = mvs.filter(function(m){ return m.id !== t.id; });
-      if(!others.length){ npCollection.style.display = 'none'; return; }
+      if(!others.length){
+        // Build 308 (Mark): an artist with only this one video: videos by artists like them.
+        var rel = relatedMusicVideos(t);
+        if(!rel.length){ npCollection.style.display = 'none'; return; }
+        npCollection.style.display = '';
+        npCollectionHeading.textContent = 'More Videos Like This';
+        var rows = {};
+        rel.forEach(function(v){ var r = buildNpMusicVideoRow(v, rel, true); rows[v.uri] = r; npCollectionGrid.appendChild(r); });
+        ensureMusicVideoStills(rel, function(v){
+          var r = rows[v.uri];
+          if(r && r.isConnected && r._paint) r._paint();
+        });
+        return;
+      }
       npCollection.style.display = '';
       npCollectionHeading.textContent = 'More Videos by ' + (t.artist || 'This Artist');
       others.forEach(function(v){ npCollectionGrid.appendChild(buildNpMusicVideoRow(v, mvs)); });
@@ -24217,13 +24230,12 @@
       npCollectionGrid.appendChild(row);
     });
   }
-  function buildNpMusicVideoRow(v, list){
+  function buildNpMusicVideoRow(v, list, showArtist){
     var row = document.createElement('div');
     row.className = 'vep-row';
     row.dataset.key = favKey(v);
     var th = document.createElement('div');
     th.className = 'vep-thumb';
-    if(v.still) th.appendChild(vImg(capUrl(v.still)));
     row.appendChild(th);
     var text = document.createElement('div');
     text.className = 'vep-text';
@@ -24233,12 +24245,66 @@
     text.appendChild(tt);
     var sub = document.createElement('div');
     sub.className = 'vep-sub';
-    sub.textContent = formatRuntime(v.duration) || '';
     text.appendChild(sub);
     row.appendChild(text);
+    // showArtist (build 308): related videos say whose they are.
+    row._paint = function(){
+      th.innerHTML = '';
+      if(v.still) th.appendChild(vImg(capUrl(v.still)));
+      sub.textContent = [showArtist ? v.artist : '', formatRuntime(v.duration) || ''].filter(Boolean).join(' · ');
+    };
+    row._paint();
     row.addEventListener('click', function(){ playMusicVideo(v, list); });
     return row;
   }
+  // Build 308: up to ten videos by other artists like this one, one each: Deezer's related artists
+  // first (when known; asked for once otherwise, and the list redrawn when they arrive), then
+  // artists sharing a genre with this one's songs, then anyone, in an order fixed per video.
+  var relatedMvAsked = {};
+  function relatedMusicVideos(t){
+    var cat;
+    try{ cat = musicVideoCatalog(); }catch(e){ return []; }
+    var key = t.artistKey, me = cat.byKey[key];
+    var picked = [], seen = {};
+    seen[key] = 1;
+    function take(k){
+      if(seen[k] || picked.length >= 10) return;
+      var a = cat.byKey[k];
+      if(!a || !a.videos.length) return;
+      seen[k] = 1;
+      var i = liveChHash(t.id + '|' + k) % a.videos.length;
+      picked.push(a.videos[i]);
+    }
+    var name = (me && me.name) || t.artist || '';
+    if(key && name){
+      var sim = similarStore()[key];
+      if(sim && sim.names) sim.names.forEach(function(n){ take(artistMatchKey(n)); });
+      else if(!relatedMvAsked[key]){
+        relatedMvAsked[key] = true;
+        fetchSimilarArtists((me && me.entry) || { key: key, name: name }).then(function(names){
+          if(!names || !names.length) return;
+          var st = npTarget();
+          if(st && st.id === t.id && nowPlayingScreen.style.display === 'flex') renderNpCollection(st);
+        });
+      }
+    }
+    // Shared genres (from the songs in the library).
+    var myGenres = {};
+    var entry = key ? findArtistEntry(key) : null;
+    if(entry && entry.tracks) entry.tracks.forEach(function(tr){ mfyGenreParts(tr.genre).forEach(function(g){ myGenres[g] = 1; }); });
+    if(Object.keys(myGenres).length){
+      cat.artists.map(function(a){
+        var n = 0;
+        if(a.entry && a.entry.tracks) a.entry.tracks.forEach(function(tr){ mfyGenreParts(tr.genre).forEach(function(g){ if(myGenres[g]) n++; }); });
+        return { k: a.key, n: n };
+      }).filter(function(x){ return x.n > 0; }).sort(function(x, y){ return y.n - x.n || (liveChHash(t.id + x.k) - liveChHash(t.id + y.k)); })
+        .forEach(function(x){ take(x.k); });
+    }
+    // Anyone else, in an order fixed for this video.
+    cat.artists.slice().sort(function(x, y){ return liveChHash(t.id + '|' + x.key) - liveChHash(t.id + '|' + y.key); }).forEach(function(a){ take(a.key); });
+    return picked;
+  }
+  window.__amplifyRelatedMusicVideos = relatedMusicVideos;
   function buildNpMovieRow(v){
     var row = document.createElement('div');
     row.className = 'vep-row vep-movie';
