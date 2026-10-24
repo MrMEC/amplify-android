@@ -3364,6 +3364,12 @@
   .np-related-heading{
     font-size:13px; letter-spacing:.01em; color:var(--text-dim); font-weight:700; margin:0 0 16px;
   }
+  .np-coll-head{ display:flex; align-items:center; gap:6px; margin:0 0 16px; }
+  .np-coll-head > .np-related-heading{ margin:0; flex:1; min-width:0; }
+  .np-coll-head > .np-foot-toggle{ display:none; }
+  .now-playing-screen.np-channel:not(.np-tv) .np-coll-head > .np-foot-toggle{ display:flex; }
+  .np-coll-head > .epg-corner.np-foot-toggle{ width:34px; height:34px; flex:0 0 34px; margin-left:-8px; border-radius:50%; background:transparent; }
+  .np-coll-head > .epg-corner.np-foot-toggle svg{ width:22px; height:22px; }
   .np-related-grid{
     display:grid; grid-template-columns: repeat(auto-fill, minmax(110px, 150px));
     gap:28px 16px; justify-content:space-between;
@@ -3591,8 +3597,9 @@
   .epg-corner.off{ visibility:hidden; pointer-events:none; }
   .epg-corner:not(:disabled){ color:var(--text); }
   /* The playing channel's details hidden (the corner's up arrow): none of its height left. */
-  /* Build 303: only on a real TV channel; a video of your own always shows its title and artist. */
-  body:not(.rotate-lock) .now-playing-screen.np-channel.np-tv.np-foot-collapsed .np-hero-foot{
+  /* Build 309 (Mark): TV channels (the guide's corner) and your own videos (the arrow beside the
+     list's heading) share one shown / hidden setting. */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed .np-hero-foot{
     height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
@@ -7161,7 +7168,12 @@
           <div class="np-ep-desc-text" id="npEpDescText"></div>
         </div>
         <div class="np-related" id="npCollection" style="display:none;">
-          <div class="np-related-heading" id="npCollectionHeading"></div>
+          <!-- Build 309: for a video of your own, the arrow that shows / hides its details (the same
+               one as the Live TV guide's corner) sits left of the heading. -->
+          <div class="np-coll-head">
+            <button type="button" class="epg-corner np-foot-toggle" id="npFootToggle" aria-label="Hide details"></button>
+            <div class="np-related-heading" id="npCollectionHeading"></div>
+          </div>
           <div class="np-related-grid" id="npCollectionGrid"></div>
         </div>
         <div class="np-related" id="npRelated">
@@ -10682,13 +10694,29 @@
         '<span>' + (npVideoOn ? 'Turn Off Video' : 'Turn On Video') + '</span>';
     }
   }
+  // Build 309 (Mark): full screen holds when one video follows another (a channel's next video, the
+  // next in a queue). Going to the next video drops the picture for a moment; leaving full screen
+  // then is noted, and the next picture to come on in the next few seconds goes straight back in.
+  var npFullCarry = null, npFullCarryTimer = 0;
   function resetNpVideoUi(){
-    if(npVideoFull) exitVideoFull();
+    var carry = npVideoFull ? { locked: npVideoFullLocked, at: Date.now() } : null;
+    if(npVideoFull){
+      // Not a hand on the button: no "don't go back in" for the phone on its side.
+      var keep = npVideoNoAutoFull;
+      exitVideoFull();
+      npVideoNoAutoFull = keep;
+    }
+    npFullCarry = carry;
+    clearTimeout(npFullCarryTimer);
+    if(carry) npFullCarryTimer = setTimeout(function(){
+      if(npFullCarry && !npVideoOn){ npFullCarry = null; nativeVideoUi({ fullscreen: false, landscape: false, awake: false }); }
+    }, 12000);
     npVideoOn = false;
     if(npVideoStream){ npVideoStream = false; nowPlayingScreen.classList.remove('np-video-stream'); syncStreamVideo(); }
     nowPlayingScreen.classList.remove('np-video-on');
     npVideoWrap.hidden = true;
-    nativeVideoUi({ fullscreen: false, landscape: false, awake: false });
+    // Held sideways (and full screen) for the next video, so the phone doesn't turn back and forth.
+    nativeVideoUi(carry ? { fullscreen: true, landscape: carry.locked, awake: true } : { fullscreen: false, landscape: false, awake: false });
     if(currentStation) syncNpVideoToggle(currentStation);
     syncVideoMini();
     vctlSync();
@@ -10711,7 +10739,7 @@
         resetNpVideoUi();
         setStatus('This episode\u2019s video couldn\u2019t be loaded. Playing the audio.');
       });
-      if(window.innerWidth > window.innerHeight) enterVideoFull(false);
+      if(!npResumeFull() && window.innerWidth > window.innerHeight) enterVideoFull(false);
     } else {
       if(!npVideoOn) return;
       if(audio.videoActive) audio.detachVideo();
@@ -10725,6 +10753,14 @@
     npVideoFullBtn.setAttribute('aria-label', 'Exit full screen');
     nativeVideoUi({ fullscreen: true, landscape: !!lockLandscape, awake: true });
     vctlSync();
+  }
+  // The next picture on: back to full screen if the last one was (build 309).
+  function npResumeFull(){
+    var c = npFullCarry;
+    npFullCarry = null;
+    clearTimeout(npFullCarryTimer);
+    if(c && Date.now() - c.at < 12000 && !npVideoFull){ enterVideoFull(c.locked); return true; }
+    return false;
   }
   function exitVideoFull(){
     if(!npVideoFull) return;
@@ -10750,6 +10786,7 @@
   });
   npVideoFullBtn.addEventListener('click', function(e){
     e.stopPropagation();
+    npFullCarry = null;
     if(npVideoFull) exitVideoFull(); else enterVideoFull(true);
   });
   // Turning the phone on its side while the video shows goes full screen; upright again
@@ -10802,7 +10839,7 @@
       npVideoWrap.hidden = false;
       syncNpVideoToggle(currentStation);
       vctlSync();
-      if(window.innerWidth > window.innerHeight && !npVideoNoAutoFull) enterVideoFull(false);
+      if(!npResumeFull() && window.innerWidth > window.innerHeight && !npVideoNoAutoFull) enterVideoFull(false);
     } else {
       resetNpVideoUi();
     }
@@ -11060,6 +11097,7 @@
   // under it is where the video came from: the Live TV guide for a channel, the movie's or the
   // show's page for a video on the phone (or from Plex).
   function npStopVideo(){
+    npFullCarry = null;
     var st = npTarget() || currentStation;
     var channel = !!(st && isNpChannel(st));
     var vid = st && isLocalVideo(st) ? st : null;
@@ -19536,12 +19574,18 @@
     b.classList.toggle('off', !on);
     var want = npFootCollapsed ? 'down' : 'up';
     if(b.dataset.arrow !== want){ b.dataset.arrow = want; b.innerHTML = npFootCollapsed ? EPG_ARROW_DOWN : EPG_ARROW_UP; }
-    var label = npFootCollapsed ? 'Show channel details' : 'Hide channel details';
+    var label = b.classList.contains('np-foot-toggle') ? (npFootCollapsed ? 'Show details' : 'Hide details') : (npFootCollapsed ? 'Show channel details' : 'Hide channel details');
     b.setAttribute('aria-label', label);
     b.title = on ? label : 'Nothing playing';
     b.setAttribute('aria-expanded', npFootCollapsed ? 'false' : 'true');
   }
   function syncEpgFootBtns(){ document.querySelectorAll('.epg-corner').forEach(syncEpgFootBtn); }
+  (function(){
+    var b = document.getElementById('npFootToggle');
+    if(!b) return;
+    b.addEventListener('click', function(e){ e.stopPropagation(); if(!b.disabled) setNpFootCollapsed(!npFootCollapsed); });
+    syncEpgFootBtn(b);
+  })();
   var npFootTimer = 0;
   function setNpFootCollapsed(c){
     c = !!c;
@@ -19549,7 +19593,7 @@
     try{ localStorage.setItem(NP_FOOT_KEY, c ? '1' : '0'); }catch(e){}
     syncEpgFootBtns();
     var foot = npHeroFoot;
-    var shown = nowPlayingScreen.style.display === 'flex' && nowPlayingScreen.classList.contains('np-tv') && !document.body.classList.contains('rotate-lock');
+    var shown = nowPlayingScreen.style.display === 'flex' && nowPlayingScreen.classList.contains('np-channel') && !document.body.classList.contains('rotate-lock');
     var still = !shown || !foot || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     clearTimeout(npFootTimer);
     if(still){
@@ -19800,7 +19844,8 @@
     // own channels the picture is the video actually playing. The schedule goes by the clock, and a
     // video that runs shorter or longer than expected leaves it on another video.
     // A music video played from Music Videos (a shuffle, an artist's videos) shows its own still too.
-    if(st && isLocalVideo(st) && (st.liveCh || st.videoKind === 'music')){
+    // Build 309 (Mark): movies and TV episodes too (their poster), so every video looks the same.
+    if(st && isLocalVideo(st)){
       src = '';
       if(st.videoKind === 'music'){
         if(st.still) src = capUrl(st.still);
@@ -19809,7 +19854,14 @@
           try{ ensureMusicVideoStills([st], function(v){ if(v === st && npTarget() === st) syncNpEpThumb(st); }); }catch(e){}
         }
       } else {
-        try{ var lv = vlib().byId[st.id]; src = lv ? videoPosterUrl(lv) : ''; }catch(e){ src = ''; }
+        // The poster; without one, the backdrop or the episode's own still.
+        try{
+          var lv = vlib().byId[st.id];
+          if(lv){
+            src = videoPosterUrl(lv) || '';
+            if(!src) try{ src = lv.kind === 'episode' ? (episodeImageUrl(lv) || '') : (movieBackdropUrl(lv) || ''); }catch(e2){}
+          }
+        }catch(e){ src = ''; }
       }
       // The program details only when the schedule agrees about what's on.
       if(on && on.it.vid !== st.id) on = null;
