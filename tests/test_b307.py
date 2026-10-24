@@ -49,7 +49,6 @@ async def main():
         await pg.evaluate("document.getElementById('addMusicOverlay').classList.remove('open'); try{ hideImportPanel(); setStatus('', false); }catch(e){}")
         await pg.evaluate("(f) => __d.mv301.seed(f)", [list(x) for x in FILES])
         # the Live TV guide's "hide channel details" left on
-        await pg.evaluate("localStorage.setItem('radioPlayerNpDetailsHidden', '1'); document.getElementById('nowPlayingScreen').classList.add('np-foot-collapsed')")
         await pg.evaluate("__d.mv301.watch()"); await pg.wait_for_timeout(1000)
         await pg.evaluate("__amplifyOpenMusicVideoArtist(__d.mv301.key('Prince'))"); await pg.wait_for_timeout(600)
         await pg.evaluate("document.querySelector('.mv-page-acts .mv-play').click()"); await pg.wait_for_timeout(2000)
@@ -63,8 +62,15 @@ async def main():
           return { h: r.height, vis: getComputedStyle(f).visibility, name: n.textContent, sub: (document.querySelector('#nowPlayingScreen .np-sub') || {}).textContent,
             cls: document.getElementById('nowPlayingScreen').className }; })()""")
         print('foot', foot)
+        # build 309: the hidden setting is shared again, now with an arrow by the list heading to bring the details back
+        await pg.evaluate("document.getElementById('npFootToggle').click()"); await pg.wait_for_timeout(700)
+        hid = await pg.evaluate("[document.querySelector('#nowPlayingScreen .np-hero-foot').getBoundingClientRect().height, document.getElementById('npFootToggle').dataset.arrow]")
+        check(hid[0] == 0 and hid[1] == 'down', f'build 309: the arrow by the heading hides the details {hid}')
+        await pg.evaluate("document.getElementById('npFootToggle').click()"); await pg.wait_for_timeout(700)
+        foot = await pg.evaluate("""(()=>{ const f = document.querySelector('#nowPlayingScreen .np-hero-foot'); const r = f.getBoundingClientRect(); const n = document.getElementById('npName');
+          return { h: r.height, vis: getComputedStyle(f).visibility, name: n.textContent, sub: (document.querySelector('#nowPlayingScreen .np-sub') || {}).textContent, cls: '' }; })()""")
         check(foot['h'] > 30 and foot['vis'] == 'visible' and foot['name'] == 'Prince 01' and 'Prince' in foot['sub'],
-              f'title and artist under the video, even with the guide\'s channel details hidden {foot}')
+              f'and brings back the title and artist {foot}')
         check('np-tv' not in foot['cls'], 'a video of your own is not treated as a TV channel')
         # Previous / Next on the picture
         await pg.evaluate("(()=>{ const v = document.getElementById('vctl'); if(!v.classList.contains('show')) v.click(); })()"); await pg.wait_for_timeout(300)
