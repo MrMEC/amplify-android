@@ -5899,6 +5899,8 @@
   .lyrics-msg .lyrics-spin{ display:inline-block; width:22px; height:22px; border-radius:50%; border:2.5px solid rgba(255,255,255,.25);
     border-top-color:var(--np-vivid, #fff); animation:lyricsSpin .8s linear infinite; margin-bottom:10px; }
   @keyframes lyricsSpin{ to{ transform:rotate(360deg); } }
+  .lyrics-why{ font-size:12px; color:var(--text-faint); }
+  .lyrics-retry{ margin-top:16px; padding:8px 18px; font-size:13.5px; }
   .lyrics-credit{ font-size:11.5px; color:var(--text-faint); padding:14px 0 42vh; }
   .lyrics-credit:empty{ padding-top:0; }
   @media (prefers-reduced-motion: reduce){ .lyrics-line{ transition:none; } .lyrics-line.now{ transform:none; } }
@@ -33690,32 +33692,58 @@
   }
 
   // -- LRCLIB --
-  function lyricsHttp(url){
+  // Build 300: the app's own connection first, the WebView's fetch as a second way in (LRCLIB
+  // allows any origin); a busy server (503/429) or a dropped request is tried again after a
+  // pause. 404 means "not there", which is an answer, not a failure.
+  function lyricsWait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function lyricsHttpOnce(url, useNative){
     var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
-    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && H && typeof H.request === 'function');
     var hdr = { 'Accept': 'application/json', 'Lrclib-Client': 'Amplify (https://github.com/MrMEC/amplify-android)' };
-    if(native){
-      return Promise.resolve(H.request({ url: url, method: 'GET', responseType: 'json', connectTimeout: 10000, readTimeout: 15000, headers: hdr }))
-        .then(function(r){
-          if(!r) throw new Error('net');
-          if(r.status === 404) return null;
-          if(r.status < 200 || r.status >= 300) throw new Error('http ' + r.status);
-          var d = r.data; if(typeof d === 'string'){ try{ d = JSON.parse(d); }catch(e){ d = null; } }
-          return d;
-        });
+    function body(status, d){
+      if(status === 404) return null;
+      if(status < 200 || status >= 300){ var e = new Error('HTTP ' + status); e.status = status; throw e; }
+      if(typeof d === 'string'){ try{ d = JSON.parse(d); }catch(err){ throw new Error('bad reply'); } }
+      return d;
+    }
+    if(useNative){
+      return Promise.resolve(H.request({ url: url, method: 'GET', responseType: 'text', connectTimeout: 12000, readTimeout: 20000, headers: hdr }))
+        .then(function(r){ if(!r) throw new Error('no reply'); return body(Number(r.status), r.data); });
     }
     return fetch(url, { mode: 'cors', headers: { 'Accept': 'application/json' } }).then(function(r){
       if(r.status === 404) return null;
-      if(!r.ok) throw new Error('http ' + r.status);
-      return r.json();
+      return r.text().then(function(t){ return body(r.status, t); });
     });
+  }
+  function lyricsHttp(url, once){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var nativeOk = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && H && typeof H.request === 'function');
+    var plan = nativeOk ? [true, false, true] : [false, false, false];
+    if(once) plan = plan.slice(0, nativeOk ? 2 : 1);
+    var lastErr = null;
+    function attempt(i){
+      if(i >= plan.length) return Promise.reject(lastErr || new Error('no connection'));
+      return (i ? lyricsWait(i === 1 ? 250 : 1200) : Promise.resolve()).then(function(){
+        return lyricsHttpOnce(url, plan[i]);
+      }).then(null, function(err){
+        lastErr = err;
+        // A real refusal (400/403...) won't change on a retry; busy (429/5xx) or no reply will.
+        if(err && err.status && err.status < 500 && err.status !== 429) throw err;
+        return attempt(i + 1);
+      });
+    }
+    return attempt(0);
   }
   function lyricsArtistName(a){ return String(a || '').split(/\s+(?:feat\.?|ft\.?|featuring|with|x|&)\s+|,\s*/i)[0].trim(); }
   function lyricsTitleName(t){ return String(t || '').replace(/\s*[\(\[][^\)\]]*\b(remaster(ed)?|live|mono|stereo|version|edit|mix|explicit|clean|bonus|deluxe|feat\.?|ft\.?)\b[^\)\]]*[\)\]]/gi, '').replace(/\s+-\s+(remaster(ed)?|live|single version|radio edit)\b.*$/i, '').trim(); }
   function lyricsFromLrclib(track){
     var artist = lyricsArtistName(track.artist), title = lyricsTitleName(track.name);
     if(!artist || !title || artist === UNKNOWN_ARTIST) return Promise.resolve(null);
-    var dur = Math.round(Number(track.duration) || (npIsCurrent() && isFinite(audio.duration) ? audio.duration : 0) || 0);
+    // The player's own length when this is the song playing (seconds, exact); otherwise the
+    // library's, read as milliseconds if it's implausibly long for seconds.
+    var live = npIsCurrent() && favKey(npTarget()) === favKey(track) && isFinite(audio.duration) && audio.duration > 0;
+    var dur = live ? audio.duration : (Number(track.duration) || 0);
+    if(dur > 36000) dur = dur / 1000;
+    dur = Math.round(dur);
     var base = 'https://lrclib.net/api/';
     function pick(r){
       if(!r || r.instrumental) return r && r.instrumental ? { instrumental: true, source: 'lrclib' } : null;
@@ -33724,15 +33752,29 @@
       return null;
     }
     var q = 'artist_name=' + encodeURIComponent(artist) + '&track_name=' + encodeURIComponent(title);
-    var first = (dur && track.album) ? lyricsHttp(base + 'get?' + q + '&album_name=' + encodeURIComponent(track.album) + '&duration=' + dur).then(pick) : Promise.resolve(null);
+    var firstErr = null;
+    var first = (dur && track.album) ? lyricsHttp(base + 'get?' + q + '&album_name=' + encodeURIComponent(track.album) + '&duration=' + dur, true)
+      .then(pick, function(e){ firstErr = e; return null; }) : Promise.resolve(null);
+    // The closest in length, timed ones first; a copy more than 10s off is a different
+    // recording (the timing wouldn't fit), so it only counts for untimed words.
+    function best(list){
+      if(!Array.isArray(list) || !list.length) return null;
+      function gap(r){ return (dur && r.duration) ? Math.abs(r.duration - dur) : 0; }
+      var timed = list.filter(function(r){ return r.syncedLyrics && gap(r) <= 10; }).sort(function(x, y){ return gap(x) - gap(y); });
+      if(timed[0]) return pick(timed[0]);
+      var plain = list.filter(function(r){ return r.plainLyrics; }).sort(function(x, y){ return gap(x) - gap(y); });
+      if(plain[0]) return { plain: plain[0].plainLyrics, source: 'lrclib' };
+      var instr = list.filter(function(r){ return r.instrumental && gap(r) <= 10; })[0];
+      return instr ? pick(instr) : null;
+    }
     return first.then(function(hit){
       if(hit) return hit;
-      return lyricsHttp(base + 'search?' + q).then(function(list){
-        if(!Array.isArray(list) || !list.length) return null;
-        var near = list.filter(function(r){ return !dur || !r.duration || Math.abs(r.duration - dur) <= 4; });
-        var pool = near.length ? near : (dur ? [] : list);
-        var best = pool.filter(function(r){ return r.syncedLyrics; })[0] || pool.filter(function(r){ return r.plainLyrics || r.instrumental; })[0];
-        return pick(best);
+      return lyricsHttp(base + 'search?' + q).then(best).then(function(h){
+        if(h) return h;
+        return lyricsHttp(base + 'search?q=' + encodeURIComponent(artist + ' ' + title)).then(best);
+      }, function(e){
+        // The search failed outright: one more way in, by free text.
+        return lyricsHttp(base + 'search?q=' + encodeURIComponent(artist + ' ' + title)).then(best, function(){ throw (firstErr || e); });
       });
     });
   }
@@ -33740,15 +33782,16 @@
   function findLyrics(track){
     var k = favKey(track);
     return lyricsGet(k).then(function(c){
-      if(c && !(c.none && Date.now() - (c.at || 0) > LYRICS_MISS_RETRY)) return c;
+      // Build 300: a miss from before the sturdier lookup (no v) is looked up again now.
+      if(c && !(c.none && (c.v !== 2 || Date.now() - (c.at || 0) > LYRICS_MISS_RETRY))) return c;
       return lyricsFromFile(track).then(function(f){
         if(f && f.synced) return f;
         return lyricsFromLrclib(track).then(function(n){
           if(n && (n.synced || !f)) return n;
           return f || n;
-        }, function(){ if(f) return f; throw new Error('net'); });
+        }, function(e){ if(f) return f; throw (e || new Error('no connection')); });
       }).then(function(r){
-        var v = r ? Object.assign({ at: Date.now() }, r) : { none: true, at: Date.now() };
+        var v = r ? Object.assign({ at: Date.now(), v: 2 }, r) : { none: true, at: Date.now(), v: 2 };
         lyricsPut(k, v);
         return v;
       });
@@ -33801,10 +33844,14 @@
       renderLyrics(res);
       lyricsScroll.scrollTop = 0;
       lyricsTick(true);
-    }, function(){
+    }, function(err){
       if(job !== lyr.job) return;
       lyr.lines = null;
-      lyricsMsg('Lyrics couldn’t be loaded. Check your connection and try again.');
+      var why = String((err && err.message) || 'no connection').replace(/[<>&]/g, '');
+      if(err && err.status === 503) why = 'LRCLIB is busy right now';
+      lyricsMsg('Lyrics couldn’t be loaded.<br><span class="lyrics-why">' + why + '</span><br><button type="button" class="queue-clear lyrics-retry" id="lyricsRetryBtn">Try again</button>');
+      var rb = document.getElementById('lyricsRetryBtn');
+      if(rb) rb.addEventListener('click', function(ev){ ev.stopPropagation(); lyr.key = ''; loadLyricsFor(track); });
     });
   }
   // The line being sung: lit, and kept a third of the way down unless they're scrolling.
@@ -33887,7 +33934,7 @@
     if(!lyricsOpen || lyricsPanel.contains(e.target) || isPhoneLayout()) return;
     closeLyricsPanel();
   });
-  window.__amplifyLyrics = { open: openLyricsPanel, close: closeLyricsPanel, isOpen: function(){ return lyricsOpen; }, parse: parseLrc, state: lyr };
+  window.__amplifyLyrics = { open: openLyricsPanel, close: closeLyricsPanel, isOpen: function(){ return lyricsOpen; }, parse: parseLrc, state: lyr, load: loadLyricsFor };
 
   // The two side panels, for the swipes below.
   var QUEUE_SIDE = { dir: 1, el: queuePanel, isOpen: function(){ return queuePanelOpen; },
