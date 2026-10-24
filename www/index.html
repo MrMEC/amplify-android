@@ -15122,11 +15122,11 @@
     ['Latin', /\b(latin\w*|spanish|español|espanol|salsa|reggaeton|tropical|mexican\w*|regional mexican|bachata|merengue|tejano|cumbia|banda)\b/],
     ['Jazz', /\b(jazz|smooth jazz|swing|big band)\b/],
     ['Classical', /\b(classical|opera|symphon\w*|baroque|orchestra\w*)\b/],
+    ['Adult Contemporary', /\b(adult contemporary|soft rock|easy listening|ac|hot ac|lite|soft|love songs|adult hits)\b/],
     ['Classic Rock', /\b(classic rock|album rock|aor)\b/],
     ['Alternative', /\b(alternative|indie|alt|modern rock|grunge|emo)\b/],
     ['Rock', /\b(rock|metal|punk|hard rock|active rock)\b/],
     ['Classic Hits & Oldies', /\b(oldies|classic hits|50s|60s|70s|80s|90s|1950s|1960s|1970s|1980s|1990s|retro|decades|doo ?wop)\b/],
-    ['Adult Contemporary', /\b(adult contemporary|soft rock|easy listening|ac|hot ac|lite|soft|love songs|adult hits)\b/],
     ['Pop & Top 40', /\b(top ?40|pop|hits|chr|contemporary hit radio|top hits|charts?)\b/],
     ['Dance & Electronic', /\b(dance|electronic|edm|house|techno|trance|club|dubstep|drum and bass|electro)\b/],
     ['Reggae & Caribbean', /\b(reggae|caribbean|island|soca|calypso|dancehall|haitian|kompa)\b/],
@@ -15306,7 +15306,7 @@
         // Still short (stations in the directory without a location): the home state's own.
         if(near.length < NEAR_MIN) near = near.concat(unplaced);
         var items = near.map(function(p){
-          return { card: p.x.card, d: p.d == null ? null : Math.round(p.d * 10) / 10, g: nearGenreOf(p.x.card.tags),
+          return { card: p.x.card, d: p.d == null ? null : Math.round(p.d * 100) / 100, g: nearGenreOf(p.x.card.tags),
             clicks: p.x.clicks, votes: p.x.votes, st: p.d == null ? p.x.state : '' };
         });
         // One entry per stream, and nothing on the blocked list.
