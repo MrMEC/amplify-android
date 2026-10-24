@@ -1,6 +1,6 @@
 """Build 301 (Mark): Watch > Music Videos: every music video on the phone by artist (artists with
 videos but no songs included), Other Videos for the rest; an artist's page plays their videos.
-Run: python3 tests/test_b301.py (screenshots in /tmp/claude-0/t/shots)"""
+Build 302: no Artist button, the name links to the artist page, the artist page heading links back, Recently Added shows the artist. Run: python3 tests/test_b301.py (screenshots in /tmp/claude-0/t/shots)"""
 import os, sys, json
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 __file__ = os.path.join(HERE, 'test_daily_mixes.py')
@@ -48,6 +48,11 @@ async def main():
         rec = await pg.evaluate("[...document.querySelectorAll('.mv-recent .yt-title')].map(e => e.textContent)")
         print('recent', rec)
         check(rec[:3] == ['Purple Rain', 'Rhythm Nation', 'Got Til Its Gone'], f'Recently Added, newest first {rec[:3]}')
+        subs = await pg.evaluate("[...document.querySelectorAll('.mv-recent .yt-date')].map(e => e.textContent)")
+        print('recent subs', subs)
+        check(subs[0] == 'Prince · 3:30' and subs[1] == 'Janet Jackson · 3:50', f'build 302: artist · length under each still {subs[:3]}')
+        oth = [x for x, r in zip(subs, rec) if r == 'random clip']
+        check(oth == ['4:20'], f'a video with no artist: just the length {oth}')
         t = await pg.evaluate(TILES); print('artists', t)
         check(t == ['Janet Jackson|2 videos', 'Madonna|1 video', 'Prince|2 videos', 'Sade|1 video', 'Other Videos|2 videos'],
               f'artists A to Z with counts (Janet Jackson and Sade have videos but no songs), Other Videos last {t}')
@@ -70,10 +75,19 @@ async def main():
           rows: [...document.querySelectorAll('.mv-row')].map(r => r.querySelector('.vep-title').textContent + '|' + r.querySelector('.vep-sub').textContent + '|' + ((r.querySelector('.mv-dur') || {}).textContent || '')) })""")
         print('prince', pi)
         check(pi['name'] == 'Prince' and pi['meta'].startswith('2 music videos'), f'the artist page: name and count {pi["meta"]}')
-        check(pi['btns'] == ['Play All', 'Shuffle', 'Artist'], f'Play All, Shuffle, and Artist (has songs) {pi["btns"]}')
+        check(pi['btns'] == ['Play All', 'Shuffle'], f'build 302: Play All and Shuffle, no Artist button {pi["btns"]}')
+        check(await pg.evaluate("document.querySelector('.mv-hero-name').classList.contains('mv-hero-link')"), 'the name is a link (has songs)')
         check(pi['rows'][0].startswith('Prince 01|Prince Album') and pi['rows'][1].startswith('Purple Rain|'), f'videos A to Z; album from the song of the same name {pi["rows"]}')
         check(pi['rows'][0].endswith('3:20'), f'length on the still {pi["rows"][0]}')
         await pg.screenshot(path=f'{shots}/b301-artist.png')
+        await pg.evaluate("document.querySelector('.mv-hero-name').click()"); await pg.wait_for_timeout(1200)
+        ap = await pg.evaluate("({ title: (document.getElementById('artistHeroName') || {}).textContent || document.title, head: (document.querySelector('.artist-videos-label') || {}).textContent, link: !!document.querySelector('.artist-videos-label.mv-heading-link') })")
+        print('artist page', ap)
+        check(ap['link'] and 'Music Videos' in (ap['head'] or ''), f'the name opens the artist page, whose Music Videos heading is a link {ap}')
+        await pg.screenshot(path=f'{shots}/b302-artistpage.png')
+        await pg.evaluate("document.querySelector('.artist-videos-label').click()"); await pg.wait_for_timeout(900)
+        back = await pg.evaluate("(document.querySelector('.mv-hero-name') || {}).textContent")
+        check(back == 'Prince', f'and the heading opens the artist\u2019s Music Videos page {back}')
         await pg.evaluate("document.querySelector('.mv-page-acts .vd-play').click()"); await pg.wait_for_timeout(900)
         q = await pg.evaluate("__d.mv301.q()"); print('queue', q)
         check(q['n'] == 2 and q['cur'] == 'Prince 01' and q['kind'] == 'music', f"Play All plays the artist's videos in order {q}")
@@ -81,7 +95,8 @@ async def main():
         # an artist with videos only
         await pg.evaluate("__amplifyOpenMusicVideoArtist(__d.mv301.key('Janet Jackson'))"); await pg.wait_for_timeout(700)
         ji = await pg.evaluate("({ btns: [...document.querySelectorAll('.mv-page-acts button')].map(b => b.textContent.trim()), rows: [...document.querySelectorAll('.mv-row .vep-title')].map(e => e.textContent) })")
-        check(ji['btns'] == ['Play All', 'Shuffle'] and ji['rows'] == ['Got Til Its Gone', 'Rhythm Nation'], f'a videos-only artist: their videos, no Artist button {ji}')
+        check(ji['btns'] == ['Play All', 'Shuffle'] and ji['rows'] == ['Got Til Its Gone', 'Rhythm Nation'], f'a videos-only artist: their videos {ji}')
+        check(not await pg.evaluate("document.querySelector('.mv-hero-name').classList.contains('mv-hero-link')"), 'a videos-only artist\'s name is not a link (no artist page)')
         await pg.evaluate("__amplifyOpenMusicVideoArtist(__d.mv301.key('Sade'))"); await pg.wait_for_timeout(500)
         si = await pg.evaluate("[...document.querySelectorAll('.mv-row .vep-title')].map(e => e.textContent)")
         check(si == ['Smooth Operator'], f'an artist from their folder name {si}')
