@@ -5867,7 +5867,13 @@
   .queue-more{ font-size:12.5px; color:var(--text-faint); padding:8px; }
   @media (max-width: 900px){ body.queue-open .sidebar-top{ visibility:hidden; } }
   /* ---------- Build 298: lyrics panel (the queue panel's look and colour) ---------- */
-  .lyrics-panel{ z-index:431; }
+  /* Build 299: lyrics come in from the left (a swipe right), the queue from the right. */
+  .lyrics-panel{ z-index:431; left:0; right:auto; transform:translateX(-100%); box-shadow:18px 0 40px rgba(0,0,0,.35); }
+  .lyrics-panel.open{ transform:translateX(0); }
+  @media (min-width: 901px){
+    .lyrics-panel{ left:var(--shell-gap); right:auto; transform:translateX(calc(-100% - 40px)); box-shadow:0 18px 50px rgba(0,0,0,.45); }
+    .lyrics-panel.open{ transform:translateX(0); }
+  }
   #lyricsCloseBtn{ width:52px; height:52px; margin:-6px 0; border-radius:0; background:none; justify-content:flex-start;
     font-size:24px; color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
   #lyricsCloseBtn:hover{ background:none; opacity:.8; }
@@ -6953,7 +6959,7 @@
                   <button type="button" class="np-menu-item" id="npQueueMenuBtn" role="menuitem">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h10"/><path class="fill" d="M16 14.2v5.6l4.6-2.8z"/></svg><span>View Queue</span>
                   </button>
-                  <!-- Build 298: the song's lyrics (also a swipe left). -->
+                  <!-- Build 298: the song's lyrics (also a swipe right). -->
                   <button type="button" class="np-menu-item" id="npLyricsMenuBtn" role="menuitem">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h12M4 10h12M4 14h7"/><path d="M17 20.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM19 18.5V10l2.5 1"/></svg><span>Lyrics</span>
                   </button>
@@ -7810,7 +7816,7 @@
 <!-- The queue: what is playing, what the listener lined up themselves (Up Next), and what
      carries on after that from the album, playlist or library the song was started from.
      Slides in from the right, over Now Playing on a phone and as a sheet beside it on a
-     desktop. Opened by the Up Next line under the controls (swiping left on Now Playing opens Lyrics for a song since build 298), or
+     desktop. Opened by swiping left on Now Playing, the Up Next line under the controls, or
      View Queue in its menu. -->
 <div class="queue-panel" id="queuePanel" role="dialog" aria-label="Queue" aria-hidden="true">
   <div class="queue-head">
@@ -7850,7 +7856,7 @@
     </div>
   </div>
 </div>
-<!-- Build 298: the playing song's lyrics, opened by swiping left on Now Playing. Same panel
+<!-- Build 298: the playing song's lyrics, opened by swiping right on Now Playing (build 299). Same panel
      (and the same colour) as the queue; timed lyrics follow the song, a tap on a line jumps there. -->
 <div class="queue-panel lyrics-panel" id="lyricsPanel" role="dialog" aria-label="Lyrics" aria-hidden="true">
   <div class="queue-head lyrics-head">
@@ -33884,13 +33890,13 @@
   window.__amplifyLyrics = { open: openLyricsPanel, close: closeLyricsPanel, isOpen: function(){ return lyricsOpen; }, parse: parseLrc, state: lyr };
 
   // The two side panels, for the swipes below.
-  var QUEUE_SIDE = { el: queuePanel, isOpen: function(){ return queuePanelOpen; },
+  var QUEUE_SIDE = { dir: 1, el: queuePanel, isOpen: function(){ return queuePanelOpen; },
     prep: function(){ closeNpMenu(); syncQueueTint(); renderQueuePanel(); }, open: openQueuePanel, close: closeQueuePanel };
-  var LYRICS_SIDE = { el: lyricsPanel, isOpen: function(){ return lyricsOpen; },
+  var LYRICS_SIDE = { dir: -1, el: lyricsPanel, isOpen: function(){ return lyricsOpen; },
     prep: prepLyricsPanel, open: openLyricsPanel, close: function(){ closeLyricsPanel(); } };
 
-  // ---------- swiping: left on Now Playing opens the lyrics (build 298; the queue for anything
-  // that isn't a song of yours), right on either panel closes it ----------
+  // ---------- swiping on Now Playing: left opens the queue, right opens a song's lyrics (build
+  // 299); each panel closes by swiping it back the way it came ----------
   // The panel follows the finger, so it can be peeked at and let go. The swipe only counts
   // once it is clearly sideways, and never starts on something that scrolls or slides
   // sideways itself (the seek bar, a horizontal row).
@@ -33913,7 +33919,7 @@
         if(queuePanelOpen || lyricsOpen){ mode = 'ignore'; return; }
         // Build 243: no queue while a channel is on screen.
         if(nowPlayingScreen.classList.contains('np-channel')){ mode = 'ignore'; return; }
-        P = lyricsApplies() ? LYRICS_SIDE : QUEUE_SIDE;
+        P = null;   // which panel: decided by the direction (left: queue, right: lyrics)
       } else if(!P.isOpen()){ mode = 'ignore'; return; }
       sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); dx = 0;
     }, { passive: true });
@@ -33924,7 +33930,11 @@
       if(mode === null){
         if(Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
         var sideways = Math.abs(dx) > Math.abs(dy) * 1.4;
-        if(!sideways || (opening ? dx > 0 : dx < 0)){ mode = 'ignore'; return; }
+        if(!sideways){ mode = 'ignore'; return; }
+        if(opening){
+          P = dx < 0 ? QUEUE_SIDE : (lyricsApplies() ? LYRICS_SIDE : null);
+          if(!P){ mode = 'ignore'; return; }
+        } else if(dx * P.dir < 0){ mode = 'ignore'; return; }   // closing goes back the way it came
         mode = 'swipe';
         if(opening) P.prep();
         width = P.el.offsetWidth || window.innerWidth;
@@ -33932,7 +33942,9 @@
       }
       if(mode !== 'swipe') return;
       if(e.cancelable) e.preventDefault();
-      var off = opening ? Math.max(0, width + dx) : Math.max(0, dx);
+      // dir 1: comes in from the right (queue); -1: from the left (lyrics).
+      var off = P.dir > 0 ? (opening ? Math.max(0, width + dx) : Math.max(0, dx))
+                          : (opening ? Math.min(0, dx - width) : Math.min(0, dx));
       P.el.style.transform = 'translateX(' + off + 'px)';
     }, { passive: false });
     function end(){
