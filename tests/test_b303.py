@@ -52,7 +52,7 @@ async def main():
         await pg.evaluate("localStorage.setItem('radioPlayerNpDetailsHidden', '1'); document.getElementById('nowPlayingScreen').classList.add('np-foot-collapsed')")
         await pg.evaluate("__d.mv301.watch()"); await pg.wait_for_timeout(1000)
         await pg.evaluate("__amplifyOpenMusicVideoArtist(__d.mv301.key('Prince'))"); await pg.wait_for_timeout(600)
-        await pg.evaluate("document.querySelector('.mv-page-acts .vd-play').click()"); await pg.wait_for_timeout(2000)
+        await pg.evaluate("document.querySelector('.mv-page-acts .mv-play').click()"); await pg.wait_for_timeout(2000)
         await pg.evaluate("__d.mv301.vidOn()"); await pg.wait_for_timeout(600)
         foot = await pg.evaluate("""(()=>{ const f = document.querySelector('#nowPlayingScreen .np-hero-foot'); const r = f.getBoundingClientRect(); const n = document.getElementById('npName');
           return { h: r.height, vis: getComputedStyle(f).visibility, name: n.textContent, sub: (document.querySelector('#nowPlayingScreen .np-sub') || {}).textContent,

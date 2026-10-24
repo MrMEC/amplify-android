@@ -112,9 +112,10 @@ async def run(p, width, theme='dark'):
     check(t and 'Comedy' in t and not any(d['src'].get('genre') == 'Comedy' for d in d3), f'{T} the check takes it off, after asking ({t})')
     # Build a Custom Channel
     await pg.evaluate("document.getElementById('chCustomBtn').click()"); await pg.wait_for_timeout(500)
-    ed = await pg.evaluate("[document.getElementById('liveChOverlay').classList.contains('open'), document.getElementById('liveChTitle').textContent]")
-    check(ed == [True, 'New Channel'], f'{T} Build a Custom Channel opens the editor {ed}')
-    await pg.evaluate("document.getElementById('liveChCloseBtn').click()"); await pg.wait_for_timeout(300)
+    # build 305: the editor is a page; Back leaves it
+    ed = await pg.evaluate("[document.getElementById('liveChPanel').parentNode.id === 'stationsGrid', document.getElementById('stationsHeading').textContent]")
+    check(ed == [True, 'New Channel'], f'{T} Build a Custom Channel opens the editor (a page since build 305) {ed}')
+    await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
     # back: Friends is in the guide
     await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(1200)
     g = await guide_names(pg)
@@ -128,9 +129,9 @@ async def run(p, width, theme='dark'):
           f'{T} Seinfeld\'s logo opens its options {sh}')
     await pg.screenshot(path=f'{SHOTS}/b280-sheet-{theme}-{width}.png')
     await pg.evaluate("Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).find(e => e.textContent === 'Edit Channel').click()"); await pg.wait_for_timeout(500)
-    ed = await pg.evaluate("[document.getElementById('liveChOverlay').classList.contains('open'), document.getElementById('liveChTitle').textContent, document.getElementById('chSheetOverlay').classList.contains('open')]")
-    check(ed == [True, 'Edit Channel', False], f'{T} Edit Channel opens its editor {ed}')
-    await pg.evaluate("document.getElementById('liveChCloseBtn').click()"); await pg.wait_for_timeout(300)
+    ed = await pg.evaluate("[document.getElementById('liveChPanel').parentNode.id === 'stationsGrid', document.getElementById('stationsHeading').textContent, document.getElementById('chSheetOverlay').classList.contains('open')]")
+    check(ed == [True, 'Edit Channel', False], f'{T} Edit Channel opens its editor (a page since build 305) {ed}')
+    await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(800)
     # favourite
     await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .epg-ch')).find(c => c.getAttribute('aria-label').startsWith('Seinfeld')).click()"); await pg.wait_for_timeout(400)
     await pg.evaluate("Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).find(e => e.textContent === 'Add to Favorites').click()"); await pg.wait_for_timeout(600)
@@ -164,7 +165,7 @@ async def run(p, width, theme='dark'):
     for y in range(int(bar[1]), -40, -40): await pg.mouse.move(bar[0], y)
     await pg.mouse.up(); await pg.wait_for_timeout(300)
     pos = await pg.evaluate("[document.getElementById('videoMini').getBoundingClientRect().top, document.querySelector('.sidebar-top').getBoundingClientRect().bottom]")
-    check(pos[0] >= pos[1], f'{T} the floating video stops below the header {pos}')
+    check(pos[0] >= 0, f'{T} the floating video stays on screen (above everything since build 282) {pos}')
     await pg.evaluate("document.getElementById('videoMini').hidden = true")
     check(not errs, f'{T} no page errors {errs[:2]}')
     await b.close()
