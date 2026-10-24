@@ -3869,6 +3869,7 @@
   .mv-acts{ display:flex; gap:8px; }
   .mv-acts .mv-btn{ padding:9px 16px; font-size:13px; }
   .tile-grid > .mv-recent{ grid-column:1/-1; }
+  .mv-recent .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tile-grid > .mv-artists-head{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; }
   .mv-seg{ display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; padding:3px; flex-shrink:0; }
   .mv-seg-btn{ border:none; background:none; font-family:inherit; font-size:12px; font-weight:700; color:var(--text-dim); padding:5px 12px; border-radius:999px; cursor:pointer; }
@@ -3884,6 +3885,10 @@
     border:3px solid var(--artist-ring, rgba(255,255,255,.26)); box-shadow:0 14px 30px rgba(0,0,0,.45); flex-shrink:0; }
   .mv-hero-art img{ width:100%; height:100%; object-fit:cover; object-position:var(--portrait-crop, 50% 25%); display:block; }
   .mv-hero-name{ font-size:26px; font-weight:800; letter-spacing:-.01em; margin-top:14px; line-height:1.2; overflow-wrap:break-word; word-break:normal; hyphens:none; max-width:100%; }
+  .grid-section-label.mv-heading-link{ cursor:pointer; display:flex; align-items:center; gap:8px; }
+  .mv-hero-link{ cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+  .mv-chev{ width:.72em; height:.72em; flex-shrink:0; fill:none; stroke:var(--text-faint); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+  .mv-hero-link .mv-chev{ width:18px; height:18px; }
   .mv-hero-meta{ font-size:13px; color:var(--text-dim); margin-top:4px; }
   .mv-page-acts{ justify-content:center; }
   .tile-grid > .mv-row{ grid-column:1/-1; }
@@ -21136,7 +21141,7 @@
     openNowPlaying(v, true);
   }
   // The section on an artist page: a sideways row of 16:9 stills, like Music Videos.
-  function buildMusicVideoTile(v, list){
+  function buildMusicVideoTile(v, list, showArtist){
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'yt-tile mv-tile';
@@ -21164,8 +21169,10 @@
     t.textContent = v.name;
     var d = document.createElement('span');
     d.className = 'yt-date';
-    d.textContent = v.duration ? formatTime(v.duration) : '';
-    b._paintDur = function(){ d.textContent = v.duration ? formatTime(v.duration) : ''; };
+    // Build 302: Recently Added names the artist before the length ("Artist · 3:45").
+    function durText(){ return [showArtist ? v.artist : '', v.duration ? formatTime(v.duration) : ''].filter(Boolean).join(' · '); }
+    d.textContent = durText();
+    b._paintDur = function(){ d.textContent = durText(); };
     b.appendChild(th); b.appendChild(t); b.appendChild(d);
     b.addEventListener('click', function(){ playMusicVideo(v, list); });
     return b;
@@ -23279,6 +23286,7 @@
   // it sits in that artist's folder. Whatever is left is under Other Videos. An artist opens a
   // page of their videos; a video plays in the video player with the rest of that page queued.
   var MV_SORT_KEY = 'radioPlayerMusicVideoSort';
+  var MV_CHEVRON = '<svg class="mv-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg>';
   var MV_OTHER_KEY = '__other__';
   var MV_GENERIC_DIR_RE = /^(my\s+)?(music\s*)?(videos?|clips?|mvs?|movies?|music|media|downloads?|download|dcim|camera|misc(ellaneous)?|others?|various( artists)?|va|unsorted|new folder( \(\d+\))?|temp|tmp|files?|mp4|avi|mkv|hd|4k|1080p?|720p?)$/i;
   var mvCatalogCache = null;
@@ -23385,7 +23393,7 @@
       var row = document.createElement('div');
       row.className = 'artist-videos artist-mvs mv-recent';
       var tiles = {};
-      recent.forEach(function(v){ var t = buildMusicVideoTile(v, recent); tiles[v.uri] = t; row.appendChild(t); });
+      recent.forEach(function(v){ var t = buildMusicVideoTile(v, recent, true); tiles[v.uri] = t; row.appendChild(t); });
       stationsGrid.appendChild(row);
       ensureMusicVideoStills(recent, function(v){ var t = tiles[v.uri]; if(t && t.isConnected){ t._paintStill(); t._paintDur(); } });
     }
@@ -23504,6 +23512,15 @@
     var nm = document.createElement('div');
     nm.className = 'mv-hero-name';
     nm.textContent = a.name;
+    // Build 302: the name is the way to the artist's page (for an artist with songs).
+    if(a.entry && a.entry.tracks && a.entry.tracks.length){
+      nm.classList.add('home-heading-link', 'mv-hero-link');
+      nm.setAttribute('role', 'link'); nm.tabIndex = 0;
+      nm.insertAdjacentHTML('beforeend', MV_CHEVRON);
+      var goArtist = function(){ pushView(); openArtistPage(a.key); };
+      nm.addEventListener('click', goArtist);
+      nm.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goArtist(); } });
+    }
     hero.appendChild(nm);
     var total = 0;
     list.forEach(function(v){ total += v.duration || 0; });
@@ -23516,9 +23533,6 @@
     actions.className = 'vd-actions mv-page-acts';
     actions.appendChild(mvButton('<i class="fa-solid fa-play"></i><span>Play All</span>', 'vd-play', function(){ mvPlayList(list, false, a.name + ' Videos'); }));
     actions.appendChild(mvButton('<span>Shuffle</span>', 'vd-secondary', function(){ mvPlayList(list, true, a.name + ' Videos'); }));
-    if(a.entry && a.entry.tracks && a.entry.tracks.length){
-      actions.appendChild(mvButton('<span>Artist</span>', 'vd-secondary', function(){ pushView(); openArtistPage(a.key); }));
-    }
     wrap.appendChild(actions);
     stationsGrid.appendChild(wrap);
     var rows = {};
@@ -31635,6 +31649,15 @@
     var label = appendGridSection(loading ? 'Music Videos' : ((rec.mv || locals.length) ? 'Music Videos' : 'Videos'));
     label.classList.add('artist-videos-label');
     stationsGrid.insertBefore(label, stationsGrid.firstChild);
+    // Build 302: with videos of theirs on the phone, the heading opens their Music Videos page.
+    if(locals.length){
+      label.classList.add('home-heading-link', 'mv-heading-link');
+      label.setAttribute('role', 'link'); label.tabIndex = 0;
+      label.insertAdjacentHTML('beforeend', MV_CHEVRON);
+      var openMv = function(){ pushView(); openMusicVideoArtist(entry.key); };
+      label.addEventListener('click', openMv);
+      label.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMv(); } });
+    }
     var row = document.createElement('div');
     row.className = 'artist-videos';
     if(loading){
@@ -31658,7 +31681,8 @@
         var c = document.createElement('span');
         c.className = 'grid-section-count';
         c.textContent = String((rec.videos || []).length + locals.length);
-        label.appendChild(c);
+        var chev = label.querySelector('.mv-chev');
+        if(chev) label.insertBefore(c, chev); else label.appendChild(c);
       }
     }
     stationsGrid.insertBefore(row, label.nextSibling);
