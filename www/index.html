@@ -3890,7 +3890,7 @@
   .mv-page{ display:flex; flex-direction:column; align-items:center; }
   .mv-hero{ display:flex; flex-direction:column; align-items:center; text-align:center; padding:8px 0 2px; width:100%; }
   .mv-hero-art{ width:150px; height:150px; border-radius:50%; overflow:hidden; position:relative; background:var(--panel-2);
-    border:3px solid var(--artist-ring, rgba(255,255,255,.26)); box-shadow:0 14px 30px rgba(0,0,0,.45); flex-shrink:0; }
+    border:1.5px solid var(--top-artist-ring, #3a3a3e); background-clip:padding-box; box-shadow:0 14px 30px rgba(0,0,0,.45); flex-shrink:0; }
   .mv-hero-art img{ width:100%; height:100%; object-fit:cover; object-position:var(--portrait-crop, 50% 25%); display:block; }
   .mv-hero-name{ font-size:26px; font-weight:800; letter-spacing:-.01em; margin-top:14px; line-height:1.2; overflow-wrap:break-word; word-break:normal; hyphens:none; max-width:100%; }
   .grid-section-label.mv-heading-link{ cursor:pointer; display:flex; align-items:center; gap:8px; }
@@ -3902,7 +3902,7 @@
   .tile-grid > .mv-row{ grid-column:1/-1; }
   /* Three artists across on a phone (as in the mockup), with room for the A to Z rail. */
   @media (max-width: 900px){
-    .tile-grid.mv-grid{ grid-template-columns:repeat(3, minmax(0, 1fr)); column-gap:14px; padding-right:14px; }
+    .tile-grid.mv-grid, .tile-grid.grid-artists{ grid-template-columns:repeat(3, minmax(0, 1fr)); column-gap:14px; padding-right:14px; }
     .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .mv-recent, .tile-grid.mv-grid > .grid-section-label,
     .tile-grid.mv-grid > .mv-artists-head{ margin-right:-14px; }
     .tile-grid.mv-grid .tile.mv-artist .tile-name{ font-size:13px; }
@@ -6027,7 +6027,9 @@
   }
   .tile-grid > .cl-row{ margin-bottom:-16px; }
   /* Artists: a thin grey ring round every portrait. */
-  .tile[data-entity="artist"]:not(.fav-card) .tile-art{ border:3px solid var(--artist-ring); }
+  /* Build 304 (Mark): every artist circle gets Top Artists' thin solid grey ring (the see-through
+     white ring let the colourful picture or placeholder show through, so it read as multicoloured). */
+  .tile[data-entity="artist"]:not(.fav-card) .tile-art{ border:1.5px solid var(--top-artist-ring); background-clip:padding-box; }
   .song-row .song-row-art.round, .fav-artists-list .row-thumb.fav-artist-thumb{ border:2px solid var(--artist-ring); }
   /* Build 208: Home's Top Artists get a thin solid grey ring (the see-through white let the
      colourful portrait show through it, so it read as a coloured border). */
@@ -8637,6 +8639,7 @@
     stationsGrid.classList.remove('grid-album');
     stationsGrid.classList.remove('guide-grid');
     stationsGrid.classList.remove('mv-grid');
+    stationsGrid.classList.remove('grid-artists');
     hideAzRail();
   }
   var stationsHeading = document.getElementById('stationsHeading');
@@ -23474,7 +23477,7 @@
         name: a.name,
         sub: mvCountText(a.videos.length),
         renderArt: function(el){ renderArtistArt(el, entry); },
-        favTarget: a.entry ? artistFavRecord(a.entry) : undefined,
+        // Build 304 (Mark): no favourite star on these.
         onClick: function(){ pushView(); openMusicVideoArtist(a.key); }
       });
       tile.classList.add('mv-artist');
@@ -23562,7 +23565,7 @@
       nm.classList.add('home-heading-link', 'mv-hero-link');
       nm.setAttribute('role', 'link'); nm.tabIndex = 0;
       nm.insertAdjacentHTML('beforeend', MV_CHEVRON);
-      var goArtist = function(){ pushView(); openArtistPage(a.key); };
+      var goArtist = function(){ openArtistPage(a.key); };   // it records this page itself
       nm.addEventListener('click', goArtist);
       nm.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goArtist(); } });
     }
@@ -30503,6 +30506,23 @@
       var ar = findArtistEntry(artist);
       return entry(ar ? ar.name : 'Artist', function(){ openArtistPage(artist); });
     }
+    // Build 304: a video page (a movie, a show, an artist's Music Videos) is remembered as itself,
+    // so back comes to it rather than falling through to Home.
+    if(onVideoDetailView && videoDetailWhere){
+      var w = videoDetailWhere;
+      if(w.indexOf('mv:') === 0){
+        var mk = w.slice(3), mvc = musicVideoCatalog(), mva = mvc.byKey[mk];
+        return entry(mk === MV_OTHER_KEY ? 'Other Videos' : (mva ? mva.name : 'Music Videos'), function(){ openMusicVideoArtist(mk); });
+      }
+      if(w.indexOf('m:') === 0){
+        var mv = vlib().byId[w.slice(2)];
+        return entry(mv ? mv.title : 'Movie', function(){ openVideoMovie(w.slice(2)); });
+      }
+      if(w.indexOf('s:') === 0){
+        var sh = vlib().showsByKey[w.slice(2)];
+        return entry(sh ? sh.title : 'Show', function(){ openVideoShow(w.slice(2)); });
+      }
+    }
     if(custom){
       var cs = findCustomSearchById(custom);
       if(cs) return entry(cs.label || 'Search', function(){ runCustomSearch(cs); });
@@ -30539,9 +30559,18 @@
     return entry('Home', function(){ loadTopStations(); });
   }
 
+  // Build 304: a page opened from a link on Now Playing (the artist's name, say) comes back to Now
+  // Playing on Back, over the page that was under it.
+  var navFromNp = null;
   function pushView(){
     if(navReplaying) return;
-    viewHistory.push(snapshotView());
+    var snap = snapshotView();
+    if(navFromNp){
+      var st = navFromNp, under = snap.open;
+      navFromNp = null;
+      snap = { label: 'Now Playing', scroll: snap.scroll, open: function(){ under(); openNowPlaying(st); } };
+    }
+    viewHistory.push(snap);
     if(viewHistory.length > VIEW_HISTORY_MAX) viewHistory.shift();
   }
 
@@ -31158,6 +31187,8 @@
       return;
     }
 
+    // Build 304: three across on a phone.
+    stationsGrid.classList.add('grid-artists');
     entries.forEach(function(e){ stationsGrid.appendChild(buildArtistTile(e)); });
     buildAzRail(azItemsFromGrid(".tile[data-entity='artist']", '.tile-name'));
 
@@ -33125,12 +33156,14 @@
     a.addEventListener('click', function(e){
       e.preventDefault();
       e.stopPropagation();
+      var from = npTarget();
       closeNowPlaying();
       // Opening Now Playing scrolled the page to the top and remembered where the list had
       // been. Putting that back before navigating is what lets the back button record where
       // you actually were, rather than the top of a list you had scrolled half way down.
       window.scrollTo(0, savedBrowseScrollY);
-      onClick();
+      navFromNp = from;
+      try{ onClick(); } finally { navFromNp = null; }
     });
     return a;
   }
