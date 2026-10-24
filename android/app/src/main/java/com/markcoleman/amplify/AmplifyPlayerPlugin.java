@@ -52,6 +52,10 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import com.getcapacitor.PermissionState;
+import android.location.Location;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -70,7 +74,12 @@ import java.util.Locale;
  * element calls into these methods, and these events back into element events.
  */
 @OptIn(markerClass = UnstableApi.class)
-@CapacitorPlugin(name = "AmplifyPlayer")
+// Build 310: "location" is the coarse (city-level) permission, for Stations Near Me.
+@CapacitorPlugin(
+    name = "AmplifyPlayer",
+    permissions = {
+      @Permission(alias = "location", strings = {android.Manifest.permission.ACCESS_COARSE_LOCATION})
+    })
 public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remote {
   private static final long CACHE_LIMIT_BYTES = 629145600;
   private static final List<String> FOLDER_EXTS =
@@ -132,6 +141,80 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   /** Build 223: a music file opened from another app is ready; the page asks for it. */
   void openedFileReady() {
     try { notifyListeners("openfile", new JSObject()); } catch (Throwable ignored) { }
+  }
+
+  // ---- Stations Near Me (build 310) ----
+  private JSObject locationAccessObj() {
+    JSObject o = new JSObject();
+    PermissionState st = getPermissionState("location");
+    o.put("state", st == null ? "prompt" : st.toString());
+    return o;
+  }
+
+  /** {state: granted | denied | prompt | prompt-with-rationale}, without asking. */
+  @PluginMethod
+  public void locationAccess(PluginCall call) {
+    call.resolve(locationAccessObj());
+  }
+
+  /** Asks for the coarse location permission (when not already granted); resolves as locationAccess. */
+  @PluginMethod
+  public void requestLocationAccess(PluginCall call) {
+    if (getPermissionState("location") == PermissionState.GRANTED) {
+      call.resolve(locationAccessObj());
+      return;
+    }
+    requestPermissionForAlias("location", call, "locationAccessDone");
+  }
+
+  @PermissionCallback
+  private void locationAccessDone(PluginCall call) {
+    call.resolve(locationAccessObj());
+  }
+
+  /** {maxAgeMs, timeoutMs} -> {lat, lon, accuracy, at}; rejects DENIED, OFF, TIMEOUT or UNAVAILABLE. */
+  @PluginMethod
+  public void getLocation(PluginCall call) {
+    if (getPermissionState("location") != PermissionState.GRANTED) {
+      call.reject("Location access isn't allowed", "DENIED");
+      return;
+    }
+    long maxAge = (long) (double) call.getDouble("maxAgeMs", 900000.0);
+    long timeout = (long) (double) call.getDouble("timeoutMs", 20000.0);
+    main.post(
+        () ->
+            NearbyLocation.get(
+                getContext(),
+                maxAge,
+                timeout,
+                (Location loc, String err) -> {
+                  if (loc == null) {
+                    call.reject("No location", err == null ? "UNAVAILABLE" : err);
+                    return;
+                  }
+                  JSObject o = new JSObject();
+                  o.put("lat", loc.getLatitude());
+                  o.put("lon", loc.getLongitude());
+                  o.put("accuracy", (double) loc.getAccuracy());
+                  o.put("at", loc.getTime());
+                  call.resolve(o);
+                }));
+  }
+
+  /** Opens Amplify's page in Android's Settings (to allow a permission turned down for good). */
+  @PluginMethod
+  public void openAppSettings(PluginCall call) {
+    try {
+      Intent i =
+          new Intent(
+              android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+              Uri.fromParts("package", getContext().getPackageName(), null));
+      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+      getContext().startActivity(i);
+      call.resolve();
+    } catch (Exception e) {
+      call.reject("Couldn't open Settings");
+    }
   }
 
   // ---- sleep timer (build 230; the timer itself is SleepTimer, in PlaybackService) ----

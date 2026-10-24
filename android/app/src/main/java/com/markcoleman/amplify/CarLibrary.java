@@ -240,6 +240,8 @@ final class CarLibrary {
     linkedHashMap.put("home:recentsongs", "Recent Songs");
     linkedHashMap.put("home:latest", "Latest Podcasts");
     linkedHashMap.put("home:topstations", "Top Stations");
+    // Build 310: stations around the phone (only listed while the phone sends some).
+    linkedHashMap.put("home:nearme", "Stations Near Me");
     linkedHashMap.put("lib:artists", "Artists");
     linkedHashMap.put("lib:albums", "Albums");
     linkedHashMap.put("lib:songs", "Songs");
@@ -263,7 +265,8 @@ final class CarLibrary {
           "home:latest",
           "home:mixes",
           "home:madeforyou",
-          "home:topstations"
+          "home:topstations",
+          "home:nearme"
         });
     linkedHashMap2.put(
         "tab:library",
@@ -276,6 +279,7 @@ final class CarLibrary {
     linkedHashMap3.put("home:recentsongs", "recentSongs");
     linkedHashMap3.put("home:latest", "podLatest");
     linkedHashMap3.put("home:topstations", "topStations");
+    linkedHashMap3.put("home:nearme", "nearMe");
     linkedHashMap3.put("st:recent", "recentStations");
     linkedHashMap3.put("st:top", "topStations");
     linkedHashMap3.put("pod:latest", "podLatest");
@@ -394,6 +398,11 @@ final class CarLibrary {
     if (strArr != null) {
       int length = strArr.length;
       while (i < length) {
+        // Build 310: Stations Near Me shows only while the phone has sent stations for it.
+        if ("home:nearme".equals(strArr[i]) && arrayOf(catalogLists(), "nearMe").isEmpty()) {
+          i++;
+          continue;
+        }
         MediaItem mediaItemNode = node(strArr[i]);
         if (mediaItemNode != null) {
           arrayList.add(mediaItemNode);
@@ -1802,6 +1811,7 @@ final class CarLibrary {
       }
     }
     arrayList2.add("topStations");
+    arrayList2.add("nearMe");
     Iterator it = arrayList2.iterator();
     while (it.hasNext()) {
       for (JSONObject jSONObject : arrayOf(jSONObjectOptJSONObject, (String) it.next())) {

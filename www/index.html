@@ -1033,6 +1033,10 @@
      generic label's negative margins (made for a 40px gap) would pull the rows over them. */
   .tile-grid > .grid-section-label.mfy-label{ margin:22px 0 4px; }
   .tile-grid > .grid-section-label.mfy-label:first-child{ margin-top:4px; }
+  /* Stations Near Me page (build 310): where it is, the genre pills, then each genre. */
+  .tile-grid > .near-where{ grid-column:1 / -1; font-size:13.5px; line-height:1.35; color:var(--text-dim); margin:0 0 2px; }
+  .tile-grid > .near-genre-tabs{ grid-column:1 / -1; margin:8px 0 2px; }
+  .tile-grid > .near-genre-tabs + .grid-section-label.mfy-label{ margin-top:14px; }
   .top-result-chev{ flex-shrink:0; width:34px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); font-size:14px; }
   .song-row.search-more-row{ cursor:pointer; }
   .song-row .song-row-art.search-more-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); font-size:20px; }
@@ -6649,6 +6653,15 @@
         </div>
         <div class="tile-grid" id="top100HomeGrid"></div>
       </div>
+      <!-- Stations Near Me (build 310): the most popular stations around the phone, up to 20, under
+           Top 100. Only while Amplify may use the phone's location (Settings > Stations Near Me).
+           The heading opens every local station, by genre. -->
+      <div class="home-section near-me-home-section" id="nearMeSection" style="display:none;">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="nearMeHeading" role="button" tabindex="0">Stations Near Me<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div class="tile-grid" id="nearMeHomeGrid"></div>
+      </div>
       <!-- Build 219: Daily Mix 1-5, Discover, Hear It Again and Artist Videos, each a row made
            fresh every day (see "Daily mixes" in the script). Filled in by renderDailyHome. -->
       <div id="dailyHomeSections" style="display:none;"></div>
@@ -7404,6 +7417,14 @@
       <select class="settings-select" id="libArtistRadioSelect" aria-labelledby="libArtistRadioLabel">
         <option value="on">Show</option>
         <option value="off">Hide</option>
+      </select>
+    </div>
+    <!-- Build 310: Stations Near Me on Home (asks for location access when turned on). -->
+    <div class="settings-row">
+      <span class="settings-label" id="nearMeLabel">Stations Near Me</span>
+      <select class="settings-select" id="nearMeSelect" aria-labelledby="nearMeLabel">
+        <option value="on">On</option>
+        <option value="off">Off</option>
       </select>
     </div>
     <!-- Build 265: the welcome tour, any time. -->
@@ -9482,6 +9503,8 @@
   function settingsInDrawer(){ return !!sidebarScroll && sidebarScroll.classList.contains('settings-on'); }
   function openSettings(){
     if(typeof renderPlexSettings === 'function') renderPlexSettings();
+    // Build 310: the Stations Near Me switch shows whether location is still allowed.
+    if(typeof nearAccessState === 'function') nearAccessState().then(function(st){ nearMeAccess = st; syncNearMeSetting(); });
     if(isMobileLayout() && drawerSettingsHost){
       if(settingsPanelEl.parentNode !== drawerSettingsHost) drawerSettingsHost.appendChild(settingsPanelEl);
       settingsOverlay.classList.remove('open');
@@ -15065,6 +15088,463 @@
   });
 
   // ================================================================
+  // Stations Near Me (build 310)
+  // ================================================================
+  // A Home row under Top 100 of the most popular stations near the phone (up to 20), shown only
+  // while Amplify has location permission (coarse, city-level) and the Settings switch is on.
+  // Its heading opens a page of every local station, grouped by genre A to Z, with genre pills.
+  // Local means within NEAR_RADIUS_MI (50 miles, roughly how far an FM signal carries); a sparse
+  // area with fewer than NEAR_MIN stations that close widens to NEAR_WIDE_MI (100 miles).
+  // The directory has no distance search, so: the phone's position is turned into the state (or
+  // states, near a border) around it, those states' stations are fetched, and each is placed by
+  // its own coordinates. Results are kept (radioPlayerNearMe) and redone after NEAR_TTL_MS or
+  // after moving NEAR_MOVE_MI. The car gets them too (Home > Stations Near Me).
+  var NEAR_KEY = 'radioPlayerNearMe', NEAR_PREF_KEY = 'radioPlayerNearMeOn', NEAR_GEO_KEY = 'radioPlayerNearGeo';
+  var NEAR_RADIUS_MI = 50, NEAR_WIDE_MI = 100, NEAR_MIN = 8, NEAR_HOME_MAX = 20;
+  var NEAR_TTL_MS = 6 * 3600 * 1000, NEAR_MOVE_MI = 10, NEAR_CHECK_MS = 10 * 60 * 1000;
+  var NEAR_VERSION = 1;
+  var nearMeSection = document.getElementById('nearMeSection');
+  var nearMeHomeGrid = document.getElementById('nearMeHomeGrid');
+  var nearMeShown = false, nearMeBusy = null, nearMeLastCheck = 0, nearMeAccess = 'unknown', nearMeGenre = 'all';
+  var nearStateCache = {};   // state stations fetched this session: { 'US|Florida': { at, list } }
+
+  // Genres for the page: a station goes under the first of its own tags that names one.
+  // Order matters (Classic Rock before Rock, Adult Contemporary before Pop).
+  var NEAR_GENRES = [
+    ['Public Radio', /\b(npr|public radio|pbs|public broadcasting)\b/],
+    ['News', /\b(news|noticias|news ?talk)\b/],
+    ['Sports', /\b(sports?|espn|deportes)\b/],
+    ['Talk', /\b(talk|politics|conservative|comedy)\b/],
+    ['Christian & Gospel', /\b(christian|gospel|worship|religio\w*|catholic|church|praise|ccm|bible|ministr\w*|islam\w*|jewish)\b/],
+    ['Country', /\b(country|bluegrass|americana|western)\b/],
+    ['Hip Hop', /\b(hip ?-?hop|rap|urban)\b/],
+    ['R&B & Soul', /\b(r ?& ?b|rnb|r'n'b|soul|motown|rhythm and blues|urban ac)\b/],
+    ['Latin', /\b(latin\w*|spanish|español|espanol|salsa|reggaeton|tropical|mexican\w*|regional mexican|bachata|merengue|tejano|cumbia|banda)\b/],
+    ['Jazz', /\b(jazz|smooth jazz|swing|big band)\b/],
+    ['Classical', /\b(classical|opera|symphon\w*|baroque|orchestra\w*)\b/],
+    ['Classic Rock', /\b(classic rock|album rock|aor)\b/],
+    ['Alternative', /\b(alternative|indie|alt|modern rock|grunge|emo)\b/],
+    ['Rock', /\b(rock|metal|punk|hard rock|active rock)\b/],
+    ['Classic Hits & Oldies', /\b(oldies|classic hits|50s|60s|70s|80s|90s|1950s|1960s|1970s|1980s|1990s|retro|decades|doo ?wop)\b/],
+    ['Adult Contemporary', /\b(adult contemporary|soft rock|easy listening|ac|hot ac|lite|soft|love songs|adult hits)\b/],
+    ['Pop & Top 40', /\b(top ?40|pop|hits|chr|contemporary hit radio|top hits|charts?)\b/],
+    ['Dance & Electronic', /\b(dance|electronic|edm|house|techno|trance|club|dubstep|drum and bass|electro)\b/],
+    ['Reggae & Caribbean', /\b(reggae|caribbean|island|soca|calypso|dancehall|haitian|kompa)\b/],
+    ['Blues', /\b(blues)\b/],
+    ['Chill & Ambient', /\b(chill\w*|ambient|lounge|relax\w*|new age)\b/],
+    ['College & Community', /\b(college|university|student|community|variety|freeform|eclectic|campus|lpfm)\b/],
+    ['Kids & Family', /\b(kids|children|family)\b/]
+  ];
+  var NEAR_OTHER = 'Other';
+  function nearGenreOf(tags){
+    var list = String(tags || '').toLowerCase().split(/[,;|\/]+/).map(function(t){ return t.trim(); }).filter(Boolean);
+    for(var i = 0; i < list.length; i++){
+      for(var j = 0; j < NEAR_GENRES.length; j++) if(NEAR_GENRES[j][1].test(list[i])) return NEAR_GENRES[j][0];
+    }
+    return NEAR_OTHER;
+  }
+
+  function nearPrefOn(){ try{ return localStorage.getItem(NEAR_PREF_KEY) !== 'off'; }catch(e){ return true; }
+  }
+  function nearPlugin(){
+    try{ return (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins
+      && Capacitor.Plugins.AmplifyPlayer) || null; }catch(e){ return null; }
+  }
+  // 'granted', 'denied', 'prompt' or 'unsupported', without asking.
+  function nearAccessState(){
+    var P = nearPlugin();
+    if(P && typeof P.locationAccess === 'function'){
+      return P.locationAccess().then(function(r){
+        var s = (r && r.state) || 'prompt';
+        return s === 'prompt-with-rationale' ? 'prompt' : s;
+      })['catch'](function(){ return 'unsupported'; });
+    }
+    if(!navigator.geolocation) return Promise.resolve('unsupported');
+    if(navigator.permissions && navigator.permissions.query){
+      return navigator.permissions.query({ name: 'geolocation' }).then(function(r){ return r.state; })['catch'](function(){ return 'prompt'; });
+    }
+    return Promise.resolve('prompt');
+  }
+  // Asks (the system's permission dialog). Resolves to the state afterwards.
+  function nearRequestAccess(){
+    var P = nearPlugin();
+    if(P && typeof P.requestLocationAccess === 'function'){
+      return P.requestLocationAccess().then(function(r){
+        var s = (r && r.state) || 'denied';
+        return s === 'prompt-with-rationale' || s === 'prompt' ? 'denied' : s;
+      })['catch'](function(){ return 'denied'; });
+    }
+    if(!navigator.geolocation) return Promise.resolve('unsupported');
+    return new Promise(function(res){
+      navigator.geolocation.getCurrentPosition(function(){ res('granted'); },
+        function(err){ res(err && err.code === 1 ? 'denied' : 'granted'); }, { timeout: 20000, maximumAge: 600000 });
+    });
+  }
+  function nearPosition(){
+    var P = nearPlugin();
+    if(P && typeof P.getLocation === 'function'){
+      return P.getLocation({ maxAgeMs: 15 * 60 * 1000, timeoutMs: 20000 }).then(function(r){
+        if(!r || typeof r.lat !== 'number') throw new Error('No location');
+        return { lat: r.lat, lon: r.lon };
+      });
+    }
+    return new Promise(function(res, rej){
+      navigator.geolocation.getCurrentPosition(function(p){ res({ lat: p.coords.latitude, lon: p.coords.longitude }); },
+        function(err){ rej(err || new Error('No location')); }, { timeout: 20000, maximumAge: 900000, enableHighAccuracy: false });
+    });
+  }
+
+  function nearMiles(a, b){
+    var R = 3958.8, rad = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  // A point d miles from p in a direction (degrees, 0 = north).
+  function nearOffset(p, miles, bearing){
+    var R = 3958.8, rad = Math.PI / 180, d = miles / R, b = bearing * rad;
+    var la1 = p.lat * rad, lo1 = p.lon * rad;
+    var la2 = Math.asin(Math.sin(la1) * Math.cos(d) + Math.cos(la1) * Math.sin(d) * Math.cos(b));
+    var lo2 = lo1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la1), Math.cos(d) - Math.sin(la1) * Math.sin(la2));
+    return { lat: la2 / rad, lon: ((lo2 / rad + 540) % 360) - 180 };
+  }
+  // Miles for the US (and the UK), kilometres elsewhere.
+  function nearUsesMiles(cc){ return !cc || /^(US|GB|LR|MM|PR|VI|GU)$/.test(cc); }
+  function nearDistLabel(mi, cc){
+    if(mi == null) return '';
+    if(nearUsesMiles(cc)) return (mi < 1 ? '< 1' : Math.round(mi)) + ' mi';
+    var km = mi * 1.609344;
+    return (km < 1 ? '< 1' : Math.round(km)) + ' km';
+  }
+
+  // Place names for a point (country code, state, city), kept by a ~15-mile grid square.
+  function nearGeoStore(){ try{ var v = JSON.parse(localStorage.getItem(NEAR_GEO_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } }
+  function nearPlaceOf(p){
+    var k = (Math.round(p.lat * 4) / 4).toFixed(2) + ',' + (Math.round(p.lon * 4) / 4).toFixed(2);
+    var store = nearGeoStore();
+    if(store[k] && Date.now() - (store[k].at || 0) < 90 * 24 * 3600 * 1000) return Promise.resolve(store[k].miss ? null : store[k]);
+    function keep(rec){
+      var m = nearGeoStore();
+      m[k] = rec;
+      var keys = Object.keys(m);
+      if(keys.length > 400){ keys.sort(function(a, b){ return (m[a].at || 0) - (m[b].at || 0); }); keys.slice(0, keys.length - 400).forEach(function(x){ delete m[x]; }); }
+      try{ localStorage.setItem(NEAR_GEO_KEY, JSON.stringify(m)); }catch(e){}
+      return rec.miss ? null : rec;
+    }
+    return fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + p.lat.toFixed(4) + '&longitude=' + p.lon.toFixed(4) + '&localityLanguage=en')
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){
+        var cc = String((d && d.countryCode) || '').toUpperCase(), st = (d && d.principalSubdivision) || '';
+        // The sea, or nowhere in particular: nothing to look up there.
+        if(!cc || !st) return keep({ at: Date.now(), miss: true });
+        return keep({ at: Date.now(), cc: cc, state: st, city: (d.city || d.locality || '') });
+      })['catch'](function(){
+        // Second source, for the phone's own spot only when the first can't be reached.
+        return fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=en&lat=' + p.lat.toFixed(4) + '&lon=' + p.lon.toFixed(4))
+          .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function(d){
+            var a = (d && d.address) || {};
+            var cc = String(a.country_code || '').toUpperCase();
+            if(!cc || !a.state) return null;
+            return keep({ at: Date.now(), cc: cc, state: a.state, city: a.city || a.town || a.village || a.county || '' });
+          })['catch'](function(){ return null; });
+      });
+  }
+  function nearStateStations(cc, state){
+    var k = cc + '|' + state, c = nearStateCache[k];
+    if(c && Date.now() - c.at < 12 * 3600 * 1000) return Promise.resolve(c.list);
+    return apiFetch('/json/stations/search?countrycode=' + encodeURIComponent(cc) + '&state=' + encodeURIComponent(state)
+      + '&hidebroken=true&order=clickcount&reverse=true&limit=3000').then(function(data){
+      var list = (data || []).map(function(s){
+        var lat = parseFloat(s.geo_lat), lon = parseFloat(s.geo_long);
+        var placed = isFinite(lat) && isFinite(lon) && !(Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01);
+        return { card: stationToCardData(s), lat: placed ? lat : null, lon: placed ? lon : null,
+          clicks: +s.clickcount || 0, votes: +s.votes || 0, state: s.state || state };
+      });
+      nearStateCache[k] = { at: Date.now(), list: list };
+      return list;
+    });
+  }
+
+  function nearLoad(){ try{ var v = JSON.parse(localStorage.getItem(NEAR_KEY) || 'null'); return v && v.v === NEAR_VERSION ? v : null; }catch(e){ return null; } }
+  function nearSave(rec){ try{ localStorage.setItem(NEAR_KEY, JSON.stringify(rec)); }catch(e){} }
+
+  // Works the list out for a position: { v, at, lat, lon, cc, city, state, radius, items:[{ card, d, g, clicks, votes }] }.
+  function nearBuild(pos){
+    var pts = [pos];
+    // Eight points round the edge of the wider circle catch a neighbouring state's stations.
+    for(var b = 0; b < 360; b += 45) pts.push(nearOffset(pos, NEAR_WIDE_MI, b));
+    return Promise.all(pts.map(function(p){ return nearPlaceOf(p)['catch'](function(){ return null; }); })).then(function(places){
+      var home = places[0];
+      var states = {}, order = [];
+      places.forEach(function(pl){
+        if(!pl || !pl.state) return;
+        var k = pl.cc + '|' + pl.state;
+        if(!states[k]){ states[k] = pl; order.push(k); }
+      });
+      if(!order.length) throw new Error('Couldn\'t tell where this is');
+      return Promise.all(order.map(function(k){
+        return nearStateStations(states[k].cc, states[k].state)['catch'](function(){ return null; });
+      })).then(function(lists){
+        if(lists.every(function(l){ return l === null; })) throw new Error('The station directory couldn\'t be reached');
+        var seen = {}, placed = [], unplaced = [];
+        lists.forEach(function(list, i){
+          (list || []).forEach(function(x){
+            var id = x.card.stationuuid || x.card.urlToResolve;
+            if(!id || seen[id]) return;
+            seen[id] = true;
+            if(x.lat != null){ placed.push({ x: x, d: nearMiles(pos, { lat: x.lat, lon: x.lon }) }); }
+            else if(home && order[i] === home.cc + '|' + home.state) unplaced.push({ x: x, d: null });
+          });
+        });
+        var radius = NEAR_RADIUS_MI;
+        var near = placed.filter(function(p){ return p.d <= radius; });
+        if(near.length < NEAR_MIN){
+          radius = NEAR_WIDE_MI;
+          near = placed.filter(function(p){ return p.d <= radius; });
+        }
+        // Still short (stations in the directory without a location): the home state's own.
+        if(near.length < NEAR_MIN) near = near.concat(unplaced);
+        var items = near.map(function(p){
+          return { card: p.x.card, d: p.d == null ? null : Math.round(p.d * 10) / 10, g: nearGenreOf(p.x.card.tags),
+            clicks: p.x.clicks, votes: p.x.votes, st: p.d == null ? p.x.state : '' };
+        });
+        // One entry per stream, and nothing on the blocked list.
+        var byUrl = {};
+        items = items.filter(function(it){
+          var u = it.card.urlToResolve || '';
+          if(!u || byUrl[u]) return false;
+          byUrl[u] = true;
+          return true;
+        });
+        return { v: NEAR_VERSION, at: Date.now(), lat: pos.lat, lon: pos.lon,
+          cc: (home && home.cc) || '', city: (home && home.city) || '', state: (home && home.state) || '',
+          radius: radius, items: items };
+      });
+    });
+  }
+
+  function nearItems(rec){
+    return ((rec && rec.items) || []).filter(function(it){ return it && it.card && !isBlacklisted(it.card); });
+  }
+  // Home's row: the most listened-to stations, nearer ones a little ahead.
+  function nearHomeList(rec){
+    var r = (rec && rec.radius) || NEAR_RADIUS_MI;
+    return nearItems(rec).map(function(it){
+      var score = Math.log(1 + (it.clicks || 0)) / Math.LN2 + 0.5 * Math.log(1 + (it.votes || 0)) / Math.LN2
+        - (it.d == null ? 1.5 : 2 * it.d / r);
+      return { it: it, s: score };
+    }).sort(function(a, b){ return b.s - a.s; }).map(function(x){ return x.it; });
+  }
+  function nearSubOf(it, rec){ return it.d == null ? (it.st || '') : nearDistLabel(it.d, rec && rec.cc); }
+
+  function renderNearMeHomeSection(){
+    if(!nearMeHomeGrid) return;
+    var rec = nearMeShowing() ? nearLoad() : null;
+    var list = nearHomeList(rec).slice(0, NEAR_HOME_MAX);
+    nearMeShown = list.length > 0;
+    nearMeHomeGrid.innerHTML = '';
+    list.forEach(function(it){
+      var tile = buildTile(it.card);
+      var sub = document.createElement('div');
+      sub.className = 'tile-sub';
+      sub.textContent = nearSubOf(it, rec);
+      tile.appendChild(sub);
+      nearMeHomeGrid.appendChild(tile);
+    });
+    if(nearMeSection && document.body.classList.contains('home-stacked')) nearMeSection.style.display = nearMeShown ? '' : 'none';
+    if(window.AmplifyScheduleCarMenu) window.AmplifyScheduleCarMenu();
+  }
+  function nearMeShowing(){ return nearPrefOn() && nearMeAccess === 'granted'; }
+
+  // For the car: every local station, most listened-to first, each with its genre and distance.
+  function nearMeCarList(){
+    var rec = nearMeShowing() ? nearLoad() : null;
+    return nearHomeList(rec).map(function(it){
+      var sub = nearSubOf(it, rec);
+      return { card: it.card, sub: it.g + (sub ? ' · ' + sub : '') };
+    });
+  }
+
+  // Checks the permission and, when it's there, makes sure the list is fresh for where the phone
+  // is now. force: redo the list even when the kept one still fits.
+  function nearMeRefresh(force){
+    if(nearMeBusy) return nearMeBusy;
+    nearMeLastCheck = Date.now();
+    nearMeBusy = nearAccessState().then(function(state){
+      nearMeAccess = state;
+      if(!nearMeShowing()){ renderNearMeHomeSection(); syncNearMeSetting(); return null; }
+      var kept = nearLoad();
+      // Show what's kept straight away; the fix and any new list follow.
+      renderNearMeHomeSection();
+      syncNearMeSetting();
+      return nearPosition().then(function(pos){
+        var fresh = kept && Date.now() - kept.at < NEAR_TTL_MS && nearMiles(pos, kept) < NEAR_MOVE_MI;
+        if(fresh && !force) return kept;
+        return nearBuild(pos).then(function(rec){
+          nearSave(rec);
+          renderNearMeHomeSection();
+          if(activeHomeSection === 'nearMe' && nearMePageOnScreen()) renderNearMePage();
+          return rec;
+        });
+      })['catch'](function(err){
+        // No fix or no answer: whatever was kept stays up.
+        if(activeHomeSection === 'nearMe' && nearMePageOnScreen() && !nearItems(nearLoad()).length) renderNearMePage(err);
+        return null;
+      });
+    })['finally'](function(){ nearMeBusy = null; });
+    return nearMeBusy;
+  }
+
+  // ---------- the page ----------
+  function nearMePageOnScreen(){
+    return !!stationsHeading && stationsHeading.textContent.trim() === (HOME_SECTION_TITLES.nearMe || 'Stations Near Me');
+  }
+  function nearAlphaKey(s){ return String(s || '').toLowerCase().replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
+  function buildNearRow(it, rec){
+    var st = it.card;
+    var row = document.createElement('div');
+    row.className = 'tile song-row mfy-row near-row';
+    row.dataset.key = favKey(st);
+    row._ctxItem = st;
+    if(currentStation && favKey(currentStation) === favKey(st)) row.classList.add('playing');
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art';
+    renderStationArt(art, st);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div'); t.className = 'tile-name song-row-title'; t.textContent = stripExclusively(st.name || '');
+    var s2 = document.createElement('div'); s2.className = 'song-row-sub'; s2.textContent = nearSubOf(it, rec);
+    body.appendChild(t); body.appendChild(s2);
+    row.appendChild(art); row.appendChild(body);
+    row.appendChild(buildRowMoreBtn(st, { fav: true }));
+    row.addEventListener('click', function(){ playEntity(st); });
+    return row;
+  }
+  function renderNearMePage(err){
+    if(activeHomeSection !== 'nearMe') return;
+    resetStationsGrid();
+    stationsGrid.classList.add('grid-songs');
+    setResultCount(null);
+    var rec = nearMeShowing() ? nearLoad() : null;
+    var items = nearItems(rec);
+    if(!items.length){
+      if(nearMeShowing() && (nearMeBusy || (!rec && !err))){
+        stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+        if(!nearMeBusy) nearMeRefresh(true);
+        return;
+      }
+      stationsGrid.innerHTML = '<div class="empty-state">' + (!nearMeShowing()
+        ? 'Turn on Stations Near Me in Settings to see stations around you.'
+        : err ? 'Couldn\'t find stations near you right now.' : 'No stations found near you.') + '</div>';
+      return;
+    }
+    // Where this is, and how far out it looks.
+    var where = document.createElement('div');
+    where.className = 'near-where';
+    var place = [rec.city, rec.state].filter(Boolean).join(', ');
+    var rad = nearUsesMiles(rec.cc) ? rec.radius + ' miles' : Math.round(rec.radius * 1.609344) + ' km';
+    where.textContent = (place ? 'Near ' + place + ' · ' : '') + 'Within ' + rad;
+    stationsGrid.appendChild(where);
+    var groups = {};
+    items.forEach(function(it){ (groups[it.g] = groups[it.g] || []).push(it); });
+    var names = Object.keys(groups).sort(function(a, b){
+      if(a === NEAR_OTHER) return 1;
+      if(b === NEAR_OTHER) return -1;
+      return a.localeCompare(b);
+    });
+    if(nearMeGenre !== 'all' && !groups[nearMeGenre]) nearMeGenre = 'all';
+    // Genre pills: All, then each genre; one shows just that genre.
+    if(names.length > 1){
+      var tabs = document.createElement('div');
+      tabs.className = 'home-tabs scroll-tabs near-genre-tabs';
+      tabs.setAttribute('role', 'tablist');
+      ['all'].concat(names).forEach(function(g){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'home-tab' + (nearMeGenre === g ? ' active' : '');
+        b.setAttribute('role', 'tab');
+        b.dataset.genre = g;
+        b.textContent = g === 'all' ? 'All' : g;
+        b.addEventListener('click', function(){
+          nearMeGenre = g;
+          var x = tabs.scrollLeft;
+          renderNearMePage();
+          var again = stationsGrid.querySelector('.near-genre-tabs');
+          if(again) again.scrollLeft = x;
+          window.scrollTo(0, 0);
+        });
+        tabs.appendChild(b);
+      });
+      stationsGrid.appendChild(tabs);
+    }
+    names.forEach(function(g){
+      if(nearMeGenre !== 'all' && g !== nearMeGenre) return;
+      var label = document.createElement('div');
+      label.className = 'grid-section-label mfy-label near-label';
+      label.textContent = g;
+      stationsGrid.appendChild(label);
+      groups[g].slice().sort(function(a, b){
+        return nearAlphaKey(a.card.name).localeCompare(nearAlphaKey(b.card.name));
+      }).forEach(function(it){ stationsGrid.appendChild(buildNearRow(it, rec)); });
+    });
+  }
+
+  // ---------- Settings ----------
+  var nearMeSelect = document.getElementById('nearMeSelect');
+  function syncNearMeSetting(){
+    if(!nearMeSelect) return;
+    nearMeSelect.value = nearMeShowing() ? 'on' : 'off';
+  }
+  function setNearMe(on){
+    if(!on){
+      try{ localStorage.setItem(NEAR_PREF_KEY, 'off'); }catch(e){}
+      syncNearMeSetting();
+      renderNearMeHomeSection();
+      if(typeof applyHomeTab === 'function' && onHomeView) applyHomeTab();
+      return Promise.resolve(false);
+    }
+    try{ localStorage.setItem(NEAR_PREF_KEY, 'on'); }catch(e){}
+    return nearAccessState().then(function(state){
+      if(state === 'granted') return state;
+      if(state === 'unsupported') return state;
+      return nearRequestAccess();
+    }).then(function(state){
+      nearMeAccess = state;
+      syncNearMeSetting();
+      if(state !== 'granted'){
+        var P = nearPlugin();
+        showNotice({ kind: 'info', sticky: true, title: 'Location is off for Amplify',
+          message: state === 'unsupported' ? 'This device can\'t share its location with Amplify.'
+            : 'To see stations near you, allow Amplify to use your location (approximate is enough).',
+          actions: (P && typeof P.openAppSettings === 'function') ? [
+            { label: 'Not Now' },
+            { label: 'Open Settings', primary: true, run: function(){ P.openAppSettings()['catch'](function(){}); } }
+          ] : null });
+        renderNearMeHomeSection();
+        return false;
+      }
+      return nearMeRefresh(true).then(function(){ if(onHomeView) applyHomeTab(); return true; });
+    });
+  }
+  if(nearMeSelect){
+    nearMeSelect.value = 'off';
+    nearMeSelect.addEventListener('change', function(){ setNearMe(nearMeSelect.value === 'on'); });
+  }
+
+  setTimeout(function(){ nearMeRefresh(false); }, 0);
+  // Back in the app (a permission given in Android's settings, or the phone has moved).
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState !== 'visible') return;
+    if(Date.now() - nearMeLastCheck > 15000) nearMeRefresh(false);
+  });
+  setInterval(function(){
+    if(document.visibilityState === 'visible' || nearMeShowing()) nearMeRefresh(false);
+  }, NEAR_CHECK_MS);
+  window.__nearMe = { refresh: nearMeRefresh, genreOf: nearGenreOf, load: nearLoad, set: setNearMe,
+    access: function(){ return nearMeAccess; }, carList: nearMeCarList };
+
+  // ================================================================
   // Made for You (build 122)
   // ================================================================
   // Recommendations worked out on the phone from what is already here -- nothing about the
@@ -16414,6 +16894,7 @@
       makeHomeRow(latestPodcastsGrid);
       makeHomeRow(playlistsHomeGrid);
       makeHomeRow(top100HomeGrid);
+      makeHomeRow(nearMeHomeGrid);
       makeHomeRow(forYouGrid);
       makeHomeRow(cwHomeGrid);
       makeHomeRow(channelsHomeGrid);
@@ -16428,6 +16909,7 @@
       topArtistsSection.style.display = topArtistsShown ? '' : 'none';
       madeForYouSection.style.display = madeForYouShown ? '' : 'none';
       top100Section.style.display = hot100Shown ? '' : 'none';
+      nearMeSection.style.display = nearMeShown ? '' : 'none';
       dailyHomeSections.style.display = '';
       if(typeof renderNpHero === 'function') renderNpHero();
       latestPodcastsSection.style.display = latestPodcastsShown ? '' : 'none';
@@ -16453,6 +16935,7 @@
       madeForYouSection.style.display = 'none';
     top100Section.style.display = 'none';
       top100Section.style.display = 'none';
+      nearMeSection.style.display = 'none';
       dailyHomeSections.style.display = 'none';
       latestPodcastsSection.style.display = 'none';
       playlistsHomeSection.style.display = 'none';
@@ -16476,6 +16959,7 @@
     topArtistsSection.style.display = 'none';
     madeForYouSection.style.display = 'none';
     top100Section.style.display = 'none';
+    nearMeSection.style.display = 'none';
     dailyHomeSections.style.display = 'none';
     latestPodcastsSection.style.display = 'none';
     playlistsHomeSection.style.display = 'none';
@@ -31112,6 +31596,7 @@
     topArtists: 'Top Artists',
     madeForYou: 'Made for You',
     top100: 'Top 100',
+    nearMe: 'Stations Near Me',
     continueWatching: 'Continue Watching'
   };
 
@@ -31142,6 +31627,7 @@
     if(section === 'topStations'){ renderTopStationsPage(); return; }
     if(section === 'madeForYou'){ libraryShuffleBtn.style.display = 'none'; renderMadeForYouPage(); return; }
     if(section === 'top100'){ renderTop100Page(); return; }
+    if(section === 'nearMe'){ libraryShuffleBtn.style.display = 'none'; renderNearMePage(); return; }
     if(section === 'continueWatching'){ renderContinueWatchingPage(); return; }
     if(dailyMixFor(section)){ renderDailyMixPage(section); return; }
     if(section === 'topArtists'){
@@ -31524,6 +32010,7 @@
   wireHomeSectionHeading(document.getElementById('topArtistsHeading'), 'topArtists');
   wireHomeSectionHeading(document.getElementById('madeForYouHeading'), 'madeForYou');
   wireHomeSectionHeading(document.getElementById('top100Heading'), 'top100');
+  wireHomeSectionHeading(document.getElementById('nearMeHeading'), 'nearMe');
 
   // Re-renders whichever library view is currently showing, including a detail page. Called
   // after an import, a removal, or a late-arriving station list.
@@ -41355,6 +41842,14 @@
             return c;
           }));
         }catch(e){ lists.madeForYou = []; }
+        // Build 310: Stations Near Me (empty, so not listed, without location access).
+        try{
+          lists.nearMe = compact(nearMeCarList().map(function(x){
+            var c = carStation(x.card);
+            if(c) c.sub = x.sub;
+            return c;
+          }));
+        }catch(e){ lists.nearMe = []; }
         // Build 231: the day's Daily Mixes, Discover and Hear It Again, as on Home.
         var mixes = [];
         try{
@@ -41440,6 +41935,7 @@
       carTimer = setTimeout(publishCarCatalog, 1500);
     }
     window.AmplifyPublishCarMenu = publishCarCatalog;
+    window.AmplifyScheduleCarMenu = scheduleCarCatalog;
 
     // Anything that changes a list the car shows re-sends the menu shortly after.
     var _saveFavorites = saveFavorites;
