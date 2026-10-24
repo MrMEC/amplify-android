@@ -1,4 +1,4 @@
-"""Build 298 (Mark): lyrics panel on a swipe left; queue title in the cover colour. Built on test_b294 / Build 294 (Mark): Now Playing's progress bar gets a Samsung-style flowing wave in the cover's
+"""Build 298 (Mark): lyrics panel on a swipe right (299), queue on a swipe left; queue title in the cover colour. Built on test_b294 / Build 294 (Mark): Now Playing's progress bar gets a Samsung-style flowing wave in the cover's
 colour over the played part, which stops (eases flat) when nothing plays; the dot has a white ring.
 Run: python3 tests/test_b294.py (screenshots in /tmp/claude-0/t/shots)"""
 import os, sys
@@ -70,9 +70,17 @@ async def main():
         await pg.screenshot(path=f'{shots}/b298-queue.png')
         await pg.evaluate("document.getElementById('queueCloseBtn').click()"); await pg.wait_for_timeout(500)
         # 2) swipe left on Now Playing opens the lyrics, not the queue
-        await pg.evaluate(f"({SWIPE})(document.getElementById('nowPlayingScreen'), -260)"); await pg.wait_for_timeout(1500)
-        st = await pg.evaluate("({ lyr: document.getElementById('lyricsPanel').classList.contains('open'), q: document.getElementById('queuePanel').classList.contains('open') })")
-        check(st['lyr'] and not st['q'], f'a swipe left opens Lyrics (not the queue) {st}')
+        OPEN = "({ lyr: document.getElementById('lyricsPanel').classList.contains('open'), q: document.getElementById('queuePanel').classList.contains('open') })"
+        await pg.evaluate(f"({SWIPE})(document.getElementById('nowPlayingScreen'), -260)"); await pg.wait_for_timeout(700)
+        st = await pg.evaluate(OPEN)
+        check(st['q'] and not st['lyr'], f'build 299: a swipe left opens the queue {st}')
+        await pg.evaluate(f"({SWIPE})(document.getElementById('queuePanel'), 260)"); await pg.wait_for_timeout(600)
+        check(not (await pg.evaluate(OPEN))['q'], 'a swipe right on the queue closes it')
+        await pg.evaluate(f"({SWIPE})(document.getElementById('nowPlayingScreen'), 260)"); await pg.wait_for_timeout(1500)
+        st = await pg.evaluate(OPEN)
+        check(st['lyr'] and not st['q'], f'a swipe right opens Lyrics {st}')
+        lx = await pg.evaluate("document.getElementById('lyricsPanel').getBoundingClientRect().left")
+        check(abs(lx) < 1, f'from the left, settled on screen {lx}')
         info = await pg.evaluate("""(()=>{ const now = document.querySelector('#lyricsBody .lyrics-line.now'); const sc = document.getElementById('lyricsScroll');
           const r = now && now.getBoundingClientRect(), sr = sc.getBoundingClientRect();
           return { lines: document.querySelectorAll('#lyricsBody .lyrics-line').length, now: now && now.textContent, past: document.querySelectorAll('#lyricsBody .lyrics-line.past').length,
@@ -97,7 +105,11 @@ async def main():
         check(n3 == 'Line at two', f'and lights it {n3}')
         # 5) swipe right closes
         await pg.evaluate(f"({SWIPE})(document.getElementById('lyricsPanel'), 260)"); await pg.wait_for_timeout(600)
-        check(not await pg.evaluate("document.getElementById('lyricsPanel').classList.contains('open')"), 'a swipe right closes it')
+        check(await pg.evaluate("document.getElementById('lyricsPanel').classList.contains('open')"), 'a swipe right on Lyrics leaves it open')
+        await pg.evaluate(f"({SWIPE})(document.getElementById('lyricsPanel'), -260)"); await pg.wait_for_timeout(600)
+        check(not await pg.evaluate("document.getElementById('lyricsPanel').classList.contains('open')"), 'a swipe left closes it (back the way it came)')
+        lx = await pg.evaluate("document.getElementById('lyricsPanel').getBoundingClientRect().right")
+        check(lx <= 1, f'tucked away off the left edge {lx}')
         # 6) kept: opening again doesn't look it up again
         before = len(hits)
         await pg.evaluate("__amplifyLyrics.state.key = ''; __amplifyLyrics.open()"); await pg.wait_for_timeout(800)
