@@ -1,0 +1,25 @@
+name: Lyrics check
+on:
+  push:
+    branches: ['tests-*']
+    paths: ['.github/workflows/lyrics-check.yml']
+jobs:
+  lrclib:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: |
+          out=""
+          for u in \
+            "https://lrclib.net/api/get?artist_name=3rd%20Bass&track_name=Steppin'%20to%20the%20A.M&album_name=The%20Cactus%20Album&duration=263" \
+            "https://lrclib.net/api/search?artist_name=3rd%20Bass&track_name=Steppin'%20to%20the%20A.M" \
+            "https://lrclib.net/api/search?q=3rd%20Bass%20Steppin%20to%20the%20A.M" \
+            "https://lrclib.net/api/search?artist_name=Angie%20Stone&track_name=No%20More%20Rain" ; do
+            for ua in "okhttp/4.12.0" "Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36" "Dalvik/2.1.0 (Linux; U; Android 14)"; do
+              r=$(curl -sS -m 20 -A "$ua" -H 'Accept: application/json' -H 'Lrclib-Client: Amplify (https://github.com/MrMEC/amplify-android)' -D /tmp/h -o /tmp/b -w '%{http_code}' "$u" 2>&1)
+              n=$(python3 -c "import json;d=json.load(open('/tmp/b'));print(len(d) if isinstance(d,list) else ('synced' if d.get('syncedLyrics') else ('plain' if d.get('plainLyrics') else d.get('name'))), [(x.get('trackName'),x.get('duration'),bool(x.get('syncedLyrics'))) for x in (d if isinstance(d,list) else [d])][:4])" 2>&1 | head -c 400)
+              cors=$(grep -i 'access-control-allow-origin\|^server' /tmp/h | tr '\r\n' '  ')
+              out="$out$r [${ua:0:12}] $n $cors <= ${u:22:90}"$'\n'
+            done
+          done
+          python3 -c "import sys; t=sys.argv[1]; print('::notice title=LRCLIB::' + t.replace('%','%25').replace('\n','%0A'))" "$out"
