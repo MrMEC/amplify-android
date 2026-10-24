@@ -5851,6 +5851,9 @@
   .queue-row-title{ font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .queue-row.now .queue-row-title{ color:var(--accent); }
   html[data-theme="light"] .queue-row.now .queue-row-title{ color:#fff; }
+  /* Build 298: the playing song's title in the cover's own colour (the same --np-vivid the
+     Now Playing controls use), in either theme. */
+  body .queue-panel .queue-row.now .queue-row-title{ color:var(--np-vivid, var(--accent)); }
   .queue-row-sub{ font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
   .queue-row-btn{
     width:36px; height:40px; flex-shrink:0; border:none; background:none; color:var(--text-dim);
@@ -5863,6 +5866,36 @@
   .queue-empty-dots{ vertical-align:middle; margin:0 5px; }
   .queue-more{ font-size:12.5px; color:var(--text-faint); padding:8px; }
   @media (max-width: 900px){ body.queue-open .sidebar-top{ visibility:hidden; } }
+  /* ---------- Build 298: lyrics panel (the queue panel's look and colour) ---------- */
+  .lyrics-panel{ z-index:431; }
+  #lyricsCloseBtn{ width:52px; height:52px; margin:-6px 0; border-radius:0; background:none; justify-content:flex-start;
+    font-size:24px; color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
+  #lyricsCloseBtn:hover{ background:none; opacity:.8; }
+  #lyricsCloseBtn:active{ transform:scale(.92); }
+  .lyrics-head-text{ flex:1; min-width:0; margin-left:-12px; }
+  .lyrics-song{ font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--np-vivid, #fff); }
+  .lyrics-artist{ font-size:13px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .lyrics-scroll{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    padding:18px 26px 0; scroll-behavior:auto;
+    -webkit-mask-image:linear-gradient(transparent 0, #000 28px, #000 calc(100% - 60px), transparent);
+            mask-image:linear-gradient(transparent 0, #000 28px, #000 calc(100% - 60px), transparent); }
+  .lyrics-body{ min-height:20px; }
+  .lyrics-line{ font-size:25px; line-height:1.3; font-weight:700; letter-spacing:-.01em; margin:0 0 16px;
+    color:rgba(255,255,255,.38); transition:color .35s ease, transform .35s ease, opacity .35s ease;
+    transform-origin:left center; cursor:pointer; overflow-wrap:break-word; word-break:normal; hyphens:none; }
+  .lyrics-line.past{ color:rgba(255,255,255,.55); }
+  .lyrics-line.now{ color:#fff; transform:scale(1.03); text-shadow:0 0 18px color-mix(in srgb, var(--np-vivid, #fff) 55%, transparent); }
+  .lyrics-line.gap{ min-height:1em; }
+  .lyrics-line.gap::before{ content:'\2022\2009\2022\2009\2022'; letter-spacing:.2em; }
+  .lyrics-body.plain .lyrics-line{ color:rgba(255,255,255,.92); cursor:default; font-size:22px; margin-bottom:10px; }
+  .lyrics-body.plain .lyrics-line.blank{ min-height:.9em; }
+  .lyrics-msg{ font-size:15px; line-height:1.5; color:var(--text-dim); padding:30px 0; text-align:center; }
+  .lyrics-msg .lyrics-spin{ display:inline-block; width:22px; height:22px; border-radius:50%; border:2.5px solid rgba(255,255,255,.25);
+    border-top-color:var(--np-vivid, #fff); animation:lyricsSpin .8s linear infinite; margin-bottom:10px; }
+  @keyframes lyricsSpin{ to{ transform:rotate(360deg); } }
+  .lyrics-credit{ font-size:11.5px; color:var(--text-faint); padding:14px 0 42vh; }
+  .lyrics-credit:empty{ padding-top:0; }
+  @media (prefers-reduced-motion: reduce){ .lyrics-line{ transition:none; } .lyrics-line.now{ transform:none; } }
 
   /* ---------- Design pass (build 164): headings, cover shadows, the playing glow, artist rings, Menu pill ---------- */
   :root{ --artist-ring: rgba(255,255,255,.26); }
@@ -6920,6 +6953,10 @@
                   <button type="button" class="np-menu-item" id="npQueueMenuBtn" role="menuitem">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h10"/><path class="fill" d="M16 14.2v5.6l4.6-2.8z"/></svg><span>View Queue</span>
                   </button>
+                  <!-- Build 298: the song's lyrics (also a swipe left). -->
+                  <button type="button" class="np-menu-item" id="npLyricsMenuBtn" role="menuitem">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h12M4 10h12M4 14h7"/><path d="M17 20.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM19 18.5V10l2.5 1"/></svg><span>Lyrics</span>
+                  </button>
                   <!-- Build 230: stop playing after a while, or at the end of this song. -->
                   <button type="button" class="np-menu-item" id="npSleepBtn" role="menuitem">
                     <i class="fa-solid fa-moon"></i><span>Sleep Timer</span><span class="np-sleep-left" id="npSleepLeft" hidden></span>
@@ -7773,7 +7810,7 @@
 <!-- The queue: what is playing, what the listener lined up themselves (Up Next), and what
      carries on after that from the album, playlist or library the song was started from.
      Slides in from the right, over Now Playing on a phone and as a sheet beside it on a
-     desktop. Opened by swiping left on Now Playing, the Up Next line under the controls, or
+     desktop. Opened by the Up Next line under the controls (swiping left on Now Playing opens Lyrics for a song since build 298), or
      View Queue in its menu. -->
 <div class="queue-panel" id="queuePanel" role="dialog" aria-label="Queue" aria-hidden="true">
   <div class="queue-head">
@@ -7811,6 +7848,23 @@
     <div class="queue-section queue-section-cont" id="queueCtxSection" style="display:none;">
       <div class="queue-list" id="queueCtxList"></div>
     </div>
+  </div>
+</div>
+<!-- Build 298: the playing song's lyrics, opened by swiping left on Now Playing. Same panel
+     (and the same colour) as the queue; timed lyrics follow the song, a tap on a line jumps there. -->
+<div class="queue-panel lyrics-panel" id="lyricsPanel" role="dialog" aria-label="Lyrics" aria-hidden="true">
+  <div class="queue-head lyrics-head">
+    <button type="button" class="queue-close lyrics-close" id="lyricsCloseBtn" title="Back" aria-label="Back">
+      <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    </button>
+    <div class="lyrics-head-text">
+      <div class="lyrics-song" id="lyricsSong"></div>
+      <div class="lyrics-artist" id="lyricsArtist"></div>
+    </div>
+  </div>
+  <div class="lyrics-scroll" id="lyricsScroll">
+    <div class="lyrics-body" id="lyricsBody"></div>
+    <div class="lyrics-credit" id="lyricsCredit"></div>
   </div>
 </div>
 
@@ -10039,6 +10093,7 @@
     }
     var wasOpen = nowPlayingScreen.style.display === 'flex';
     closeQueuePanel();
+    if(typeof closeLyricsPanel === 'function') closeLyricsPanel();
     if(animate && wasOpen && npSheetMotionOk()){
       var mobile = npSheetMobile();
       if(mobile){
@@ -33531,6 +33586,7 @@
   });
   npUpNext.addEventListener('click', openQueuePanel);
   npQueueMenuBtn.addEventListener('click', function(){ closeNpMenu(); openQueuePanel(); });
+  document.getElementById('npLyricsMenuBtn').addEventListener('click', function(){ closeNpMenu(); openLyricsPanel(); });
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
     closeRowMenu();
@@ -33543,7 +33599,298 @@
     closeQueuePanel();
   });
 
-  // ---------- swiping: left on Now Playing opens the queue, right on the queue closes it ----------
+
+  // ---------- Build 298: lyrics ----------
+  // Swiping left on Now Playing opens the playing song's lyrics (the queue is still the Next
+  // card's and the menu's). Where they come from, in order: the song file's own tags (often
+  // timed, as LRC text), then LRCLIB (lrclib.net, free, no key) by artist, title, album and
+  // length. Timed lyrics light the line being sung and keep it in view; a tap on a line jumps
+  // there. Kept on the device (IndexedDB), so a song is only looked up once.
+  var lyricsPanel = document.getElementById('lyricsPanel');
+  var lyricsScroll = document.getElementById('lyricsScroll');
+  var lyricsBody = document.getElementById('lyricsBody');
+  var lyricsCredit = document.getElementById('lyricsCredit');
+  var lyricsOpen = false;
+  var lyr = { key: '', track: null, lines: null, plain: '', idx: -2, timer: 0, userScrollAt: 0, autoScrolling: 0, job: 0 };
+  var LYRICS_MISS_RETRY = 3 * 24 * 3600 * 1000;
+  var lyricsMem = {};
+  function lyricsApplies(t){ t = t || npTarget(); return !!t && isLocalTrack(t) && !nowPlayingScreen.classList.contains('np-channel'); }
+
+  // -- kept copies --
+  var lyricsDbP = null;
+  function lyricsDb(){
+    if(lyricsDbP) return lyricsDbP;
+    lyricsDbP = new Promise(function(res){
+      try{
+        var rq = indexedDB.open('amplifyLyrics', 1);
+        rq.onupgradeneeded = function(){ rq.result.createObjectStore('l'); };
+        rq.onsuccess = function(){ res(rq.result); };
+        rq.onerror = function(){ res(null); };
+      }catch(e){ res(null); }
+    });
+    return lyricsDbP;
+  }
+  function lyricsGet(k){
+    if(lyricsMem[k]) return Promise.resolve(lyricsMem[k]);
+    return lyricsDb().then(function(db){
+      if(!db) return null;
+      return new Promise(function(res){
+        try{ var r = db.transaction('l').objectStore('l').get(k); r.onsuccess = function(){ res(r.result || null); }; r.onerror = function(){ res(null); }; }
+        catch(e){ res(null); }
+      });
+    });
+  }
+  function lyricsPut(k, v){
+    lyricsMem[k] = v;
+    lyricsDb().then(function(db){ if(!db) return; try{ db.transaction('l', 'readwrite').objectStore('l').put(v, k); }catch(e){} });
+  }
+
+  // -- LRC text: "[mm:ss.xx]words", several stamps on a line, an [offset:+ms] tag --
+  function parseLrc(text){
+    if(!text) return null;
+    var out = [], offset = 0, stamp = /\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g;
+    String(text).replace(/\r/g, '').split('\n').forEach(function(raw){
+      var off = /^\s*\[offset:\s*([+-]?\d+)\s*\]/i.exec(raw);
+      if(off){ offset = Number(off[1]) / 1000; return; }
+      var times = [], m; stamp.lastIndex = 0;
+      while((m = stamp.exec(raw))){ times.push(Number(m[1]) * 60 + Number(m[2].replace(':', '.'))); }
+      if(!times.length) return;
+      var words = raw.replace(stamp, '').replace(/<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g, '').replace(/\s+/g, ' ').trim();
+      times.forEach(function(t){ out.push({ t: t, text: words }); });
+    });
+    if(out.length < 2) return null;
+    out.sort(function(a, b){ return a.t - b.t; });
+    if(offset) out.forEach(function(l){ l.t = Math.max(0, l.t - offset); });
+    // Trailing empty stamps are just "end" markers.
+    while(out.length && !out[out.length - 1].text) out.pop();
+    return out.length >= 2 ? out : null;
+  }
+  function lrcPlain(text){
+    return String(text || '').replace(/\r/g, '').split('\n').map(function(l){
+      return l.replace(/\[[^\]]*\]/g, '').trim();
+    }).join('\n').replace(/^\n+|\n+$/g, '');
+  }
+
+  // -- the song file's own tags --
+  function lyricsFromFile(track){
+    return tagSourceFor(track).then(function(src){
+      return readTagDoc(src.blob, track.fileName || src.blob.name || '');
+    }).then(function(doc){
+      var v = doc && doc.values && doc.values.lyrics;
+      if(!v || !String(v).trim()) return null;
+      var lines = parseLrc(v);
+      return lines ? { synced: v, source: 'file' } : { plain: String(v).trim(), source: 'file' };
+    })['catch'](function(){ return null; });
+  }
+
+  // -- LRCLIB --
+  function lyricsHttp(url){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && H && typeof H.request === 'function');
+    var hdr = { 'Accept': 'application/json', 'Lrclib-Client': 'Amplify (https://github.com/MrMEC/amplify-android)' };
+    if(native){
+      return Promise.resolve(H.request({ url: url, method: 'GET', responseType: 'json', connectTimeout: 10000, readTimeout: 15000, headers: hdr }))
+        .then(function(r){
+          if(!r) throw new Error('net');
+          if(r.status === 404) return null;
+          if(r.status < 200 || r.status >= 300) throw new Error('http ' + r.status);
+          var d = r.data; if(typeof d === 'string'){ try{ d = JSON.parse(d); }catch(e){ d = null; } }
+          return d;
+        });
+    }
+    return fetch(url, { mode: 'cors', headers: { 'Accept': 'application/json' } }).then(function(r){
+      if(r.status === 404) return null;
+      if(!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    });
+  }
+  function lyricsArtistName(a){ return String(a || '').split(/\s+(?:feat\.?|ft\.?|featuring|with|x|&)\s+|,\s*/i)[0].trim(); }
+  function lyricsTitleName(t){ return String(t || '').replace(/\s*[\(\[][^\)\]]*\b(remaster(ed)?|live|mono|stereo|version|edit|mix|explicit|clean|bonus|deluxe|feat\.?|ft\.?)\b[^\)\]]*[\)\]]/gi, '').replace(/\s+-\s+(remaster(ed)?|live|single version|radio edit)\b.*$/i, '').trim(); }
+  function lyricsFromLrclib(track){
+    var artist = lyricsArtistName(track.artist), title = lyricsTitleName(track.name);
+    if(!artist || !title || artist === UNKNOWN_ARTIST) return Promise.resolve(null);
+    var dur = Math.round(Number(track.duration) || (npIsCurrent() && isFinite(audio.duration) ? audio.duration : 0) || 0);
+    var base = 'https://lrclib.net/api/';
+    function pick(r){
+      if(!r || r.instrumental) return r && r.instrumental ? { instrumental: true, source: 'lrclib' } : null;
+      if(r.syncedLyrics) return { synced: r.syncedLyrics, plain: r.plainLyrics || '', source: 'lrclib' };
+      if(r.plainLyrics) return { plain: r.plainLyrics, source: 'lrclib' };
+      return null;
+    }
+    var q = 'artist_name=' + encodeURIComponent(artist) + '&track_name=' + encodeURIComponent(title);
+    var first = (dur && track.album) ? lyricsHttp(base + 'get?' + q + '&album_name=' + encodeURIComponent(track.album) + '&duration=' + dur).then(pick) : Promise.resolve(null);
+    return first.then(function(hit){
+      if(hit) return hit;
+      return lyricsHttp(base + 'search?' + q).then(function(list){
+        if(!Array.isArray(list) || !list.length) return null;
+        var near = list.filter(function(r){ return !dur || !r.duration || Math.abs(r.duration - dur) <= 4; });
+        var pool = near.length ? near : (dur ? [] : list);
+        var best = pool.filter(function(r){ return r.syncedLyrics; })[0] || pool.filter(function(r){ return r.plainLyrics || r.instrumental; })[0];
+        return pick(best);
+      });
+    });
+  }
+  // File first (timed beats untimed; a file's untimed words are kept in case LRCLIB has none).
+  function findLyrics(track){
+    var k = favKey(track);
+    return lyricsGet(k).then(function(c){
+      if(c && !(c.none && Date.now() - (c.at || 0) > LYRICS_MISS_RETRY)) return c;
+      return lyricsFromFile(track).then(function(f){
+        if(f && f.synced) return f;
+        return lyricsFromLrclib(track).then(function(n){
+          if(n && (n.synced || !f)) return n;
+          return f || n;
+        }, function(){ if(f) return f; throw new Error('net'); });
+      }).then(function(r){
+        var v = r ? Object.assign({ at: Date.now() }, r) : { none: true, at: Date.now() };
+        lyricsPut(k, v);
+        return v;
+      });
+    });
+  }
+  window.__amplifyFindLyrics = findLyrics;
+
+  // -- the panel --
+  function lyricsMsg(html){ lyricsBody.className = 'lyrics-body'; lyricsBody.innerHTML = '<div class="lyrics-msg">' + html + '</div>'; lyricsCredit.textContent = ''; }
+  function renderLyrics(res){
+    lyr.lines = null; lyr.plain = ''; lyr.idx = -2;
+    lyricsBody.innerHTML = '';
+    if(!res || res.none){ lyricsMsg('No lyrics found for this song.'); return; }
+    if(res.instrumental){ lyricsMsg('This one’s an instrumental.'); return; }
+    var lines = parseLrc(res.synced);
+    lyricsCredit.textContent = res.source === 'file' ? 'Lyrics from the song file' : 'Lyrics from LRCLIB';
+    if(lines){
+      lyr.lines = lines;
+      lyricsBody.className = 'lyrics-body synced';
+      lines.forEach(function(l, i){
+        var d = document.createElement('div');
+        d.className = 'lyrics-line' + (l.text ? '' : ' gap');
+        d.textContent = l.text;
+        d.dataset.i = i;
+        lyricsBody.appendChild(d);
+      });
+      lyricsTick(true);
+      return;
+    }
+    var text = res.plain ? lrcPlain(res.plain) : lrcPlain(res.synced);
+    lyr.plain = text;
+    lyricsBody.className = 'lyrics-body plain';
+    text.split('\n').forEach(function(l){
+      var d = document.createElement('div');
+      d.className = 'lyrics-line' + (l ? '' : ' blank');
+      d.textContent = l;
+      lyricsBody.appendChild(d);
+    });
+    lyricsCredit.textContent += ' · not timed';
+  }
+  function loadLyricsFor(track){
+    lyr.key = favKey(track); lyr.track = track;
+    document.getElementById('lyricsSong').textContent = track.name || '';
+    document.getElementById('lyricsArtist').textContent = [track.artist, track.album].filter(Boolean).join(' · ');
+    var job = ++lyr.job;
+    lyricsScroll.scrollTop = 0;
+    lyricsMsg('<span class="lyrics-spin"></span><br>Finding lyrics…');
+    findLyrics(track).then(function(res){
+      if(job !== lyr.job) return;
+      renderLyrics(res);
+      lyricsScroll.scrollTop = 0;
+      lyricsTick(true);
+    }, function(){
+      if(job !== lyr.job) return;
+      lyr.lines = null;
+      lyricsMsg('Lyrics couldn’t be loaded. Check your connection and try again.');
+    });
+  }
+  // The line being sung: lit, and kept a third of the way down unless they're scrolling.
+  function lyricsTick(jump){
+    if(!lyricsOpen) return;
+    var t = npTarget();
+    if(t && lyricsApplies(t) && favKey(t) !== lyr.key){ loadLyricsFor(t); return; }
+    if(!lyr.lines) return;
+    var live = npIsCurrent();
+    var pos = live ? (audio.currentTime || 0) + 0.15 : -1;
+    var i = -1, L = lyr.lines;
+    for(var k = 0; k < L.length; k++){ if(L[k].t <= pos) i = k; else break; }
+    if(i === lyr.idx && !jump) return;
+    lyr.idx = i;
+    var els = lyricsBody.children;
+    for(var j = 0; j < els.length; j++){
+      els[j].classList.toggle('now', j === i);
+      els[j].classList.toggle('past', j < i);
+    }
+    if(Date.now() - lyr.userScrollAt < 3500) return;
+    var el = els[Math.max(0, i)];
+    if(!el) return;
+    var target = el.offsetTop - lyricsScroll.clientHeight * 0.32 + el.offsetHeight / 2;
+    lyr.autoScrolling = Date.now();
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try{ lyricsScroll.scrollTo({ top: Math.max(0, target), behavior: (jump || reduce) ? 'auto' : 'smooth' }); }
+    catch(e){ lyricsScroll.scrollTop = Math.max(0, target); }
+  }
+  function lyricsUserScrolled(){ if(Date.now() - lyr.autoScrolling > 700) lyr.userScrollAt = Date.now(); }
+  lyricsScroll.addEventListener('touchmove', function(){ lyr.userScrollAt = Date.now(); }, { passive: true });
+  lyricsScroll.addEventListener('wheel', function(){ lyr.userScrollAt = Date.now(); }, { passive: true });
+  lyricsScroll.addEventListener('scroll', lyricsUserScrolled, { passive: true });
+  lyricsBody.addEventListener('click', function(e){
+    var el = e.target.closest('.lyrics-line');
+    if(!el || !lyr.lines || el.dataset.i == null || !npIsCurrent()) return;
+    var l = lyr.lines[Number(el.dataset.i)];
+    if(!l) return;
+    try{ audio.currentTime = l.t; }catch(err){}
+    lyr.userScrollAt = 0;
+    setTimeout(function(){ lyricsTick(true); }, 60);
+  });
+  function syncLyricsTint(){
+    var tint = '';
+    try{ tint = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-tint').trim(); }catch(e){}
+    lyricsPanel.style.setProperty('--q-tint', tint || '#1c1d22');
+  }
+  function prepLyricsPanel(){
+    closeNpMenu(); closeRowMenu();
+    syncLyricsTint();
+    var t = npTarget();
+    lyricsOpen = true;   // so the first tick runs; settled again by open/close
+    if(t && favKey(t) !== lyr.key) loadLyricsFor(t);
+  }
+  function openLyricsPanel(){
+    prepLyricsPanel();
+    lyricsPanel.classList.remove('dragging');
+    lyricsPanel.style.transform = '';
+    lyricsPanel.classList.add('open');
+    lyricsPanel.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('queue-open', 'lyrics-open');
+    lyricsOpen = true;
+    lyr.userScrollAt = 0;
+    clearInterval(lyr.timer);
+    lyr.timer = setInterval(function(){ lyricsTick(false); }, 200);
+    lyricsTick(true);
+  }
+  function closeLyricsPanel(){
+    if(!lyricsPanel) return;
+    lyricsPanel.classList.remove('open', 'dragging');
+    lyricsPanel.style.transform = '';
+    lyricsPanel.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('lyrics-open');
+    if(!queuePanelOpen) document.body.classList.remove('queue-open');
+    lyricsOpen = false;
+    clearInterval(lyr.timer); lyr.timer = 0;
+  }
+  document.getElementById('lyricsCloseBtn').addEventListener('click', closeLyricsPanel);
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && lyricsOpen) closeLyricsPanel(); });
+  document.addEventListener('mousedown', function(e){
+    if(!lyricsOpen || lyricsPanel.contains(e.target) || isPhoneLayout()) return;
+    closeLyricsPanel();
+  });
+  window.__amplifyLyrics = { open: openLyricsPanel, close: closeLyricsPanel, isOpen: function(){ return lyricsOpen; }, parse: parseLrc, state: lyr };
+
+  // The two side panels, for the swipes below.
+  var QUEUE_SIDE = { el: queuePanel, isOpen: function(){ return queuePanelOpen; },
+    prep: function(){ closeNpMenu(); syncQueueTint(); renderQueuePanel(); }, open: openQueuePanel, close: closeQueuePanel };
+  var LYRICS_SIDE = { el: lyricsPanel, isOpen: function(){ return lyricsOpen; },
+    prep: prepLyricsPanel, open: openLyricsPanel, close: function(){ closeLyricsPanel(); } };
+
+  // ---------- swiping: left on Now Playing opens the lyrics (build 298; the queue for anything
+  // that isn't a song of yours), right on either panel closes it ----------
   // The panel follows the finger, so it can be peeked at and let go. The swipe only counts
   // once it is clearly sideways, and never starts on something that scrolls or slides
   // sideways itself (the seek bar, a horizontal row).
@@ -33557,13 +33904,17 @@
     }
     return false;
   }
-  function attachQueueSwipe(surface, opening){
-    var sx = 0, sy = 0, st = 0, dx = 0, mode = null, width = 0;
+  function attachQueueSwipe(surface, opening, side){
+    var sx = 0, sy = 0, st = 0, dx = 0, mode = null, width = 0, P = side;
     surface.addEventListener('touchstart', function(e){
       mode = null;
-      if(e.touches.length !== 1 || queuePanelOpen !== !opening || scrollsSideways(e.target, surface)){ mode = 'ignore'; return; }
-      // Build 243: no queue while a channel is on screen.
-      if(opening && nowPlayingScreen.classList.contains('np-channel')){ mode = 'ignore'; return; }
+      if(e.touches.length !== 1 || scrollsSideways(e.target, surface)){ mode = 'ignore'; return; }
+      if(opening){
+        if(queuePanelOpen || lyricsOpen){ mode = 'ignore'; return; }
+        // Build 243: no queue while a channel is on screen.
+        if(nowPlayingScreen.classList.contains('np-channel')){ mode = 'ignore'; return; }
+        P = lyricsApplies() ? LYRICS_SIDE : QUEUE_SIDE;
+      } else if(!P.isOpen()){ mode = 'ignore'; return; }
       sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); dx = 0;
     }, { passive: true });
     surface.addEventListener('touchmove', function(e){
@@ -33575,14 +33926,14 @@
         var sideways = Math.abs(dx) > Math.abs(dy) * 1.4;
         if(!sideways || (opening ? dx > 0 : dx < 0)){ mode = 'ignore'; return; }
         mode = 'swipe';
-        if(opening){ closeNpMenu(); syncQueueTint(); renderQueuePanel(); }
-        width = queuePanel.offsetWidth || window.innerWidth;
-        queuePanel.classList.add('dragging');
+        if(opening) P.prep();
+        width = P.el.offsetWidth || window.innerWidth;
+        P.el.classList.add('dragging');
       }
       if(mode !== 'swipe') return;
       if(e.cancelable) e.preventDefault();
       var off = opening ? Math.max(0, width + dx) : Math.max(0, dx);
-      queuePanel.style.transform = 'translateX(' + off + 'px)';
+      P.el.style.transform = 'translateX(' + off + 'px)';
     }, { passive: false });
     function end(){
       if(mode !== 'swipe'){ mode = null; return; }
@@ -33590,16 +33941,17 @@
       var dt = Math.max(1, Date.now() - st);
       var fast = Math.abs(dx) / dt > 0.45 && Math.abs(dx) > 40;
       var far = Math.abs(dx) > width * 0.3;
-      queuePanel.classList.remove('dragging');
-      queuePanel.style.transform = '';
+      P.el.classList.remove('dragging');
+      P.el.style.transform = '';
       var commit = fast || far;
-      if(opening ? commit : !commit) openQueuePanel(); else closeQueuePanel();
+      if(opening ? commit : !commit) P.open(); else P.close();
     }
     surface.addEventListener('touchend', end);
     surface.addEventListener('touchcancel', end);
   }
-  attachQueueSwipe(nowPlayingScreen, true);
-  attachQueueSwipe(queuePanel, false);
+  attachQueueSwipe(nowPlayingScreen, true, QUEUE_SIDE);
+  attachQueueSwipe(queuePanel, false, QUEUE_SIDE);
+  attachQueueSwipe(lyricsPanel, false, LYRICS_SIDE);
 
   // ---------- swiping down on Now Playing puts it away ----------
   // Only from the top of the screen (further down, a downward swipe is just scrolling back
@@ -33610,7 +33962,7 @@
     var sy = 0, sx = 0, st = 0, dy = 0, mode = null, h = 0;
     function usable(){
       // Not on a channel: its list scrolls, and a pull down there is scrolling, not closing.
-      return npSheetMobile() && npSheetMotionOk() && !queuePanelOpen && !npSheetDone &&
+      return npSheetMobile() && npSheetMotionOk() && !queuePanelOpen && !lyricsOpen && !npSheetDone &&
         !el.classList.contains('np-channel') &&
         document.body.classList.contains('np-open') && el.style.display === 'flex';
     }
@@ -33819,6 +34171,7 @@
   function toggleNpMenu(){
     // Build 243: a channel has no queue (sideways swipes are for the guide grid).
     try{ npQueueMenuBtn.style.display = isNpChannel(npTarget()) ? 'none' : ''; }catch(e){}
+    try{ document.getElementById('npLyricsMenuBtn').style.display = lyricsApplies() ? '' : 'none'; }catch(e){}
     var open = npMenu.classList.toggle('open');
     npMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
