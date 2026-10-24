@@ -16,7 +16,7 @@ os.makedirs(root)
 HOOK = ("window.__d = { n: function(){ return libraryTracks.length; }, home: function(){ loadTopStations(); }, st: function(){ return window.__amplifyDaily(); },"
         " names: function(id){ var m = dailyMixFor(id); return m ? dailyMixSongs(m).map(function(t){ return t.artist + '|' + t.name; }) : null; },"
         " plays: function(){ var p = {}; ['Prince', 'Madonna', 'Kay', 'Earth, Wind & Fire', 'Rick James', 'Lee'].forEach(function(n, i){ p[artistMatchKey(n)] = { name: n, count: [40, 30, 20, 12, 6, 3][i], last: Date.now() - i * 1000 }; }); saveArtistPlays(p);"
-        "   var sp = {}; libraryTracks.filter(function(t){ return /^Madonna 0[1-6]$/.test(t.name); }).forEach(function(t){ sp[favKey(t)] = [5, Date.now()]; });"
+        "   var sp = {}; libraryTracks.filter(function(t){ return /^Madonna 0[1-6]$/.test(t.name); }).forEach(function(t){ sp[favKey(t)] = [3 + parseInt(t.name.slice(-1), 10), Date.now()]; });"
         "   localStorage.setItem('radioPlayerSongPlays', JSON.stringify(sp)); },"
         " vid: function(){ var k = artistMatchKey('Kay'); ytStore[k] = { channels: ['UC' + 'k'.repeat(22)], chTs: Date.now(), ts: Date.now(), fv: YT_FV, mv: true,"
         "   videos: [{ id: 'kayVid00001', title: 'Kay - One (Official Video)', published: '2024-01-01' }, { id: 'kayVid00002', title: 'Kay - Two (Official Video)', published: '2023-01-01' }, { id: 'kayVid00003', title: 'Kay - Three (Official Video)', published: '2022-01-01' }] }; ytSave(); },"
@@ -26,6 +26,8 @@ HOOK = ("window.__d = { n: function(){ return libraryTracks.length; }, home: fun
         " reset: function(){ localStorage.removeItem('radioPlayerDailyMixes'); dailyState = null; },"
         " q: function(){ return { label: queueLabel, n: playQueue.length, cur: currentStation && currentStation.name }; },"
         " note: function(name){ var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; recordArtistPlay(t); return loadSongPlays()[favKey(t)]; },"
+        " stl: function(){ var s = JSON.parse(JSON.stringify(window.__amplifyDaily())); s.mixes.forEach(function(m){ if(m.id === 'mix:again') m.songs = hearItAgainSongs().map(favKey); }); return s; },"
+        " forget: function(name){ var m = loadSongPlays(); var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; delete m[favKey(t)]; localStorage.setItem('radioPlayerSongPlays', JSON.stringify(m)); },"
         " stopPlay: function(){ audio.play = function(){ return Promise.resolve(); }; } };\n")
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
@@ -126,7 +128,7 @@ async def run(theme):
         ids = [x['id'] for x in r['rows']]
         titles = [x['title'] for x in r['rows']]
         print(titles)
-        check(r['shown'] and r['after'] == 'top100Section', f'[{theme}] the rows sit right under Top 100 (after {r["after"]})')
+        check(r['shown'] and r['after'] == 'nearMeSection', f'[{theme}] the rows sit right under Top 100 and Stations Near Me (after {r["after"]})')
         check(len([t for t in titles[:5] if t.startswith('Daily Mix: ')]) == 5,
               f'[{theme}] five Daily Mixes, one per top artist {titles[:5]}')
         check(len(set(titles)) == len(titles), f'[{theme}] no artist gets two mixes {titles}')
@@ -163,13 +165,22 @@ async def run(theme):
         again = await pg.evaluate("__d.names('mix:again')")
         played = {f'Madonna|Madonna {i:02d}' for i in range(1, 7)}
         check(not (played & set(disc)), f'[{theme}] Discover leaves out the most played songs')
-        check(played <= set(again), f'[{theme}] Hear It Again has every song played 5 times')
-        check(len(again) >= 20 and all(a.split('|')[0] in ('Madonna', 'Prince', 'Kay', 'Earth, Wind & Fire', 'Rick James', 'Lee') for a in again),
-              f'[{theme}] and is filled from the most played artists ({len(again)})')
+        # Build 314: exactly the played songs, most played first; nothing filled in from unplayed songs.
+        want = [f'Madonna|Madonna {i:02d}' for i in range(6, 0, -1)]
+        check(again == want, f'[{theme}] Hear It Again is the played songs, most played first {again}')
+        lee = await pg.evaluate("[__d.note('Lee 01'), __d.names('mix:again')]")
+        check(lee[1][-1] == 'Lee|Lee 01' and len(lee[1]) == 7, f'[{theme}] a song just played joins at once, by its count {lee[1][-2:]}')
+        for _ in range(9): await pg.evaluate("__d.note('Lee 01')")
+        top = await pg.evaluate("__d.names('mix:again')")
+        check(top[0] == 'Lee|Lee 01', f'[{theme}] and moves up as its count grows ({top[0]})')
+        await pg.wait_for_timeout(2000)
+        row = await pg.evaluate("Array.from(document.querySelectorAll('[data-daily=\"mix:again\"] .tile-name')).map(function(e){ return e.textContent; })")
+        check(row[:2] == ['Lee 01', 'Madonna 06'], f'[{theme}] the Home row follows ({row[:3]})')
+        await pg.evaluate("__d.forget('Lee 01')")
         # Build 231: the same lists in Android Auto (Home > Daily Mixes), each a folder of songs
         await pg.wait_for_timeout(1500)
         cat = await pg.evaluate('window.__cat || null')
-        shown = [m for m in (await pg.evaluate('__d.st()'))['mixes'] if len(m['songs']) >= 10]
+        shown = [m for m in (await pg.evaluate('__d.stl()'))['mixes'] if len(m['songs']) >= (3 if m['id'] == 'mix:again' else 10)]
         check(cat and [m['id'] for m in cat.get('mixes', [])] == [m['id'] for m in shown]
               and [m['title'] for m in cat['mixes']] == [m['title'] for m in shown],
               f'[{theme}] the car gets every list shown on Home, in order {[m["title"] for m in shown]} {[m["title"] for m in (cat or {}).get("mixes", [])]}')
@@ -233,14 +244,14 @@ async def run(theme):
         # a new day remakes them
         await pg.evaluate("__d.yesterday()")
         await pg.evaluate('__d.home()'); await pg.wait_for_timeout(800)
-        st2 = await pg.evaluate('__d.st()')
+        st2 = await pg.evaluate('__d.stl()')
         check(st2['day'] != '2000-1-1' and json.dumps(st2['mixes']) != after, f'[{theme}] a new day makes new lists')
         await pg.wait_for_timeout(1500)
         cat2 = await pg.evaluate('window.__cat || null')
-        want = [m['id'] for m in st2['mixes'] if len(m['songs']) >= 10]
+        want = [m['id'] for m in st2['mixes'] if len(m['songs']) >= (3 if m['id'] == 'mix:again' else 10)]
         check(cat2 and [m['id'] for m in cat2['mixes']] == want
               and all(len(cat2['lists'][m['id']]) == len(m['songs']) for m in st2['mixes'] if m['id'] in want)
-              and json.dumps([cat2['lists'][i] for i in want]) != json.dumps([(cat or {}).get('lists', {}).get(i) for i in want]),
+              and json.dumps([cat2['lists'][i] for i in want if i != 'mix:again']) != json.dumps([(cat or {}).get('lists', {}).get(i) for i in want if i != 'mix:again']),
               f'[{theme}] and the car gets the new day\'s lists')
         # song plays are counted
         c1 = await pg.evaluate("__d.note('Lee 01')")

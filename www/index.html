@@ -13925,6 +13925,12 @@
       }
       localStorage.setItem(SONG_PLAYS_KEY, JSON.stringify(m));
     }catch(e){}
+    // Build 314: Hear It Again follows the counts (Home row and the car), a moment later.
+    clearTimeout(noteSongPlay._t);
+    noteSongPlay._t = setTimeout(function(){
+      try{ if(typeof renderDailyHome === 'function') renderDailyHome(); }catch(e){}
+      try{ if(window.AmplifyScheduleCarMenu) window.AmplifyScheduleCarMenu(); }catch(e){}
+    }, 1500);
   }
   // A play counts once it has actually been listened to: 20 seconds of playing (pauses
   // don't count), or nearly all of a song shorter than that -- the same 20 seconds the
@@ -32861,6 +32867,8 @@
   var DAILY_SIZE = 100, DAILY_ROW = 20, DAILY_MIXES = 5, DAILY_TOP = 10;
   var DAILY_FEATURED_SHARE = 0.6;      // of a Daily Mix, the featured artist's songs
   var DAILY_MIN_SONGS = 10;            // fewer than this and a list isn't shown
+  var AGAIN_MIN_SONGS = 3;             // build 314: Hear It Again shows from three played songs
+  function dailyMinFor(mix){ return mix && mix.id === 'mix:again' ? AGAIN_MIN_SONGS : DAILY_MIN_SONGS; }
   var SIMILAR_KEY = 'radioPlayerSimilarArtists';
   var SIMILAR_TTL_MS = 30 * 24 * 3600 * 1000, SIMILAR_MISS_MS = 3 * 24 * 3600 * 1000;
   var dailyState = null, dailySimilarPending = {}, dailyReady = false;
@@ -32999,26 +33007,23 @@
     // The least-played 40% (60% of a small library), and never fewer than the list needs.
     var cut = low.length > 250 ? Math.max(DAILY_SIZE, Math.round(low.length * 0.4)) : Math.max(DAILY_MIN_SONGS, Math.round(low.length * 0.6));
     var discover = mfySeeded(low.slice(0, cut), 'disc2|' + day).slice(0, DAILY_SIZE);
-    // Hear It Again: songs played 2+ times, most played first, a random hundred of the top part.
-    var hi = pool.filter(function(t){ return c(t) >= 2; }).sort(function(a, b){ return c(b) - c(a); });
-    var again = mfySeeded(hi.slice(0, DAILY_SIZE * 2), 'again|' + day).slice(0, DAILY_SIZE);
-    if(again.length < DAILY_SIZE){
-      // Until enough songs have counts: songs by the most-played artists, theirs first.
-      var aplays = loadArtistPlays(), have = {};
-      again.forEach(function(t){ have[favKey(t)] = true; });
-      var byArtist = pool.filter(function(t){
-        var r = aplays[artistMatchKey(t.artist || '')];
-        return !have[favKey(t)] && r && r.count >= 2;
-      });
-      byArtist = mfySeeded(byArtist, 'again2|' + day).sort(function(a, b){
-        return (aplays[artistMatchKey(b.artist || '')].count) - (aplays[artistMatchKey(a.artist || '')].count);
-      });
-      again = again.concat(mfySeeded(byArtist.slice(0, (DAILY_SIZE - again.length) * 2), 'again3|' + day).slice(0, DAILY_SIZE - again.length));
-    }
+    // Hear It Again is worked out live from the play counts (hearItAgainSongs), not kept for the day.
     return [
       { id: 'mix:discover', title: 'Discover', songs: dailySpread(discover).map(favKey) },
-      { id: 'mix:again', title: 'Hear It Again', songs: dailySpread(mfySeeded(again, 'again4|' + day)).map(favKey) }
+      { id: 'mix:again', title: 'Hear It Again', songs: [] }
     ];
+  }
+  // Build 314 (Mark: songs he plays weren't showing, songs he'd never played were): Hear It Again
+  // is the library songs with the most plays, most played first (ties: played most recently first),
+  // up to DAILY_SIZE. Only songs actually played count; nothing is filled in from the artist's
+  // other songs, and it follows the counts as they change (no longer fixed for the day).
+  function hearItAgainSongs(){
+    var plays = loadSongPlays();
+    return dailyPool().filter(function(t){ var r = plays[favKey(t)]; return r && (r[0] || 0) >= 1; })
+      .sort(function(a, b){
+        var x = plays[favKey(a)], y = plays[favKey(b)];
+        return ((y[0] || 0) - (x[0] || 0)) || ((y[1] || 0) - (x[1] || 0));
+      }).slice(0, DAILY_SIZE);
   }
   // ---------- Artist Videos: the day's artist (build 290, Mark) ----------
   // Any artist in the library (not only favourites; never a song's combined credit "A feat. B"
@@ -33165,6 +33170,7 @@
   }
   // The songs still in the library, in the mix's order.
   function dailyMixSongs(mix){
+    if(mix && mix.id === 'mix:again') return hearItAgainSongs();
     return (mix.songs || []).map(function(id){ return libraryById[id]; }).filter(function(t){ return t && !isBlacklisted(t); });
   }
   function homeSectionTitle(section){
@@ -33213,7 +33219,7 @@
     if(ensureDailyLists()){
       dailyState.mixes.forEach(function(mix){
         var songs = dailyMixSongs(mix);
-        if(songs.length < DAILY_MIN_SONGS) return;
+        if(songs.length < dailyMinFor(mix)) return;
         var sec = dailySection(mix.id, mix.title, function(){ openHomeSectionPage(mix.id); });
         var grid = sec._grid, sig = mix.title + '|' + songs.slice(0, DAILY_ROW).map(favKey).join();
         if(grid._sig !== sig){
@@ -41987,7 +41993,7 @@
           if(dailyReady && ensureDailyLists()){
             dailyState.mixes.forEach(function(m){
               var songs = dailyMixSongs(m);
-              if(songs.length < DAILY_MIN_SONGS) return;
+              if(songs.length < dailyMinFor(m)) return;
               lists[m.id] = compact(songs.map(carSong));
               if(!lists[m.id].length) return;
               var sub = m.id === 'mix:discover' ? 'Songs you rarely play' : m.id === 'mix:again' ? 'Your most played songs'
