@@ -33,7 +33,7 @@ import java.util.Locale;
  */
 final class VideoControls extends FrameLayout {
   interface Listener {
-    /** action: play, pause, seek (value = seconds), full, stop. */
+    /** action: play, pause, seek (value = seconds), full, stop, prev, next. */
     void onControl(String action, double value);
   }
 
@@ -46,6 +46,9 @@ final class VideoControls extends FrameLayout {
   private final float dp;
   private final View scrim;
   private final Glyph play;
+  // Build 303: Previous / Next either side of Play while the video is part of a queue.
+  private final Glyph prev, next;
+  private boolean steps, hasPrev, hasNext;
   private final LinearLayout bar;
   private final TextView elapsed, total, liveTag;
   private final SeekBar seek;
@@ -103,6 +106,34 @@ final class VideoControls extends FrameLayout {
         });
     int ps = px(64);
     addView(play, new LayoutParams(ps, ps, Gravity.CENTER));
+
+    prev = new Glyph(context, Glyph.PREV, true);
+    prev.setContentDescription("Previous");
+    prev.setOnClickListener(
+        new OnClickListener() {
+          @Override
+          public void onClick(View v) {
+            if (!hasPrev) return;
+            listener.onControl("prev", 0);
+            poke();
+          }
+        });
+    next = new Glyph(context, Glyph.NEXT, true);
+    next.setContentDescription("Next");
+    next.setOnClickListener(
+        new OnClickListener() {
+          @Override
+          public void onClick(View v) {
+            if (!hasNext) return;
+            listener.onControl("next", 0);
+            poke();
+          }
+        });
+    int ss = px(48);
+    addView(prev, new LayoutParams(ss, ss, Gravity.CENTER));
+    addView(next, new LayoutParams(ss, ss, Gravity.CENTER));
+    prev.setTranslationX(-px(88));
+    next.setTranslationX(px(88));
 
     bar = new LinearLayout(context);
     bar.setOrientation(LinearLayout.HORIZONTAL);
@@ -211,6 +242,7 @@ final class VideoControls extends FrameLayout {
 
     applyAccent();
     applyMode();
+    applySteps();
     setVisibility(View.INVISIBLE);
     setAlpha(0f);
   }
@@ -273,6 +305,24 @@ final class VideoControls extends FrameLayout {
       setShown(true); // first look at the video: show them, then they hide on their own
     }
     refreshTimes();
+  }
+
+  /** Build 303: Previous / Next shown (a queue), and which of them can be used. */
+  void setSteps(boolean show, boolean canPrev, boolean canNext) {
+    steps = show;
+    hasPrev = canPrev;
+    hasNext = canNext;
+    applySteps();
+  }
+
+  private void applySteps() {
+    int vis = steps ? View.VISIBLE : View.GONE;
+    prev.setVisibility(vis);
+    next.setVisibility(vis);
+    prev.setAlpha(hasPrev ? 1f : 0.4f);
+    next.setAlpha(hasNext ? 1f : 0.4f);
+    prev.setEnabled(hasPrev);
+    next.setEnabled(hasNext);
   }
 
   private void setPlaying(boolean p) {
@@ -400,7 +450,7 @@ final class VideoControls extends FrameLayout {
 
   /** A button drawn as a shape: play, pause, full screen, leave full screen. */
   static final class Glyph extends View {
-    static final int PLAY = 0, PAUSE = 1, FULL = 2, EXIT_FULL = 3;
+    static final int PLAY = 0, PAUSE = 1, FULL = 2, EXIT_FULL = 3, PREV = 4, NEXT = 5;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint disc = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -455,6 +505,25 @@ final class VideoControls extends FrameLayout {
           c.drawRoundRect(r, 1.2f * u, 1.2f * u, fill);
           r.set(ox + 13.8f * u, oy + 4.5f * u, ox + 18 * u, oy + 19.5f * u);
           c.drawRoundRect(r, 1.2f * u, 1.2f * u, fill);
+          break;
+        case PREV:
+          // A bar on the left, a triangle pointing at it.
+          r.set(ox + 5.5f * u, oy + 6 * u, ox + 8 * u, oy + 18 * u);
+          c.drawRoundRect(r, 1f * u, 1f * u, fill);
+          path.moveTo(ox + 18.5f * u, oy + 6 * u);
+          path.lineTo(ox + 9.5f * u, oy + 12 * u);
+          path.lineTo(ox + 18.5f * u, oy + 18 * u);
+          path.close();
+          c.drawPath(path, fill);
+          break;
+        case NEXT:
+          r.set(ox + 16 * u, oy + 6 * u, ox + 18.5f * u, oy + 18 * u);
+          c.drawRoundRect(r, 1f * u, 1f * u, fill);
+          path.moveTo(ox + 5.5f * u, oy + 6 * u);
+          path.lineTo(ox + 14.5f * u, oy + 12 * u);
+          path.lineTo(ox + 5.5f * u, oy + 18 * u);
+          path.close();
+          c.drawPath(path, fill);
           break;
         case FULL:
           corner(c, ox, oy, u, 4, 9, 4, 4, 9, 4);

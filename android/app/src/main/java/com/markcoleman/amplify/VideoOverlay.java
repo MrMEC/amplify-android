@@ -112,6 +112,7 @@ public final class VideoOverlay {
   private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull;
   private double ctlPos, ctlDur;
   private String ctlAccent = "";
+  private boolean ctlSteps, ctlHasPrev, ctlHasNext;
 
   VideoOverlay(Activity activity, View webView, Listener listener) {
     this.activity = activity;
@@ -222,6 +223,14 @@ public final class VideoOverlay {
     ctlFull = full;
     ctlAccent = accent == null ? "" : accent;
     if (controls != null) controls.update(enabled, playing, pos, dur, live, full, ctlAccent);
+  }
+
+  /** Build 303: Previous / Next on the picture while the video is part of a queue. */
+  void setSteps(boolean show, boolean hasPrev, boolean hasNext) {
+    ctlSteps = show;
+    ctlHasPrev = hasPrev;
+    ctlHasNext = hasNext;
+    if (controls != null) controls.setSteps(show, hasPrev, hasNext);
   }
 
   void release() {
@@ -365,6 +374,7 @@ public final class VideoOverlay {
         new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     controls.update(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
+    controls.setSteps(ctlSteps, ctlHasPrev, ctlHasNext);
     // Posted: resizing the picture from inside a layout pass can be dropped until something else
     // asks for layout, which left a shrunk box drawing nothing.
     box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> box.post(this::fit));

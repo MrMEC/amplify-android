@@ -3445,9 +3445,16 @@
     background:linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 46%), rgba(0,0,0,.18);
     opacity:0; transition:opacity .22s ease;
   }
-  .vctl-play, .vctl-bar, .vctl-stop{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
+  .vctl-play, .vctl-bar, .vctl-stop, .vctl-step{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
   .vctl.show::before{ opacity:1; }
-  .vctl.show .vctl-play, .vctl.show .vctl-bar, .vctl.show .vctl-stop{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
+  .vctl.show .vctl-play, .vctl.show .vctl-bar, .vctl.show .vctl-stop, .vctl.show.steps .vctl-step{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
+  .vctl-step{ display:none; position:absolute; top:50%; left:50%; width:48px; height:48px; margin:-24px 0 0 -24px; border-radius:50%; border:none; padding:0;
+    background:rgba(0,0,0,.45); color:#fff; cursor:pointer; align-items:center; justify-content:center; }
+  .vctl.steps .vctl-step{ display:flex; }
+  .vctl-prev{ transform:translateX(-88px); }
+  .vctl-next{ transform:translateX(88px); }
+  .vctl-step svg{ width:22px; height:22px; fill:currentColor; }
+  .vctl.show.steps .vctl-step:disabled{ opacity:.4; cursor:default; }
   /* Build 246 (Mark): Stop, top right of the controls: ends the video and goes back to where it came
      from (the Live TV guide, or the movie's / show's page). */
   .vctl-stop{
@@ -3584,7 +3591,8 @@
   .epg-corner.off{ visibility:hidden; pointer-events:none; }
   .epg-corner:not(:disabled){ color:var(--text); }
   /* The playing channel's details hidden (the corner's up arrow): none of its height left. */
-  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed .np-hero-foot{
+  /* Build 303: only on a real TV channel; a video of your own always shows its title and artist. */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-tv.np-foot-collapsed .np-hero-foot{
     height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
@@ -6926,6 +6934,13 @@
                draws the same controls on it (VideoControls.java). -->
           <div class="vctl" id="vctl">
             <button type="button" class="vctl-stop" id="vctlStop" aria-label="Stop">Stop</button>
+            <!-- Build 303: Previous / Next either side of Play while the video is part of a queue. -->
+            <button type="button" class="vctl-step vctl-prev" id="vctlPrev" aria-label="Previous">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="6" width="2.5" height="12" rx="1"/><path d="M18.5 6L9.5 12l9 6z"/></svg>
+            </button>
+            <button type="button" class="vctl-step vctl-next" id="vctlNext" aria-label="Next">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="16" y="6" width="2.5" height="12" rx="1"/><path d="M5.5 6l9 6-9 6z"/></svg>
+            </button>
             <button type="button" class="vctl-play" id="vctlPlay" aria-label="Play">
               <svg class="vctl-ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5a.8.8 0 0 0-1.2.7z"/></svg>
               <svg class="vctl-ico-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4.2" height="15" rx="1.2"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2"/></svg>
@@ -10889,6 +10904,24 @@
   var VCTL_HIDE_MS = 3000;
   var vctlTimer = 0, vctlDragging = false, vctlWasOn = false, vctlNativeKey = '', vctlAccent = '', vctlColorCtx = null;
   function vctlPlaying(){ return !!npTarget() && npIsCurrent() && uiIsPlaying; }
+  // Build 303: a video of your own playing as part of a queue (a shuffle, an artist's videos, Play
+  // All) gets Previous / Next on the picture.
+  function vctlSteps(){
+    var st = npTarget();
+    if(!st || !isLocalVideo(st) || !npIsCurrent()) return { on: false, prev: false, next: false };
+    var inQueue = isQueueCurrent(st) && playQueue.length > 1;
+    if(!inQueue && !upNext.length) return { on: false, prev: false, next: false };
+    return { on: true, prev: inQueue && queueHasPrev(), next: !!upNext.length || (inQueue && queueHasNext()) };
+  }
+  function vctlStep(dir){
+    var st = currentStation;
+    if(!st) return;
+    if(dir < 0){
+      if((audio.currentTime || 0) > 3){ try{ audio.currentTime = 0; }catch(e){} return; }
+      if(queueHasPrev()) playQueueStep(-1);
+    } else if(!playNextInLine()) return;
+    if(nowPlayingScreen.style.display === 'flex' && currentStation){ npStation = currentStation; renderNowPlayingScreen(); }
+  }
   function vctlArm(){
     clearTimeout(vctlTimer);
     vctlTimer = setTimeout(function(){
@@ -10928,6 +10961,10 @@
     var live = !npSeekApplies();
     vctl.classList.toggle('live', live);
     vctl.classList.toggle('no-full', !npVideoOn);
+    var stp = vctlSteps();
+    vctl.classList.toggle('steps', stp.on);
+    document.getElementById('vctlPrev').disabled = !stp.prev;
+    document.getElementById('vctlNext').disabled = !stp.next;
     if(!live && !vctlDragging){
       var t = vctlTimes();
       vctlRange.disabled = !t.cur || !t.dur;
@@ -10952,18 +10989,20 @@
       cx.fillStyle = '#ffffff'; cx.fillStyle = c;
       vctlAccent = String(cx.fillStyle);
     }catch(e){}
+    var stp = vctlSteps();
     var msg = { enabled: on, playing: vctlPlaying(), live: !npSeekApplies(), full: !!npVideoFull,
-      pos: Math.round(t.pos * 10) / 10, dur: Math.round(t.dur * 10) / 10, accent: vctlAccent };
+      pos: Math.round(t.pos * 10) / 10, dur: Math.round(t.dur * 10) / 10, accent: vctlAccent,
+      steps: stp.on, hasPrev: stp.prev, hasNext: stp.next };
     // The phone counts the time along by itself; the position is sent again only when it moves
     // on by a couple of seconds or jumps (so a timeupdate a few times a second isn't a message each).
-    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent].join('|');
+    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext].join('|');
     if(key === vctlNativeKey) return;
     vctlNativeKey = key;
     videoPlugin.setVideoControls(msg)['catch'](function(){});
   }
   vctl.addEventListener('click', function(e){
     e.stopPropagation();
-    if(e.target.closest('.vctl-play, .vctl-bar, .vctl-stop')){ vctlShow(true); return; }
+    if(e.target.closest('.vctl-play, .vctl-bar, .vctl-stop, .vctl-step')){ vctlShow(true); return; }
     vctlShow(!vctl.classList.contains('show'));
   });
   // Any button or the bar touched keeps them up for another 3 seconds.
@@ -10971,6 +11010,8 @@
     if(vctl.classList.contains('show') && e.target.closest('button, input')) vctlArm();
   }, true);
   vctlPlay.addEventListener('click', function(){ npPlayBtn.click(); });
+  document.getElementById('vctlPrev').addEventListener('click', function(e){ e.stopPropagation(); vctlShow(true); vctlStep(-1); });
+  document.getElementById('vctlNext').addEventListener('click', function(e){ e.stopPropagation(); vctlShow(true); vctlStep(1); });
   document.getElementById('vctlStop').addEventListener('click', function(e){ e.stopPropagation(); npStopVideo(); });
   // Build 246 (Mark): Stop on the video. The video stops and closes, Now Playing closes, and the page
   // under it is where the video came from: the Live TV guide for a channel, the movie's or the
@@ -11032,6 +11073,8 @@
         npVideoFullBtn.click();
       } else if(a === 'stop'){
         npStopVideo();
+      } else if(a === 'prev' || a === 'next'){
+        vctlStep(a === 'prev' ? -1 : 1);
       }
     });
   }
@@ -11869,6 +11912,8 @@
     // A TV channel and a video of your own share the video layout.
     var videoLayout = isNpChannel(st) || isLocalVideo(st);
     nowPlayingScreen.classList.toggle('np-channel', videoLayout);
+    // Build 303: a real TV channel (not a video of your own in the same layout).
+    nowPlayingScreen.classList.toggle('np-tv', isNpChannel(st));
     document.body.classList.toggle('np-channel-open', videoLayout);
     if(videoLayout) setNpImmersive(false);
     renderNpCollection(st);
@@ -19304,7 +19349,7 @@
     try{ localStorage.setItem(NP_FOOT_KEY, c ? '1' : '0'); }catch(e){}
     syncEpgFootBtns();
     var foot = npHeroFoot;
-    var shown = nowPlayingScreen.style.display === 'flex' && nowPlayingScreen.classList.contains('np-channel') && !document.body.classList.contains('rotate-lock');
+    var shown = nowPlayingScreen.style.display === 'flex' && nowPlayingScreen.classList.contains('np-tv') && !document.body.classList.contains('rotate-lock');
     var still = !shown || !foot || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     clearTimeout(npFootTimer);
     if(still){
@@ -33687,6 +33732,8 @@
   function queueRowSub(t){
     if(isLocalTrack(t)) return [t.artist, t.album].filter(Boolean).join(' · ') || 'Song';
     if(isPodcastTrack(t)) return subtitleForPodcast(t);
+    // Build 303: a music video by its artist (or "Music Video"); another video of yours as "Video".
+    if(t && t.type === 'video') return t.videoKind === 'music' ? (t.artist || 'Music Video') : (t.showTitle || 'Video');
     return 'Amplify Radio';
   }
   function buildQueueRow(t, o){
@@ -34286,8 +34333,9 @@
       if(e.touches.length !== 1 || scrollsSideways(e.target, surface)){ mode = 'ignore'; return; }
       if(opening){
         if(queuePanelOpen || lyricsOpen){ mode = 'ignore'; return; }
-        // Build 243: no queue while a channel is on screen.
-        if(nowPlayingScreen.classList.contains('np-channel')){ mode = 'ignore'; return; }
+        // Build 243: no queue while a channel is on screen. Build 303: a video of your own (same
+        // layout) has one: a swipe left shows it.
+        if(nowPlayingScreen.classList.contains('np-tv')){ mode = 'ignore'; return; }
         P = null;   // which panel: decided by the direction (left: queue, right: lyrics)
       } else if(!P.isOpen()){ mode = 'ignore'; return; }
       sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); dx = 0;

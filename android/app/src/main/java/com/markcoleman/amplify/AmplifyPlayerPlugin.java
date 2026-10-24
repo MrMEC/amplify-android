@@ -2372,6 +2372,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull;
   private double ctlPos, ctlDur;
   private String ctlAccent = "";
+  private boolean ctlSteps, ctlHasPrev, ctlHasNext;
 
   /**
    * What the controls on the picture show: {enabled (false on the floating window), playing,
@@ -2389,6 +2390,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final double pos = p == null ? 0 : p;
     final double dur = d == null ? 0 : d;
     final String accent = call.getString("accent", "");
+    // Build 303: Previous / Next while the video is part of a queue.
+    final boolean steps = Boolean.TRUE.equals(call.getBoolean("steps", false));
+    final boolean hasPrev = Boolean.TRUE.equals(call.getBoolean("hasPrev", false));
+    final boolean hasNext = Boolean.TRUE.equals(call.getBoolean("hasNext", false));
     main.post(
         () -> {
           ctlEnabled = enabled;
@@ -2398,8 +2403,13 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           ctlPos = pos;
           ctlDur = dur;
           ctlAccent = accent == null ? "" : accent;
-          if (video != null)
+          ctlSteps = steps;
+          ctlHasPrev = hasPrev;
+          ctlHasNext = hasNext;
+          if (video != null) {
             video.setControls(enabled, playing, pos, dur, live, full, ctlAccent);
+            video.setSteps(steps, hasPrev, hasNext);
+          }
           call.resolve();
         });
   }
@@ -2486,6 +2496,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                     });
             video.setVideoSize(videoW, videoH, videoRatio);
             video.setControls(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
+            video.setSteps(ctlSteps, ctlHasPrev, ctlHasNext);
           }
           if (show && hasVideo) {
             if (VlcEngine.isActive()) video.show(VlcEngine.getTarget(), x, y, w, h);
