@@ -3898,7 +3898,12 @@
   .mv-chev{ width:.72em; height:.72em; flex-shrink:0; fill:none; stroke:var(--text-faint); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
   .mv-hero-link .mv-chev{ width:18px; height:18px; }
   .mv-hero-meta{ font-size:13px; color:var(--text-dim); margin-top:4px; }
-  .mv-page-acts{ justify-content:center; }
+  .mv-page-acts{ display:flex; align-items:center; justify-content:center; gap:20px; width:100%; margin:16px 0 14px; }
+  .mv-page-acts .album-circle-btn{ background:none; border:none; color:var(--text); }
+  .mv-page-acts .album-circle-btn:hover{ background:none; opacity:.8; }
+  .mv-page-acts .album-shuffle-icon{ width:30px; height:30px; }
+  .mv-page-acts .icon-ellipsis-v{ transform:scale(1.45); }
+  .mv-page-acts .album-play-pill.mv-play{ background:var(--accent); color:var(--accent-text); }
   .tile-grid > .mv-row{ grid-column:1/-1; }
   /* Three artists across on a phone (as in the mockup), with room for the A to Z rail. */
   @media (max-width: 900px){
@@ -4191,6 +4196,25 @@
   .lc-note{ margin:8px 0 0; font-size:12.5px; line-height:1.5; color:var(--text-dim); }
   .lc-note:empty{ display:none; }
   .lc-new-btn{ margin:0 0 14px; }
+  /* Build 305: the editor as a page. */
+  .tile-grid > .lc-panel{ grid-column:1/-1; width:100%; max-width:560px; max-height:none; overflow:visible; margin:0;
+    padding:0; background:none; border:none; box-shadow:none; border-radius:0; transform:none; animation:none; }
+  .tile-grid > .lc-panel > .settings-header{ display:none; }
+  .tile-grid > .lc-panel .lc-body{ padding:0; }
+  .lc-body .cs-field{ margin-bottom:14px; }
+  .lc-top{ position:relative; display:flex; align-items:flex-end; gap:14px; margin-bottom:16px; }
+  .lc-top .lc-art{ width:76px; height:76px; flex:0 0 76px; border-radius:12px; }
+  .lc-art-edit{ position:absolute; left:52px; top:52px; width:30px; height:30px; border-radius:50%; border:2px solid var(--bg, #000);
+    background:var(--panel-2); color:var(--text); font-size:12px; display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+  .lc-top .lc-name-field{ flex:1; min-width:0; margin-bottom:0; }
+  .lc-one-row{ flex-wrap:nowrap !important; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .lc-one-row::-webkit-scrollbar{ display:none; }
+  .lc-one-row > .home-tab{ flex:0 0 auto; }
+  .tile-grid > .lc-panel .lc-list{ max-height:min(42vh, 420px); }
+  #liveChMvPick{ margin-top:10px; }
+  #liveChMvPick[hidden]{ display:none; }
+  .tile-grid > .lc-panel .lc-actions{ padding:4px 0 8px; justify-content:space-between; }
+  .lc-list .artist-info-thumb.lc-mv-thumb{ width:44px; height:44px; border-radius:50%; }
   /* Build 264: each list of channels in Edit is its own box, so a row drags only within it. */
   .tile-grid > .ch-edit-list{ grid-column:1/-1; display:flex; flex-direction:column; min-width:0; }
   .tile-grid > .ch-edit-list + .ch-group-head{ margin-top:6px; }
@@ -6191,6 +6215,12 @@
     }
     /* The queue: same gutter; its rows keep their padding (the playing row is shaded) and
        give it back with a negative margin, so the pictures sit on the edge too. */
+    /* Build 305 (Mark): Add Channels' tab row runs to the screen's edge like the other tab rows
+       (.ch-tools .home-tabs reset its margins, so it stopped short on both sides). */
+    .ch-tools .home-tabs.scroll-tabs{ margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad)); }
+    /* The New Channel page's one-row choices run off the edges the same way. */
+    .tile-grid > .lc-panel .lc-one-row{ margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
+      padding-left:var(--main-pad); padding-right:var(--main-pad); scroll-padding-inline:var(--main-pad); }
     .queue-head{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
     .queue-scroll{ padding-left:var(--main-pad); padding-right:var(--main-pad); }
     .queue-row{ margin-left:-8px; margin-right:-4px; }
@@ -7471,52 +7501,56 @@
   </div>
 </div>
 <!-- Build 263: make or change one of your own channels (Live TV, Edit). -->
+<!-- Build 305 (Mark): New Channel / Edit Channel is a page of its own (the panel is moved into the
+     page's grid when it opens, and back here when it closes). Name beside the picture, what it
+     plays and the order each a single row. -->
 <div class="settings-overlay" id="liveChOverlay" role="dialog" aria-modal="true" aria-labelledby="liveChTitle">
-  <div class="settings-panel" id="liveChPanel">
+  <div class="settings-panel lc-panel" id="liveChPanel">
     <div class="settings-header">
       <h2 id="liveChTitle">New Channel</h2>
       <button class="settings-close" id="liveChCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="art-url-body">
-      <div class="cs-field">
-        <label for="liveChName">Name</label>
-        <input type="text" class="cs-field-input" id="liveChName" autocomplete="off" maxlength="60">
-      </div>
-      <div class="cs-field">
-        <label>Picture</label>
-        <div class="cs-cover-row">
-          <button type="button" class="cs-cover-thumb tile-art" id="liveChArtBtn" title="Change picture" aria-label="Change picture"></button>
-          <button type="button" class="art-url-search-btn" id="liveChArtChange">Change</button>
+    <div class="art-url-body lc-body">
+      <div class="lc-top">
+        <button type="button" class="cs-cover-thumb tile-art lc-art" id="liveChArtBtn" title="Change picture" aria-label="Change picture"></button>
+        <button type="button" class="lc-art-edit" id="liveChArtChange" aria-label="Change picture"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+        <div class="cs-field lc-name-field">
+          <label for="liveChName">Name</label>
+          <input type="text" class="cs-field-input" id="liveChName" autocomplete="off" maxlength="60">
         </div>
       </div>
       <div class="cs-field">
         <label id="liveChKindLabel">Plays</label>
-        <div class="lc-opts" id="liveChKind" role="radiogroup" aria-labelledby="liveChKindLabel"></div>
+        <div class="lc-opts lc-one-row" id="liveChKind" role="radiogroup" aria-labelledby="liveChKindLabel"></div>
       </div>
       <div class="cs-field lc-pane" id="liveChPanePick">
         <input type="search" class="cs-field-input" id="liveChSearch" placeholder="Find shows and movies" autocomplete="off" aria-label="Find shows and movies">
         <div class="artist-info-list lc-list" id="liveChList" role="listbox" aria-multiselectable="true" aria-label="Shows and movies"></div>
       </div>
       <div class="cs-field lc-pane" id="liveChPaneMovies">
-        <label id="liveChFromLabel">From</label>
-        <div class="lc-opts" id="liveChFrom" role="radiogroup" aria-labelledby="liveChFromLabel"></div>
+        <div class="lc-opts lc-one-row" id="liveChFrom" role="radiogroup" aria-label="Movies from"></div>
       </div>
       <div class="cs-field lc-pane" id="liveChPaneGenre">
-        <label for="liveChGenre">Genre</label>
-        <select class="settings-select lc-select" id="liveChGenre"></select>
+        <select class="settings-select lc-select" id="liveChGenre" aria-label="Genre"></select>
         <p class="lc-note" id="liveChGenreNote" hidden>Genres come from Plex. If none are listed, use Sync Now in Settings, under Plex.</p>
       </div>
       <div class="cs-field lc-pane" id="liveChPaneDecade">
-        <label for="liveChDecade">Decade</label>
-        <select class="settings-select lc-select" id="liveChDecade"></select>
+        <select class="settings-select lc-select" id="liveChDecade" aria-label="Decade"></select>
+      </div>
+      <div class="cs-field lc-pane" id="liveChPaneMv">
+        <div class="lc-opts lc-one-row" id="liveChMvWho" role="radiogroup" aria-label="Which music videos"></div>
+        <div id="liveChMvPick">
+          <input type="search" class="cs-field-input" id="liveChMvSearch" placeholder="Find artists" autocomplete="off" aria-label="Find artists">
+          <div class="artist-info-list lc-list" id="liveChMvList" role="listbox" aria-multiselectable="true" aria-label="Artists"></div>
+        </div>
       </div>
       <div class="cs-field">
         <label id="liveChOrderLabel">Order</label>
-        <div class="lc-opts" id="liveChOrder" role="radiogroup" aria-labelledby="liveChOrderLabel"></div>
+        <div class="lc-opts lc-one-row" id="liveChOrder" role="radiogroup" aria-labelledby="liveChOrderLabel"></div>
       </div>
       <p class="lc-note" id="liveChSummary"></p>
     </div>
-    <div class="art-url-actions">
+    <div class="art-url-actions lc-actions">
       <button class="art-url-trash-btn" id="liveChDeleteBtn" title="Delete this channel" aria-label="Delete this channel">
         <i class="fa-solid fa-trash"></i>
       </button>
@@ -8634,6 +8668,7 @@
     var allArtists = document.getElementById('allArtistsLink');
     if(allArtists) allArtists.style.display = 'none';
     sectionHeadingRow.classList.remove('has-side-link');
+    if(typeof liveChPageLeft === 'function' && liveChPanelEl && liveChPanelEl.parentNode === stationsGrid) liveChPageLeft();
     stationsGrid.innerHTML = '';
     stationsGrid.classList.remove('grid-songs');
     stationsGrid.classList.remove('grid-album');
@@ -18500,7 +18535,7 @@
   }
   function liveChValidDef(d){
     if(!d || typeof d !== 'object' || !d.id || !d.src || typeof d.src !== 'object') return false;
-    return ['pick', 'movies', 'genre', 'decade'].indexOf(d.src.kind) !== -1;
+    return ['pick', 'movies', 'genre', 'decade', 'mv'].indexOf(d.src.kind) !== -1;
   }
   function liveChDefs(){
     if(liveChStore) return liveChStore;
@@ -18528,7 +18563,10 @@
   function liveChState(){
     if(typeof videoFiles === 'undefined' || !Array.isArray(videoFiles)) return null;
     var lib = vlib();
-    if(!liveChCache || liveChCache.lib !== lib) liveChCache = { lib: lib, lineups: {}, items: {}, sets: {} };
+    // Build 305: music video channels follow the music videos too.
+    var mvIdx = null;
+    try{ mvIdx = musicVideoIndex(); }catch(e){}
+    if(!liveChCache || liveChCache.lib !== lib || liveChCache.mvIdx !== mvIdx) liveChCache = { lib: lib, mvIdx: mvIdx, lineups: {}, items: {}, sets: {} };
     return liveChCache;
   }
   // The library's show for a name: the same name, or with "(US)" / a year after it.
@@ -18558,9 +18596,37 @@
     g = String(g || '').toLowerCase();
     return !!g && (x.genres || []).some(function(y){ return String(y).toLowerCase() === g; });
   }
+  // Build 305: a music video for a channel: its own length, or about four minutes until the phone
+  // has said (the lengths are asked for in the background, see liveChProbeMusicVideos).
+  var LIVE_MV_GUESS_SEC = 240;
+  function liveChMv(v){
+    var it = {};
+    for(var k in v) if(Object.prototype.hasOwnProperty.call(v, k)) it[k] = v[k];
+    it.mvItem = true;
+    it.duration = v.duration > 0 ? v.duration : LIVE_MV_GUESS_SEC;
+    return it;
+  }
+  function liveChMvList(src){
+    var cat;
+    try{ cat = musicVideoCatalog(); }catch(e){ return []; }
+    var vids = [];
+    if(src.all) vids = cat.all;
+    else (src.artists || []).forEach(function(k){ var a = cat.byKey[k]; if(a) vids = vids.concat(a.videos); });
+    return vids.map(liveChMv);
+  }
+  var liveChProbed = false;
+  function liveChProbeMusicVideos(){
+    if(liveChProbed) return;
+    liveChProbed = true;
+    try{
+      var todo = musicVideoCatalog().all.filter(function(v){ return !videoInfo[v.uri]; });
+      if(todo.length) ensureMusicVideoStills(todo, function(){ liveChCache = null; });
+    }catch(e){}
+  }
   // What a channel plays: its shows and its movies (before ordering).
   function liveChSources(def, lib){
     var src = def.src || {}, shows = [], movies = [];
+    if(src.kind === 'mv') return { shows: [], movies: [], mvs: liveChMvList(src) };
     if(src.kind === 'pick'){
       var seen = {};
       (src.shows || []).forEach(function(n){ var s = liveChShow(lib, n); if(s && !seen[s.key]){ seen[s.key] = 1; shows.push(s); } });
@@ -18579,7 +18645,7 @@
       shows = lib.shows.filter(inDec);
       movies = lib.movies.filter(inDec);
     }
-    return { shows: shows, movies: movies.filter(liveChTimed) };
+    return { shows: shows, movies: movies.filter(liveChTimed), mvs: [] };
   }
   function liveChShuffled(items, seed){
     return items.slice().sort(function(a, b){
@@ -18598,7 +18664,10 @@
     var lib = st.lib, set = liveChSources(def, lib), items = [];
     if(def.order === 'shuffle' || def.order === 'daily'){
       set.shows.forEach(function(s){ items = items.concat(liveChEpisodes(s)); });
-      items = liveChShuffled(items.concat(set.movies), def.id + (def.order === 'daily' ? '|' + day : ''));
+      items = liveChShuffled(items.concat(set.movies, set.mvs || []), def.id + (def.order === 'daily' ? '|' + day : ''));
+    } else if((set.mvs || []).length){
+      // In order: artist by artist (A to Z), each artist's videos A to Z.
+      items = set.mvs.slice();
     } else {
       // In order: the shows take turns (an episode of each, in order), the movies (by year,
       // then title) taking a turn of their own.
@@ -18612,7 +18681,7 @@
     }
     var starts = [], total = 0;
     items.forEach(function(v){ starts.push(total); total += Math.round(v.duration * 1000); });
-    var lu = { items: items, starts: starts, total: total, show: set.shows.length === 1 && !set.movies.length ? set.shows[0] : null, set: set };
+    var lu = { items: items, starts: starts, total: total, show: set.shows.length === 1 && !set.movies.length && !(set.mvs || []).length ? set.shows[0] : null, set: set };
     st.lineups[key] = lu;
     return lu;
   }
@@ -18622,6 +18691,14 @@
     if(src.kind === 'movies') return 'Movies';
     if(src.kind === 'genre') return String(src.genre || 'Genre');
     if(src.kind === 'decade') return (parseInt(src.decade, 10) || 0) + 's';
+    if(src.kind === 'mv'){
+      if(src.all) return 'Music Videos';
+      var an = [];
+      try{ var mc = musicVideoCatalog(); (src.artists || []).forEach(function(k){ if(mc.byKey[k]) an.push(mc.byKey[k].name); }); }catch(e){}
+      if(!an.length) return 'Music Videos';
+      if(an.length === 1) return an[0] + ' Videos';
+      return an[0] + (an.length === 2 ? ' & ' + an[1] : ' & More');
+    }
     var names = (set ? set.shows.map(function(s){ return s.title; }).concat(set.movies.map(function(m){ return m.title; })) : [])
       .concat(set ? [] : (src.shows || []));
     if(!names.length) names = (src.shows || []).slice();
@@ -18641,8 +18718,12 @@
     var custom = getCustomArtUrl('livech:' + url) || '';
     var art = custom;
     if(!art){
-      try{ art = lu.show ? showPosterUrl(lu.show) : (lu.items[0] ? videoPosterUrl(lu.items[0]) : ''); }catch(e){}
+      try{
+        var i0 = lu.items[0];
+        art = lu.show ? showPosterUrl(lu.show) : (i0 ? (i0.mvItem ? (i0.still ? capUrl(i0.still) : '') : videoPosterUrl(i0)) : '');
+      }catch(e){}
     }
+    if(def.src && def.src.kind === 'mv') liveChProbeMusicVideos();
     return { id: 'live:' + def.id, name: def.name || liveChAutoName(def, lu.set), url: url,
       logo: custom, art: art || '', cats: [], src: 'live', live: true, empty: !lu.items.length };
   }
@@ -18701,6 +18782,11 @@
   }
   function liveChProgram(lib, slot, multi){
     var v = slot.v, ep = v.kind === 'episode';
+    // Build 305: a music video: its title, the artist under it, its still.
+    if(v.mvItem){
+      var still = v.still ? capUrl(v.still) : '';
+      return { s: slot.s, e: slot.e, t: v.name || '', sub: v.artist || '', code: '', d: '', r: '', im: still, sq: still, raw: true, vid: v.id };
+    }
     var show = ep ? lib.showsByKey[v.showKey] : null;
     var im = '', sq = '';
     try{ im = ep ? episodeImageUrl(v) : movieBackdropUrl(v); sq = videoPosterUrl(v); }catch(e){}
@@ -18725,6 +18811,7 @@
   function liveTrackText(t){
     if(!t) return '';
     if(t.videoKind === 'episode') return (t.liveShow ? t.liveShow + ' \u00b7 ' : '') + subtitleForVideo(t);
+    if(t.videoKind === 'music') return [t.liveTitle, t.liveArtist].filter(Boolean).join(' · ');
     return [t.liveTitle, t.year].filter(Boolean).join(' · ');
   }
   // Tunes in: plays what's on now from where it is. after: the video that just ended (when
@@ -18740,11 +18827,20 @@
       if(!nx) return false;
       slot = { v: nx.v, s: now, e: now + Math.round(nx.v.duration * 1000) };
     }
-    var t = videoToTrack(slot.v);
+    var t;
+    if(slot.v.mvItem){
+      // Build 305: a music video on a channel of your own.
+      var mv = slot.v;
+      t = { type: 'video', videoKind: 'music', id: mv.id, uri: mv.uri, artist: mv.artist, artistKey: mv.artistKey,
+        duration: mv.duration || 0, still: mv.still || '', favicon: mv.still ? capUrl(mv.still) : '' };
+      t.liveTitle = mv.name || '';
+      t.liveArtist = mv.artist || '';
+    } else t = videoToTrack(slot.v);
     t.liveCh = ch.url;
     t.urlToResolve = ch.url;
     t.name = ch.name;
-    if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
+    if(slot.v.mvItem){ /* title and artist set above */ }
+    else if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
     else{ var ldef = liveChDefOf(ch), llu = ldef ? liveChLineupAt(ldef, now) : null; if(llu && !llu.show) t.liveShow = slot.v.show || ''; }
     t._liveItemStart = slot.s;
     Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
@@ -18763,7 +18859,8 @@
   function liveChKindText(def){
     var src = def.src || {};
     var k = src.kind === 'movies' ? 'All movies' + ({ phone: ' on the phone', plex: ' on Plex', all: '' })[src.from || 'phone']
-      : src.kind === 'genre' ? 'Genre: ' + (src.genre || '') : src.kind === 'decade' ? 'The ' + (parseInt(src.decade, 10) || 0) + 's' : 'Shows & movies';
+      : src.kind === 'genre' ? 'Genre: ' + (src.genre || '') : src.kind === 'decade' ? 'The ' + (parseInt(src.decade, 10) || 0) + 's'
+      : src.kind === 'mv' ? (src.all ? 'All music videos' : 'Music videos · ' + (src.artists || []).length + ((src.artists || []).length === 1 ? ' artist' : ' artists')) : 'Shows & movies';
     return k + ' · ' + ({ sequence: 'In order', shuffle: 'Shuffled', daily: 'Daily shuffle' })[def.order || 'sequence'];
   }
   function liveChStationOf(c){
@@ -18973,25 +19070,53 @@
     lib.shows.concat(lib.movies).forEach(function(x){ var y = liveChYear(x); if(y) seen[Math.floor(y / 10) * 10] = 1; });
     return Object.keys(seen).map(Number).sort(function(a, b){ return a - b; });
   }
+  // Build 305 (Mark): a page, not a dialog. The panel moves into the page's grid; Back (or Save,
+  // or Delete) goes back to where it was opened from, and the panel goes home again.
+  var liveChPanelEl = document.getElementById('liveChPanel');
+  function liveChPageOpen(){ return liveChPanelEl.parentNode === stationsGrid; }
   function openLiveChEditor(id){
     var def = id ? liveChDefById(id) : null;
+    closeChSheet && closeChSheet();
+    var title = def ? 'Edit Channel' : 'New Channel';
+    pushView();
+    enterLibraryChrome();
+    setDetailBackToHistory(function(){ openVideoHome(); }, 'Watch');
+    stationsHeading.textContent = title;
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    resetStationsGrid();
     liveChEd = def ? { id: def.id, isNew: false, name: def.name || '', src: JSON.parse(JSON.stringify(def.src)), order: def.order || 'sequence' }
       : { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), isNew: true, name: '', src: { kind: 'pick', shows: [], movies: [] }, order: 'sequence' };
-    lcEl('liveChTitle').textContent = def ? 'Edit Channel' : 'New Channel';
+    lcEl('liveChTitle').textContent = title;
     lcEl('liveChName').value = liveChEd.name;
     lcEl('liveChSearch').value = '';
+    lcEl('liveChMvSearch').value = '';
     lcEl('liveChDeleteBtn').style.visibility = def ? '' : 'hidden';
+    stationsGrid.appendChild(liveChPanelEl);
+    document.body.classList.add('lc-page-open');
     renderLiveChEditor();
-    liveChOverlayEl.classList.add('open');
-    lcEl('liveChPanel').scrollTop = 0;
     lcEl('liveChList').scrollTop = 0;
+    window.scrollTo(0, 0);
+  }
+  // The panel back in its holder (any way off the page: Back, a tab, Save).
+  function liveChPageLeft(){
+    if(!liveChPageOpen()) return;
+    liveChOverlayEl.appendChild(liveChPanelEl);
+    document.body.classList.remove('lc-page-open');
+    if(liveChEd){
+      // A new channel that wasn't saved leaves no picture behind.
+      if(liveChEd.isNew && !liveChEd.saved){ try{ clearCustomArtUrl('livech:amplify-live:' + liveChEd.id); }catch(e){} }
+      liveChEd = null;
+    }
   }
   function closeLiveChEditor(saved){
     if(!liveChEd) return;
-    // A new channel that wasn't saved leaves no picture behind.
-    if(!saved && liveChEd.isNew){ try{ clearCustomArtUrl('livech:amplify-live:' + liveChEd.id); }catch(e){} }
-    liveChEd = null;
-    liveChOverlayEl.classList.remove('open');
+    liveChEd.saved = !!saved;
+    if(!liveChPageOpen()){ liveChPageLeft(); liveChEd = null; return; }
+    goBack(function(){ videoTab = 'channels'; vsave(VIDEO_TAB_KEY, videoTab); openVideoHome(); });
+    liveChPageLeft();
   }
   // The editor's channel as it stands (what Save would keep).
   function liveChEdDef(){
@@ -19000,16 +19125,32 @@
     else if(src.kind === 'movies') out.from = src.from || 'phone';
     else if(src.kind === 'genre') out.genre = src.genre || '';
     else if(src.kind === 'decade') out.decade = parseInt(src.decade, 10) || 0;
+    else if(src.kind === 'mv'){ if(src.all) out.all = true; else out.artists = (src.artists || []).slice(); }
     return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order };
   }
   function renderLiveChEditor(){
     var ed = liveChEd, lib = vlib(), src = ed.src;
-    lcPills(lcEl('liveChKind'), [['pick', 'Shows & Movies'], ['movies', 'All Movies'], ['genre', 'Genre'], ['decade', 'Decade']], src.kind, function(k){
+    lcPills(lcEl('liveChKind'), [['pick', 'Shows & Movies'], ['mv', 'Music Videos'], ['movies', 'All Movies'], ['genre', 'Genre'], ['decade', 'Decade']], src.kind, function(k){
       if(k === src.kind) return;
       ed.src = k === 'pick' ? { kind: 'pick', shows: [], movies: [] } : k === 'movies' ? { kind: 'movies', from: 'phone' }
+        : k === 'mv' ? { kind: 'mv', all: true, artists: [] }
         : k === 'genre' ? { kind: 'genre', genre: lcGenres(vlib())[0] || '' } : { kind: 'decade', decade: lcDecades(vlib())[0] || 1990 };
+      if(k === 'mv' && ed.order === 'sequence') ed.order = 'shuffle';
       renderLiveChEditor();
     });
+    var kAct = lcEl('liveChKind').querySelector('.home-tab.active');
+    if(kAct) revealActiveTab(lcEl('liveChKind'));
+    lcEl('liveChPaneMv').hidden = src.kind !== 'mv';
+    if(src.kind === 'mv'){
+      lcPills(lcEl('liveChMvWho'), [['all', 'All Artists'], ['pick', 'Pick Artists']], src.all ? 'all' : 'pick', function(v){
+        src.all = v === 'all';
+        if(!src.artists) src.artists = [];
+        renderLiveChEditor();
+      });
+      lcEl('liveChMvPick').hidden = !!src.all;
+      if(!src.all) renderLiveChMvList();
+      liveChProbeMusicVideos();
+    }
     lcEl('liveChPanePick').hidden = src.kind !== 'pick';
     lcEl('liveChPaneMovies').hidden = src.kind !== 'movies';
     lcEl('liveChPaneGenre').hidden = src.kind !== 'genre';
@@ -19040,20 +19181,24 @@
     var ed = liveChEd, lib = vlib(), d = liveChEdDef();
     var set = liveChSources(d, lib);
     lcEl('liveChName').placeholder = liveChAutoName(d, set);
-    var nShows = set.shows.length, nMovies = set.movies.length, secs = 0;
+    var nShows = set.shows.length, nMovies = set.movies.length, mvs = set.mvs || [], secs = 0;
     set.shows.forEach(function(s){ liveChEpisodes(s).forEach(function(e){ secs += e.duration || 0; }); });
     set.movies.forEach(function(m){ secs += m.duration || 0; });
+    mvs.forEach(function(v){ secs += v.duration || 0; });
     var bits = [];
     if(nShows) bits.push(nShows + (nShows === 1 ? ' show' : ' shows'));
     if(nMovies) bits.push(nMovies + (nMovies === 1 ? ' movie' : ' movies'));
+    if(mvs.length) bits.push(mvs.length + (mvs.length === 1 ? ' music video' : ' music videos'));
     var hrs = Math.round(secs / 3600);
+    // Build 305 (Mark): nothing said while nothing is picked.
+    var picking = d.src.kind === 'pick' || (d.src.kind === 'mv' && !d.src.all);
     lcEl('liveChSummary').textContent = !secs
-      ? (d.src.kind === 'pick' ? 'Pick the shows and movies it plays.' : 'Nothing in your library fits this yet.')
+      ? (picking ? '' : 'Nothing in your library fits this yet.')
       : bits.join(' and ') + ', ' + (hrs >= 1 ? 'about ' + hrs + (hrs === 1 ? ' hour' : ' hours') : 'under an hour') + ' before it repeats.';
     lcEl('liveChSaveBtn').disabled = !secs;
     // The picture: the one chosen, else the first show's or movie's poster.
     var thumb = lcEl('liveChArtBtn'), url = getCustomArtUrl('livech:amplify-live:' + ed.id) || '';
-    if(!url){ try{ url = set.shows[0] ? showPosterUrl(set.shows[0]) : (set.movies[0] ? videoPosterUrl(set.movies[0]) : ''); }catch(e){ url = ''; } }
+    if(!url){ try{ url = set.shows[0] ? showPosterUrl(set.shows[0]) : (set.movies[0] ? videoPosterUrl(set.movies[0]) : (mvs[0] && mvs[0].still ? capUrl(mvs[0].still) : '')); }catch(e){ url = ''; } }
     if(thumb.dataset.src !== url){
       thumb.dataset.src = url;
       thumb.innerHTML = '';
@@ -19133,6 +19278,54 @@
       box.appendChild(e);
     }
   }
+  // Build 305: the artists to pick for a music video channel.
+  function renderLiveChMvList(){
+    var ed = liveChEd, box = lcEl('liveChMvList');
+    var q = alphaSortKey(String(lcEl('liveChMvSearch').value || '').trim());
+    var cat;
+    try{ cat = musicVideoCatalog(); }catch(e){ cat = { artists: [] }; }
+    var chosen = {};
+    (ed.src.artists || []).forEach(function(k){ chosen[k] = 1; });
+    box.innerHTML = '';
+    var n = 0;
+    cat.artists.forEach(function(a){
+      if(q && alphaSortKey(a.name).indexOf(q) === -1) return;
+      n++;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'artist-info-row';
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-selected', chosen[a.key] ? 'true' : 'false');
+      b.dataset.key = a.key;
+      var th = document.createElement('span');
+      th.className = 'artist-info-thumb lc-mv-thumb tile-art';
+      try{ renderArtistArt(th, a.entry || { key: a.key, name: a.name, tracks: [], stations: [] }); }catch(e){}
+      b.appendChild(th);
+      var tx = document.createElement('span');
+      tx.className = 'artist-info-text';
+      var nm = document.createElement('span'); nm.className = 'artist-info-name'; nm.textContent = a.name;
+      var ds = document.createElement('span'); ds.className = 'artist-info-desc'; ds.textContent = a.videos.length + (a.videos.length === 1 ? ' music video' : ' music videos');
+      tx.appendChild(nm); tx.appendChild(ds);
+      b.appendChild(tx);
+      var ck = document.createElement('i'); ck.className = 'fa-solid fa-check'; ck.setAttribute('aria-hidden', 'true');
+      b.appendChild(ck);
+      b.addEventListener('click', function(){
+        var list = ed.src.artists || (ed.src.artists = []);
+        if(chosen[a.key]){ ed.src.artists = list.filter(function(k){ return k !== a.key; }); delete chosen[a.key]; }
+        else { list.push(a.key); chosen[a.key] = 1; }
+        b.setAttribute('aria-selected', chosen[a.key] ? 'true' : 'false');
+        syncLiveChEditorBits();
+      });
+      box.appendChild(b);
+    });
+    if(!n){
+      var e = document.createElement('div');
+      e.className = 'artist-info-empty';
+      e.textContent = cat.artists.length ? 'Nothing matches that.' : 'Music videos in your music folders show up here.';
+      box.appendChild(e);
+    }
+  }
+  lcEl('liveChMvSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChMvList(); });
   lcEl('liveChSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChPickList(); });
   lcEl('liveChName').addEventListener('input', function(){ if(liveChEd) liveChEd.name = lcEl('liveChName').value; });
   lcEl('liveChGenre').addEventListener('change', function(){ if(liveChEd){ liveChEd.src.genre = lcEl('liveChGenre').value; syncLiveChEditorBits(); } });
@@ -19159,7 +19352,6 @@
     else liveChDefs().push(d);
     saveLiveChDefs();
     closeLiveChEditor(true);
-    if(onVideoView) rerenderVideoKeepingScroll();
     try{ var st = npTarget(); if(st && isNpChannel(st) && nowPlayingScreen.style.display === 'flex') renderNpChannels(st); }catch(e){}
   });
   lcEl('liveChDeleteBtn').addEventListener('click', function(){
@@ -20406,6 +20598,10 @@
       } else if(src.kind === 'movies'){ if((ds.from || 'phone') === src.from) return d; }
       else if(src.kind === 'genre'){ if(String(ds.genre || '').toLowerCase() === String(src.genre).toLowerCase()) return d; }
       else if(src.kind === 'decade'){ if((parseInt(ds.decade, 10) || 0) === src.decade) return d; }
+      else if(src.kind === 'mv'){
+        if(src.all){ if(ds.all) return d; }
+        else if(!ds.all && (ds.artists || []).length === 1 && ds.artists[0] === src.artist) return d;
+      }
     }
     return null;
   }
@@ -20462,6 +20658,7 @@
       else if(src.kind === 'movies') out.from = src.from;
       else if(src.kind === 'genre') out.genre = src.genre;
       else if(src.kind === 'decade') out.decade = src.decade;
+      else if(src.kind === 'mv'){ if(src.all) out.all = true; else out.artists = [src.artist]; }
       liveChDefs().push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: item.chName || '', src: out,
         order: src.kind === 'pick' ? 'sequence' : 'shuffle' });
       saveLiveChDefs();
@@ -20480,10 +20677,12 @@
     card.type = 'button';
     card.className = 'ch-custom-card';
     card.id = 'chCustomBtn';
-    card.innerHTML = '<div class="ch-logo"><i class="fa-solid fa-plus" aria-hidden="true"></i></div><div class="ch-text"><div class="ch-name">Build a Custom Channel</div><div class="ch-sub">Mix several shows and movies, a genre or a decade</div></div>';
+    card.innerHTML = '<div class="ch-logo"><i class="fa-solid fa-plus" aria-hidden="true"></i></div><div class="ch-text"><div class="ch-name">Build a Custom Channel</div><div class="ch-sub">Mix shows and movies, a genre, a decade or music videos</div></div>';
     card.addEventListener('click', function(){ openLiveChEditor(null); });
     host.appendChild(card);
-    if(!lib.shows.length && !lib.movies.length){
+    var anyMv = false;
+    try{ anyMv = musicVideoCatalog().all.length > 0; }catch(e){}
+    if(!lib.shows.length && !lib.movies.length && !anyMv){
       var e0 = document.createElement('div');
       e0.className = 'empty-state';
       e0.textContent = 'Your shows and movies show up here once they’re in Watch: add a folder of videos in Movies or TV Shows, or sign in to Plex in Settings.';
@@ -20525,6 +20724,22 @@
     if(coll.length){
       head('Collections');
       coll.forEach(function(c){ host.appendChild(mineRow(c)); n++; });
+    }
+    // Build 305: music videos: all of them, or one artist's, as a 24/7 channel.
+    var mvc = null;
+    try{ mvc = musicVideoCatalog(); }catch(e){}
+    if(mvc && mvc.all.length){
+      var mrows = [{ id: 'mv:all', name: 'All Music Videos', chName: 'Music Videos', mono: '♪', src: { kind: 'mv', all: true },
+        sub: mvc.all.length + (mvc.all.length === 1 ? ' video' : ' videos') }];
+      mvc.artists.forEach(function(a){
+        mrows.push({ id: 'mv:' + a.key, name: a.name, chName: a.name + ' Videos', mono: '♪', src: { kind: 'mv', artist: a.key },
+          sub: 'Music videos · ' + a.videos.length + (a.videos.length === 1 ? ' video' : ' videos') });
+      });
+      mrows = mrows.filter(function(c){ return match(c.name); });
+      if(mrows.length){
+        head('Music Videos');
+        mrows.forEach(function(c){ host.appendChild(mineRow(c)); n++; });
+      }
     }
     if(!n){
       var e1 = document.createElement('div');
@@ -23577,10 +23792,17 @@
     meta.textContent = (isOther ? mvCountText(list.length) : list.length + ' music video' + (list.length === 1 ? '' : 's')) + (total ? ' · ' + formatRuntime(total) : '');
     hero.appendChild(meta);
     wrap.appendChild(hero);
+    // Build 305 (Mark): the artist page's row: Shuffle on the left, Play in the middle (in the
+    // theme's colour), More on the right (Favorite, Play Next, Add to Queue).
     var actions = document.createElement('div');
-    actions.className = 'vd-actions mv-page-acts';
-    actions.appendChild(mvButton('<i class="fa-solid fa-play"></i><span>Play All</span>', 'vd-play', function(){ mvPlayList(list, false, a.name + ' Videos'); }));
-    actions.appendChild(mvButton('<span>Shuffle</span>', 'vd-secondary', function(){ mvPlayList(list, true, a.name + ' Videos'); }));
+    actions.className = 'mv-page-acts';
+    var shuf = mvButton(MV_SHUFFLE_SVG, 'album-circle-btn mv-shuffle', function(){ mvPlayList(list, true, a.name + ' Videos'); });
+    shuf.title = 'Shuffle'; shuf.setAttribute('aria-label', 'Shuffle ' + a.name + ' videos');
+    actions.appendChild(shuf);
+    actions.appendChild(mvButton('<i class="fa-solid fa-play" aria-hidden="true"></i><span>Play</span>', 'album-play-pill mv-play', function(){ mvPlayList(list, false, a.name + ' Videos'); }));
+    var more = mvButton('<span class="icon-ellipsis-v" aria-hidden="true"></span>', 'album-circle-btn mv-more', function(){ openMvMenu(more, a, list); });
+    more.title = 'More'; more.setAttribute('aria-label', 'More actions'); more.setAttribute('aria-haspopup', 'true');
+    actions.appendChild(more);
     wrap.appendChild(actions);
     stationsGrid.appendChild(wrap);
     var rows = {};
@@ -23594,6 +23816,44 @@
     });
   }
   window.__amplifyOpenMusicVideoArtist = openMusicVideoArtist;
+  var MV_SHUFFLE_SVG = '<svg class="album-shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/><path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>';
+  // The page's More menu: Favorite (an artist with a page of their own), Play Next, Add to Queue.
+  var mvMenu = null;
+  function closeMvMenu(){ if(mvMenu){ mvMenu.remove(); mvMenu = null; } }
+  document.addEventListener('click', function(e){ if(mvMenu && !mvMenu.contains(e.target) && !(e.target.closest && e.target.closest('.mv-more'))) closeMvMenu(); });
+  window.addEventListener('scroll', closeMvMenu, { passive: true });
+  function openMvMenu(anchor, a, list){
+    if(mvMenu){ closeMvMenu(); return; }
+    var m = document.createElement('div');
+    m.className = 'np-menu row-menu mv-menu open';
+    m.setAttribute('role', 'menu');
+    function item(html, fn, id){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'np-menu-item'; b.setAttribute('role', 'menuitem');
+      if(id) b.id = id;
+      b.innerHTML = html;
+      b.addEventListener('click', function(e){ e.stopPropagation(); closeMvMenu(); fn(); });
+      m.appendChild(b);
+      return b;
+    }
+    if(a.entry){
+      var rec = artistFavRecord(a.entry), on = isFavorite(rec);
+      var fb = item(on ? '<i class="fa-solid fa-heart"></i><span>Favorited</span>' : '<i class="fa-regular fa-heart"></i><span>Favorite</span>',
+        function(){ toggleFavorite(rec); }, 'mvMenuFav');
+      if(on) fb.classList.add('on');
+    }
+    item('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h11M4 12h11M4 18h7"/><path class="fill" d="M15 14.2v5.6l4.6-2.8z"/></svg><span>Play Next</span>',
+      function(){ queuePlayNext(list.slice()); }, 'mvMenuNext');
+    item('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 13.5v7M14.5 17h7"/></svg><span>Add to Queue</span>',
+      function(){ queueAddToEnd(list.slice()); }, 'mvMenuQueue');
+    document.body.appendChild(m);
+    mvMenu = m;
+    var r = anchor.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    var left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
+    var top = r.bottom + 6;
+    if(top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+    m.style.left = left + 'px'; m.style.top = top + 'px';
+  }
 
   // ---- fixing what the names got wrong: one menu per title
   var videoMenu = null;
@@ -30508,6 +30768,10 @@
     }
     // Build 304: a video page (a movie, a show, an artist's Music Videos) is remembered as itself,
     // so back comes to it rather than falling through to Home.
+    if(liveChPanelEl && liveChPanelEl.parentNode === stationsGrid && liveChEd){
+      var eid = liveChEd.isNew ? null : liveChEd.id;
+      return entry(eid ? 'Edit Channel' : 'New Channel', function(){ openLiveChEditor(eid); });
+    }
     if(onVideoDetailView && videoDetailWhere){
       var w = videoDetailWhere;
       if(w.indexOf('mv:') === 0){
@@ -38539,7 +38803,7 @@
     if(document.body.classList.contains('search-open')) return 'search';
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
-    if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView) return 'video';
+    if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView || document.body.classList.contains('lc-page-open')) return 'video';
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
     // For You (and its searches) lives on Home now.
