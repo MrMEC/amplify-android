@@ -7427,6 +7427,15 @@
         <option value="off">Off</option>
       </select>
     </div>
+    <!-- Build 312: how far out Stations Near Me looks (shown while it's on). -->
+    <div class="settings-row" id="nearRadiusRow" style="display:none;">
+      <span class="settings-label" id="nearRadiusLabel">Station proximity</span>
+      <select class="settings-select" id="nearRadiusSelect" aria-labelledby="nearRadiusLabel">
+        <option value="50">50 miles</option>
+        <option value="100">100 miles</option>
+        <option value="200">200 miles</option>
+      </select>
+    </div>
     <!-- Build 265: the welcome tour, any time. -->
     <div class="settings-row settings-row--stack">
       <span class="settings-label">Tour of Amplify</span>
@@ -15093,8 +15102,8 @@
   // A Home row under Top 100 of the most popular stations near the phone (up to 20), shown only
   // while Amplify has location permission (coarse, city-level) and the Settings switch is on.
   // Its heading opens a page of every local station, grouped by genre A to Z, with genre pills.
-  // Local means within NEAR_RADIUS_MI (50 miles, roughly how far an FM signal carries); a sparse
-  // area with fewer than NEAR_MIN stations that close widens to NEAR_WIDE_MI (100 miles).
+  // Local means within the Station proximity setting (50 miles by default, roughly how far an FM
+  // signal carries; 100 or 200 in Settings); fewer than NEAR_MIN that close widens to the next size.
   // The directory has no distance search, so: the phone's position is turned into the state (or
   // states, near a border) around it, those states' stations are fetched, and each is placed by
   // its own coordinates. Results are kept (radioPlayerNearMe) and redone after NEAR_TTL_MS or
@@ -15103,6 +15112,15 @@
   var NEAR_RADIUS_MI = 50, NEAR_WIDE_MI = 100, NEAR_MIN = 8, NEAR_HOME_MAX = 20;
   var NEAR_TTL_MS = 6 * 3600 * 1000, NEAR_MOVE_MI = 10, NEAR_CHECK_MS = 10 * 60 * 1000;
   var NEAR_VERSION = 1;
+  // Build 312 (Mark): Settings > Station proximity picks the circle: 50, 100 or 200 miles. Fewer than
+  // NEAR_MIN stations inside it widens to the next size up (50 -> 100 -> 200).
+  var NEAR_RADIUS_KEY = 'radioPlayerNearMeRadius', NEAR_RADII = [50, 100, 200];
+  function nearRadiusPref(){
+    var v = 50;
+    try{ v = parseInt(localStorage.getItem(NEAR_RADIUS_KEY) || '50', 10); }catch(e){}
+    return NEAR_RADII.indexOf(v) === -1 ? 50 : v;
+  }
+  function nearNextRadius(r){ var i = NEAR_RADII.indexOf(r); return i === -1 || i === NEAR_RADII.length - 1 ? r : NEAR_RADII[i + 1]; }
   var nearMeSection = document.getElementById('nearMeSection');
   var nearMeHomeGrid = document.getElementById('nearMeHomeGrid');
   var nearMeShown = false, nearMeBusy = null, nearMeLastCheck = 0, nearMeAccess = 'unknown', nearMeGenre = 'all';
@@ -15271,9 +15289,14 @@
 
   // Works the list out for a position: { v, at, lat, lon, cc, city, state, radius, items:[{ card, d, g, clicks, votes }] }.
   function nearBuild(pos){
+    var want = nearRadiusPref(), outer = nearNextRadius(want);
     var pts = [pos];
-    // Eight points round the edge of the wider circle catch a neighbouring state's stations.
-    for(var b = 0; b < 360; b += 45) pts.push(nearOffset(pos, NEAR_WIDE_MI, b));
+    // Eight points round the edge of the widest circle it may use catch a neighbouring state's
+    // stations (and eight halfway out for the big circles, so a state in between isn't missed).
+    for(var b = 0; b < 360; b += 45){
+      pts.push(nearOffset(pos, outer, b));
+      if(outer > 100) pts.push(nearOffset(pos, outer / 2, b));
+    }
     return Promise.all(pts.map(function(p){ return nearPlaceOf(p)['catch'](function(){ return null; }); })).then(function(places){
       var home = places[0];
       var states = {}, order = [];
@@ -15297,10 +15320,10 @@
             else if(home && order[i] === home.cc + '|' + home.state) unplaced.push({ x: x, d: null });
           });
         });
-        var radius = NEAR_RADIUS_MI;
+        var radius = want;
         var near = placed.filter(function(p){ return p.d <= radius; });
-        if(near.length < NEAR_MIN){
-          radius = NEAR_WIDE_MI;
+        if(near.length < NEAR_MIN && outer > want){
+          radius = outer;
           near = placed.filter(function(p){ return p.d <= radius; });
         }
         // Still short (stations in the directory without a location): the home state's own.
@@ -15319,7 +15342,7 @@
         });
         return { v: NEAR_VERSION, at: Date.now(), lat: pos.lat, lon: pos.lon,
           cc: (home && home.cc) || '', city: (home && home.city) || '', state: (home && home.state) || '',
-          radius: radius, items: items };
+          radius: radius, want: want, items: items };
       });
     });
   }
@@ -15379,7 +15402,7 @@
       renderNearMeHomeSection();
       syncNearMeSetting();
       return nearPosition().then(function(pos){
-        var fresh = kept && Date.now() - kept.at < NEAR_TTL_MS && nearMiles(pos, kept) < NEAR_MOVE_MI;
+        var fresh = kept && (kept.want || 50) === nearRadiusPref() && Date.now() - kept.at < NEAR_TTL_MS && nearMiles(pos, kept) < NEAR_MOVE_MI;
         if(fresh && !force) return kept;
         return nearBuild(pos).then(function(rec){
           nearSave(rec);
@@ -15495,6 +15518,19 @@
   function syncNearMeSetting(){
     if(!nearMeSelect) return;
     nearMeSelect.value = nearMeShowing() ? 'on' : 'off';
+    // Station proximity only matters (and only shows) while Stations Near Me is on.
+    var row = document.getElementById('nearRadiusRow');
+    if(row) row.style.display = nearMeShowing() ? '' : 'none';
+    if(nearRadiusSelect) nearRadiusSelect.value = String(nearRadiusPref());
+  }
+  var nearRadiusSelect = document.getElementById('nearRadiusSelect');
+  if(nearRadiusSelect){
+    nearRadiusSelect.value = String(nearRadiusPref());
+    nearRadiusSelect.addEventListener('change', function(){
+      try{ localStorage.setItem(NEAR_RADIUS_KEY, nearRadiusSelect.value); }catch(e){}
+      // Worked out again for the new circle (after any lookup already under way).
+      Promise.resolve(nearMeBusy)['catch'](function(){}).then(function(){ return nearMeRefresh(true); });
+    });
   }
   function setNearMe(on){
     if(!on){

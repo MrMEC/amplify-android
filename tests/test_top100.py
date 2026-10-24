@@ -195,10 +195,10 @@ async def run(theme, b):
       const t = [...g.querySelectorAll('.tile')]; return { shown: s && getComputedStyle(s).display !== 'none', n: t.length,
       first: t[0] ? t[0].querySelector('.tile-name').textContent + ' / ' + (t[0].querySelector('.tile-sub')||{}).textContent : '',
       row: g.classList.contains('home-row') || (g.parentElement && g.parentElement.classList.contains('home-row')),
-      before: !!(s && s.nextElementSibling && s.nextElementSibling.id === 'dailyHomeSections' && s.nextElementSibling.nextElementSibling.id === 'madeForYouSection') }; })()""")
+      before: !!(s && s.nextElementSibling && s.nextElementSibling.id === 'nearMeSection' && s.nextElementSibling.nextElementSibling.id === 'dailyHomeSections' && s.nextElementSibling.nextElementSibling.nextElementSibling.id === 'madeForYouSection') }; })()""")
     print(theme, home)
     check(home['shown'] and home['n'] == 20 and home['first'] == '1. Patient Zero / Taylor Swift', f'{theme}: Home shows a Top 100 row of this week\'s top 20 {home}')
-    check(home['before'], f'{theme}: Top 100 sits right above the daily rows (build 219), then Made for You')
+    check(home['before'], f'{theme}: Top 100, then Stations Near Me (build 310), the daily rows (build 219), then Made for You')
     el = await pg.query_selector('#top100Section')
     await el.scroll_into_view_if_needed(); await pg.wait_for_timeout(1800)
     imgs = await pg.evaluate("[...document.querySelectorAll('#top100HomeGrid .tile-art img')].map(i => i.src).slice(0, 3)")

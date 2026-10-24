@@ -298,6 +298,34 @@ async def main():
         await page.evaluate("() => { __loc.lat = 28.549; return window.__nearMe.refresh(true); }")
         await page.wait_for_timeout(1500)
 
+        # ---- Station proximity (build 312) ----
+        await ev(page, 'openSettings()'); await page.wait_for_timeout(400)
+        pr = await page.evaluate("() => { var r = document.getElementById('nearRadiusRow'), s = document.getElementById('nearRadiusSelect');"
+            " return { shown: getComputedStyle(r).display !== 'none', v: s.value, opts: Array.from(s.options).map(o => o.textContent),"
+            " after: r.previousElementSibling.querySelector('#nearMeSelect') !== null }; }")
+        check(pr['shown'] and pr['v'] == '50' and pr['opts'] == ['50 miles', '100 miles', '200 miles'] and pr['after'],
+              'Station proximity under Stations Near Me: 50 / 100 / 200 miles, 50 chosen (%s)' % pr)
+        await page.evaluate("() => document.getElementById('nearRadiusRow').scrollIntoView({ block: 'center' })")
+        await page.wait_for_timeout(300)
+        await page.screenshot(path=OUT + '/nearme-proximity.png')
+        g1 = len(hits['geo'])
+        await page.select_option('#nearRadiusSelect', '100'); await page.wait_for_timeout(1800)
+        rec = await page.evaluate("() => window.__nearMe.load()")
+        check(rec['radius'] == 100 and rec['want'] == 100 and len(rec['items']) == 52, '100 miles: the 60-93 mile stations join (%s, %d)' % (rec['radius'], len(rec['items'])))
+        await page.select_option('#nearRadiusSelect', '200'); await page.wait_for_timeout(1800)
+        rec = await page.evaluate("() => window.__nearMe.load()")
+        far = max(mi(HOME, p) for p in hits['geo'][g1:]) if len(hits['geo']) > g1 else 0
+        check(rec['radius'] == 200 and len(rec['items']) == 52 and far > 190, '200 miles: looks out to 200 (%s, %d, %.0f)' % (rec['radius'], len(rec['items']), far))
+        await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
+        await page.reload(); await page.wait_for_timeout(1500)
+        v = await page.evaluate("() => document.getElementById('nearRadiusSelect').value")
+        check(v == '200', 'proximity kept after a restart (%s)' % v)
+        await ev(page, 'openSettings()'); await page.wait_for_timeout(300)
+        await page.select_option('#nearRadiusSelect', '50'); await page.wait_for_timeout(1800)
+        await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
+        rec = await page.evaluate("() => window.__nearMe.load()")
+        check(rec['radius'] == 50 and len(rec['items']) == 40, 'back to 50 miles (%d)' % len(rec['items']))
+
         # ---- larger text at 412 and 360 wide ----
         for w in (412, 360):
             c2, p2, h2, e2 = await context(b, loc={'state': 'granted', 'grantOnAsk': True, 'lat': 28.549, 'lon': -81.773}, width=w, scale='1.35')
@@ -319,6 +347,8 @@ async def main():
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
         d = await page.evaluate("() => getComputedStyle(document.getElementById('nearMeSection')).display")
         check(d == 'none', 'Off hides the row (%s)' % d)
+        d = await page.evaluate("() => getComputedStyle(document.getElementById('nearRadiusRow')).display")
+        check(d == 'none', 'Off hides Station proximity too (%s)' % d)
         await page.evaluate('() => window.AmplifyPublishCarMenu && window.AmplifyPublishCarMenu()'); await page.wait_for_timeout(1200)
         car = await page.evaluate("() => (window.__cat.lists.nearMe || []).length")
         check(car == 0, 'car folder empty when off (%d)' % car)
