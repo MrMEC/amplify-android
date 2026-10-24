@@ -3876,7 +3876,12 @@
   .mv-sum{ font-size:13px; color:var(--text-dim); }
   .mv-acts{ display:flex; gap:8px; }
   .mv-acts .mv-btn{ padding:9px 16px; font-size:13px; }
-  .tile-grid > .mv-recent{ grid-column:1/-1; }
+  .tile-grid > .mv-recent, .tile-grid > .mv-daily{ grid-column:1/-1; }
+  /* Build 306 (Mark): a thin grey edge on video stills (Home's daily videos, the Music Videos
+     tab and an artist's Music Videos page), like the artist circles. */
+  #dailyHomeSections .yt-thumb, .mv-recent .yt-thumb, .mv-daily .yt-thumb, .mv-row .vep-thumb{
+    border:1.5px solid var(--top-artist-ring, #3a3a3e); background-clip:padding-box; box-sizing:border-box; }
+  .mv-daily .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mv-recent .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tile-grid > .mv-artists-head{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; }
   .mv-seg{ display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; padding:3px; flex-shrink:0; }
@@ -19617,11 +19622,15 @@
       if(cell.closest('#stationsGrid') && onVideoView) openChSheet(ch); else playChannel(ch);
     });
     row.appendChild(cell);
-    var blocks = src ? epgBlocks(ch, t0, t1) : [];
+    // Build 306 (Mark): a music video channel is one block all the way across, "Music Videos"
+    // (its 4-minute videos as separate blocks were too many to read).
+    var mvCh = false;
+    if(isLiveChUrl(ch.url)){ var mdef = liveChDefOf(ch); mvCh = !!(mdef && mdef.src && mdef.src.kind === 'mv'); }
+    var blocks = src && !mvCh ? epgBlocks(ch, t0, t1) : [];
     var now = Date.now();
     if(!blocks.length){
       // No schedule (or not yet): the channel as one block across.
-      row.appendChild(epgBlock(ch, t0, t1, ch.name || 'Channel', ch.dead ? 'Not working' : '', true, true));
+      row.appendChild(epgBlock(ch, t0, t1, mvCh ? 'Music Videos' : (ch.name || 'Channel'), ch.dead ? 'Not working' : '', true, true));
     } else {
       blocks.forEach(function(b){
         row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
@@ -23649,6 +23658,8 @@
     acts.appendChild(mvButton('<span>Shuffle</span>', 'vd-secondary mv-btn', function(){ mvPlayList(cat.all, true); }));
     top.appendChild(acts);
     stationsGrid.appendChild(top);
+    // Build 306 (Mark): the day's artist (the same one as Home's daily videos), above Recently Added.
+    appendMvDailySection(cat);
     // Recently added: the newest dozen, a sideways row of stills.
     var recent = cat.all.filter(function(v){ return v.addedAt; }).sort(function(a, b){ return b.addedAt - a.addedAt; }).slice(0, 12);
     if(recent.length >= 2){
@@ -23709,6 +23720,33 @@
       stationsGrid.appendChild(ot);
     }
     if(sort === 'az') buildAzRail(azItemsFromGrid('.tile.mv-artist:not(.mv-other)', '.tile-name'));
+  }
+  function appendMvDailySection(cat){
+    try{ ensureDailyLists(); }catch(e){}
+    var key = dailyState && dailyState.videoKey;
+    var entry = key ? findArtistEntry(key) : null;
+    if(!entry) return;
+    var rec = ytStore && ytStore[key];
+    var yt = (rec && rec.videos) || [];
+    var locals = musicVideosFor(key);
+    if(!yt.length && !locals.length) return;
+    var label = appendGridSection(entry.name);
+    label.classList.add('mv-daily-label', 'home-heading-link', 'mv-heading-link');
+    label.setAttribute('role', 'link'); label.tabIndex = 0;
+    label.insertAdjacentHTML('beforeend', MV_CHEVRON);
+    // Their Music Videos page when they have videos on the phone, otherwise their artist page.
+    var go = function(){
+      if(cat.byKey[key]){ pushView(); openMusicVideoArtist(key); } else openArtistPage(key);
+    };
+    label.addEventListener('click', go);
+    label.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } });
+    var row = document.createElement('div');
+    row.className = 'artist-videos artist-mvs mv-daily';
+    yt.forEach(function(v){ var t = buildYtTile(v, entry.name); t._ytList = yt; row.appendChild(t); });
+    var tiles = {};
+    locals.forEach(function(v){ var t = buildMusicVideoTile(v, locals); tiles[v.uri] = t; row.appendChild(t); });
+    stationsGrid.appendChild(row);
+    ensureMusicVideoStills(locals, function(v){ var t = tiles[v.uri]; if(t && t.isConnected){ t._paintStill(); t._paintDur(); } });
   }
   // The album and year a video shares with the artist's song of the same name, when there is one.
   function mvNameKey(s){ return alphaSortKey(mvTidyTitle(s)).replace(/[^a-z0-9]+/g, ''); }
