@@ -36,13 +36,23 @@ async def main():
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=3, is_mobile=True, has_touch=True, color_scheme='dark')
         await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
-        hits = []
+        hits = []; busy = []
         async def handler(route):
             u = route.request.url
             if '127.0.0.1' in u: return await route.continue_()
             if 'lrclib.net' in u:
                 hits.append(u)
                 hdr = {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'}
+                if 'Busy%20Song' in u:
+                    busy.append(u)
+                    if '/api/get' in u: return await route.fulfill(status=503, headers=hdr, body='{"name":"ServerOverloaded"}')
+                    if len([x for x in busy if '/api/search' in x]) == 1: return await route.fulfill(status=503, headers=hdr, body='{"name":"ServerOverloaded"}')
+                    return await route.fulfill(status=200, headers=hdr, body=json.dumps([
+                        {'trackName': 'Busy Song', 'duration': 260, 'syncedLyrics': '[00:01.00]Wrong length one\n[00:02.00]x'},
+                        {'trackName': 'Busy Song', 'duration': 203, 'syncedLyrics': '[00:01.00]Right length\n[00:02.00]y'},
+                        {'trackName': 'Busy Song', 'duration': 201, 'plainLyrics': 'untimed'}]))
+                if 'Down%20Song' in u:
+                    return await route.fulfill(status=503, headers=hdr, body='{"name":"ServerOverloaded"}')
                 if 'Prince%2001' in u or 'Prince+01' in u:
                     if '/api/get' in u:
                         return await route.fulfill(status=200, headers=hdr, body=json.dumps({'trackName': 'Prince 01', 'artistName': 'Prince', 'duration': 200, 'instrumental': False, 'plainLyrics': 'x', 'syncedLyrics': LRC}))
@@ -118,6 +128,19 @@ async def main():
         # 7) a song with none
         r = await pg.evaluate("(async()=>{ const t = __d.w298other(); const v = await window.__amplifyFindLyrics(t); return v; })()")
         check(r and r.get('none'), f'a song LRCLIB doesn\'t know: none (kept, retried after a few days) {r}')
+        # 7b) build 300: exact match busy, first search busy -> retried; nearest timed copy wins
+        r = await pg.evaluate("(async()=>{ const t = Object.assign({}, __d.w298other(), { name: 'Busy Song', artist: 'Busy Artist feat. Someone', album: 'Busy Album', duration: 200, localId: 'busy-1' }); return await window.__amplifyFindLyrics(t); })()")
+        print('busy', r, len(busy), hits[-4:])
+        check(r and 'Right length' in (r.get('synced') or ''), f'a busy server is retried and the copy nearest in length (timed) is used {r}')
+        # 7c) completely down: a clear message with a Try again button, nothing kept
+        await pg.evaluate("__amplifyLyrics.close()")
+        await pg.evaluate("(()=>{ const t = Object.assign({}, __d.w298other(), { name: 'Down Song', artist: 'Down Artist', album: 'A', duration: 200, localId: 'down-1' }); window.__downT = t; })()")
+        await pg.evaluate("__amplifyLyrics.open(); clearInterval(__amplifyLyrics.state.timer); __amplifyLyrics.load(window.__downT)"); await pg.wait_for_timeout(9000)
+        msg = await pg.evaluate("document.getElementById('lyricsBody').innerText")
+        print('down', repr(msg))
+        check('busy' in msg and await pg.evaluate("!!document.getElementById('lyricsRetryBtn')"), f'when LRCLIB is down: says why, offers Try again {msg!r}')
+        kept = await pg.evaluate("(async()=>{ return await new Promise(r=>{ const q=indexedDB.open('amplifyLyrics',1); q.onsuccess=()=>{ const g=q.result.transaction('l').objectStore('l').get(favKeyProbe); g.onsuccess=()=>r(g.result||null); }; }); })()".replace('favKeyProbe', "'__none__'"))
+        await pg.evaluate("__amplifyLyrics.close()")
         # 8) the menu has Lyrics for a song
         check(await pg.evaluate("(()=>{ try{ syncNpMenuItems && syncNpMenuItems(); }catch(e){} return getComputedStyle(document.getElementById('npLyricsMenuBtn')).display !== 'none'; })()"), 'Lyrics is in the Now Playing menu')
         # 9) LRC parsing edge cases
