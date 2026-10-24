@@ -58,6 +58,15 @@ def florida(dense=True):
     out.append(st('zero', 'Zero Island', 'pop', 0, 0, 9999))
     return out
 GEORGIA = [st('ga01', 'Atlanta Hits', 'top 40', 33.75, -84.39, 5000, state='Georgia')]
+# Build 313: entries with no map position, placed by a city in their name or tags.
+FL_CODE = [st('sunny', 'Sunny 105.9', 'adult contemporary,orlando', None, None, 5, state='FL')]          # state as "FL"
+FL_CITY = [st('wdbo', 'News 96.5 WDBO Orlando', 'news,talk', None, None, 4)]                             # "Florida", no position
+BLANK = [st('blank', 'La Rumba 99', 'latin,kissimmee', None, None, 3, state=''),                          # no state: tag search
+         st('ohio', 'Orlando Ohio Hits', 'pop', None, None, 3, state='Ohio')]                               # another state: left out
+CITY_ROWS = {'sunny': 'Orlando', 'wdbo': 'Orlando', 'blank': 'Kissimmee'}
+CITIES = [('Orlando', 28.5384, -81.3789, 'city', '307573'), ('Kissimmee', 28.2920, -81.4076, 'city', '79226'),
+          ('Tampa', 27.9506, -82.4572, 'city', '384959'), ('Clermont', 28.5494, -81.7729, 'town', '43021'),
+          ('Christmas', 28.5361, -81.0181, 'town', '')]
 
 MOCK = r"""(function(){
  var L = {}; window.__nat = { loads: [], locCalls: 0, reqCalls: 0, settings: 0 };
@@ -105,9 +114,20 @@ async def context(b, dense=True, loc=None, width=412, scale=None):
             if 'state' in q:
                 hits['states'].append(q['state'][0])
                 body = fl if q['state'][0] == 'Florida' else GEORGIA if q['state'][0] == 'Georgia' else []
+                if q['state'][0] == 'Florida' and dense: body = body + FL_CITY
+                if q['state'][0] == 'FL' and q.get('stateExact') == ['true'] and dense: body = FL_CODE
+            elif 'name' in q or 'tag' in q:
+                hits.setdefault('names', []).append(('name:' + q['name'][0]) if 'name' in q else ('tag:' + q['tag'][0]))
+                w = (q.get('name') or q.get('tag'))[0].lower()
+                pool = (FL_CODE + FL_CITY + BLANK) if dense else []
+                body = [x for x in pool if w in (x['name'] + ',' + x['tags']).lower()]
             else:
                 body = [st('top%d' % i, 'Top %d' % i, 'pop', None, None, 10) for i in range(6)]
             return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps(body))
+        if p.netloc == 'overpass-api.de':
+            hits.setdefault('overpass', []).append(r.request.post_data or '')
+            els = [{'type': 'node', 'lat': c[1], 'lon': c[2], 'tags': {'name': c[0], 'place': c[3], **({'population': c[4]} if c[4] else {})}} for c in CITIES]
+            return await r.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps({'elements': els}))
         if p.netloc == 'api.bigdatacloud.net':
             q = parse_qs(p.query); la = float(q['latitude'][0]); lo = float(q['longitude'][0])
             hits['geo'].append((la, lo))
@@ -184,7 +204,7 @@ async def main():
         check(info['row'] and info['sw'] > info['cw'] + 100, 'a sideways row that scrolls (%d > %d)' % (info['sw'], info['cw']))
         check(abs(info['left']) < 1 and abs(info['right'] - 412) < 1, 'row runs to both screen edges (%.1f..%.1f)' % (info['left'], info['right']))
         check(info['keys'][0] == 'fl00', 'most popular first (%s)' % info['keys'][0])
-        check(sorted(set(hits['states'])) == ['Florida', 'Georgia'], 'looked up the states around (%s)' % sorted(set(hits['states'])))
+        check(sorted(set(hits['states'])) == ['FL', 'Florida', 'GA', 'Georgia'], 'looked up the states around (%s)' % sorted(set(hits['states'])))
         await page.evaluate("() => document.getElementById('nearMeSection').scrollIntoView({ block: 'center' })")
         await page.wait_for_timeout(500)
         await page.screenshot(path=OUT + '/nearme-home.png')
@@ -212,7 +232,7 @@ async def main():
         await page.evaluate('() => window.AmplifyPublishCarMenu && window.AmplifyPublishCarMenu()')
         await page.wait_for_timeout(1500)
         car = await page.evaluate("() => (window.__cat && window.__cat.lists && window.__cat.lists.nearMe) || null")
-        check(car is not None and len(car) == 40, 'car list has every local station (%s)' % (len(car) if car else car))
+        check(car is not None and len(car) == 43, 'car list has every local station (%s)' % (len(car) if car else car))
         check(car and ' · ' in (car[0].get('sub') or '') and car[0]['sub'].endswith(' mi'), 'car rows say genre and distance (%s)' % (car[0].get('sub') if car else ''))
 
         # ---- the page ----
@@ -236,7 +256,11 @@ async def main():
         expect = sorted([x for x in gnames if x != 'Other'])
         check(gnames[:-1] == expect and gnames[-1] == 'Other', 'genres A to Z, Other last: %s' % gnames)
         total = sum(len(x['rows']) for x in pg['groups'])
-        check(total == 40, 'every local station, no limit (%d)' % total)
+        check(total == 43, 'every local station, no limit (%d)' % total)
+        cityrows = {r['k']: r['s'] for x in pg['groups'] for r in x['rows'] if r['k'] in CITY_ROWS}
+        check(cityrows == CITY_ROWS, 'no map position: placed by the city in the name or tags, city shown (%s)' % cityrows)
+        check(not any(r['k'] == 'ohio' for x in pg['groups'] for r in x['rows']), 'a city name in another state is left out')
+        check(any(n == 'tag:kissimmee' for n in hits.get('names', [])) and any(n == 'name:Orlando' for n in hits.get('names', [])), 'asked by city name and tag (%s)' % hits.get('names', [])[:6])
         def key(n): return re.sub(r'[^a-z0-9]+', ' ', re.sub(r'^(the|a|an)\s+', '', n.lower())).strip()
         ok = all([key(r['n']) for r in x['rows']] == sorted(key(r['n']) for r in x['rows']) for x in pg['groups'])
         check(ok, 'stations A to Z within each genre')
@@ -251,6 +275,7 @@ async def main():
         bad = []
         for x in pg['groups']:
             for r in x['rows']:
+                if r['k'] in CITY_ROWS: continue
                 s = fl.get(r['k'])
                 if not s: bad.append(r['k']); continue
                 d = mi(HOME, (s['geo_lat'], s['geo_long']))
@@ -271,7 +296,7 @@ async def main():
         await page.tap('.near-genre-tabs .home-tab[data-genre="all"]')
         await page.wait_for_timeout(400)
         n_all = await page.evaluate("() => document.querySelectorAll('#stationsGrid .near-row').length")
-        check(n_all == 40, 'All brings everything back (%d)' % n_all)
+        check(n_all == 43, 'All brings everything back (%d)' % n_all)
         # Tap a row: it plays through its genre.
         before = len(await page.evaluate('() => __nat.loads'))
         await page.tap('#stationsGrid .near-row .song-row-title')
@@ -311,11 +336,11 @@ async def main():
         g1 = len(hits['geo'])
         await page.select_option('#nearRadiusSelect', '100'); await page.wait_for_timeout(1800)
         rec = await page.evaluate("() => window.__nearMe.load()")
-        check(rec['radius'] == 100 and rec['want'] == 100 and len(rec['items']) == 52, '100 miles: the 60-93 mile stations join (%s, %d)' % (rec['radius'], len(rec['items'])))
+        check(rec['radius'] == 100 and rec['want'] == 100 and len(rec['items']) == 55, '100 miles: the 60-93 mile stations join (%s, %d)' % (rec['radius'], len(rec['items'])))
         await page.select_option('#nearRadiusSelect', '200'); await page.wait_for_timeout(1800)
         rec = await page.evaluate("() => window.__nearMe.load()")
         far = max(mi(HOME, p) for p in hits['geo'][g1:]) if len(hits['geo']) > g1 else 0
-        check(rec['radius'] == 200 and len(rec['items']) == 52 and far > 190, '200 miles: looks out to 200 (%s, %d, %.0f)' % (rec['radius'], len(rec['items']), far))
+        check(rec['radius'] == 200 and len(rec['items']) == 55 and far > 190, '200 miles: looks out to 200 (%s, %d, %.0f)' % (rec['radius'], len(rec['items']), far))
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
         await page.reload(); await page.wait_for_timeout(1500)
         v = await page.evaluate("() => document.getElementById('nearRadiusSelect').value")
@@ -324,7 +349,7 @@ async def main():
         await page.select_option('#nearRadiusSelect', '50'); await page.wait_for_timeout(1800)
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
         rec = await page.evaluate("() => window.__nearMe.load()")
-        check(rec['radius'] == 50 and len(rec['items']) == 40, 'back to 50 miles (%d)' % len(rec['items']))
+        check(rec['radius'] == 50 and len(rec['items']) == 43, 'back to 50 miles (%d)' % len(rec['items']))
 
         # ---- larger text at 412 and 360 wide ----
         for w in (412, 360):

@@ -15111,7 +15111,7 @@
   var NEAR_KEY = 'radioPlayerNearMe', NEAR_PREF_KEY = 'radioPlayerNearMeOn', NEAR_GEO_KEY = 'radioPlayerNearGeo';
   var NEAR_RADIUS_MI = 50, NEAR_WIDE_MI = 100, NEAR_MIN = 8, NEAR_HOME_MAX = 20;
   var NEAR_TTL_MS = 6 * 3600 * 1000, NEAR_MOVE_MI = 10, NEAR_CHECK_MS = 10 * 60 * 1000;
-  var NEAR_VERSION = 1;
+  var NEAR_VERSION = 2;   // 2 (build 313): stations placed by the city in their name or tags
   // Build 312 (Mark): Settings > Station proximity picks the circle: 50, 100 or 200 miles. Fewer than
   // NEAR_MIN stations inside it widens to the next size up (50 -> 100 -> 200).
   var NEAR_RADIUS_KEY = 'radioPlayerNearMeRadius', NEAR_RADII = [50, 100, 200];
@@ -15268,20 +15268,83 @@
           })['catch'](function(){ return null; });
       });
   }
+  function nearRaw(s, state){
+    var lat = parseFloat(s.geo_lat), lon = parseFloat(s.geo_long);
+    var placed = isFinite(lat) && isFinite(lon) && !(Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01);
+    return { card: stationToCardData(s), lat: placed ? lat : null, lon: placed ? lon : null,
+      clicks: +s.clickcount || 0, votes: +s.votes || 0, state: s.state || state || '', cc: String(s.countrycode || '').toUpperCase() };
+  }
+  // US states are often entered as their two-letter code ("FL"), which a search for the name misses.
+  var NEAR_US_ABBR = { 'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA','colorado':'CO','connecticut':'CT',
+    'delaware':'DE','district of columbia':'DC','florida':'FL','georgia':'GA','hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN',
+    'iowa':'IA','kansas':'KS','kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA','michigan':'MI',
+    'minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT','nebraska':'NE','nevada':'NV','new hampshire':'NH',
+    'new jersey':'NJ','new mexico':'NM','new york':'NY','north carolina':'NC','north dakota':'ND','ohio':'OH','oklahoma':'OK',
+    'oregon':'OR','pennsylvania':'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD','tennessee':'TN','texas':'TX',
+    'utah':'UT','vermont':'VT','virginia':'VA','washington':'WA','west virginia':'WV','wisconsin':'WI','wyoming':'WY' };
   function nearStateStations(cc, state){
     var k = cc + '|' + state, c = nearStateCache[k];
     if(c && Date.now() - c.at < 12 * 3600 * 1000) return Promise.resolve(c.list);
-    return apiFetch('/json/stations/search?countrycode=' + encodeURIComponent(cc) + '&state=' + encodeURIComponent(state)
-      + '&hidebroken=true&order=clickcount&reverse=true&limit=3000').then(function(data){
-      var list = (data || []).map(function(s){
-        var lat = parseFloat(s.geo_lat), lon = parseFloat(s.geo_long);
-        var placed = isFinite(lat) && isFinite(lon) && !(Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01);
-        return { card: stationToCardData(s), lat: placed ? lat : null, lon: placed ? lon : null,
-          clicks: +s.clickcount || 0, votes: +s.votes || 0, state: s.state || state };
-      });
+    var tail = '&hidebroken=true&order=clickcount&reverse=true&limit=3000';
+    var abbr = cc === 'US' ? NEAR_US_ABBR[state.toLowerCase()] : null;
+    var jobs = [apiFetch('/json/stations/search?countrycode=' + encodeURIComponent(cc) + '&state=' + encodeURIComponent(state) + tail)];
+    if(abbr) jobs.push(apiFetch('/json/stations/search?countrycode=US&stateExact=true&state=' + abbr + tail)['catch'](function(){ return []; }));
+    return Promise.all(jobs).then(function(r){
+      var list = (r[0] || []).concat(r[1] || []).map(function(s){ return nearRaw(s, state); });
       nearStateCache[k] = { at: Date.now(), list: list };
       return list;
     });
+  }
+  // Build 313 (Mark: Sunny 105.9 in Orlando was missing): many directory entries have no map
+  // position, and some no state. Those are placed by a city named in their name or tags. The
+  // stations named after the biggest cities are also asked for by name and by tag, which finds
+  // the entries with no state at all.
+  function nearSearchStations(cc, field, value){
+    var k = cc + '|' + field + '|' + value.toLowerCase(), c = nearStateCache[k];
+    if(c && Date.now() - c.at < 12 * 3600 * 1000) return Promise.resolve(c.list);
+    return apiFetch('/json/stations/search?countrycode=' + encodeURIComponent(cc) + '&' + field + '=' + encodeURIComponent(value)
+      + '&hidebroken=true&order=clickcount&reverse=true&limit=500').then(function(data){
+      var list = (data || []).map(function(s){ return nearRaw(s, ''); });
+      nearStateCache[k] = { at: Date.now(), list: list };
+      return list;
+    });
+  }
+  // Cities and larger towns (10,000+ people) within miles of p, from OpenStreetMap (Overpass),
+  // kept 30 days per ~15-mile square: [{ name, lat, lon, pop }], biggest first.
+  var NEAR_CITY_KEY = 'radioPlayerNearCities';
+  function nearCities(p, miles){
+    var k = (Math.round(p.lat * 4) / 4).toFixed(2) + ',' + (Math.round(p.lon * 4) / 4).toFixed(2) + ',' + miles;
+    var store = {};
+    try{ store = JSON.parse(localStorage.getItem(NEAR_CITY_KEY) || '{}') || {}; }catch(e){}
+    if(store[k] && Date.now() - (store[k].at || 0) < 30 * 24 * 3600 * 1000) return Promise.resolve(store[k].list);
+    var m = Math.round(miles * 1609.344), at = '(around:' + m + ',' + p.lat.toFixed(4) + ',' + p.lon.toFixed(4) + ')';
+    var q = '[out:json][timeout:25];(node["place"="city"]' + at + ';node["place"="town"]' + at + ';);out;';
+    return fetch('https://overpass-api.de/api/interpreter', { method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q) })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){
+        var seen = {}, list = [];
+        ((d && d.elements) || []).forEach(function(el){
+          var t = el.tags || {}, name = t['name:en'] || t.name || '';
+          var pop = parseInt(String(t.population || '').replace(/[^0-9]/g, ''), 10) || 0;
+          if(!name || name.length < 4 || typeof el.lat !== 'number') return;
+          if(t.place === 'town' && pop < 10000) return;
+          var key = name.toLowerCase();
+          if(seen[key]) return;
+          seen[key] = true;
+          list.push({ name: name, lat: el.lat, lon: el.lon, pop: pop || (t.place === 'city' ? 50000 : 10000) });
+        });
+        list.sort(function(a, b){ return b.pop - a.pop; });
+        list = list.slice(0, 300);
+        store[k] = { at: Date.now(), list: list };
+        var keys = Object.keys(store);
+        if(keys.length > 40){ keys.sort(function(a, b){ return (store[a].at || 0) - (store[b].at || 0); }); keys.slice(0, keys.length - 40).forEach(function(x){ delete store[x]; }); }
+        try{ localStorage.setItem(NEAR_CITY_KEY, JSON.stringify(store)); }catch(e){}
+        return list;
+      });
+  }
+  function nearCityRe(name){
+    return new RegExp('(^|[^a-z0-9])' + name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])');
   }
 
   function nearLoad(){ try{ var v = JSON.parse(localStorage.getItem(NEAR_KEY) || 'null'); return v && v.v === NEAR_VERSION ? v : null; }catch(e){ return null; } }
@@ -15297,6 +15360,7 @@
       pts.push(nearOffset(pos, outer, b));
       if(outer > 100) pts.push(nearOffset(pos, outer / 2, b));
     }
+    var citiesP = nearCities(pos, outer)['catch'](function(){ return null; });
     return Promise.all(pts.map(function(p){ return nearPlaceOf(p)['catch'](function(){ return null; }); })).then(function(places){
       var home = places[0];
       var states = {}, order = [];
@@ -15306,31 +15370,62 @@
         if(!states[k]){ states[k] = pl; order.push(k); }
       });
       if(!order.length) throw new Error('Couldn\'t tell where this is');
-      return Promise.all(order.map(function(k){
-        return nearStateStations(states[k].cc, states[k].state)['catch'](function(){ return null; });
-      })).then(function(lists){
-        if(lists.every(function(l){ return l === null; })) throw new Error('The station directory couldn\'t be reached');
-        var seen = {}, placed = [], unplaced = [];
+      var homeCc = (home && home.cc) || states[order[0]].cc;
+      var stateNames = {};
+      order.forEach(function(k){ var n = states[k].state.toLowerCase(); stateNames[n] = true; if(NEAR_US_ABBR[n]) stateNames[NEAR_US_ABBR[n].toLowerCase()] = true; });
+      return citiesP.then(function(cities){
+        // Cities without a place-name answer: the ones the reverse geocoder named.
+        if(!cities || !cities.length){
+          cities = [];
+          places.forEach(function(pl, i){ if(pl && pl.city && pl.city.length >= 4) cities.push({ name: pl.city, lat: pts[i].lat, lon: pts[i].lon, pop: i ? 1 : 2 }); });
+        }
+        cities = cities.map(function(c){ return { name: c.name, lat: c.lat, lon: c.lon, pop: c.pop, d: nearMiles(pos, c), re: nearCityRe(c.name) }; })
+          .filter(function(c){ return c.d <= outer; });
+        // Name and tag searches for the six biggest cities in range.
+        var big = cities.slice().sort(function(a, b){ return b.pop - a.pop; }).slice(0, 6);
+        var jobs = order.map(function(k){
+          return nearStateStations(states[k].cc, states[k].state)['catch'](function(){ return null; });
+        });
+        big.forEach(function(c){
+          jobs.push(nearSearchStations(homeCc, 'name', c.name)['catch'](function(){ return []; }));
+          jobs.push(nearSearchStations(homeCc, 'tag', c.name.toLowerCase())['catch'](function(){ return []; }));
+        });
+        return Promise.all(jobs).then(function(all){ return { lists: all, cities: cities, nStates: order.length }; });
+      }).then(function(got){
+        var lists = got.lists, cities = got.cities;
+        if(lists.slice(0, got.nStates).every(function(l){ return l === null; })) throw new Error('The station directory couldn\'t be reached');
+        var seen = {}, placed = [], unplaced = [], byCity = [];
+        function cityOf(x){
+          var text = ' ' + String(x.card.name || '').toLowerCase() + ' ' + String(x.card.tags || '').toLowerCase() + ' ';
+          var best = null;
+          cities.forEach(function(c){ if(c.re.test(text) && (!best || c.d < best.d)) best = c; });
+          return best;
+        }
         lists.forEach(function(list, i){
+          var fromState = i < got.nStates;
           (list || []).forEach(function(x){
             var id = x.card.stationuuid || x.card.urlToResolve;
             if(!id || seen[id]) return;
-            seen[id] = true;
-            if(x.lat != null){ placed.push({ x: x, d: nearMiles(pos, { lat: x.lat, lon: x.lon }) }); }
-            else if(home && order[i] === home.cc + '|' + home.state) unplaced.push({ x: x, d: null });
+            // From a name or tag search: only this country, with no state or one of these states.
+            if(!fromState && ((x.cc && x.cc !== homeCc) || (x.state && !stateNames[x.state.toLowerCase()]))) return;
+            if(x.lat != null){ seen[id] = true; placed.push({ x: x, d: nearMiles(pos, { lat: x.lat, lon: x.lon }) }); return; }
+            var c = cityOf(x);
+            if(c){ seen[id] = true; byCity.push({ x: x, d: c.d, city: c.name }); return; }
+            if(fromState && home && order[i] === home.cc + '|' + home.state){ seen[id] = true; unplaced.push({ x: x, d: null }); }
           });
         });
         var radius = want;
-        var near = placed.filter(function(p){ return p.d <= radius; });
+        function within(r){ return placed.concat(byCity).filter(function(p){ return p.d <= r; }); }
+        var near = within(radius);
         if(near.length < NEAR_MIN && outer > want){
           radius = outer;
-          near = placed.filter(function(p){ return p.d <= radius; });
+          near = within(radius);
         }
         // Still short (stations in the directory without a location): the home state's own.
         if(near.length < NEAR_MIN) near = near.concat(unplaced);
         var items = near.map(function(p){
           return { card: p.x.card, d: p.d == null ? null : Math.round(p.d * 100) / 100, g: nearGenreOf(p.x.card.tags),
-            clicks: p.x.clicks, votes: p.x.votes, st: p.d == null ? p.x.state : '' };
+            clicks: p.x.clicks, votes: p.x.votes, st: p.d == null ? p.x.state : '', city: p.city || '' };
         });
         // One entry per stream, and nothing on the blocked list.
         var byUrl = {};
@@ -15359,7 +15454,7 @@
       return { it: it, s: score };
     }).sort(function(a, b){ return b.s - a.s; }).map(function(x){ return x.it; });
   }
-  function nearSubOf(it, rec){ return it.d == null ? (it.st || '') : nearDistLabel(it.d, rec && rec.cc); }
+  function nearSubOf(it, rec){ return it.city ? it.city : it.d == null ? (it.st || '') : nearDistLabel(it.d, rec && rec.cc); }
 
   function renderNearMeHomeSection(){
     if(!nearMeHomeGrid) return;
