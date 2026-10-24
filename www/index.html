@@ -19796,6 +19796,24 @@
     var on = st && isNpChannel(st) ? epgNowItem(st) : null;
     var pic = on ? (on.it.sq || on.it.im) : '';   // square (build 250): the square picture first
     var src = pic ? epgImg(pic, 240, on && on.it.raw) : '';
+    // Build 307 (Mark: the picture didn't change on a shuffled music video channel): on one of your
+    // own channels the picture is the video actually playing. The schedule goes by the clock, and a
+    // video that runs shorter or longer than expected leaves it on another video.
+    // A music video played from Music Videos (a shuffle, an artist's videos) shows its own still too.
+    if(st && isLocalVideo(st) && (st.liveCh || st.videoKind === 'music')){
+      src = '';
+      if(st.videoKind === 'music'){
+        if(st.still) src = capUrl(st.still);
+        else if(!st._stillAsked){
+          st._stillAsked = true;
+          try{ ensureMusicVideoStills([st], function(v){ if(v === st && npTarget() === st) syncNpEpThumb(st); }); }catch(e){}
+        }
+      } else {
+        try{ var lv = vlib().byId[st.id]; src = lv ? videoPosterUrl(lv) : ''; }catch(e){ src = ''; }
+      }
+      // The program details only when the schedule agrees about what's on.
+      if(on && on.it.vid !== st.id) on = null;
+    }
     var details = npDetailsEl();
     npEpThumb.hidden = !src;
     if(details) details.classList.toggle('np-has-ep', !!src);
@@ -33598,7 +33616,7 @@
     }
     // Build 262: tuned in to one of your own channels: the episode or movie that's on.
     if(st.liveCh){ npSub.classList.remove('np-sub-linked'); syncNpEpThumb(st); npSub.textContent = isLocalVideo(st) ? liveTrackText(st) : epgNowText(st); return; }
-    if(isLocalVideo(st)){ npSub.classList.remove('np-sub-linked'); npSub.textContent = subtitleForVideo(st); return; }
+    if(isLocalVideo(st)){ npSub.classList.remove('np-sub-linked'); syncNpEpThumb(st); npSub.textContent = subtitleForVideo(st); return; }
     npSub.classList.toggle('np-sub-linked', isLocalTrack(st));
     // A podcast episode's subtitle names the show it belongs to -- the same way in as an
     // artist link below, so the show is reachable without leaving Now Playing to hunt for it
