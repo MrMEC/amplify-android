@@ -1,7 +1,9 @@
 package com.markcoleman.amplify;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.SurfaceTexture;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
@@ -10,6 +12,7 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
@@ -107,6 +110,115 @@ public final class VideoOverlay {
       };
   private static final long UNBIND_DELAY_MS = 2500;
 
+  // ---- Build 316: one video straight into the next (full screen) ----
+  // While the page holds the picture (between two videos watched full screen), the box stays
+  // where and as it is, showing the last frame of the video that ended (a still taken from the
+  // picture), however the page's box moves or hides meanwhile. The still goes as soon as the next
+  // video draws its first frame, so it cuts straight from one to the other: no controls, no
+  // background picture and no black in between.
+  private boolean holding;
+  private boolean heldShow; // what the page last asked for while holding
+  private Target heldTarget;
+  private float heldX, heldY, heldW, heldH;
+  private float lastX, lastY, lastW, lastH; // where the page last put the box
+  @Nullable private ImageView still;
+  private long stillSince;
+  private long firstAt, firstTs; // when the next video said it drew its first frame
+  private static final long HOLD_MAX_MS = 12000;
+  private static final long STILL_MAX_MS = 4000;
+  private final Runnable holdTimeout = () -> hold(false);
+  private final Runnable stillWatch =
+      new Runnable() {
+        @Override
+        public void run() {
+          if (still == null || still.getVisibility() != View.VISIBLE) return;
+          long now = android.os.SystemClock.uptimeMillis();
+          // The next video has drawn (the player says so), and the box has shown a frame of it
+          // since (or a moment has passed): cut over.
+          boolean fresh = firstAt > 0 && (frameTs() != firstTs || now - firstAt > 300);
+          boolean stale = now - stillSince > STILL_MAX_MS && !holding;
+          if (fresh || stale) {
+            // One more frame so the new picture is on screen under it before the still goes.
+            main.postDelayed(VideoOverlay.this::dropStill, fresh ? 34 : 0);
+            return;
+          }
+          main.postDelayed(this, 40);
+        }
+      };
+
+  private long frameTs() {
+    try {
+      SurfaceTexture st = texture == null ? null : texture.getSurfaceTexture();
+      return st == null ? -1 : st.getTimestamp();
+    } catch (Exception e) {
+      return -1;
+    }
+  }
+
+  /** Build 316: the player has drawn the first frame of what plays now. */
+  void firstFrame() {
+    if (still == null || still.getVisibility() != View.VISIBLE) return;
+    firstAt = android.os.SystemClock.uptimeMillis();
+    firstTs = frameTs();
+  }
+
+  private void dropStill() {
+    main.removeCallbacks(stillWatch);
+    if (still != null) {
+      still.setVisibility(View.GONE);
+      still.setImageDrawable(null);
+    }
+  }
+
+  /** Build 316: hold the picture as it is (true) until the next video is up, or let it go (false). */
+  void hold(boolean on) {
+    main.removeCallbacks(holdTimeout);
+    if (on) {
+      if (holding) {
+        main.postDelayed(holdTimeout, HOLD_MAX_MS);
+        return;
+      }
+      if (box == null || box.getVisibility() != View.VISIBLE || texture == null) return;
+      holding = true;
+      heldShow = true;
+      heldTarget = boundTo;
+      heldX = lastX; heldY = lastY; heldW = lastW; heldH = lastH;
+      main.removeCallbacks(unbind);
+      Bitmap b = null;
+      try {
+        if (texture.isAvailable()) b = texture.getBitmap();
+      } catch (Exception | OutOfMemoryError ignored) {
+        // No still: the box just stays black until the next picture.
+      }
+      if (b != null) {
+        if (still == null) {
+          still = new ImageView(activity);
+          still.setScaleType(ImageView.ScaleType.FIT_XY);
+          box.addView(still, box.indexOfChild(texture) + 1);
+        }
+        FrameLayout.LayoutParams tl = (FrameLayout.LayoutParams) texture.getLayoutParams();
+        FrameLayout.LayoutParams sl = new FrameLayout.LayoutParams(tl.width, tl.height, Gravity.CENTER);
+        still.setLayoutParams(sl);
+        still.setImageBitmap(b);
+        still.setVisibility(View.VISIBLE);
+        firstAt = 0;
+        stillSince = android.os.SystemClock.uptimeMillis();
+        main.removeCallbacks(stillWatch);
+        main.postDelayed(stillWatch, 40);
+      }
+      main.postDelayed(holdTimeout, HOLD_MAX_MS);
+      return;
+    }
+    if (!holding) return;
+    holding = false;
+    if (heldShow && heldTarget != null) {
+      show(heldTarget, heldX, heldY, heldW, heldH);
+    } else {
+      dropStill();
+      hide();
+    }
+  }
+
   /** The controls drawn on the picture (build 181), and the last state the page sent. */
   @Nullable private VideoControls controls;
   private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull, ctlQuiet;
@@ -130,6 +242,21 @@ public final class VideoOverlay {
       hide();
       return;
     }
+    if (holding) {
+      // Build 316: the next video's picture is connected (drawing under the still), but the box
+      // stays put until the page lets go.
+      heldShow = true;
+      heldTarget = target;
+      heldX = x; heldY = y; heldW = w; heldH = h;
+      if (!target.equals(boundTo)) {
+        if (boundTo != null) boundTo.unbind(texture);
+        target.bind(texture);
+        boundTo = target;
+        int tw = texture.getLayoutParams().width, th = texture.getLayoutParams().height;
+        if (tw > 0 && th > 0) target.onWindowSize(tw, th);
+      }
+      return;
+    }
     if (!ensureBox()) return;
     main.removeCallbacks(unbind);
     if (!target.equals(boundTo)) {
@@ -139,6 +266,7 @@ public final class VideoOverlay {
       int tw = texture.getLayoutParams().width, th = texture.getLayoutParams().height;
       if (tw > 0 && th > 0) target.onWindowSize(tw, th);
     }
+    lastX = x; lastY = y; lastW = w; lastH = h;
     place(x, y, w, h);
     box.setVisibility(View.VISIBLE);
     box.bringToFront();
@@ -147,6 +275,11 @@ public final class VideoOverlay {
 
   /** Nothing to show (no video, Now Playing closed, or something on the page covers the box). */
   void hide() {
+    if (holding) {
+      heldShow = false; // kept on screen as it is until the page lets go (build 316)
+      return;
+    }
+    dropStill();
     // INVISIBLE rather than GONE keeps the box laid out, so coming back needs no new layout pass.
     if (box != null) box.setVisibility(View.INVISIBLE);
     // No surface while hidden for long: the sound carries on, the phone stops drawing frames
@@ -240,6 +373,10 @@ public final class VideoOverlay {
   }
 
   void release() {
+    holding = false;
+    main.removeCallbacks(holdTimeout);
+    dropStill();
+    still = null;
     if (controls != null) controls.release();
     controls = null;
     unbindNow();

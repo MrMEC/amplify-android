@@ -2526,6 +2526,17 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
    * Where the page's video box is: {show, x, y, width, height} in CSS pixels relative to the
    * WebView. show=false whenever there is nothing to show or the box is covered.
    */
+  /** Build 316: {on} holds the picture on screen as it is between two videos watched full screen. */
+  @PluginMethod
+  public void holdVideo(PluginCall call) {
+    final boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+    main.post(
+        () -> {
+          if (video != null) video.hold(on);
+          call.resolve();
+        });
+  }
+
   @PluginMethod
   public void setVideoView(PluginCall call) {
     boolean show = Boolean.TRUE.equals(call.getBoolean("show", false));
@@ -2953,6 +2964,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         }
 
         @Override
+        public void onVlcFirstFrame() {
+          if (VlcEngine.isActive() && video != null) video.firstFrame(); // build 316
+        }
+
+        @Override
         public void onVlcError(String message) {
           if (currentId == null) return;
           JSObject o = new JSObject();
@@ -2981,6 +2997,13 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     public void onCues(CueGroup cueGroup) {
       if (VlcEngine.isActive() || castActive) return; // the phone's player is idle while VLC plays (or while casting)
       AmplifyPlayerPlugin.this.onCues(cueGroup);
+    }
+
+    // Build 316: the next video's first frame is drawn (the held still can go).
+    @Override
+    public void onRenderedFirstFrame() {
+      if (VlcEngine.isActive() || castActive) return;
+      if (video != null) video.firstFrame();
     }
 
     private ExoListener() {}

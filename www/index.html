@@ -10235,6 +10235,7 @@
 
   function closeNowPlaying(restoreScroll, animate){
     setNpImmersive(false);
+    if(typeof npHoldVideo === 'function') npHoldVideo(false);
     // A channel's screen closes at once rather than sliding down.
     if(nowPlayingScreen.classList.contains('np-channel')) animate = false;
     // The video carries on in the floating window instead of stopping (build 155).
@@ -10613,6 +10614,27 @@
       if(P && P.setVideoUi) P.setVideoUi(opts)['catch'](function(){});
     }catch(e){}
   }
+  // Build 316 (Mark: a flash of the background picture between videos): between two videos
+  // watched full screen the phone keeps the picture as it is (the last frame) until the next
+  // video draws, instead of the page's box going away and coming back.
+  var npHoldTimer = 0, npHolding = false;
+  function npHoldVideo(on){
+    clearTimeout(npHoldTimer);
+    if(!!on === npHolding && !on) return;
+    npHolding = !!on;
+    try{
+      var cap = window.Capacitor, P = cap && cap.Plugins && cap.Plugins.AmplifyPlayer;
+      if(P && typeof P.holdVideo === 'function') P.holdVideo({ on: !!on })['catch'](function(){});
+    }catch(e){}
+    // Never longer than this (the next item may not be a video at all).
+    if(on) npHoldTimer = setTimeout(function(){ npHoldVideo(false); }, 8000);
+  }
+  // Let go once the next video is back in full screen and its box has been reported.
+  function npHoldRelease(){
+    if(!npHolding) return;
+    clearTimeout(npHoldTimer);
+    npHoldTimer = setTimeout(function(){ npHoldVideo(false); }, 400);
+  }
   function videoCapable(st){
     return !!(st && isPodcastTrack(st) && st.isVideo && st.episodeUrl && audio && typeof audio.attachVideo === 'function') ||
       streamVideoCapable(st);
@@ -10737,7 +10759,7 @@
   function resetNpVideoUi(){
     var carry = npVideoFull ? { locked: npVideoFullLocked, at: Date.now() } : null;
     // Build 316: noted first, so the controls stay quiet while leaving full screen for the next one.
-    if(carry) npFullCarry = carry;
+    if(carry){ npFullCarry = carry; npHoldVideo(true); }
     if(npVideoFull){
       // Not a hand on the button: no "don't go back in" for the phone on its side.
       var keep = npVideoNoAutoFull;
@@ -10747,7 +10769,7 @@
     npFullCarry = carry;
     clearTimeout(npFullCarryTimer);
     if(carry) npFullCarryTimer = setTimeout(function(){
-      if(npFullCarry && !npVideoOn){ npFullCarry = null; nativeVideoUi({ fullscreen: false, landscape: false, awake: false }); }
+      if(npFullCarry && !npVideoOn){ npFullCarry = null; npHoldVideo(false); nativeVideoUi({ fullscreen: false, landscape: false, awake: false }); }
     }, 12000);
     npVideoOn = false;
     if(npVideoStream){ npVideoStream = false; nowPlayingScreen.classList.remove('np-video-stream'); syncStreamVideo(); }
@@ -10797,7 +10819,8 @@
     var c = npFullCarry;
     npFullCarry = null;
     clearTimeout(npFullCarryTimer);
-    if(c && Date.now() - c.at < 12000 && !npVideoFull){ enterVideoFull(c.locked); return true; }
+    if(c && Date.now() - c.at < 12000 && !npVideoFull){ enterVideoFull(c.locked); npHoldRelease(); return true; }
+    npHoldVideo(false);
     return false;
   }
   function exitVideoFull(){
@@ -10824,7 +10847,7 @@
   });
   npVideoFullBtn.addEventListener('click', function(e){
     e.stopPropagation();
-    npFullCarry = null;
+    npFullCarry = null; npHoldVideo(false);
     if(npVideoFull) exitVideoFull(); else enterVideoFull(true);
   });
   // Turning the phone on its side while the video shows goes full screen; upright again
@@ -11140,7 +11163,7 @@
   // under it is where the video came from: the Live TV guide for a channel, the movie's or the
   // show's page for a video on the phone (or from Plex).
   function npStopVideo(){
-    npFullCarry = null;
+    npFullCarry = null; npHoldVideo(false);
     var st = npTarget() || currentStation;
     var channel = !!(st && isNpChannel(st));
     var vid = st && isLocalVideo(st) ? st : null;

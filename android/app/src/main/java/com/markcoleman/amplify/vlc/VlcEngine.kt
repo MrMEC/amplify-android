@@ -47,7 +47,11 @@ object VlcEngine {
         fun onVlcVideo()
 
         fun onVlcError(message: String)
+
+        /** Build 316: the picture of what plays now has started moving (its first frames are up). */
+        fun onVlcFirstFrame()
     }
+    private var firstFrameSent = false
 
     @JvmStatic
     var listener: Listener? = null
@@ -467,6 +471,7 @@ object VlcEngine {
         if (!isActive) return
         when (e.type) {
             MediaPlayer.Event.Opening -> {
+                firstFrameSent = false
                 ignoreStop = false
                 playbackState = Player.STATE_BUFFERING
                 notifyState(false)
@@ -518,7 +523,13 @@ object VlcEngine {
                 listener?.onVlcError("VLC couldn't play this file")
                 notifyState(false)
             }
-            MediaPlayer.Event.TimeChanged -> lastTimeMs = e.timeChanged
+            MediaPlayer.Event.TimeChanged -> {
+                lastTimeMs = e.timeChanged
+                if (!firstFrameSent) {
+                    firstFrameSent = true
+                    listener?.onVlcFirstFrame()
+                }
+            }
             MediaPlayer.Event.LengthChanged -> {
                 lengthMs = e.lengthChanged
                 if (pendingSeekMs >= 0 && p.isSeekable && playbackState == Player.STATE_READY) {

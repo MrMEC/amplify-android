@@ -19,9 +19,11 @@ SEED = [{'id': 'link:%d' % i, 'name': 'Channel %02d' % i, 'url': 'http://ch%d.ex
 SPY = """
 (function(){
   var P = window.Capacitor.Plugins.AmplifyPlayer;
-  window.__ctl = [];
+  window.__ctl = []; window.__hold = []; window.__view = [];
   window.Capacitor.Plugins.AmplifyPlayer = new Proxy({}, {get:function(t,k){
     if(k === 'setVideoControls') return function(m){ m.t = Date.now(); window.__ctl.push(m); return Promise.resolve({}); };
+    if(k === 'holdVideo') return function(m){ window.__hold.push([m.on, Date.now()]); return Promise.resolve({}); };
+    if(k === 'setVideoView') return function(m){ window.__view.push([!!m.show, Math.round(m.width), Math.round(m.height), Date.now()]); return P[k](m); };
     return P[k];
   }});
 })();
@@ -82,6 +84,12 @@ async def main():
         check(all(m['quiet'] for m in msgs if m['enabled'] and not m['full']) and back and back[0]['quiet'], 'the native player is told quiet while the picture comes back %s' % [(m['enabled'], m['quiet'], m['full']) for m in msgs[:6]])
         check(await pg.evaluate("document.body.classList.contains('np-video-full')"), 'and full screen holds')
         await pg.screenshot(path=f'{SHOTS}/seamless-full-next.png')
+        hold = await pg.evaluate("window.__hold")
+        check(len(hold) >= 2 and hold[0][0] is True and hold[-1][0] is False, 'the phone holds the picture between the two videos and lets go after %s' % hold)
+        on_t = hold[0][1]; off_t = hold[-1][1]
+        views = await pg.evaluate("window.__view")
+        full_after = [v for v in views if v[3] > on_t and v[3] < off_t and v[0] and v[2] >= 800]
+        check(full_after, 'the full screen box is reported again before letting go %s' % [v[:3] for v in views if v[3] > on_t][:5])
         # A tap still shows them.
         bx = await pg.evaluate("(()=>{var r=document.getElementById('vctl').getBoundingClientRect();return [r.left,r.top,r.width,r.height];})()")
         await pg.touchscreen.tap(bx[0] + bx[2] * .2, bx[1] + bx[3] * .3); await pg.wait_for_timeout(350)
