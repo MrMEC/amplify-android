@@ -6309,6 +6309,10 @@
     width:16px; height:16px; box-sizing:border-box; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); }
   .now-playing-screen .np-seek-range::-moz-range-thumb, body.rotate-lock .now-playing-screen .np-seek-range::-moz-range-thumb{
     width:16px; height:16px; box-sizing:border-box; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); }
+  /* Build 319 (Mark): sideways, room above the progress bar for its wave (it reached the artist /
+     album line), the controls moving down with it; Play / Pause is a circle there too. */
+  body.rotate-lock .now-playing-screen .np-seek{ margin-top:26px; }
+  body.rotate-lock .now-playing-screen .np-play-btn{ border-radius:50%; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
