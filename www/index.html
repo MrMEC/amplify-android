@@ -3579,9 +3579,11 @@
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
   /* ---------- Build 243: the Live TV guide grid (Mark's mockups) ---------- */
   /* Build 285 (Mark): in dark mode the channel and show blocks are solid black on the grid's own grey. */
-  :root{ --epg-bg:#1b1c20; --epg-cell:#000000; --epg-cell-now:#000000; --epg-line:var(--accent); }
-  html[data-theme="light"]{ --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; }
-  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; } }
+  :root{ --epg-bg:#1b1c20; --epg-cell:#000000; --epg-cell-now:#000000; --epg-line:var(--accent); --epg-ch-cell:#000000; --epg-ch-text:var(--text); }
+  /* Build 315 (Mark): the channel column is the dark grey channel logos sit on elsewhere in light
+     mode too, so white logos show. */
+  html[data-theme="light"]{ --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; } }
   .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1); }
   .epg{ background:var(--epg-bg); min-width:0; }
   .epg.epg-np{ margin:0 calc(var(--main-pad) * -1); }
@@ -3613,9 +3615,11 @@
   /* Build 286 (Mark): roomier rows (5 on a phone instead of 6). */
   .epg-row{ position:relative; height:62px; margin-top:4px; }
   .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:62px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--text); }
-  .epg-ch::before{ content:''; position:absolute; inset:0 4px 0 4px; background:var(--epg-cell); border-radius:5px; z-index:-1; }
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--epg-ch-text); }
+  .epg-ch::before{ content:''; position:absolute; inset:0 4px 0 4px; background:var(--epg-ch-cell); border-radius:5px; z-index:-1; }
   .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
+  /* Build 315: the gap above each channel cell covered too, so the now line never shows through the column. */
+  .epg-ch{ box-shadow:0 -4px 0 0 var(--epg-bg); }
   .epg-logo{ display:flex; align-items:center; justify-content:center; width:60px; height:28px; }
   .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
   .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:normal; word-break:normal; hyphens:none; max-width:100%; }
@@ -19051,6 +19055,9 @@
   function renderNpChannels(st){
     var req = ++npChannelsRequest;
     var url = st.urlToResolve || st.url_resolved || st.url || '';
+    // Build 315 (Mark): picking another channel in the guide under the player redraws it; it stays
+    // scrolled where it was instead of going back to the top of the channel list.
+    var kept = keepEpgPlace(npCollectionGrid);
     npCollectionGrid.innerHTML = '';
     npCollectionGrid.classList.remove('grid-songs');
     npCollectionGrid.classList.add('np-ch-list');
@@ -19082,6 +19089,7 @@
       npCollectionHeading.textContent = '';
       npCollection.style.display = gridList.length ? '' : 'none';
       npCollectionGrid.appendChild(buildEpgGrid(gridList, { np: true }));
+      restoreEpgPlace(kept);
       guideRefresh(mineList.filter(function(ch){ return !!guideSource(ch); }));
       return;
     }
@@ -20119,6 +20127,28 @@
       }catch(e){}
     }, 250);
   });
+  // Build 315: where a guide is scrolled to (every scrolling box above it, the page, and the grid's
+  // own sideways scroll), so a redrawn guide comes back to the same place.
+  function keepEpgPlace(host){
+    var old = host && host.querySelector('.epg');
+    if(!old) return null;
+    var boxes = [];
+    for(var el = host; el && el !== document.body && el !== document.documentElement; el = el.parentElement){
+      if(el.scrollTop > 0) boxes.push([el, el.scrollTop]);
+    }
+    var sc = old.querySelector('.epg-scroll');
+    return { boxes: boxes, y: window.scrollY, x: sc ? sc.scrollLeft : 0 };
+  }
+  function restoreEpgPlace(k){
+    if(!k) return;
+    function put(){
+      k.boxes.forEach(function(b){ if(b[0].isConnected) b[0].scrollTop = b[1]; });
+      if(Math.abs(window.scrollY - k.y) > 1) window.scrollTo(window.scrollX, k.y);
+      document.querySelectorAll('#npCollectionGrid .epg-scroll, #npCollectionGrid .epg-head-track').forEach(function(sc){ if(k.x) sc.scrollLeft = k.x; });
+    }
+    put();
+    requestAnimationFrame(put);
+  }
   function buildEpgGrid(channels, opts){
     opts = opts || {};
     EPG_SLOT_W = epgSlotWidth();
@@ -20267,13 +20297,26 @@
     cell.setAttribute('aria-label', (ch.name || 'Channel') + (playing ? ', playing' : ''));
     var logo = document.createElement('span');
     logo.className = 'epg-logo';
-    if(ch.logo){
-      var img = document.createElement('img');
-      img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
-      img.src = secureUrl(ch.logo);
-      img.onerror = function(){ logo.innerHTML = ''; logo.appendChild(epgLogoName(ch)); };
-      logo.appendChild(img);
-    } else logo.appendChild(epgLogoName(ch));
+    function plainLogo(){
+      logo.innerHTML = '';
+      if(ch.logo){
+        var img = document.createElement('img');
+        img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+        img.src = secureUrl(ch.logo);
+        img.onerror = function(){ logo.innerHTML = ''; logo.appendChild(epgLogoName(ch)); };
+        logo.appendChild(img);
+      } else logo.appendChild(epgLogoName(ch));
+    }
+    // Build 315 (Mark: MiamiTV's cover didn't show here): a cover set with Custom Cover Art comes
+    // first, as it does everywhere else; the channel's own logo (or name) when it can't load.
+    var custom = null;
+    try{ custom = customArtFor(st); }catch(e){}
+    if(custom){
+      var cimg = document.createElement('img');
+      cimg.alt = ''; cimg.referrerPolicy = 'no-referrer';
+      logo.appendChild(cimg);
+      setCustomCoverImg(cimg, custom, plainLogo, null);
+    } else plainLogo();
     cell.appendChild(logo);
     if(isFavorite(st)){
       var heart = document.createElement('i');
