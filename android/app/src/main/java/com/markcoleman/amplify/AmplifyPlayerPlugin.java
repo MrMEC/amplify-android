@@ -2452,7 +2452,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   // ---------------- video ----------------
 
   // The page's video controls (build 181), drawn on the picture by VideoOverlay/VideoControls.
-  private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull;
+  private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull, ctlQuiet;
   private double ctlPos, ctlDur;
   private String ctlAccent = "";
   private boolean ctlSteps, ctlHasPrev, ctlHasNext;
@@ -2477,8 +2477,11 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean steps = Boolean.TRUE.equals(call.getBoolean("steps", false));
     final boolean hasPrev = Boolean.TRUE.equals(call.getBoolean("hasPrev", false));
     final boolean hasNext = Boolean.TRUE.equals(call.getBoolean("hasNext", false));
+    // Build 316: a video following on from the last one: don't show the controls as it starts.
+    final boolean quiet = Boolean.TRUE.equals(call.getBoolean("quiet", false));
     main.post(
         () -> {
+          ctlQuiet = quiet;
           ctlEnabled = enabled;
           ctlPlaying = playing;
           ctlLive = live;
@@ -2490,6 +2493,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           ctlHasPrev = hasPrev;
           ctlHasNext = hasNext;
           if (video != null) {
+            video.setQuiet(quiet);
             video.setControls(enabled, playing, pos, dur, live, full, ctlAccent);
             video.setSteps(steps, hasPrev, hasNext);
           }
@@ -2578,6 +2582,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
                       }
                     });
             video.setVideoSize(videoW, videoH, videoRatio);
+            video.setQuiet(ctlQuiet);
             video.setControls(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
             video.setSteps(ctlSteps, ctlHasPrev, ctlHasNext);
           }

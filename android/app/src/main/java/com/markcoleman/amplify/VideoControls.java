@@ -56,6 +56,9 @@ final class VideoControls extends FrameLayout {
   private final TextView stop;
 
   private boolean enabled, shown, playing, live, isFull, seeking;
+  // Build 316: the page says the next video follows on from one already watched (full screen, or a
+  // queue / channel moving on), so the controls don't pop up when it starts.
+  private boolean quiet;
   private double pos, dur;
   private long posAt;
   private int accent = 0xFFFFFFFF;
@@ -301,10 +304,15 @@ final class VideoControls extends FrameLayout {
     applyMode();
     if (!enabled) {
       setShown(false);
-    } else if (!wasEnabled) {
+    } else if (!wasEnabled && !quiet) {
       setShown(true); // first look at the video: show them, then they hide on their own
     }
     refreshTimes();
+  }
+
+  /** Build 316: a video following on from the last one starts without the controls showing. */
+  void setQuiet(boolean q) {
+    quiet = q;
   }
 
   /** Build 303: Previous / Next shown (a queue), and which of them can be used. */

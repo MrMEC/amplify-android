@@ -10736,6 +10736,8 @@
   var npFullCarry = null, npFullCarryTimer = 0;
   function resetNpVideoUi(){
     var carry = npVideoFull ? { locked: npVideoFullLocked, at: Date.now() } : null;
+    // Build 316: noted first, so the controls stay quiet while leaving full screen for the next one.
+    if(carry) npFullCarry = carry;
     if(npVideoFull){
       // Not a hand on the button: no "don't go back in" for the phone on its side.
       var keep = npVideoNoAutoFull;
@@ -11070,7 +11072,7 @@
       vctlPushNative();
       return;
     }
-    if(!vctlWasOn){ vctlWasOn = true; vctlShow(true); }
+    if(!vctlWasOn){ vctlWasOn = true; if(!vctlQuiet()) vctlShow(true); }
     var playing = vctlPlaying();
     vctl.classList.toggle('playing', playing);
     vctlPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
@@ -11092,6 +11094,11 @@
     if(playing && vctl.classList.contains('show') && !vctlTimer) vctlArm();
     vctlPushNative();
   }
+  // Build 316 (Mark): watching full screen, the next video (a shuffle of music videos, a channel
+  // moving on) starts without the controls popping up; a tap still shows them.
+  function vctlQuiet(){
+    return !!(npVideoFull || (npFullCarry && Date.now() - npFullCarry.at < 12000));
+  }
   function vctlPushNative(){
     if(!videoPlugin || typeof videoPlugin.setVideoControls !== 'function' || !vctl) return;
     var on = !!(nowPlayingScreen.classList.contains('np-vplayer') && npVideoStream && !videoMiniOn);
@@ -11108,10 +11115,10 @@
     var stp = vctlSteps();
     var msg = { enabled: on, playing: vctlPlaying(), live: !npSeekApplies(), full: !!npVideoFull,
       pos: Math.round(t.pos * 10) / 10, dur: Math.round(t.dur * 10) / 10, accent: vctlAccent,
-      steps: stp.on, hasPrev: stp.prev, hasNext: stp.next };
+      steps: stp.on, hasPrev: stp.prev, hasNext: stp.next, quiet: vctlQuiet() };
     // The phone counts the time along by itself; the position is sent again only when it moves
     // on by a couple of seconds or jumps (so a timeupdate a few times a second isn't a message each).
-    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext].join('|');
+    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext, msg.quiet].join('|');
     if(key === vctlNativeKey) return;
     vctlNativeKey = key;
     videoPlugin.setVideoControls(msg)['catch'](function(){});

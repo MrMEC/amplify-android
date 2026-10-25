@@ -109,7 +109,7 @@ public final class VideoOverlay {
 
   /** The controls drawn on the picture (build 181), and the last state the page sent. */
   @Nullable private VideoControls controls;
-  private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull;
+  private boolean ctlEnabled, ctlPlaying, ctlLive, ctlFull, ctlQuiet;
   private double ctlPos, ctlDur;
   private String ctlAccent = "";
   private boolean ctlSteps, ctlHasPrev, ctlHasNext;
@@ -223,6 +223,12 @@ public final class VideoOverlay {
     ctlFull = full;
     ctlAccent = accent == null ? "" : accent;
     if (controls != null) controls.update(enabled, playing, pos, dur, live, full, ctlAccent);
+  }
+
+  /** Build 316: the next video follows on from the last (no controls popping up as it starts). */
+  void setQuiet(boolean q) {
+    ctlQuiet = q;
+    if (controls != null) controls.setQuiet(q);
   }
 
   /** Build 303: Previous / Next on the picture while the video is part of a queue. */
@@ -373,6 +379,7 @@ public final class VideoOverlay {
         controls,
         new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    controls.setQuiet(ctlQuiet);
     controls.update(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
     controls.setSteps(ctlSteps, ctlHasPrev, ctlHasNext);
     // Posted: resizing the picture from inside a layout pass can be dropped until something else
