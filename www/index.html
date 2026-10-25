@@ -11169,6 +11169,10 @@
     var vid = st && isLocalVideo(st) ? st : null;
     if(npVideoFull){ try{ exitVideoFull(); }catch(e){} }
     stopPlayback();
+    // Build 318 (Mark: Cover Flow didn't open after a video was stopped): the video's picture is
+    // put away too. It was left marked as showing, so turning the phone later (on Albums or
+    // Artists, say) went into the stopped video's full screen instead.
+    try{ resetNpVideoUi(); }catch(e){}
     if(channel){
       videoTab = 'channels'; vsave(VIDEO_TAB_KEY, videoTab);
       videoChannelsEditing = false;
