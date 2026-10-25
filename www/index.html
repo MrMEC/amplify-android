@@ -10488,7 +10488,7 @@
     var keep = [];
     for(var i = 0; i < list.length; i++){
       var p = list[i];
-      p.age += dtMs * speed;
+      p.age += dtMs; // they fade on time even when paused; only their drift slows
       if(p.age >= p.life) continue;
       var d = Math.exp(-p.drag * dt);
       p.vx *= d; p.vy *= d;
@@ -10497,6 +10497,7 @@
       var u = p.age / p.life, a = (u < .15 ? u / .15 : 1 - (u - .15) / .85);
       a *= .55 + .45 * Math.sin(p.tw + p.age / 140);
       a *= .55 + .45 * Math.max(s.high, s.lvl);
+      a *= .3 + .7 * rate;
       if(a <= .01) { keep.push(p); continue; }
       var sz = p.size * (1 + .35 * fx.beat) * k;
       x.globalAlpha = Math.min(1, a);
