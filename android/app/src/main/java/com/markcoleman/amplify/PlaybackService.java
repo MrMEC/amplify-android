@@ -199,6 +199,17 @@ public class PlaybackService extends MediaLibraryService {
             .setEnableFloatOutput(enableFloatOutput)
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
             .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[] {new EqProcessor(), new LevelingProcessor()})
+            // Build 320: the buffer's length is how far ahead of the speaker the audio meter
+            // hears the music (AudioMeter.latencyNs), so the page can show each beat on time.
+            .setAudioTrackBufferSizeProvider(
+                (minBufferSizeInBytes, encoding, outputMode, pcmFrameSize, sampleRate, bitrate, maxSpeed) -> {
+                  int size =
+                      androidx.media3.exoplayer.audio.DefaultAudioSink.AudioTrackBufferSizeProvider.DEFAULT
+                          .getBufferSizeInBytes(
+                              minBufferSizeInBytes, encoding, outputMode, pcmFrameSize, sampleRate, bitrate, maxSpeed);
+                  if (pcmFrameSize > 0) AudioMeter.setBuffer(size / pcmFrameSize, sampleRate);
+                  return size;
+                })
             .build();
       }
     };

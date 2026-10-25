@@ -44,6 +44,8 @@ final class LevelingProcessor extends BaseAudioProcessor {
       for (int i = 0; i < samples; i++) work[i] = in.getFloat();
     }
     leveler.process(work, frames, channels, fmt.sampleRate);
+    // Build 320: Immersive View's glow and particles measure the music here (when asked for).
+    if (AudioMeter.enabled) AudioMeter.feed(work, frames, channels, fmt.sampleRate);
     ByteBuffer out = replaceOutputBuffer(remaining);
     if (pcm16) {
       for (int i = 0; i < samples; i++) {
@@ -62,5 +64,6 @@ final class LevelingProcessor extends BaseAudioProcessor {
   @Override
   protected void onFlush() {
     leveler.reset();
+    AudioMeter.reset();
   }
 }

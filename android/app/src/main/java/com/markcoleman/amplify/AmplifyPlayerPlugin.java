@@ -157,6 +157,47 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     call.resolve(locationAccessObj());
   }
 
+  /**
+   * Build 320: Immersive View's audio meter. {on}: while on, the music's loudness and nine
+   * frequency bands (AudioMeter) are sent to the page about every 100ms as a "meter" event:
+   * {f: [[ms until heard, level, band0..band8], ...]}, values 0..100.
+   */
+  @PluginMethod
+  public void setMeter(PluginCall call) {
+    boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+    meterWanted = on;
+    AudioMeter.setEnabled(on && pageAwake);
+    main.removeCallbacks(meterTick);
+    if (on && pageAwake) main.postDelayed(meterTick, METER_EVERY_MS);
+    call.resolve();
+  }
+
+  private static final long METER_EVERY_MS = 100;
+  private boolean meterWanted;
+  private final Runnable meterTick =
+      new Runnable() {
+        @Override
+        public void run() {
+          if (!AudioMeter.enabled) return;
+          try {
+            int[][] rows = AudioMeter.drain(System.nanoTime());
+            if (rows.length > 0) {
+              JSArray f = new JSArray();
+              for (int[] r : rows) {
+                JSArray row = new JSArray();
+                for (int v : r) row.put(v);
+                f.put(row);
+              }
+              JSObject o = new JSObject();
+              o.put("f", f);
+              notifyListeners("meter", o);
+            }
+          } catch (Throwable ignored) {
+          }
+          main.postDelayed(this, METER_EVERY_MS);
+        }
+      };
+
   /** Asks for the coarse location permission (when not already granted); resolves as locationAccess. */
   @PluginMethod
   public void requestLocationAccess(PluginCall call) {
@@ -359,6 +400,12 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     super.handleOnResume();
     pageAwake = true;
     main.post(() -> { if (cast != null) cast.setDiscovery(true); });
+    // Build 320: the meter pauses with the app (nothing to show it on) and picks up again here.
+    if (meterWanted && !AudioMeter.enabled) {
+      AudioMeter.setEnabled(true);
+      main.removeCallbacks(meterTick);
+      main.postDelayed(meterTick, METER_EVERY_MS);
+    }
   }
 
   @Override
@@ -366,6 +413,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     super.handleOnPause();
     pageAwake = false;
     main.post(() -> { if (cast != null) cast.setDiscovery(false); });
+    AudioMeter.setEnabled(false);
+    main.removeCallbacks(meterTick);
   }
 
   /** Build 196: an error while casting is recorded (Check storage) and never closes the app. */
