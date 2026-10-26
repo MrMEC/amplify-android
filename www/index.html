@@ -964,7 +964,7 @@
   .sec-filter .sf-clear:hover{ color:var(--text); background:var(--border); }
   .sec-filter .sf-empty{ padding:18px 4px 4px; color:var(--text-dim); font-size:14px; }
   .sec-filter .sf-empty[hidden]{ display:none; }
-  .sf-hide{ display:none !important; }
+  .sf-hide, .sf-mvh{ display:none !important; }
   @media (max-width:900px){
     body:has(#stationsGrid > .epg):not(.np-open) #stationsGrid > .sec-filter{ margin-left:calc(4px - var(--main-pad)); margin-right:calc(4px - var(--main-pad)); }
   }
@@ -43070,7 +43070,50 @@
     }
 
     // Hides what doesn't match; returns { total, shown } over the page's filterable rows.
+    // Music Videos: while something is typed the page shows the matching videos themselves, as
+    // rows that play (build 327), instead of the page's artists and rows; clearing the box puts
+    // the page back as it was.
+    function mvResults(){
+      var kids = Array.prototype.slice.call(stationsGrid.children);
+      var old = kids.filter(function(k){ return k.classList.contains('sf-mv-res'); });
+      if(!tokens.length){
+        old.forEach(function(k){ k.remove(); });
+        kids.forEach(function(k){ k.classList.remove('sf-mvh'); });
+        return false;
+      }
+      kids.forEach(function(k){
+        if(k === bar || k.classList.contains('watch-tabs') || k.classList.contains('sf-mv-res')) return;
+        k.classList.add('sf-mvh');
+      });
+      if(old.length && old[0].dataset.sfq === query) return old.length;
+      old.forEach(function(k){ k.remove(); });
+      var cat = musicVideoCatalog(), seen = {}, hits = [];
+      (cat.all || []).concat(cat.other || []).forEach(function(v){
+        if(seen[v.uri]) return; seen[v.uri] = true;
+        var t = norm([v.name, v.artist, v.fileName].join(' '));
+        for(var i = 0; i < tokens.length; i++){ if(t.indexOf(tokens[i]) < 0) return; }
+        hits.push(v);
+      });
+      hits.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+      var rows = {};
+      hits.forEach(function(v){
+        var a = v.artistKey && cat.byKey ? cat.byKey[v.artistKey] : null;
+        var r = buildMvRow(v, hits, a && a.entry, true);
+        r.classList.add('sf-mv-res'); r.dataset.sfq = query; rows[v.uri] = r;
+        stationsGrid.appendChild(r);
+      });
+      if(hits.length) ensureMusicVideoStills(hits, function(v){ var r = rows[v.uri]; if(r && r.isConnected) r._paint(); });
+      return hits.length;
+    }
+
     function apply(){
+      if(curKey === 'music'){
+        var n = mvResults();
+        if(n !== false){
+          if(azRail) azRail.style.display = 'none';
+          return { total: 1, shown: n };
+        }
+      }
       var total = 0, shown = 0;
       var head = null, headOn = false;
       function closeHead(){ if(head) show(head, headOn || !tokens.length); }
