@@ -6357,6 +6357,22 @@
       margin-right:calc(48px - (38px - var(--main-pad)));
     }
   }
+  /* ---------- Build 325 (Mark) ----------
+     Watch with the Live TV guide showing: the tabs and the Watch heading start on the channel
+     column's edge (its cells are inset 4px from the screen), not the page's usual gutter. */
+  @media (max-width: 900px){
+    body:has(#stationsGrid > .epg):not(.np-open) #stationsGrid > .video-tabs,
+    body:has(#stationsGrid > .epg):not(.np-open) .video-tabs.scroll-tabs{ padding-left:4px; scroll-padding-left:4px; scroll-padding-inline:4px; }
+    body:has(#stationsGrid > .epg):not(.np-open):not(.vdetail-open) #sectionHeadingRow:not(.has-back) #stationsHeading{ margin-left:calc(4px - var(--main-pad)); }
+  }
+  /* Light theme: the guide's channel column is a lighter grey (build 315's #2b2c31 was too dark),
+     still dark enough for white channel logos and names. */
+  html[data-theme="light"]{ --epg-ch-cell:#7a7e88; }
+  @media (prefers-color-scheme: light){ html:not([data-theme]){ --epg-ch-cell:#7a7e88; } }
+  /* Search: with the box empty there is no clear button, so the placeholder gets that room, and
+     it shrinks to fit (fitSearchPlaceholder) rather than being cut off with large system text. */
+  #searchSheetInput:placeholder-shown{ padding-right:14px; }
+  #searchSheetInput::placeholder{ font-size:calc(1em * var(--ph-fit, 1)); }
   /* ---------- Build 324 (Mark): the Artists list in rows, like Library's Favorite Artists ----------
      A round 52px portrait with its ring and the name beside it, one artist per row. */
   .tile-grid.grid-artists, .tile-grid.mv-grid.grid-artists{ display:flex; flex-direction:column; gap:0; padding-right:0; }
@@ -8833,6 +8849,30 @@
     }
   })();
   var stationsHeadingInput = document.getElementById('stationsHeadingInput');
+  // Build 325: the search box's placeholder always shows in full: when it doesn't fit (large
+  // system text), --ph-fit shrinks it. Measured with a canvas in the box's own font.
+  (function(){
+    var inp = document.getElementById('searchSheetInput');
+    if(!inp) return;
+    var cv = null, raf = 0;
+    function fit(){
+      raf = 0;
+      if(!inp.offsetWidth) return;
+      inp.style.removeProperty('--ph-fit');
+      var cs = getComputedStyle(inp);
+      cv = cv || document.createElement('canvas');
+      var ctx = cv.getContext('2d');
+      ctx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      var w = ctx.measureText(inp.placeholder || '').width;
+      // the room it has while empty (padding-right is 14px then, not the clear button's 44px)
+      var avail = inp.clientWidth - parseFloat(cs.paddingLeft) - 14 - 2;
+      if(w > avail && w > 0) inp.style.setProperty('--ph-fit', Math.max(0.6, avail / w).toFixed(3));
+    }
+    function later(){ if(!raf) raf = requestAnimationFrame(fit); }
+    if(window.ResizeObserver) new ResizeObserver(later).observe(inp);
+    window.addEventListener('resize', later);
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(later);
+  })();
   var recentSection = document.getElementById('recentSection');
   var favoritesSection = document.getElementById('favoritesSection');
   var favoritesGrid = document.getElementById('favoritesGrid');
