@@ -4805,6 +4805,8 @@
     body.search-open .sidebar-top{ visibility:hidden; transition:none; }
     /* Build 255: no tab bar while the keyboard is up (see the kb-open script). */
     body.kb-open .mobile-nav{ display:none; }
+    /* Build 330: nor the black fade that sits behind the tab bar and mini player, which with both gone is just a dark smear over the list. */
+    body.kb-open .mobile-scroll-fade{ display:none !important; }
     /* Build 329: and the mini Now Playing too, while a section filter box is the field being typed in. */
     body.kb-open:has(.sec-filter input:focus) .player-bar{ display:none !important; }
     body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:60px; }

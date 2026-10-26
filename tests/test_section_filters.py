@@ -133,8 +133,10 @@ async def run(vw, vh, mobile, scheme, tag, full):
         await pg.focus('#secFilterInput'); await pg.wait_for_timeout(300)
         if mobile:
             check(await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display") == 'none', f'[{tag}] keyboard up in a filter: the mini player is hidden')
+            check(await pg.evaluate("Array.prototype.every.call(document.querySelectorAll('.mobile-scroll-fade'),function(e){return getComputedStyle(e).display==='none';})"), f'[{tag}] keyboard up in a filter: the bottom fade is gone')
             await pg.evaluate("document.getElementById('secFilterInput').blur()"); await pg.wait_for_timeout(300)
             check(await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display") != 'none', f'[{tag}] filter let go: the mini player is back')
+            check(await pg.evaluate("Array.prototype.some.call(document.querySelectorAll('.mobile-scroll-fade'),function(e){return getComputedStyle(e).display!=='none';})"), f'[{tag}] filter let go: the bottom fade is back')
         else:
             check(await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display") != 'none', f'[{tag}] desktop: the player stays')
             await pg.evaluate("document.getElementById('secFilterInput').blur()")
