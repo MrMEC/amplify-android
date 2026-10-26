@@ -936,6 +936,38 @@
   /* ---------- Home tabs (Top Stations / Recent / Favorites) ---------- */
   /* Top Stations was previously pushed below however many recents had built up, which on a
      full homepage meant scrolling to reach it. Tabs put both a click away at the top. */
+  /* Build 326: a filter box under each list's heading (Artists, Albums, Songs, Podcasts) and
+     under the Watch tabs (Live TV, Movies, TV Shows, Music Videos). It narrows the list as you
+     type; see "Section filters" in the script. */
+  .sec-filter{ position:relative; margin:-6px 0 16px; }
+  .tile-grid > .sec-filter{ grid-column:1/-1; margin:2px 0 6px; }
+  .sec-filter .sf-ico{
+    position:absolute; left:14px; top:23px; transform:translateY(-50%); font-size:14px;
+    color:var(--text-dim); pointer-events:none;
+  }
+  .sec-filter input{
+    display:block; width:100%; box-sizing:border-box; height:46px; margin:0;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    padding:0 44px 0 40px; border-radius:10px; font:inherit; font-size:15px; outline:none; min-width:0;
+    -webkit-appearance:none; appearance:none;
+  }
+  .sec-filter input:focus{ border-color:var(--accent-dim); }
+  .sec-filter input::placeholder{ color:var(--text-dim); opacity:1; }
+  .sec-filter input::-webkit-search-cancel-button,
+  .sec-filter input::-webkit-search-decoration{ -webkit-appearance:none; display:none; }
+  .sec-filter .sf-clear{
+    position:absolute; top:5px; right:5px; width:36px; height:36px; border-radius:8px;
+    background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sec-filter .sf-clear[hidden]{ display:none; }
+  .sec-filter .sf-clear:hover{ color:var(--text); background:var(--border); }
+  .sec-filter .sf-empty{ padding:18px 4px 4px; color:var(--text-dim); font-size:14px; }
+  .sec-filter .sf-empty[hidden]{ display:none; }
+  .sf-hide{ display:none !important; }
+  @media (max-width:900px){
+    body:has(#stationsGrid > .epg):not(.np-open) #stationsGrid > .sec-filter{ margin-left:calc(4px - var(--main-pad)); margin-right:calc(4px - var(--main-pad)); }
+  }
   .home-tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:2px 0 18px; }
   .home-tab{
     padding:7px 16px; border-radius:999px; font-size:12.5px; font-weight:700;
@@ -42943,6 +42975,182 @@
       openTour(0);
     }
     setTimeout(tryOpen, 1200);
+  })();
+
+  // ---------- Section filters (build 326) ----------
+  // A filter box under the heading of Artists, Albums, Songs and Podcasts, and under the tabs
+  // of Watch (Live TV, Movies, TV Shows, Music Videos). It narrows what the page already drew,
+  // as you type: rows that don't match get a class that hides them, and a heading with nothing
+  // left under it hides too. One box is moved to whichever page is showing; the page's own
+  // render code is untouched. Every word typed has to be found (any order, any case, accents
+  // ignored) in the row's name / artist / album. It is never focused by itself, so on a phone
+  // the keyboard stays down until the box is tapped.
+  (function(){
+    var bar = document.createElement('div');
+    bar.className = 'sec-filter';
+    bar.id = 'secFilter';
+    bar.setAttribute('role', 'search');
+    bar.innerHTML = '<i class="fa-solid fa-magnifying-glass sf-ico" aria-hidden="true"></i>'
+      + '<input type="search" id="secFilterInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">'
+      + '<button type="button" class="sf-clear" aria-label="Clear filter" title="Clear" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>'
+      + '<div class="sf-empty" hidden></div>';
+    var input = bar.querySelector('input');
+    var clearBtn = bar.querySelector('.sf-clear');
+    var emptyNote = bar.querySelector('.sf-empty');
+
+    var LABELS = { artists: 'artists', albums: 'albums', songs: 'songs', podcasts: 'podcasts',
+                   channels: 'channels', movies: 'movies', shows: 'TV shows', music: 'music videos' };
+    var HEAD_RE = /(^|\s)(song-letter|podcast-date-heading|grid-section-label|ch-group-head|mv-artists-head)(\s|$)/;
+    var ITEM_SEL = '.tile, .song-row, .row-item, .cw-row, .vep-row';
+    var REMEMBER_MS = 10 * 60 * 1000;
+    var remembered = {};
+    var curKey = null, query = '', tokens = [], raf = 0;
+
+    function norm(s){
+      s = String(s || '').toLowerCase();
+      try{ s = s.normalize('NFD').replace(/[̀-ͯ]/g, ''); }catch(e){}
+      return s;
+    }
+    function textOf(el){
+      if(el._sfText === undefined){
+        var t = el.textContent;
+        if(el.classList.contains('epg-row')){
+          var ch = el.querySelector('.epg-ch');
+          t = ch ? (ch.getAttribute('aria-label') || ch.textContent) : '';
+        }
+        el._sfText = norm(t);
+      }
+      return el._sfText;
+    }
+    function matches(el){
+      if(!tokens.length) return true;
+      var t = textOf(el);
+      for(var i = 0; i < tokens.length; i++){ if(t.indexOf(tokens[i]) < 0) return false; }
+      return true;
+    }
+    function show(el, on){ if(el.classList.contains('sf-hide') === on) el.classList.toggle('sf-hide', !on); }
+
+    // Which page is showing, if it is one that gets a filter box: { key, tabs } or null.
+    function context(){
+      var cls = document.body.classList;
+      if(typeof onVideoView !== 'undefined' && onVideoView){
+        if(onVideoDetailView || onAddChannelsView || videoChannelsEditing) return null;
+        if(['channels', 'movies', 'shows', 'music'].indexOf(videoTab) < 0) return null;
+        var tabs = null;
+        for(var i = 0; i < stationsGrid.children.length; i++){
+          if(stationsGrid.children[i].classList.contains('watch-tabs')){ tabs = stationsGrid.children[i]; break; }
+        }
+        return tabs ? { key: videoTab, tabs: tabs } : null;
+      }
+      if(onPodcastsView){
+        if(activeShowCollectionId) return null;
+        return { key: 'podcasts', tabs: null };
+      }
+      if(activeHomeSection || onHomeView || activeArtistKey || activeAlbumKey) return null;
+      if(cls.contains('album-open') || cls.contains('artist-open')) return null;
+      var h = (stationsHeading.textContent || '').trim();
+      if(activeLibrarySection === 'artists' && h === 'Artists') return { key: 'artists', tabs: null };
+      if(activeLibrarySection === 'albums' && h === 'Albums') return { key: 'albums', tabs: null };
+      if(activeLibrarySection === 'songs' && h === 'Songs') return { key: 'songs', tabs: null };
+      return null;
+    }
+
+    function place(ctx){
+      if(ctx.tabs){
+        if(ctx.tabs.nextElementSibling !== bar) ctx.tabs.insertAdjacentElement('afterend', bar);
+      } else if(bar.previousElementSibling !== sectionHeadingRow || bar.parentNode !== sectionHeadingRow.parentNode){
+        sectionHeadingRow.insertAdjacentElement('afterend', bar);
+      }
+    }
+
+    // Hides what doesn't match; returns { total, shown } over the page's filterable rows.
+    function apply(){
+      var total = 0, shown = 0;
+      var head = null, headOn = false;
+      function closeHead(){ if(head) show(head, headOn || !tokens.length); }
+      Array.prototype.forEach.call(stationsGrid.children, function(k){
+        if(k === bar) return;
+        var cn = k.className || '';
+        if(typeof cn !== 'string') return;
+        if(HEAD_RE.test(cn)){ closeHead(); head = k; headOn = false; return; }
+        if(k.classList.contains('mv-top') || k.classList.contains('shuffle-all-row')){ show(k, !tokens.length); return; }
+        if(k.classList.contains('epg')){
+          Array.prototype.forEach.call(k.querySelectorAll('.epg-row'), function(r){
+            var ok = matches(r); total++; if(ok) shown++; show(r, ok);
+          });
+          return;
+        }
+        if(k.classList.contains('artist-videos')){
+          var any = false;
+          Array.prototype.forEach.call(k.children, function(v){
+            var ok = matches(v); total++; if(ok){ shown++; any = true; } show(v, ok);
+          });
+          show(k, any || !tokens.length);
+          if(any) headOn = true;
+          return;
+        }
+        if(k.matches(ITEM_SEL)){
+          var ok2 = matches(k); total++;
+          if(ok2){ shown++; headOn = true; }
+          show(k, ok2);
+        }
+      });
+      closeHead();
+      // The A to Z rail points at rows that may be hidden now: it steps aside while filtering.
+      if(azRail){
+        if(tokens.length) azRail.style.display = 'none';
+        else if(azRail.children.length) azRail.style.display = '';
+      }
+      return { total: total, shown: shown };
+    }
+
+    function sync(){
+      raf = 0;
+      var ctx = context();
+      if(!ctx){
+        if(curKey){ remembered[curKey] = { v: input.value, t: Date.now() }; }
+        curKey = null; query = ''; tokens = [];
+        if(bar.parentNode) bar.parentNode.removeChild(bar);
+        return;
+      }
+      if(ctx.key !== curKey){
+        if(curKey) remembered[curKey] = { v: input.value, t: Date.now() };
+        if(document.activeElement === input) input.blur();
+        curKey = ctx.key;
+        var r = remembered[curKey];
+        input.value = (r && Date.now() - r.t < REMEMBER_MS) ? r.v : '';
+        input.placeholder = 'Filter ' + LABELS[curKey];
+        input.setAttribute('aria-label', 'Filter ' + LABELS[curKey]);
+      }
+      query = input.value;
+      tokens = norm(query).split(/\s+/).filter(Boolean);
+      place(ctx);
+      var res = apply();
+      // Nothing on the page to filter (an empty library, the Live TV start cards): no box.
+      if(!res.total && !tokens.length){
+        if(bar.parentNode) bar.parentNode.removeChild(bar);
+        return;
+      }
+      clearBtn.hidden = !input.value;
+      var none = tokens.length && !res.shown;
+      emptyNote.hidden = !none;
+      if(none) emptyNote.textContent = 'No ' + LABELS[curKey] + ' match “' + query.trim() + '”.';
+    }
+    function schedule(){ if(!raf) raf = requestAnimationFrame(sync); }
+
+    input.addEventListener('input', schedule);
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+      else if(e.key === 'Escape' && input.value){ e.preventDefault(); input.value = ''; schedule(); }
+    });
+    clearBtn.addEventListener('click', function(){ input.value = ''; schedule(); });
+
+    if(window.MutationObserver){
+      new MutationObserver(schedule).observe(stationsGrid, { childList: true });
+      new MutationObserver(schedule).observe(stationsHeading, { childList: true, characterData: true, subtree: true });
+    }
+    window.__secFilter = { sync: sync, input: input, bar: bar };
+    schedule();
   })();
 
   if(!storageWorks) setStatus('Heads up: this browser is blocking local storage, so Favorites / Recent / volume won\'t be remembered next time you open this file.', true);
