@@ -3393,7 +3393,7 @@
      tile, so it reads as "this person" rather than as a second cover. The text scrolls inside
      the panel; the credit stays quiet at the foot (Wikipedia's licence asks for it). */
   .artist-bio-head{ display:flex; align-items:center; gap:12px; min-width:0; }
-  .artist-bio-head h2{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .artist-bio-head h2{ min-width:0; }   /* build 324: wraps between words, never an ellipsis */
   .artist-bio-avatar{
     position:relative; flex:none; width:56px; height:56px; border-radius:50%; overflow:hidden;
     background:var(--panel-2);
@@ -4056,7 +4056,7 @@
   }
   .settings-header.tag-header{ padding:0 16px 0 10px; margin-bottom:10px; gap:10px; }
   .tag-header-left{ display:flex; align-items:center; gap:6px; min-width:0; }
-  .tag-header-left h2{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag-header-left h2{ min-width:0; }   /* build 324: no ellipsis on a heading */
   .tag-edit-btn{
     flex-shrink:0; min-width:72px; height:34px; padding:0 16px; border-radius:17px; cursor:pointer;
     background:var(--panel-2); color:var(--text); border:1px solid var(--border); font-size:13px; font-weight:600;
@@ -6105,7 +6105,10 @@
     .recent-col-heading{ font-size:22px; }
     .section-heading, .section-heading-row .section-heading{ font-size:calc(22px * var(--title-fit, 1)); line-height:1.2; }
     /* A page title stays on one line (Mark: "My Library" wrapped beside its three buttons). */
-    .section-heading-row:not(.is-search) .section-heading{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .section-heading-row:not(.is-search) .section-heading{ white-space:nowrap; overflow:hidden; min-width:0; }
+    /* Build 324 (Mark): a heading never shows an ellipsis. It shrinks to fit (--title-fit), and a
+       title too long even at the smallest size wraps between words instead. */
+    .section-heading-row:not(.is-search) .section-heading.title-wrap{ white-space:normal; overflow-wrap:normal; word-break:normal; }
     body.home-stacked #homeTopHeading .section-heading, body.home-stacked .section-heading-row .section-heading{ font-size:24px; }
   }
   /* Build 221: Home's section headings are smaller, so the hero's title stands out above them. */
@@ -6348,7 +6351,27 @@
     /* Things that stay at the top while their list scrolls now stick to the top of the
        screen itself: there is no header bar for them to sit under. */
     .tile-grid > .podcast-date-heading, .tile-grid > .epg > .epg-head{ top:0; }
+    /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
+       inset on the right, so the page's buttons sit the usual 10px from the menu button. */
+    body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
+      margin-right:calc(48px - (38px - var(--main-pad)));
+    }
   }
+  /* ---------- Build 324 (Mark): the Artists list in rows, like Library's Favorite Artists ----------
+     A round 52px portrait with its ring and the name beside it, one artist per row. */
+  .tile-grid.grid-artists, .tile-grid.mv-grid.grid-artists{ display:flex; flex-direction:column; gap:0; padding-right:0; }
+  .tile-grid.grid-artists > .tile[data-entity="artist"]{
+    display:flex; flex-direction:row; align-items:center; gap:14px; padding:7px 4px; border-radius:12px; text-align:left; min-width:0;
+  }
+  .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-art{
+    flex:0 0 52px; width:52px; height:52px; aspect-ratio:auto; margin:0; border-radius:50%; font-size:20px; box-shadow:var(--shadow);
+  }
+  .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-name{
+    flex:1 1 auto; min-width:0; margin:0; font-size:15px; font-weight:600; text-align:left; line-height:1.3;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; -webkit-line-clamp:unset; display:block;
+  }
+  .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-fav{ display:none; }
+  @media (max-width: 900px){ .tile-grid.grid-artists > .tile[data-entity="artist"]{ padding-left:0; } }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -8782,19 +8805,28 @@
       if(!h || busy) return;
       busy = true;
       h.style.removeProperty('--title-fit');
+      h.classList.remove('title-wrap');
       if(window.innerWidth <= 900 && h.offsetParent && !h.closest('.is-search')){
         var f = 1;
-        for(var i = 0; i < 14 && h.scrollWidth > h.clientWidth + 1 && f > 0.5; i++){
-          f = Math.max(0.5, f * Math.min(0.96, h.clientWidth / h.scrollWidth));
+        for(var i = 0; i < 16 && h.scrollWidth > h.clientWidth + 1 && f > 0.65; i++){
+          f = Math.max(0.65, f * Math.min(0.96, h.clientWidth / h.scrollWidth));
           h.style.setProperty('--title-fit', f.toFixed(3));
         }
+        // Build 324: still too long at the smallest size -> wrap between words (never an ellipsis).
+        if(h.scrollWidth > h.clientWidth + 1) h.classList.add('title-wrap');
       }
       busy = false;
     }
     function later(){ if(!raf) raf = requestAnimationFrame(fit); }
     if(stationsHeading){
       new MutationObserver(later).observe(stationsHeading, { childList: true, characterData: true, subtree: true });
-      if(window.ResizeObserver) new ResizeObserver(later).observe(stationsHeading.parentElement || stationsHeading);
+      if(window.ResizeObserver){
+        var ro = new ResizeObserver(later);
+        ro.observe(stationsHeading.parentElement || stationsHeading);
+        // Build 324: the buttons beside it change its width without changing the row's.
+        var right = stationsHeading.parentElement && stationsHeading.parentElement.querySelector('.section-heading-right');
+        if(right) ro.observe(right);
+      }
       window.addEventListener('resize', later);
       if(document.fonts && document.fonts.ready) document.fonts.ready.then(later);
       later();
