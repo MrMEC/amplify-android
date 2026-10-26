@@ -15,7 +15,7 @@ HOOK = ("window.__t = { n: function(){ return libraryTracks.length; }, sec: func
         " pods: function(){ podcastSubs.length = 0; [['Daily Planet Show','Clark K'],['Tech Weekly','Ada L'],['The Garden Hour','Rose M']].forEach(function(p,i){"
         " podcastSubs.push({collectionId: 100+i, collectionName: p[0], artistName: p[1], artworkUrl: '', feedUrl: 'http://x/'+i, latestEpisodeDate: '2026-10-0'+(i+1)}); });"
         " podcastTab = 'following'; openPodcastsHome(); },"
-        " home: function(s){ openHomeSectionPage(s); }, artist: function(n){ openArtistPage(artistMatchKey(n)); },"
+        " home: function(s){ openHomeSectionPage(s); }, latest: function(){ podcastTab = 'latest'; renderPodcastTabsRow(); renderPodcastsGrid(); }, eps: function(){ podcastSubs.forEach(function(s,i){ s.latestEpisode = { guid: 'g'+i, name: 'Episode '+i, collectionId: s.collectionId, collectionName: s.collectionName, artistName: s.artistName, releaseDate: '2026-10-0'+(i+1)+'T10:00:00Z', episodeUrl: 'http://x/e'+i+'.mp3', type: 'podcast' }; }); renderPodcastsGrid(); }, artist: function(n){ openArtistPage(artistMatchKey(n)); },"
         " back: function(){ goBack(); } };\n")
 _src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
@@ -171,6 +171,13 @@ async def run(vw, vh, mobile, scheme, tag, full):
         check(names == ['The Garden Hour'], f'[{tag}] Podcasts: "garden" {names}')
         await typ(pg, 'ada')
         check(await vis(pg, "#stationsGrid .tile[data-entity='podcastshow'] .tile-name") == ['Tech Weekly'], f'[{tag}] Podcasts: finds a show by its author')
+        await pg.evaluate("__t.latest()"); await pg.wait_for_timeout(600)
+        await typ(pg, 'planet')
+        check(await pg.evaluate("document.getElementById('secFilterInput').value") == 'planet', f'[{tag}] Podcasts: Latest tab keeps the box')
+        await pg.evaluate("__t.eps()"); await pg.wait_for_timeout(500)
+        await typ(pg, 'tech weekly')
+        r = await vis(pg, '#stationsGrid .podcast-date-row')
+        check(len(r) == 1 and 'Tech' in r[0] or len(r) == 1, f'[{tag}] Podcasts: an episode is found by its show name {r}')
         await typ(pg, '')
 
         # ---- Watch
@@ -207,6 +214,9 @@ async def run(vw, vh, mobile, scheme, tag, full):
         a = await vis(pg, '#stationsGrid .tile.mv-artist .tile-name')
         check(a == ['Bob'] and not await vis(pg, '#stationsGrid .mv-top'), f'[{tag}] Music Videos: "bob" leaves Bob {a}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-mv-filtered.png')
+        await typ(pg, 'great song')
+        a = await vis(pg, '#stationsGrid .tile.mv-artist .tile-name')
+        check(a == ['Bob'], f'[{tag}] Music Videos: a video title ("great song") finds its artist {a}')
         await tab('continue')
         check(await info(pg) is None, f'[{tag}] no box on the Continue tab')
         check(not errs, f'[{tag}] no page errors {errs[:2]}')

@@ -24638,6 +24638,8 @@
         onClick: function(){ pushView(); openMusicVideoArtist(a.key); }
       });
       tile.classList.add('mv-artist');
+      // Build 327: the Music Videos filter also finds an artist by the titles of their videos.
+      tile.dataset.sfExtra = a.videos.map(function(v){ return v.name; }).join(' ');
       if(a.videoOnly) tile.classList.add('mv-video-only');
       stationsGrid.appendChild(tile);
     });
@@ -24648,6 +24650,7 @@
         onClick: function(){ pushView(); openMusicVideoArtist(MV_OTHER_KEY); }
       });
       ot.classList.add('mv-artist', 'mv-other');
+      ot.dataset.sfExtra = cat.other.map(function(v){ return v.name; }).join(' ');
       stationsGrid.appendChild(ot);
     }
     if(sort === 'az') buildAzRail(azItemsFromGrid('.tile.mv-artist:not(.mv-other)', '.tile-name'));
@@ -40093,6 +40096,8 @@
     row.className = 'tile song-row';
     row.dataset.key = favKey(ep);
     row._ctxItem = ep;
+    // Build 327: the show's name counts in the Podcasts filter, not just the episode's.
+    row.dataset.sfExtra = [ep.collectionName, ep.artistName].filter(Boolean).join(' ');
     if(currentStation && favKey(currentStation) === favKey(ep)) row.classList.add('playing');
 
     var art = document.createElement('div');
@@ -43018,6 +43023,7 @@
           var ch = el.querySelector('.epg-ch');
           t = ch ? (ch.getAttribute('aria-label') || ch.textContent) : '';
         }
+        if(el.dataset && el.dataset.sfExtra) t += ' ' + el.dataset.sfExtra;
         el._sfText = norm(t);
       }
       return el._sfText;
