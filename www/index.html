@@ -5509,6 +5509,14 @@
   }
   .cf-panel.open{ display:flex; }
   .cf-panel-head{ flex:0 0 auto; padding:12px 16px 10px; border-bottom:1px solid rgba(255,255,255,.08); cursor:pointer; }
+  .cf-panel-head{ display:flex; align-items:center; gap:12px; padding:10px 8px 10px 12px; }
+  .cf-panel-thumb{ flex:0 0 40px; width:40px; height:40px; border-radius:4px; overflow:hidden; background:#2c2c30; }
+  .cf-panel-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .cf-panel-text{ flex:1 1 auto; min-width:0; }
+  .cf-panel-shuffle{ flex:0 0 auto; width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+    border:none; background:none; color:#fff; cursor:pointer; padding:0; border-radius:50%; }
+  .cf-panel-shuffle:active{ background:rgba(255,255,255,.1); }
+  .cf-panel-shuffle .shuffle-icon{ width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .cf-panel-title{ color:#fff; font-weight:700; font-size:15px; line-height:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cf-panel-artist{ color:rgba(255,255,255,.6); font-size:12.5px; line-height:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cf-tracks{ flex:1 1 auto; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
@@ -6313,6 +6321,34 @@
      album line), the controls moving down with it; Play / Pause is a circle there too. */
   body.rotate-lock .now-playing-screen .np-seek{ margin-top:26px; }
   body.rotate-lock .now-playing-screen .np-play-btn{ border-radius:50%; }
+  /* ---------- Build 323 (Mark): a transparent header ----------
+     On a phone the header has no background or border on any page. The Amplify logo shows on
+     Home only (and fades away once Home is scrolled, so it never sits over the rows). Every
+     other page puts its own first row where the logo was: the page heading on Library,
+     Podcasts and Watch, the back arrow (with the page's buttons) on pages that have one, and
+     the rest of the page moves up with it. The menu button stays as it was in the top right;
+     the page's buttons keep clear of it. */
+  @media (max-width: 900px){
+    html body .sidebar-top{ background:transparent; border-bottom:none; pointer-events:none; }
+    html body .sidebar-top > *{ pointer-events:auto; }
+    .sidebar-top .top-actions{ margin-left:auto; }
+    body:not(.home-view) .sidebar-top .brand, body.np-open .sidebar-top .brand{ display:none; }
+    .sidebar-top .brand{ transition:opacity .2s ease; }
+    body.home-view.hdr-scrolled .sidebar-top .brand{ opacity:0; pointer-events:none; }
+    body:not(.home-view):not(.search-view):not(.search-open) .browse-view{ padding-top:var(--hdr-row-top, 11px); }
+    body:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{ margin-right:48px; }
+    body:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow:not(.has-back){ min-height:34px; }
+    /* Back's arrow on the menu button's centre line, level with the page's buttons. */
+    body:not(.album-open):not(.artist-open):not(.vdetail-open) #sectionHeadingRow.has-back #detailBackBtn{ margin-top:-9px; margin-bottom:-9px; }
+    body.album-open #sectionHeadingRow, body.artist-open #sectionHeadingRow{ top:9px; }
+    /* Movie and TV pages: the backdrop starts at the top of the screen, Back on the menu
+       button's line, as on the artist page. */
+    body.vdetail-open #browseView{ padding-top:0; }
+    body.vdetail-open #sectionHeadingRow{ top:4px; }
+    /* Things that stay at the top while their list scrolls now stick to the top of the
+       screen itself: there is no header bar for them to sit under. */
+    .tile-grid > .podcast-date-heading, .tile-grid > .epg > .epg-head{ top:0; }
+  }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -9688,6 +9724,7 @@
     hdrLastY = hdrScrollY();
     document.body.classList.remove('hdr-hidden');
     document.body.classList.toggle('hdr-autohide', hdrAutoHidePage());
+    document.body.classList.toggle('hdr-scrolled', hdrLastY > 8);
   }
   function syncHeaderAutoHide(){
     var on = hdrAutoHidePage();
@@ -9695,6 +9732,8 @@
     var y = hdrScrollY();
     var dy = y - hdrLastY;
     hdrLastY = y;
+    // Build 323: Home's logo fades once the page has moved (the header has no background now).
+    document.body.classList.toggle('hdr-scrolled', y > 8);
     if(!on || y < HDR_SHOW_ABOVE){ hdrDownRun = 0; document.body.classList.remove('hdr-hidden'); return; }
     if(dy > 0){
       hdrDownRun += dy;
@@ -16055,7 +16094,12 @@
     empty.style.display = 'none';
     var panel = document.createElement('div');
     panel.className = 'cf-panel';
-    panel.innerHTML = '<div class="cf-panel-head"><div class="cf-panel-title"></div><div class="cf-panel-artist"></div></div><div class="cf-tracks"></div>';
+    // Build 323 (Mark): the head shows a small copy of the cover left of the album and artist,
+    // and a Shuffle button on the right that plays the album shuffled.
+    panel.innerHTML = '<div class="cf-panel-head"><span class="cf-panel-thumb"></span><div class="cf-panel-text"><div class="cf-panel-title"></div><div class="cf-panel-artist"></div></div>' +
+      '<button type="button" class="cf-panel-shuffle" aria-label="Shuffle" title="Shuffle"><svg class="shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/>' +
+      '<path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg></button></div><div class="cf-tracks"></div>';
     root.appendChild(stage);
     root.appendChild(caption);
     root.appendChild(empty);
@@ -16552,6 +16596,10 @@
       if(hooks.onAlbumOpened){ try{ hooks.onAlbumOpened(al); }catch(e){} }
       panel.querySelector('.cf-panel-title').textContent = al.album;
       panel.querySelector('.cf-panel-artist').textContent = al.artist;
+      var th = panel.querySelector('.cf-panel-thumb');
+      th.innerHTML = '';
+      var fimg = el.querySelector('.cf-face img');
+      if(fimg && fimg.src){ var ti = document.createElement('img'); ti.alt = ''; ti.src = fimg.src; th.appendChild(ti); }
       var list = panel.querySelector('.cf-tracks');
       list.innerHTML = '';
       al.tracks.forEach(function(t, n){
@@ -16630,6 +16678,13 @@
     panel.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
     panel.addEventListener('click', function(e){ e.stopPropagation(); });
     panel.querySelector('.cf-panel-head').addEventListener('click', function(e){ e.stopPropagation(); unflip(); });
+    panel.querySelector('.cf-panel-shuffle').addEventListener('click', function(e){
+      e.stopPropagation();
+      var al = flipped !== null ? albums[flipped] : null;
+      if(!al || !al.tracks.length) return;
+      playShuffled(al.tracks, al.album);
+      syncPlaying();
+    });
     function syncPlaying(){
       if(!panel.classList.contains('open') && flipped === null) return;
       var cur = currentStation ? favKey(currentStation) : null;
