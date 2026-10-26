@@ -130,6 +130,14 @@ async def run(vw, vh, mobile, scheme, tag, full):
         v = await pg.evaluate("(document.getElementById('secFilterInput')||{}).value")
         check(v == 'carl' and await vis(pg, "#stationsGrid .tile[data-entity='artist'] .tile-name") == ['Carl'], f'[{tag}] back from the artist page: still filtered by "carl" {v}')
 
+        await pg.focus('#secFilterInput'); await pg.wait_for_timeout(300)
+        if mobile:
+            check(await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display") == 'none', f'[{tag}] keyboard up in a filter: the mini player is hidden')
+            await pg.evaluate("document.getElementById('secFilterInput').blur()"); await pg.wait_for_timeout(300)
+            check(await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display") != 'none', f'[{tag}] filter let go: the mini player is back')
+        else:
+            check(await pg.evaluate("getComputedStyle(document.getElementById('playerBar')).display") != 'none', f'[{tag}] desktop: the player stays')
+            await pg.evaluate("document.getElementById('secFilterInput').blur()")
         # ---- Albums
         await pg.evaluate("__t.sec('albums')"); await pg.wait_for_timeout(1000)
         i = await info(pg)

@@ -4805,6 +4805,8 @@
     body.search-open .sidebar-top{ visibility:hidden; transition:none; }
     /* Build 255: no tab bar while the keyboard is up (see the kb-open script). */
     body.kb-open .mobile-nav{ display:none; }
+    /* Build 329: and the mini Now Playing too, while a section filter box is the field being typed in. */
+    body.kb-open:has(.sec-filter input:focus) .player-bar{ display:none !important; }
     body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:60px; }
 
     /* Content clears the tab bar plus the player bar above it. */
