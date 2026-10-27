@@ -5099,6 +5099,12 @@
   }
   .settings-select:hover{ border-color:var(--accent-dim); }
   .settings-select:focus{ outline:none; border-color:var(--accent); }
+  .settings-input{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:8px;
+    padding:8px 12px; font-size:12.5px; font-weight:600; font-family:inherit; width:100%; box-sizing:border-box; min-width:0;
+  }
+  .settings-input:focus{ outline:none; border-color:var(--accent); }
+  .settings-note{ font-size:11.5px; line-height:1.4; color:var(--muted, #8a93a0); margin-top:6px; }
   .settings-data-btn:hover{ border-color:var(--accent-dim); }
 
   /* ---------- the Settings card itself ----------
@@ -7618,6 +7624,16 @@
       </div>
       <div class="plex-body" id="plexSettingsBody"></div>
     </div>
+    <!-- Build 327: Podcast Index (a second place to find podcasts, next to Apple's). Its free
+         key and secret come from podcastindex.org; both stay on this phone. -->
+    <div class="settings-row settings-row--stack" id="podcastIndexRow">
+      <div class="settings-row-head">
+        <span class="settings-label">Podcast Index</span>
+      </div>
+      <input type="text" class="settings-input" id="piKeyInput" placeholder="API key" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Podcast Index API key">
+      <input type="password" class="settings-input" id="piSecretInput" placeholder="API secret" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Podcast Index API secret" style="margin-top:8px;">
+      <div class="settings-note">Free at podcastindex.org/api. Adds its shows to Podcast search.</div>
+    </div>
     <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
          re-downloaded and opened from several places, and without this there is no way to
          tell one build from another from inside the app. -->
@@ -9402,6 +9418,15 @@
     try{ sel.value = localStorage.getItem('radioPlayerVideoPlayer') === 'builtin' ? 'builtin' : 'vlc'; hw.value = localStorage.getItem('radioPlayerVlcHw') === 'off' ? 'off' : 'on'; }catch(e){}
     sel.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVideoPlayer', sel.value); }catch(e){} });
     hw.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVlcHw', hw.value); }catch(e){} });
+  })();
+  // Podcast Index key and secret (build 327): kept on this phone only.
+  (function(){
+    var k = document.getElementById('piKeyInput'), sc = document.getElementById('piSecretInput');
+    if(!k || !sc) return;
+    try{ k.value = localStorage.getItem('radioPlayerPodcastIndexKey') || ''; sc.value = localStorage.getItem('radioPlayerPodcastIndexSecret') || ''; }catch(e){}
+    function save(){ try{ localStorage.setItem('radioPlayerPodcastIndexKey', k.value.trim()); localStorage.setItem('radioPlayerPodcastIndexSecret', sc.value.trim()); }catch(e){} }
+    k.addEventListener('change', save); sc.addEventListener('change', save);
+    k.addEventListener('input', save); sc.addEventListener('input', save);
   })();
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
@@ -38603,6 +38628,180 @@
   // search box at all -- until now there was no route to one except the Artists list.
 
   // Top Results (build 117) leads: the closest few matches of every kind, in one list.
+  // ---------- Podcast Index and the Internet Archive (build 327) ----------
+  // Two more places to find things. Both are asked through the phone's own connection
+  // (CapacitorHttp: no CORS) and through the WebView's fetch anywhere else.
+  function extJson(url, headers){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && H && typeof H.request === 'function');
+    if(native){
+      return Promise.resolve(H.request({ url: url, method: 'GET', responseType: 'text', connectTimeout: 12000, readTimeout: 20000, headers: headers || {} })).then(function(r){
+        if(!r || Number(r.status) < 200 || Number(r.status) >= 300) throw new Error('HTTP ' + (r && r.status));
+        var d = r.data;
+        if(typeof d === 'string'){ try{ d = JSON.parse(d); }catch(e){ throw new Error('bad reply'); } }
+        return d;
+      });
+    }
+    return fetch(url, { mode: 'cors', headers: headers || {} }).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  // -- Podcast Index (free key and secret from podcastindex.org, entered in Settings) --
+  // Only shows that also have an Apple (iTunes) id are kept: Amplify opens a show through
+  // that id, so a Podcast Index show without one has nothing to open yet.
+  var PI_KEY_STORE = 'radioPlayerPodcastIndexKey', PI_SECRET_STORE = 'radioPlayerPodcastIndexSecret';
+  function podcastIndexCreds(){
+    try{
+      var k = (localStorage.getItem(PI_KEY_STORE) || '').trim(), sc = (localStorage.getItem(PI_SECRET_STORE) || '').trim();
+      return k && sc ? { key: k, secret: sc } : null;
+    }catch(e){ return null; }
+  }
+  function sha1Hex(text){
+    if(!(window.crypto && window.crypto.subtle)) return Promise.reject(new Error('no crypto'));
+    return window.crypto.subtle.digest('SHA-1', new TextEncoder().encode(text)).then(function(buf){
+      return Array.prototype.map.call(new Uint8Array(buf), function(x){ return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  }
+  function podcastIndexSearch(term, limit){
+    var c = podcastIndexCreds();
+    if(!c) return Promise.resolve([]);
+    var ts = String(Math.floor(Date.now() / 1000));
+    return sha1Hex(c.key + c.secret + ts).then(function(auth){
+      return extJson('https://api.podcastindex.org/api/1.0/search/byterm?max=' + (limit || 15) + '&q=' + encodeURIComponent(term),
+        { 'X-Auth-Date': ts, 'X-Auth-Key': c.key, 'Authorization': auth, 'User-Agent': 'Amplify/1.0' });
+    }).then(function(d){
+      return ((d && d.feeds) || []).filter(function(f){ return f && Number(f.itunesId) > 0; }).map(function(f){
+        // Shaped like an iTunes result, so everything downstream reads it the same way.
+        return {
+          collectionId: Number(f.itunesId), collectionName: f.title || '', artistName: f.author || f.ownerName || '',
+          artworkUrl600: f.artwork || f.image || '', feedUrl: f.url || '', trackCount: f.episodeCount || 0,
+          genres: f.categories ? Object.keys(f.categories).map(function(k){ return f.categories[k]; }) : []
+        };
+      });
+    });
+  }
+  // Apple's answers first, then anything Podcast Index adds that Apple's did not return.
+  // Podcast Index failing never costs the Apple results; Apple failing only matters when
+  // Podcast Index has nothing either.
+  function podcastSearchBoth(term, limit){
+    var piP = podcastIndexSearch(term, limit)['catch'](function(){ return []; });
+    return itunesSearchPodcasts(term, limit).then(function(r){ return { r: r, err: null }; }, function(e){ return { r: [], err: e }; })
+      .then(function(a){
+        return piP.then(function(extra){
+          if(a.err && !extra.length) throw a.err;
+          var have = {};
+          a.r.forEach(function(x){ have[String(x.collectionId)] = true; });
+          return a.r.concat(extra.filter(function(x){ return !have[String(x.collectionId)]; }));
+        });
+      });
+  }
+
+  // -- Internet Archive (no key) --
+  // Films and TV, and audio (concerts, old radio, music), from the Archive's own curated
+  // collections, so the open uploads that anyone can add to are left out.
+  var IA_COLLECTIONS = ['moviesandfilms', 'classic_tv', 'prelinger', 'silent_films', 'feature_films', 'classic_cartoons',
+    'scifi_horror', 'comedy_films', 'film_noir', 'television', 'fedflix', 'newsandpublicaffairs', 'sports',
+    'etree', 'gratefuldead', 'oldtimeradio', 'radioprograms', 'audio_music', 'netlabels', '78rpm', 'librivoxaudio', 'podcasts'];
+  function archiveArtUrl(id){ return 'https://archive.org/services/img/' + encodeURIComponent(id); }
+  function archiveSearchItems(term){
+    var words = String(term || '').replace(/[^A-Za-z0-9À-￿\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
+    if(!words.length) return Promise.resolve([]);
+    var w = words.join(' AND ');
+    var q = '(title:(' + w + ') OR creator:(' + w + ')) AND mediatype:(movies OR audio) AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')';
+    var url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q)
+      + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype&fl%5B%5D=creator&fl%5B%5D=year'
+      + '&sort%5B%5D=' + encodeURIComponent('downloads desc') + '&rows=30&page=1&output=json';
+    return extJson(url, { 'Accept': 'application/json' }).then(function(d){
+      var docs = (d && d.response && d.response.docs) || [];
+      return docs.filter(function(x){ return x && x.identifier && x.title; }).map(function(x){
+        var cr = Array.isArray(x.creator) ? x.creator[0] : x.creator;
+        return { id: String(x.identifier), title: String(Array.isArray(x.title) ? x.title[0] : x.title), creator: cr ? String(cr) : '',
+          year: x.year ? String(x.year).slice(0, 4) : '', video: x.mediatype === 'movies' };
+      });
+    });
+  }
+  function archiveSeconds(v){
+    if(v == null || v === '') return 0;
+    var s = String(v);
+    if(/^\d+(\.\d+)?$/.test(s)) return Math.round(Number(s));
+    var parts = s.split(':').map(Number);
+    if(parts.some(function(n){ return !isFinite(n); })) return 0;
+    return parts.reduce(function(a, n){ return a * 60 + n; }, 0);
+  }
+  // The playable files of one item: for a film, the one best video; for audio, every song
+  // in order, in one format.
+  function archivePlayables(meta, item){
+    var files = (meta && meta.files) || [];
+    var base = 'https://archive.org/download/' + encodeURIComponent(item.id) + '/';
+    function url(f){ return base + String(f.name).split('/').map(encodeURIComponent).join('/'); }
+    function ep(f, isVideo){
+      return { type: 'podcast', guid: 'ia:' + item.id + '/' + f.name, collectionId: '', collectionName: isVideo ? (item.creator || 'Internet Archive') : item.title,
+        artistName: item.creator, name: isVideo ? item.title : (f.title || String(f.name).replace(/\.[^.]+$/, '')).replace(/^\s*\d{1,3}\s*[-.)]\s*/, ''),
+        favicon: archiveArtUrl(item.id), releaseDate: '', duration: archiveSeconds(f.length), episodeUrl: url(f),
+        description: item.year ? 'Internet Archive · ' + item.year : 'Internet Archive', isVideo: isVideo };
+    }
+    var usable = files.filter(function(f){ return f && f.name && !f.private && f.source !== 'metadata'; });
+    var video = usable.filter(function(f){ return /^(h\.264|mpeg4|512kb mpeg4)$/i.test(f.format || '') || /\.(mp4|m4v)$/i.test(f.name); });
+    var pref = ['h.264', 'mpeg4', '512kb mpeg4'];
+    if(item.video && video.length){
+      video.sort(function(a, b){
+        var ia = pref.indexOf(String(a.format || '').toLowerCase()), ib = pref.indexOf(String(b.format || '').toLowerCase());
+        if(ia < 0) ia = 9; if(ib < 0) ib = 9;
+        return ia - ib || (Number(b.size) || 0) - (Number(a.size) || 0);
+      });
+      return [ep(video[0], true)];
+    }
+    var audio = usable.filter(function(f){ return /^vbr mp3$/i.test(f.format || ''); });
+    if(!audio.length) audio = usable.filter(function(f){ return /mp3$/i.test(f.format || '') || /\.mp3$/i.test(f.name); });
+    if(!audio.length) audio = usable.filter(function(f){ return /ogg vorbis/i.test(f.format || ''); });
+    audio.sort(function(a, b){
+      var ta = parseInt(a.track, 10), tb = parseInt(b.track, 10);
+      if(isFinite(ta) && isFinite(tb) && ta !== tb) return ta - tb;
+      return String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+    });
+    if(!audio.length && video.length) return [ep(video[0], true)];
+    return audio.slice(0, 200).map(function(f){ return ep(f, false); });
+  }
+  function playArchiveItem(item, row){
+    if(row) row.classList.add('loading');
+    extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
+      if(row) row.classList.remove('loading');
+      var list = archivePlayables(meta, item);
+      if(!list.length){ setStatus('Nothing playable in this Internet Archive item.', true); return; }
+      if(list.length > 1) setQueue(list, list[0], item.title); else clearQueue();
+      playStation(list[0]);
+      openNowPlaying(list[0], true);
+    })['catch'](function(){
+      if(row) row.classList.remove('loading');
+      setStatus('Could not reach the Internet Archive.', true);
+    });
+  }
+  function buildArchiveResultRow(item){
+    var row = document.createElement('div');
+    row.className = 'tile song-row video-result-row archive-result-row';
+    row.dataset.kind = 'archive';
+    row.dataset.key = 'archive:' + item.id;
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art video-result-art wide';
+    art.appendChild(vImg(archiveArtUrl(item.id)));
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div');
+    t.className = 'tile-name song-row-title';
+    t.textContent = item.title;
+    body.appendChild(t);
+    var sub = document.createElement('div');
+    sub.className = 'song-row-sub';
+    sub.textContent = [item.video ? 'Video' : 'Audio', item.year, item.creator].filter(Boolean).join(' · ');
+    body.appendChild(sub);
+    row.appendChild(body);
+    row.addEventListener('click', function(){ playArchiveItem(item, row); });
+    return row;
+  }
+
   var SEARCH_GROUPS = [
     { id: 'top', label: 'Top Results', noun: 'result' },
     { id: 'stations', label: 'Stations', noun: 'station' },
@@ -38612,6 +38811,7 @@
     { id: 'musicVideos', label: 'Music Videos', noun: 'music video' },
     { id: 'podcasts', label: 'Podcasts', noun: 'show' },
     { id: 'videos', label: 'Movies & TV', noun: 'video' },
+    { id: 'archive', label: 'Archive', noun: 'Internet Archive item' },
     { id: 'channels', label: 'Channels', noun: 'channel' },
     { id: 'playlists', label: 'Playlists', noun: 'playlist' }
   ];
@@ -38779,12 +38979,13 @@
   function searchGroupHasContent(id){
     if(id === 'top'){
       return !!searchState && (searchState.pending || searchState.podcastsPending ||
-        SEARCH_GROUPS.some(function(g){ return g.id !== 'top' && (searchState[g.id] || []).length; }));
+        SEARCH_GROUPS.some(function(g){ return g.id !== 'top' && g.id !== 'archive' && (searchState[g.id] || []).length; }));
     }
     // While the directory call is in flight the Stations tab is offered anyway, so the
     // grouping does not visibly rearrange itself the moment results land.
     if(id === 'stations' && searchState && searchState.pending) return true;
     if(id === 'podcasts' && searchState && searchState.podcastsPending) return true;
+    if(id === 'archive' && searchState && searchState.archivePending) return true;
     return searchGroupItems(id).length > 0;
   }
 
@@ -38807,9 +39008,11 @@
       playlists: searchPlaylists(q),
       videos: searchVideos(q),
       musicVideos: searchMusicVideos(q),
+      archive: [],
       tab: prevTab,
       pending: true,
-      podcastsPending: true
+      podcastsPending: true,
+      archivePending: true
     };
     lastSearch = searchState;
     var st = searchState;
@@ -38829,7 +39032,20 @@
     // The answers belong to this search (st), even after a newer one replaced it.
     function stale(){ return lastSearch !== st; }
 
-    itunesSearchPodcasts(remoteQ, 15).then(function(results){
+    archiveSearchItems(remoteQ).then(function(items){
+      if(stale()) return;
+      st.archive = rankByMatch(items.filter(function(it){
+        return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases });
+      }), function(it){ return it.title; }, pq);
+      st.archivePending = false;
+      if(searchState === st) applySearchResults();
+    })['catch'](function(){
+      if(stale()) return;
+      st.archivePending = false;
+      if(searchState === st) applySearchResults();
+    });
+
+    podcastSearchBoth(remoteQ, 15).then(function(results){
       if(stale()) return;
       st.podcasts = rankByMatch(results.map(showFromItunes).filter(function(sh){
         return !pq.phrases.length || matchesQuery([sh.collectionName, sh.artistName], { terms: [], phrases: pq.phrases });
@@ -38952,13 +39168,18 @@
       setResultCount(null);
       return;
     }
+    if(group.id === 'archive' && !items.length && searchState.archivePending){
+      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      setResultCount(null);
+      return;
+    }
     if(!items.length){
       stationsGrid.innerHTML = '<div class="empty-state">No ' + group.label.toLowerCase() + ' matched that search.</div>';
       setResultCount(0, group.noun);
       return;
     }
 
-    if(group.id === 'videos' || group.id === 'musicVideos') stationsGrid.classList.add('grid-songs');
+    if(group.id === 'videos' || group.id === 'musicVideos' || group.id === 'archive') stationsGrid.classList.add('grid-songs');
     // Save as Custom Station sits on the Stations tab, centred above the results (build 119).
     if(group.id === 'stations'){
       var bar = document.createElement('div');
@@ -38999,6 +39220,8 @@
         var chList = stationsGrid.querySelector(':scope > .ch-list');
         if(!chList){ chList = document.createElement('div'); chList.className = 'ch-list'; stationsGrid.appendChild(chList); }
         chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url), search: true }));
+      } else if(group.id === 'archive'){
+        stationsGrid.appendChild(buildArchiveResultRow(item));
       } else if(group.id === 'videos'){
         stationsGrid.appendChild(buildVideoResultRow(item, false));
       } else if(group.id === 'musicVideos'){
@@ -39031,6 +39254,7 @@
     // Still counting up while the directory answers, so no total is claimed yet.
     if(group.id === 'stations' && searchState.pending) setResultCount(null);
     else if(group.id === 'podcasts' && searchState.podcastsPending) setResultCount(null);
+    else if(group.id === 'archive' && searchState.archivePending) setResultCount(null);
     else setResultCount(items.length, group.noun);
   }
 
