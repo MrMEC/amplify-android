@@ -1150,6 +1150,8 @@
   /* On the Podcasts page an episode title may take three lines before it is cut off with an
      ellipsis (two from build 48, three from build 334): episode titles run long, and one line
      cut most of them mid-thought. Everywhere else a row keeps its single line. */
+  /* Build 335: the cover sits level with the top of the episode name, not centred beside it. */
+  .podcast-date-row{ align-items:flex-start; }
   .podcast-date-row .song-row-title{
     white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
     line-clamp:3; overflow:hidden; line-height:1.3;
