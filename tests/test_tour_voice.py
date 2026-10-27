@@ -57,9 +57,9 @@ async def main():
         s = await pg.evaluate(STATE); check(not s['playing'] and not s['tourOpen'], 'closing the tour stops it')
         n = s['n']; await pg.evaluate("window.__amplifyTour.open(2)"); await pg.wait_for_timeout(500)
         s = await pg.evaluate(STATE); check(s['n'] == n and not s['playing'], 'opening on a later screen does not play it')
-        await pg.evaluate("window.__amplifyTour.close(false); window.__amplifyTour.open(0)"); await pg.wait_for_timeout(7600)
+        await pg.evaluate("window.__amplifyTour.close(false); window.__amplifyTour.open(0)"); await pg.wait_for_timeout(9200)
         s = await pg.evaluate("(()=>{var l=window.__auds[window.__auds.length-1]; return {gone:!l.getAttribute('src'), paused:l.paused};})()")
-        check(s['paused'], f'it ends by itself after its 6.8 seconds {s}')
+        check(s['paused'], f'it ends by itself after its 8 seconds (1.2 s lead-in + 6.8 s voice) {s}')
         check(len(errs) == 0, f'no page errors {errs}')
         await b.close()
         # --- sound needs a touch: screen 1 waits for the first touch
