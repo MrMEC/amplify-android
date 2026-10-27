@@ -264,6 +264,25 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     return holdingTile;
   }
 
+  /** Build 337: the tour's welcome voice, played by the phone itself (see WelcomeVoice). */
+  @PluginMethod
+  public void playWelcomeVoice(PluginCall call) {
+    String res = WelcomeVoice.play(getContext(), "public/tour-welcome.wav");
+    if (res.startsWith("error")) {
+      call.reject(res);
+      return;
+    }
+    JSObject o = new JSObject();
+    o.put("status", res);
+    call.resolve(o);
+  }
+
+  @PluginMethod
+  public void stopWelcomeVoice(PluginCall call) {
+    WelcomeVoice.stop();
+    call.resolve();
+  }
+
   @PluginMethod
   public void holdTouch(PluginCall call) {
     holdingTile = Boolean.TRUE.equals(call.getBoolean("on", false));

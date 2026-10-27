@@ -41,8 +41,9 @@ async def main():
         b, pg, errs = await run(p, ['--autoplay-policy=no-user-gesture-required'], 'auto')
         s = await pg.evaluate(STATE)
         check(s['tourOpen'] and s['step'] == 0, f'tour opened by itself on screen 1 {s["step"]}')
-        check(s['playing'] and s['src'] == 'tour-welcome.wav', f'voice plays by itself {s}')
+        check(s['playing'] and (s['src'] or '').startswith('blob:'), f'voice plays by itself {s}')
         check(not s['npShown'] and s['mainPaused'] and not s['mainSrc'], 'no Now Playing screen; the app\'s own player untouched')
+        check(await pg.evaluate('window.__tourVoice.status()') == 'playing', 'status reads playing (Settings > Check storage)')
         await pg.screenshot(path=SHOTS + '/voice_screen1.png')
         await pg.wait_for_timeout(1000)
         s2 = await pg.evaluate(STATE); check(s2['t'] > s['t'], 'it keeps playing in the background')
@@ -73,5 +74,31 @@ async def main():
             s = await pg.evaluate(STATE)
             check(s['playing'], f'blocked at first: the first touch on the tour starts it {s}')
         await b.close()
+        # --- on the phone: played by the app's own voice player; the web player stays unused
+        for mode in ('ok', 'fail'):
+            b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium', args=['--autoplay-policy=no-user-gesture-required'])
+            ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark')
+            await ctx.add_init_script(INIT)
+            await ctx.add_init_script("""(function(){ window.__nv=[]; window.__L={};
+              var P=new Proxy({}, {get:function(t,k){ if(k==='then') return undefined;
+                if(k==='addListener') return function(n,f){ (window.__L[n]=window.__L[n]||[]).push(f); return Promise.resolve({remove:function(){}}); };
+                if(k==='playWelcomeVoice') return function(){ window.__nv.push('play'); return %s; };
+                if(k==='stopWelcomeVoice') return function(){ window.__nv.push('stop'); return Promise.resolve({}); };
+                return function(){ return Promise.resolve({}); }; }});
+              window.Capacitor={isNativePlatform:function(){return true;},getPlatform:function(){return 'android';},Plugins:{AmplifyPlayer:P},convertFileSrc:function(u){return u;}}; })();""" % ("Promise.resolve({status:'playing'})" if mode == 'ok' else "Promise.reject(new Error('no sound'))"))
+            pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e))); await pg.route('**/*', route)
+            await pg.goto('http://127.0.0.1:8834/index.html'); await pg.wait_for_timeout(3500)
+            nv = await pg.evaluate('window.__nv'); st = await pg.evaluate('window.__tourVoice.status()'); s = await pg.evaluate(STATE)
+            if mode == 'ok':
+                check(nv[:1] == ['play'] and s['n'] == 0 and st == 'playing (phone player)' and not s['npShown'], f'phone: the app plays the voice, not the web player {nv} {st} audios={s["n"]}')
+                await pg.evaluate("document.getElementById('tourNext').click()"); await pg.wait_for_timeout(400)
+                check((await pg.evaluate('window.__nv'))[-1] == 'stop', 'phone: Start stops it')
+                await pg.evaluate("window.__amplifyTour.close(false); window.__amplifyTour.open(0)"); await pg.wait_for_timeout(400)
+                await pg.evaluate("window.__amplifyTour.close(false)"); await pg.wait_for_timeout(300)
+                nv = await pg.evaluate('window.__nv'); check(nv[-1] == 'stop' and nv.count('play') == 2, f'phone: reopen plays again, close stops {nv}')
+            else:
+                check(nv[:1] == ['play'] and s['playing'] and (s['src'] or '').startswith('blob:'), f'phone player failed: falls back to the web player {nv} {st}')
+            check(len(errs) == 0, f'no page errors ({mode}) {errs}')
+            await b.close()
     print('\n%d failure(s)' % fails); raise SystemExit(1 if fails else 0)
 asyncio.run(main())

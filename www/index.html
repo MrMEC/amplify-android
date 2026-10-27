@@ -9585,6 +9585,7 @@
       var metaFallback = Object.keys(lsGet('artistMeta') || {}).length;
       diagnosticsEl.innerHTML =
         line('Build', APP_BUILD) +
+        line('Tour voice', (window.__tourVoice ? window.__tourVoice.status() : 'not loaded')) +
         line('Settings storage', lsOk ? 'working' : 'not persisting', !lsOk) +
         line('File storage (database)', dbDown ? 'unavailable' : 'working', dbDown) +
         line('Other Amplify tabs open', anotherInstanceOpen() ? 'yes' : 'no', anotherInstanceOpen()) +
@@ -43094,32 +43095,102 @@
     // its first screen -- its own audio element, not the app's player, so there is no Now
     // Playing screen, no media notification and nothing added to Recent. It stops as soon as
     // the tour moves on or closes.
-    var narration = null, narrationGesture = null;
+    var narration = null, narrationGesture = null, narrationToken = 0, narrationBlob = null;
+    var narrationLog = 'not played yet';
+    // Settings > Check storage lists how the last try went ("Tour voice").
+    window.__tourVoice = { status: function(){ return narrationLog; } };
+    // The file is read once and played from the page's own copy of it (a blob), not straight from
+    // the app's built-in web server, whose handling of media requests is rough.
+    function narrationUrl(){
+      if(!narrationBlob){
+        narrationBlob = fetch('tour-welcome.wav').then(function(r){
+          if(!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        }).then(function(b){ return URL.createObjectURL(new Blob([b], { type: 'audio/wav' })); });
+        narrationBlob['catch'](function(){ narrationBlob = null; });
+      }
+      return narrationBlob;
+    }
+    try{ narrationUrl()['catch'](function(){}); }catch(e){}
+    // On the phone the voice is played by the app itself (WelcomeVoice): a plain Android player
+    // with no Now Playing and no notification. The web player below is the fallback.
+    var nativeVoice = false;
+    function voicePlugin(){
+      var C = window.Capacitor, P = C && C.Plugins && C.Plugins.AmplifyPlayer;
+      return (P && typeof P.playWelcomeVoice === 'function' && typeof C.isNativePlatform === 'function' && C.isNativePlatform()) ? P : null;
+    }
     function stopNarration(){
+      narrationToken++;
+      if(nativeVoice){
+        nativeVoice = false;
+        var NP = voicePlugin();
+        try{ if(NP) NP.stopWelcomeVoice(); }catch(e){}
+      }
       if(narrationGesture){ ov.removeEventListener('pointerdown', narrationGesture, true); narrationGesture = null; }
       if(!narration) return;
-      try{ narration.pause(); narration.removeAttribute('src'); narration.load(); }catch(e){}
-      narration = null;
+      var a = narration; narration = null;
+      try{ a.pause(); a.removeAttribute('src'); a.load(); }catch(e){}
     }
-    function startNarration(){
-      stopNarration();
+    function playNarration(src, my, retryPlain){
+      function live(){ return my === narrationToken && openNow && at === 0; }
       var a;
-      try{ a = new Audio('tour-welcome.wav'); }catch(e){ return; }
+      try{ a = new Audio(src); }catch(e){ narrationLog = 'could not start (' + e + ')'; return; }
       narration = a;
       a.preload = 'auto';
-      a.addEventListener('ended', function(){ if(narration === a) stopNarration(); });
+      a.addEventListener('playing', function(){ if(narration === a) narrationLog = 'playing'; });
+      a.addEventListener('ended', function(){ if(narration === a){ narrationLog = 'finished'; stopNarration(); } });
+      a.addEventListener('error', function(){
+        if(narration !== a) return;
+        narrationLog = 'file error ' + (a.error ? a.error.code + ' ' + (a.error.message || '') : '');
+        if(retryPlain && live()){ narration = null; playNarration('tour-welcome.wav', my, false); }
+      });
       var p = null;
-      try{ p = a.play(); }catch(e){}
-      // A browser that won't start sound before a touch (the phone's WebView is set to allow it)
+      try{ p = a.play(); }catch(e){ narrationLog = 'could not play (' + e + ')'; }
+      // A browser that won't start sound before a touch (the phone's web view is set to allow it)
       // starts it with the first touch on the tour instead, if the tour is still on screen 1.
-      if(p && typeof p.catch === 'function') p['catch'](function(){
-        if(narration !== a || at !== 0 || !openNow) return;
+      if(p && typeof p.then === 'function') p.then(null, function(err){
+        if(narration !== a) return;
+        narrationLog = 'blocked (' + (err && err.name ? err.name : err) + ')';
+        if(!live()) return;
         narrationGesture = function(){
           if(narrationGesture) ov.removeEventListener('pointerdown', narrationGesture, true);
           narrationGesture = null;
-          if(narration === a && at === 0 && openNow){ try{ a.play()['catch'](function(){}); }catch(e){} }
+          if(narration === a && live()){ try{ a.play()['catch'](function(){}); }catch(e){} }
         };
         ov.addEventListener('pointerdown', narrationGesture, true);
+      });
+    }
+    function startNarration(){
+      stopNarration();
+      var my = narrationToken;
+      function live(){ return my === narrationToken && openNow && at === 0; }
+      narrationLog = 'loading';
+      var NP = voicePlugin();
+      if(NP){
+        nativeVoice = true;
+        var started;
+        try{ started = NP.playWelcomeVoice(); }catch(e){ started = Promise.reject(e); }
+        Promise.resolve(started).then(function(){
+          // The tour moved on while it was starting: stop it (unless a newer one has begun).
+          if(!live()){ if(!nativeVoice){ try{ NP.stopWelcomeVoice(); }catch(e){} } return; }
+          narrationLog = 'playing (phone player)';
+        }, function(err){
+          nativeVoice = false;
+          narrationLog = 'phone player failed (' + ((err && err.message) || err) + '); trying the web player';
+          if(live()) webVoice();
+        });
+        return;
+      }
+      webVoice();
+    }
+    function webVoice(){
+      var my = narrationToken;
+      function live(){ return my === narrationToken && openNow && at === 0; }
+      narrationUrl().then(function(url){
+        if(live()) playNarration(url, my, true);
+      }, function(err){
+        narrationLog = 'could not read the file (' + ((err && err.message) || err) + ')';
+        if(live()) playNarration('tour-welcome.wav', my, false);
       });
     }
     function openTour(from){
