@@ -43087,16 +43087,51 @@
       body.style.animation = 'none';
       void body.offsetWidth;
       body.style.animation = '';
+      if(at !== 0) stopNarration();
       place();
+    }
+    // Build 336: the welcome voice. It plays by itself, in the background, when the tour opens on
+    // its first screen -- its own audio element, not the app's player, so there is no Now
+    // Playing screen, no media notification and nothing added to Recent. It stops as soon as
+    // the tour moves on or closes.
+    var narration = null, narrationGesture = null;
+    function stopNarration(){
+      if(narrationGesture){ ov.removeEventListener('pointerdown', narrationGesture, true); narrationGesture = null; }
+      if(!narration) return;
+      try{ narration.pause(); narration.removeAttribute('src'); narration.load(); }catch(e){}
+      narration = null;
+    }
+    function startNarration(){
+      stopNarration();
+      var a;
+      try{ a = new Audio('tour-welcome.wav'); }catch(e){ return; }
+      narration = a;
+      a.preload = 'auto';
+      a.addEventListener('ended', function(){ if(narration === a) stopNarration(); });
+      var p = null;
+      try{ p = a.play(); }catch(e){}
+      // A browser that won't start sound before a touch (the phone's WebView is set to allow it)
+      // starts it with the first touch on the tour instead, if the tour is still on screen 1.
+      if(p && typeof p.catch === 'function') p['catch'](function(){
+        if(narration !== a || at !== 0 || !openNow) return;
+        narrationGesture = function(){
+          if(narrationGesture) ov.removeEventListener('pointerdown', narrationGesture, true);
+          narrationGesture = null;
+          if(narration === a && at === 0 && openNow){ try{ a.play()['catch'](function(){}); }catch(e){} }
+        };
+        ov.addEventListener('pointerdown', narrationGesture, true);
+      });
     }
     function openTour(from){
       at = typeof from === 'number' ? from : 0;
       openNow = true;
       ov.classList.add('open');
       render();
+      if(at === 0) startNarration();
     }
     function closeTour(dismiss){
       if(dismiss){ try{ localStorage.setItem(TOUR_DONE_KEY, '1'); }catch(e){} }
+      stopNarration();
       openNow = false;
       ov.classList.remove('open', 'spotlit');
     }

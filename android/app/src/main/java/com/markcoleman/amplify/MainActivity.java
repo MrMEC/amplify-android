@@ -26,6 +26,8 @@ public class MainActivity extends BridgeActivity {
     try {
       if (getBridge() != null && getBridge().getWebView() != null) {
         getBridge().getWebView().setOnLongClickListener(v -> AmplifyPlayerPlugin.holdingTile());
+        // Build 336: the tour's welcome voice starts by itself, without waiting for a touch.
+        getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
       }
     } catch (Exception ignored) {
       // No WebView yet: nothing to change.
