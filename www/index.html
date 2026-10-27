@@ -1219,6 +1219,8 @@
     overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
     min-width:0;
   }
+  /* Build 331: a podcast show's name gets three lines (Podcasts A-Z / Popular, and search). */
+  .tile[data-entity="podcastshow"]:not(.tile-row) .tile-name{ -webkit-line-clamp:3; line-clamp:3; }
   /* Second line under a tile name, used by the Artists and Albums grids to say what each
      entry actually holds ("12 songs", "2 stations"). Never set on a plain station tile. */
   .tile-sub{
