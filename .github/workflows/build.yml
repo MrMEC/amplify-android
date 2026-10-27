@@ -32,6 +32,9 @@ jobs:
       - name: Build number
         run: echo "BUILD=$(( ${{ github.run_number }} + 40 ))" >> "$GITHUB_ENV"
 
+      - name: Stamp the build number into the app (Settings > Build)
+        run: sed -i "s/var APP_BUILD = '[^']*';/var APP_BUILD = '$BUILD';/" www/index.html && grep -n "var APP_BUILD" www/index.html
+
       - name: Install
         run: npm ci
 

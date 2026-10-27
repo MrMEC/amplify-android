@@ -1147,12 +1147,12 @@
      under a date heading and between two episode rows in the same date group. Pulling each
      row up with a negative margin closes most of that gap without changing the grid's gap
      value itself. */
-  /* On the Podcasts page an episode title may take two lines before it is cut off with an
-     ellipsis (build 48): episode titles run long, and one line cut most of them mid-thought.
-     Everywhere else a row keeps its single line. */
+  /* On the Podcasts page an episode title may take three lines before it is cut off with an
+     ellipsis (two from build 48, three from build 334): episode titles run long, and one line
+     cut most of them mid-thought. Everywhere else a row keeps its single line. */
   .podcast-date-row .song-row-title{
-    white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
-    line-clamp:2; overflow:hidden; line-height:1.3;
+    white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+    line-clamp:3; overflow:hidden; line-height:1.3;
   }
   .tile-grid > .podcast-date-heading + .podcast-date-row{ margin-top:-34px; }
   .tile-grid > .podcast-date-row + .podcast-date-row{ margin-top:-30px; }
@@ -9505,7 +9505,9 @@
   // ---------- which build is this, and what can it see ----------
   // Bumped with every delivered change, so "am I running the new file" is a two-tap
   // question rather than a guess.
-  var APP_BUILD = '2026-09-25 · 75';
+  // The build workflow replaces this with the build number (GitHub run number + 40, the same
+  // number as the release title and the app's version 1.0.N); 'dev' only when run unbuilt.
+  var APP_BUILD = 'dev';
   var buildStampEl = document.getElementById('buildStamp');
   var diagnosticsEl = document.getElementById('diagnostics');
   var diagnosticsBtn = document.getElementById('diagnosticsBtn');
