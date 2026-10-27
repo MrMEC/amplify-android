@@ -1,8 +1,6 @@
-"""Build 327: Internet Archive (the Archive tab in Search) and Podcast Index (merged into Podcasts).
-Mocked archive.org and api.podcastindex.org. Checks: the Settings fields; Archive tab + rows;
-tapping a film plays it (one file) and an album queues its songs; Podcast Index adds shows
-Apple's search missed (and drops ones without an Apple id / duplicates); no creds = no request.
-Run: python3 tests/test_archive_podcastindex.py (screenshots in /tmp/claude-0/t/shots)"""
+"""Build 327: Internet Archive (the Archive tab in Search). Mocked archive.org. Checks: Archive tab + rows;
+tapping a film plays it (one file) and an album queues its songs; Podcast Index is not in the app.
+Run: python3 tests/test_archive.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, re, shutil, threading, http.server, functools
 from urllib.parse import urlparse, parse_qs
 from playwright.async_api import async_playwright
@@ -68,31 +66,13 @@ async def main():
         await pg.route('**/*', route)
         await pg.goto('http://127.0.0.1:8828/index.html'); await pg.wait_for_timeout(2500)
 
-        # --- Settings fields
-        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(500)
-        await pg.evaluate("document.getElementById('podcastIndexRow').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(300)
-        vis = await pg.evaluate("(()=>{var r=document.getElementById('piKeyInput').getBoundingClientRect(), s=document.getElementById('piSecretInput').getBoundingClientRect(), pn=document.getElementById('settingsPanel').getBoundingClientRect(); return {kw:Math.round(r.width), sw:Math.round(s.width), inside:r.left>=pn.left&&r.right<=pn.right&&s.right<=pn.right, stype:document.getElementById('piSecretInput').type};})()")
-        check(vis['kw'] > 150 and vis['sw'] > 150 and vis['inside'] and vis['stype'] == 'password', f'Podcast Index fields fit the card {vis}')
-        await pg.screenshot(path=SHOTS + '/arch_settings.png')
-        # No credentials yet: a podcast search must not call Podcast Index.
-        await pg.evaluate("document.getElementById('settingsCloseBtn').click()"); await pg.wait_for_timeout(300)
+        # --- Settings: no Podcast Index fields; Podcasts search is Apple's alone
+        gone = await pg.evaluate("!document.getElementById('podcastIndexRow') && !document.getElementById('piKeyInput')")
+        check(gone, 'no Podcast Index fields in Settings')
         await sheet_search(pg, 'serial')
-        check(len(seen['pi']) == 0, 'no Podcast Index request without a key and secret')
+        check(len(seen['pi']) == 0, 'no Podcast Index request')
         await click_tab(pg, 'Podcasts')
-        check(await names(pg) == ['Serial Dup'], f'podcasts: only Apple\'s answer {await names(pg)}')
-        # --- type the credentials in Settings (as Mark would) and search again
-        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(400)
-        await pg.fill('#piKeyInput', 'KEY123'); await pg.fill('#piSecretInput', 'SECRET456')
-        await pg.evaluate("document.getElementById('settingsCloseBtn').click()"); await pg.wait_for_timeout(300)
-        await sheet_search(pg, 'serial two')
-        check(len(seen['pi']) >= 1, 'Podcast Index asked once credentials are saved')
-        if seen['pi']:
-            h = {k.lower(): v for k, v in seen['pi'][-1]['h'].items()}
-            check(h.get('x-auth-key') == 'KEY123' and re.fullmatch(r'[0-9a-f]{40}', h.get('authorization', '')) and h.get('x-auth-date', '').isdigit(), f'auth headers well formed {h}')
-        await click_tab(pg, 'Podcasts')
-        nm = await names(pg)
-        check(nm == ['Serial Dup', 'Serial Only On PI'], f'podcasts: Apple + Podcast Index extra, no duplicate, no id-less show {nm}')
-        await pg.screenshot(path=SHOTS + '/arch_podcasts.png')
+        check(await names(pg) == ['Serial Dup'], f'podcasts: Apple only {await names(pg)}')
 
         # --- Archive tab
         await sheet_search(pg, 'nosferatu')

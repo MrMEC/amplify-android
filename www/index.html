@@ -5099,12 +5099,6 @@
   }
   .settings-select:hover{ border-color:var(--accent-dim); }
   .settings-select:focus{ outline:none; border-color:var(--accent); }
-  .settings-input{
-    background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:8px;
-    padding:8px 12px; font-size:12.5px; font-weight:600; font-family:inherit; width:100%; box-sizing:border-box; min-width:0;
-  }
-  .settings-input:focus{ outline:none; border-color:var(--accent); }
-  .settings-note{ font-size:11.5px; line-height:1.4; color:var(--muted, #8a93a0); margin-top:6px; }
   .settings-data-btn:hover{ border-color:var(--accent-dim); }
 
   /* ---------- the Settings card itself ----------
@@ -7624,16 +7618,6 @@
       </div>
       <div class="plex-body" id="plexSettingsBody"></div>
     </div>
-    <!-- Build 327: Podcast Index (a second place to find podcasts, next to Apple's). Its free
-         key and secret come from podcastindex.org; both stay on this phone. -->
-    <div class="settings-row settings-row--stack" id="podcastIndexRow">
-      <div class="settings-row-head">
-        <span class="settings-label">Podcast Index</span>
-      </div>
-      <input type="text" class="settings-input" id="piKeyInput" placeholder="API key" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Podcast Index API key">
-      <input type="password" class="settings-input" id="piSecretInput" placeholder="API secret" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Podcast Index API secret" style="margin-top:8px;">
-      <div class="settings-note">Free at podcastindex.org/api. Adds its shows to Podcast search.</div>
-    </div>
     <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
          re-downloaded and opened from several places, and without this there is no way to
          tell one build from another from inside the app. -->
@@ -9418,15 +9402,6 @@
     try{ sel.value = localStorage.getItem('radioPlayerVideoPlayer') === 'builtin' ? 'builtin' : 'vlc'; hw.value = localStorage.getItem('radioPlayerVlcHw') === 'off' ? 'off' : 'on'; }catch(e){}
     sel.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVideoPlayer', sel.value); }catch(e){} });
     hw.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVlcHw', hw.value); }catch(e){} });
-  })();
-  // Podcast Index key and secret (build 327): kept on this phone only.
-  (function(){
-    var k = document.getElementById('piKeyInput'), sc = document.getElementById('piSecretInput');
-    if(!k || !sc) return;
-    try{ k.value = localStorage.getItem('radioPlayerPodcastIndexKey') || ''; sc.value = localStorage.getItem('radioPlayerPodcastIndexSecret') || ''; }catch(e){}
-    function save(){ try{ localStorage.setItem('radioPlayerPodcastIndexKey', k.value.trim()); localStorage.setItem('radioPlayerPodcastIndexSecret', sc.value.trim()); }catch(e){} }
-    k.addEventListener('change', save); sc.addEventListener('change', save);
-    k.addEventListener('input', save); sc.addEventListener('input', save);
   })();
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
@@ -38628,8 +38603,8 @@
   // search box at all -- until now there was no route to one except the Artists list.
 
   // Top Results (build 117) leads: the closest few matches of every kind, in one list.
-  // ---------- Podcast Index and the Internet Archive (build 327) ----------
-  // Two more places to find things. Both are asked through the phone's own connection
+  // ---------- Internet Archive (build 327) ----------
+  // Another place to find things. It is asked through the phone's own connection
   // (CapacitorHttp: no CORS) and through the WebView's fetch anywhere else.
   function extJson(url, headers){
     var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
@@ -38646,56 +38621,6 @@
       if(!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     });
-  }
-
-  // -- Podcast Index (free key and secret from podcastindex.org, entered in Settings) --
-  // Only shows that also have an Apple (iTunes) id are kept: Amplify opens a show through
-  // that id, so a Podcast Index show without one has nothing to open yet.
-  var PI_KEY_STORE = 'radioPlayerPodcastIndexKey', PI_SECRET_STORE = 'radioPlayerPodcastIndexSecret';
-  function podcastIndexCreds(){
-    try{
-      var k = (localStorage.getItem(PI_KEY_STORE) || '').trim(), sc = (localStorage.getItem(PI_SECRET_STORE) || '').trim();
-      return k && sc ? { key: k, secret: sc } : null;
-    }catch(e){ return null; }
-  }
-  function sha1Hex(text){
-    if(!(window.crypto && window.crypto.subtle)) return Promise.reject(new Error('no crypto'));
-    return window.crypto.subtle.digest('SHA-1', new TextEncoder().encode(text)).then(function(buf){
-      return Array.prototype.map.call(new Uint8Array(buf), function(x){ return ('0' + x.toString(16)).slice(-2); }).join('');
-    });
-  }
-  function podcastIndexSearch(term, limit){
-    var c = podcastIndexCreds();
-    if(!c) return Promise.resolve([]);
-    var ts = String(Math.floor(Date.now() / 1000));
-    return sha1Hex(c.key + c.secret + ts).then(function(auth){
-      return extJson('https://api.podcastindex.org/api/1.0/search/byterm?max=' + (limit || 15) + '&q=' + encodeURIComponent(term),
-        { 'X-Auth-Date': ts, 'X-Auth-Key': c.key, 'Authorization': auth, 'User-Agent': 'Amplify/1.0' });
-    }).then(function(d){
-      return ((d && d.feeds) || []).filter(function(f){ return f && Number(f.itunesId) > 0; }).map(function(f){
-        // Shaped like an iTunes result, so everything downstream reads it the same way.
-        return {
-          collectionId: Number(f.itunesId), collectionName: f.title || '', artistName: f.author || f.ownerName || '',
-          artworkUrl600: f.artwork || f.image || '', feedUrl: f.url || '', trackCount: f.episodeCount || 0,
-          genres: f.categories ? Object.keys(f.categories).map(function(k){ return f.categories[k]; }) : []
-        };
-      });
-    });
-  }
-  // Apple's answers first, then anything Podcast Index adds that Apple's did not return.
-  // Podcast Index failing never costs the Apple results; Apple failing only matters when
-  // Podcast Index has nothing either.
-  function podcastSearchBoth(term, limit){
-    var piP = podcastIndexSearch(term, limit)['catch'](function(){ return []; });
-    return itunesSearchPodcasts(term, limit).then(function(r){ return { r: r, err: null }; }, function(e){ return { r: [], err: e }; })
-      .then(function(a){
-        return piP.then(function(extra){
-          if(a.err && !extra.length) throw a.err;
-          var have = {};
-          a.r.forEach(function(x){ have[String(x.collectionId)] = true; });
-          return a.r.concat(extra.filter(function(x){ return !have[String(x.collectionId)]; }));
-        });
-      });
   }
 
   // -- Internet Archive (no key) --
@@ -39045,7 +38970,7 @@
       if(searchState === st) applySearchResults();
     });
 
-    podcastSearchBoth(remoteQ, 15).then(function(results){
+    itunesSearchPodcasts(remoteQ, 15).then(function(results){
       if(stale()) return;
       st.podcasts = rankByMatch(results.map(showFromItunes).filter(function(sh){
         return !pq.phrases.length || matchesQuery([sh.collectionName, sh.artistName], { terms: [], phrases: pq.phrases });
