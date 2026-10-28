@@ -4055,6 +4055,21 @@
   .ia-items{ padding-left:12px; border-left:2px solid var(--border); margin-left:6px; }
   .ia-item .ch-name{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; }
   .ia-item .ch-sub{ white-space:normal; }
+  .ia-combine{ margin-right:-4px; }
+  .ia-custom-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 0 4px; }
+  .ia-custom-tools .settings-select{ flex:0 0 auto; width:auto; min-width:0; }
+  .ia-del{ color:#ff6b6b; }
+  .ia-sheet-back{ position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.55); display:flex; align-items:flex-end; justify-content:center; }
+  .ia-sheet{ width:100%; max-width:560px; max-height:80vh; overflow:auto; background:var(--panel); border-radius:16px 16px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); box-sizing:border-box; }
+  .ia-sheet-title{ font-size:17px; font-weight:700; color:var(--text); }
+  .ia-sheet-sub{ white-space:normal; margin:2px 0 10px; }
+  .ia-pick{ display:flex; align-items:center; gap:10px; width:100%; padding:12px 4px; background:none; border:0; border-bottom:1px solid var(--border); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .ia-pick-name{ flex:1 1 auto; min-width:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ia-pick-n{ flex:none; font-size:12px; color:var(--text-dim); }
+  .ia-pick.has i{ color:var(--accent); }
+  .ia-new{ display:flex; gap:8px; margin-top:14px; }
+  .ia-new .cs-field-input{ flex:1 1 auto; width:auto; min-width:0; }
+  .ia-sheet-done{ display:block; width:100%; margin-top:14px; }
   /* A station with video, in the search results: the camera to the right of the name, level
      with its first line. The name keeps its two-line clamp and gives way to the icon. */
   .tile-name-row{ display:flex; align-items:flex-start; gap:5px; margin-top:9px; min-width:0; }
@@ -21541,7 +21556,7 @@
     tools.appendChild(row);
     var hint = document.createElement('div');
     hint.className = 'ch-sub ia-hint';
-    hint.textContent = 'Off: searches the collections below. On: searches all of archive.org. Tap + to add an item as a channel.';
+    hint.textContent = 'Off: searches the collections below. On: searches all of archive.org. Tap + to make an item its own channel, or the list button next to it to put it in a custom channel.';
     tools.appendChild(hint);
   }
   function archiveCount(n){ return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0); }
@@ -21560,6 +21575,17 @@
     var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = sub; text.appendChild(sb);
     row.appendChild(text);
     var ch = archiveItemChannel(it);
+    var combine = document.createElement('button');
+    combine.type = 'button';
+    combine.className = 'ch-add ia-combine';
+    combine.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h11M4 12h8M4 17h8M18 12v6M15 15h6"/></svg>';
+    combine.title = 'Add to a custom channel';
+    combine.setAttribute('aria-label', 'Add to a custom channel');
+    combine.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      openArchivePicker(it, function(){ if(!(addChannelsState.archiveQ || '').trim() && onAddChannelsView && addChannelsTab === 'archive') renderAddChannels(true); });
+    });
+    row.appendChild(combine);
     var add = document.createElement('button');
     add.type = 'button';
     function paint(){
@@ -21600,6 +21626,86 @@
         body.innerHTML = '<div class="empty-state">Couldn’t reach archive.org. Check your connection and try again.</div>';
       });
       return;
+    }
+    function customRow(c){
+      var wrap = document.createElement('div');
+      wrap.className = 'ia-cat ia-custom';
+      var row = document.createElement('div');
+      row.className = 'ch-row ch-mine';
+      var logo = document.createElement('div');
+      logo.className = 'ch-logo';
+      if(c.archive.items.length) logo.appendChild(vImg(archiveArtUrl(c.archive.items[0].id))); else logo.innerHTML = LOGO_FALLBACK;
+      row.appendChild(logo);
+      var text = document.createElement('div');
+      text.className = 'ch-text';
+      var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = c.name; text.appendChild(n);
+      var sb = document.createElement('div'); sb.className = 'ch-sub';
+      sb.textContent = c.archive.items.length + (c.archive.items.length === 1 ? ' item' : ' items') + ' · ' + (c.archive.order === 'shuffle' ? 'Shuffled' : 'In order');
+      text.appendChild(sb);
+      row.appendChild(text);
+      var chev = document.createElement('i');
+      chev.className = 'fa-solid fa-chevron-down ia-chev';
+      chev.setAttribute('aria-hidden', 'true');
+      row.appendChild(chev);
+      wrap.appendChild(row);
+      var open = null;
+      function draw(){
+        open.innerHTML = '';
+        var tools = document.createElement('div'); tools.className = 'ia-custom-tools';
+        var sw = document.createElement('label'); sw.className = 'ia-switch';
+        sw.innerHTML = '<input type="checkbox" role="switch" aria-label="Shuffle"><span class="ia-switch-track" aria-hidden="true"></span><span class="ia-switch-text">Shuffle</span>';
+        var cb = sw.querySelector('input'); cb.checked = c.archive.order === 'shuffle';
+        cb.addEventListener('change', function(){ c.archive.order = cb.checked ? 'shuffle' : 'sequence'; saveVideoChannels(); sb.textContent = c.archive.items.length + (c.archive.items.length === 1 ? ' item' : ' items') + ' · ' + (cb.checked ? 'Shuffled' : 'In order'); });
+        tools.appendChild(sw);
+        var rn = document.createElement('button'); rn.type = 'button'; rn.className = 'settings-select'; rn.textContent = 'Rename';
+        rn.addEventListener('click', function(){
+          var t = window.prompt('Channel name', c.name || '');
+          if(t == null || !t.trim()) return;
+          renameVideoChannel(c.url, t);
+          n.textContent = c.name;
+        });
+        tools.appendChild(rn);
+        var del = document.createElement('button'); del.type = 'button'; del.className = 'settings-select ia-del'; del.textContent = 'Delete channel';
+        del.addEventListener('click', function(){
+          if(!window.confirm('Delete the channel "' + c.name + '"? The archive.org items stay on archive.org.')) return;
+          removeVideoChannel(c.url);
+          renderAddChannels(true);
+        });
+        tools.appendChild(del);
+        open.appendChild(tools);
+        if(!c.archive.items.length){
+          var em = document.createElement('div'); em.className = 'ch-sub'; em.textContent = 'Empty. Search or browse, then tap the list button on an item to add it here.';
+          open.appendChild(em);
+        }
+        c.archive.items.forEach(function(it, i){
+          var r = document.createElement('div'); r.className = 'ch-row ch-mine ia-item';
+          var lg = document.createElement('div'); lg.className = 'ch-logo'; lg.appendChild(vImg(archiveArtUrl(it.id))); r.appendChild(lg);
+          var tx = document.createElement('div'); tx.className = 'ch-text';
+          var nm = document.createElement('div'); nm.className = 'ch-name'; nm.textContent = (i + 1) + '. ' + it.title; tx.appendChild(nm);
+          var s2 = document.createElement('div'); s2.className = 'ch-sub'; s2.textContent = [it.video ? 'Video' : 'Audio', it.year, it.creator].filter(Boolean).join(' · '); tx.appendChild(s2);
+          r.appendChild(tx);
+          var x = document.createElement('button'); x.type = 'button'; x.className = 'ch-add ia-remove'; x.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+          x.title = 'Remove from this channel'; x.setAttribute('aria-label', 'Remove from this channel');
+          x.addEventListener('click', function(ev){
+            ev.stopPropagation();
+            removeFromArchiveCustom(c, it.id);
+            sb.textContent = c.archive.items.length + (c.archive.items.length === 1 ? ' item' : ' items') + ' · ' + (c.archive.order === 'shuffle' ? 'Shuffled' : 'In order');
+            draw();
+          });
+          r.appendChild(x);
+          r.addEventListener('click', function(){ playArchiveItem(it, r); });
+          open.appendChild(r);
+        });
+      }
+      row.addEventListener('click', function(){
+        if(open){ open.remove(); open = null; wrap.classList.remove('open'); return; }
+        wrap.classList.add('open');
+        open = document.createElement('div');
+        open.className = 'ia-items';
+        wrap.appendChild(open);
+        draw();
+      });
+      return wrap;
     }
     function catRow(cat){
       var wrap = document.createElement('div');
@@ -21657,6 +21763,11 @@
         });
       });
       return wrap;
+    }
+    var mineCh = archiveCustomChannels();
+    if(mineCh.length){
+      var h0 = document.createElement('div'); h0.className = 'ia-head'; h0.textContent = 'Your archive channels'; body.appendChild(h0);
+      mineCh.forEach(function(c){ body.appendChild(customRow(c)); });
     }
     var h1 = document.createElement('div'); h1.className = 'ia-head'; h1.textContent = 'Popular collections'; body.appendChild(h1);
     ARCHIVE_CATS.filter(function(c){ return !c.more; }).forEach(function(c){ body.appendChild(catRow(c)); });
@@ -38890,6 +39001,92 @@
     return { id: 'archive:i:' + it.id, name: it.title, url: 'amplify-archive:i:' + it.id, logo: archiveArtUrl(it.id),
       cats: ['archive.org'], src: 'archive', archive: { id: it.id, title: it.title, creator: it.creator, year: it.year, video: !!it.video } };
   }
+  // Build 340 (Mark): your own archive channels: a name and any archive.org items you put in
+  // it (cartoons and Wonderful World of Disney in one "Disney" channel, say). Kept in My
+  // Channels like any other channel; it plays its items in order or shuffled.
+  function isArchiveCustomUrl(u){ return typeof u === 'string' && u.indexOf('amplify-archive:m:') === 0; }
+  function archiveCustomChannels(){ return videoChannels.filter(function(c){ return isArchiveCustomUrl(c.url) && c.archive && c.archive.items; }); }
+  function archiveItemStub(it){ return { id: it.id, title: it.title, creator: it.creator || '', year: it.year || '', video: !!it.video }; }
+  function archiveCustomHas(ch, it){
+    return ch.archive.items.some(function(x){ return x.id === it.id; });
+  }
+  function createArchiveCustom(name, it){
+    name = String(name || '').trim();
+    if(!name) return null;
+    var url = 'amplify-archive:m:' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+    var items = it ? [archiveItemStub(it)] : [];
+    if(!addVideoChannel({ id: 'archive:m:' + url.slice(18), name: name, url: url, logo: items.length ? archiveArtUrl(items[0].id) : '',
+      cats: ['archive.org'], src: 'archive', archive: { items: items, order: 'sequence' } })) return null;
+    return findVideoChannel(url);
+  }
+  function archiveCustomRefresh(ch){
+    var a = ch.archive;
+    ch.logo = a.items.length ? archiveArtUrl(a.items[0].id) : '';
+    saveVideoChannels();
+  }
+  function addToArchiveCustom(ch, it){
+    if(archiveCustomHas(ch, it)) return false;
+    ch.archive.items.push(archiveItemStub(it));
+    archiveCustomRefresh(ch);
+    return true;
+  }
+  function removeFromArchiveCustom(ch, id){
+    ch.archive.items = ch.archive.items.filter(function(x){ return x.id !== id; });
+    archiveCustomRefresh(ch);
+  }
+  // The "add to a custom channel" sheet: pick one of your archive channels, or name a new one.
+  function openArchivePicker(it, onDone){
+    var back = document.createElement('div');
+    back.className = 'ia-sheet-back';
+    var sheet = document.createElement('div');
+    sheet.className = 'ia-sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-label', 'Add to a custom channel');
+    back.appendChild(sheet);
+    function close(){ back.remove(); if(onDone) onDone(); }
+    back.addEventListener('click', function(e){ if(e.target === back) close(); });
+    function draw(){
+      sheet.innerHTML = '';
+      var h = document.createElement('div'); h.className = 'ia-sheet-title'; h.textContent = 'Add to a custom channel'; sheet.appendChild(h);
+      var sub = document.createElement('div'); sub.className = 'ch-sub ia-sheet-sub'; sub.textContent = it.title; sheet.appendChild(sub);
+      archiveCustomChannels().forEach(function(ch){
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'ia-pick';
+        var has = archiveCustomHas(ch, it);
+        row.innerHTML = '<span class="ia-pick-name"></span><span class="ia-pick-n"></span><i class="fa-solid ' + (has ? 'fa-check' : 'fa-plus') + '"></i>';
+        row.querySelector('.ia-pick-name').textContent = ch.name;
+        row.querySelector('.ia-pick-n').textContent = ch.archive.items.length + (ch.archive.items.length === 1 ? ' item' : ' items');
+        if(has) row.classList.add('has');
+        row.addEventListener('click', function(){
+          if(has) removeFromArchiveCustom(ch, it.id); else addToArchiveCustom(ch, it);
+          draw();
+        });
+        sheet.appendChild(row);
+      });
+      var nw = document.createElement('div'); nw.className = 'ia-new';
+      var inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'cs-field-input'; inp.placeholder = 'New channel name'; inp.maxLength = 60;
+      inp.setAttribute('aria-label', 'New channel name');
+      var go = document.createElement('button');
+      go.type = 'button'; go.className = 'settings-select ia-new-go'; go.textContent = 'Create';
+      function make(){
+        if(!inp.value.trim()) { inp.focus(); return; }
+        var c = createArchiveCustom(inp.value, it);
+        if(c) draw();
+      }
+      go.addEventListener('click', make);
+      inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); make(); } });
+      nw.appendChild(inp); nw.appendChild(go);
+      sheet.appendChild(nw);
+      var done = document.createElement('button');
+      done.type = 'button'; done.className = 'settings-select ia-sheet-done'; done.textContent = 'Done';
+      done.addEventListener('click', close);
+      sheet.appendChild(done);
+    }
+    draw();
+    document.body.appendChild(back);
+  }
   function archiveChannelMeta(url){
     var ch = findVideoChannel(url);
     if(ch && ch.archive) return ch.archive;
@@ -38907,6 +39104,7 @@
     var name = (ch && ch.name) || (cat && cat.name) || meta.title || 'Archive.org';
     var token = ++archiveChToken;
     var itemsP = meta.collection ? archiveTopItems(meta.collection)
+      : meta.items ? Promise.resolve(meta.order === 'shuffle' ? shuffled(meta.items) : meta.items.slice())
       : Promise.resolve([{ id: meta.id, title: meta.title || meta.id, creator: meta.creator || '', year: meta.year || '', video: !!meta.video }]);
     itemsP.then(function(items){
       if(token !== archiveChToken) return;
