@@ -4040,6 +4040,21 @@
     color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; padding:0; }
   .ch-add.added{ background:var(--accent); border-color:var(--accent); color:var(--accent-text); }
   .ch-more{ align-self:center; margin:14px 0 4px; }
+  /* Build 339: Add Channels > Archive.org */
+  .ia-switch{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; flex:none; font-size:13px; color:var(--text); }
+  .ia-switch input{ position:absolute; opacity:0; width:1px; height:1px; }
+  .ia-switch-track{ position:relative; width:38px; height:22px; border-radius:11px; background:var(--panel-2); border:1px solid var(--border); transition:background .15s; flex:none; }
+  .ia-switch-track::after{ content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:var(--text-dim); transition:transform .15s, background .15s; }
+  .ia-switch input:checked + .ia-switch-track{ background:var(--accent); border-color:var(--accent); }
+  .ia-switch input:checked + .ia-switch-track::after{ transform:translateX(16px); background:var(--accent-text); }
+  .ia-switch input:focus-visible + .ia-switch-track{ outline:2px solid var(--accent); outline-offset:2px; }
+  .ia-hint{ white-space:normal; margin:8px 0 0; }
+  .ia-head{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); margin:14px 0 2px; }
+  .ia-chev{ flex:none; width:18px; text-align:center; color:var(--text-dim); font-size:12px; transition:transform .15s; }
+  .ia-cat.open > .ch-row .ia-chev{ transform:rotate(180deg); }
+  .ia-items{ padding-left:12px; border-left:2px solid var(--border); margin-left:6px; }
+  .ia-item .ch-name{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; }
+  .ia-item .ch-sub{ white-space:normal; }
   /* A station with video, in the search results: the camera to the right of the name, level
      with its first line. The name keeps its two-line clamp and gives way to the icon. */
   .tile-name-row{ display:flex; align-items:flex-start; gap:5px; margin-top:9px; min-width:0; }
@@ -18950,6 +18965,7 @@
   }
   function playChannel(ch){
     if(ch && isLiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true }); return; }
+    if(ch && isArchiveChUrl(ch.url)){ playArchiveChannel(ch.url, { open: true }); return; }
     var st = channelToStation(ch);
     playStation(st);
     openNowPlaying(st, true);
@@ -18958,13 +18974,14 @@
     if(!ch || !ch.url || findVideoChannel(ch.url)) return false;
     videoChannels.push({ id: ch.id || ('link:' + ch.url), name: ch.name || 'Channel', url: ch.url, logo: ch.logo || '',
       country: ch.country || '', cats: ch.cats || [], catNames: (ch.cats || []).map(categoryName),
-      src: ch.src || 'link', adult: isAdultChannel(ch) || undefined, gridKey: ch.gridKey || undefined, addedAt: Date.now() });
+      src: ch.src || 'link', adult: isAdultChannel(ch) || undefined, gridKey: ch.gridKey || undefined, archive: ch.archive || undefined, addedAt: Date.now() });
     saveVideoChannels();
     return true;
   }
   // A category's display name: the directory's own name when it's loaded, else the id
   // tidied up ("news" -> "News", "kids" -> "Kids").
   function categoryName(id){
+    if(id === 'archive.org') return 'Archive.org';
     if(iptvIndex && iptvIndex.cats && iptvIndex.cats[id]) return iptvIndex.cats[id];
     return String(id || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
   }
@@ -21432,6 +21449,7 @@
       if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
       var tabList = [['mine', 'My Shows & Movies'], ['recommended', 'Recommended'], ['all', 'All']];
       tabList.push(['pluto', 'Pluto']);
+      tabList.push(['archive', 'Archive.org']);
       if(plexSignedIn()) tabList.push(['plex', 'Plex']);
       // Build 268: signed out, a Plex button in the same place opens a how-to dialog instead
       // of a tab, unless "No thanks" put it away (until Plex is signed in from Settings).
@@ -21458,6 +21476,7 @@
       revealActiveTab(tabs);
       if(addChannelsTab === 'link') buildLinkTools(tools);
       else if(addChannelsTab === 'mine') buildMineTools(tools);
+      else if(addChannelsTab === 'archive') buildArchiveTools(tools);
       else buildBrowseTools(tools);
     }
     var body = document.createElement('div');
@@ -21465,6 +21484,7 @@
     stationsGrid.appendChild(body);
     if(addChannelsTab === 'link'){ renderLinkResults(body); return; }
     if(addChannelsTab === 'mine'){ renderMineChannels(body); return; }
+    if(addChannelsTab === 'archive'){ renderArchiveTab(body); return; }
     body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; })
       : addChannelsTab === 'plex' ? loadPlexLive() : addChannelsTab === 'pluto' ? loadPluto() : loadFreeTv();
@@ -21491,6 +21511,158 @@
         ? '<div class="empty-state">Couldn’t load Pluto TV’s channels (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>'
         : '<div class="empty-state">Couldn’t load the channel list (' + ((err && err.message) || 'network error') + '). Check your connection and try again.</div>';
     });
+  }
+  // ---------- Build 339 (Mark): the Archive.org tab ----------
+  function buildArchiveTools(tools){
+    var row = document.createElement('div');
+    row.className = 'ch-tools-row';
+    var input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'cs-field-input';
+    input.placeholder = 'Search archive.org';
+    input.value = addChannelsState.archiveQ || '';
+    input.setAttribute('aria-label', 'Search archive.org');
+    input.addEventListener('input', function(){
+      addChannelsState.archiveQ = input.value;
+      clearTimeout(addChannelsSearchTimer);
+      addChannelsSearchTimer = setTimeout(function(){ renderAddChannels(true); }, 350);
+    });
+    row.appendChild(input);
+    var sw = document.createElement('label');
+    sw.className = 'ia-switch';
+    sw.innerHTML = '<input type="checkbox" role="switch" aria-label="Search everything"><span class="ia-switch-track" aria-hidden="true"></span><span class="ia-switch-text">Search everything</span>';
+    var cb = sw.querySelector('input');
+    cb.checked = archiveSearchAll();
+    cb.addEventListener('change', function(){
+      setArchiveSearchAll(cb.checked);
+      if((addChannelsState.archiveQ || '').trim()) renderAddChannels(true);
+    });
+    row.appendChild(sw);
+    tools.appendChild(row);
+    var hint = document.createElement('div');
+    hint.className = 'ch-sub ia-hint';
+    hint.textContent = 'Off: searches the collections below. On: searches all of archive.org. Tap + to add an item as a channel.';
+    tools.appendChild(hint);
+  }
+  function archiveCount(n){ return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0); }
+  // One archive.org item as a row: tap to play it, + to make it a channel.
+  function archiveItemRow(it, rank){
+    var row = document.createElement('div');
+    row.className = 'ch-row ch-mine ia-item';
+    var logo = document.createElement('div');
+    logo.className = 'ch-logo';
+    logo.appendChild(vImg(archiveArtUrl(it.id)));
+    row.appendChild(logo);
+    var text = document.createElement('div');
+    text.className = 'ch-text';
+    var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = (rank ? rank + '. ' : '') + it.title; text.appendChild(n);
+    var sub = [it.video ? 'Video' : 'Audio', it.year, it.creator, it.downloads ? archiveCount(it.downloads) + ' downloads' : ''].filter(Boolean).join(' · ');
+    var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = sub; text.appendChild(sb);
+    row.appendChild(text);
+    var ch = archiveItemChannel(it);
+    var add = document.createElement('button');
+    add.type = 'button';
+    function paint(){
+      var on = !!findVideoChannel(ch.url);
+      add.className = 'ch-add' + (on ? ' added' : '');
+      add.innerHTML = on ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-plus"></i>';
+      add.title = on ? 'In My Channels (tap to remove)' : 'Add to My Channels';
+      add.setAttribute('aria-label', add.title);
+    }
+    paint();
+    add.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if(findVideoChannel(ch.url)) removeVideoChannel(ch.url); else addVideoChannel(ch);
+      paint();
+    });
+    row.appendChild(add);
+    row.addEventListener('click', function(){ playArchiveItem(it, row); });
+    return row;
+  }
+  function renderArchiveTab(body){
+    var q = (addChannelsState.archiveQ || '').trim();
+    body.innerHTML = '';
+    if(q){
+      body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      var all = archiveSearchAll();
+      archiveSearchItems(q, all).then(function(items){
+        if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q) return;
+        body.innerHTML = '';
+        if(!items.length){
+          body.innerHTML = '<div class="empty-state">Nothing found' + (all ? '' : ' in the collections. Turn on Search everything to look through all of archive.org') + '.</div>';
+          setResultCount(0, 'item');
+          return;
+        }
+        items.forEach(function(it){ body.appendChild(archiveItemRow(it)); });
+        setResultCount(items.length, 'item');
+      }, function(){
+        if(!onAddChannelsView || addChannelsTab !== 'archive') return;
+        body.innerHTML = '<div class="empty-state">Couldn’t reach archive.org. Check your connection and try again.</div>';
+      });
+      return;
+    }
+    function catRow(cat){
+      var wrap = document.createElement('div');
+      wrap.className = 'ia-cat';
+      var row = document.createElement('div');
+      row.className = 'ch-row ch-mine';
+      var logo = document.createElement('div');
+      logo.className = 'ch-logo';
+      logo.appendChild(vImg(archiveArtUrl(cat.id)));
+      row.appendChild(logo);
+      var text = document.createElement('div');
+      text.className = 'ch-text';
+      var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = cat.name; text.appendChild(n);
+      var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = 'Top 20 · ' + cat.sub; text.appendChild(sb);
+      row.appendChild(text);
+      var ch = archiveCatChannel(cat);
+      var add = document.createElement('button');
+      add.type = 'button';
+      function paint(){
+        var on = !!findVideoChannel(ch.url);
+        add.className = 'ch-add' + (on ? ' added' : '');
+        add.innerHTML = on ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-plus"></i>';
+        add.title = on ? 'In Live TV (tap to remove)' : 'Add as a Live TV channel';
+        add.setAttribute('aria-label', add.title);
+      }
+      paint();
+      add.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        if(findVideoChannel(ch.url)) removeVideoChannel(ch.url); else addVideoChannel(ch);
+        paint();
+      });
+      row.appendChild(add);
+      var chev = document.createElement('i');
+      chev.className = 'fa-solid fa-chevron-down ia-chev';
+      chev.setAttribute('aria-hidden', 'true');
+      row.appendChild(chev);
+      wrap.appendChild(row);
+      var open = null;
+      row.addEventListener('click', function(){
+        if(open){ open.remove(); open = null; wrap.classList.remove('open'); return; }
+        wrap.classList.add('open');
+        open = document.createElement('div');
+        open.className = 'ia-items';
+        open.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+        wrap.appendChild(open);
+        var mine = open;
+        archiveTopItems(cat.id).then(function(items){
+          if(open !== mine) return;
+          mine.innerHTML = '';
+          if(!items.length){ mine.innerHTML = '<div class="empty-state">Nothing came back for this category.</div>'; return; }
+          items.forEach(function(it, i){ mine.appendChild(archiveItemRow(it, i + 1)); });
+        }, function(){
+          if(open !== mine) return;
+          mine.innerHTML = '<div class="empty-state">Couldn’t reach archive.org. Check your connection and try again.</div>';
+        });
+      });
+      return wrap;
+    }
+    var h1 = document.createElement('div'); h1.className = 'ia-head'; h1.textContent = 'Popular collections'; body.appendChild(h1);
+    ARCHIVE_CATS.filter(function(c){ return !c.more; }).forEach(function(c){ body.appendChild(catRow(c)); });
+    var h2 = document.createElement('div'); h2.className = 'ia-head'; h2.textContent = 'More to explore'; body.appendChild(h2);
+    ARCHIVE_CATS.filter(function(c){ return c.more; }).forEach(function(c){ body.appendChild(catRow(c)); });
+    setResultCount(ARCHIVE_CATS.length, 'collection');
   }
   function buildBrowseTools(tools){
     var row = document.createElement('div');
@@ -38633,26 +38805,136 @@
   // -- Internet Archive (no key) --
   // Films and TV, and audio (concerts, old radio, music), from the Archive's own curated
   // collections, so the open uploads that anyone can add to are left out.
+  // Build 339: archive.org collection ids are case-sensitive (SciFi_Horror, Film_Noir,
+  // Comedy_Films and FedFlix were spelled in lower case and matched nothing).
   var IA_COLLECTIONS = ['moviesandfilms', 'classic_tv', 'prelinger', 'silent_films', 'feature_films', 'classic_cartoons',
-    'scifi_horror', 'comedy_films', 'film_noir', 'television', 'fedflix', 'newsandpublicaffairs', 'sports',
+    'SciFi_Horror', 'Comedy_Films', 'Film_Noir', 'television', 'FedFlix', 'newsandpublicaffairs', 'sports',
     'etree', 'gratefuldead', 'oldtimeradio', 'radioprograms', 'audio_music', 'netlabels', '78rpm', 'librivoxaudio', 'podcasts'];
   function archiveArtUrl(id){ return 'https://archive.org/services/img/' + encodeURIComponent(id); }
-  function archiveSearchItems(term){
+  // Build 339 (Mark): "Search everything" -- off, a search looks only in the collections above;
+  // on, it looks through all of archive.org. One switch, kept, used by Search's Archive tab
+  // and by Add Channels' Archive.org tab.
+  var ARCHIVE_ALL_KEY = 'radioPlayerArchiveAll';
+  function archiveSearchAll(){ try{ return localStorage.getItem(ARCHIVE_ALL_KEY) === '1'; }catch(e){ return false; } }
+  function setArchiveSearchAll(on){ try{ localStorage.setItem(ARCHIVE_ALL_KEY, on ? '1' : '0'); }catch(e){} }
+  var IA_MEDIA = 'mediatype:(movies OR audio OR etree)';
+  function archiveDocs(d){
+    var docs = (d && d.response && d.response.docs) || [];
+    return docs.filter(function(x){ return x && x.identifier && x.title; }).map(function(x){
+      var cr = Array.isArray(x.creator) ? x.creator[0] : x.creator;
+      return { id: String(x.identifier), title: String(Array.isArray(x.title) ? x.title[0] : x.title), creator: cr ? String(cr) : '',
+        year: x.year ? String(x.year).slice(0, 4) : '', video: x.mediatype === 'movies', downloads: Number(x.downloads) || 0 };
+    });
+  }
+  function archiveQueryUrl(q, rows){
+    return 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q)
+      + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype&fl%5B%5D=creator&fl%5B%5D=year&fl%5B%5D=downloads'
+      + '&sort%5B%5D=' + encodeURIComponent('downloads desc') + '&rows=' + rows + '&page=1&output=json';
+  }
+  function archiveSearchItems(term, all){
+    if(all == null) all = archiveSearchAll();
     var words = String(term || '').replace(/[^A-Za-z0-9À-￿\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
     if(!words.length) return Promise.resolve([]);
     var w = words.join(' AND ');
-    var q = '(title:(' + w + ') OR creator:(' + w + ')) AND mediatype:(movies OR audio) AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')';
-    var url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q)
-      + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype&fl%5B%5D=creator&fl%5B%5D=year'
-      + '&sort%5B%5D=' + encodeURIComponent('downloads desc') + '&rows=30&page=1&output=json';
-    return extJson(url, { 'Accept': 'application/json' }).then(function(d){
-      var docs = (d && d.response && d.response.docs) || [];
-      return docs.filter(function(x){ return x && x.identifier && x.title; }).map(function(x){
-        var cr = Array.isArray(x.creator) ? x.creator[0] : x.creator;
-        return { id: String(x.identifier), title: String(Array.isArray(x.title) ? x.title[0] : x.title), creator: cr ? String(cr) : '',
-          year: x.year ? String(x.year).slice(0, 4) : '', video: x.mediatype === 'movies' };
-      });
+    var q = '(title:(' + w + ') OR creator:(' + w + ')) AND ' + IA_MEDIA + (all ? '' : ' AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')');
+    return extJson(archiveQueryUrl(q, 30), { 'Accept': 'application/json' }).then(archiveDocs);
+  }
+  // ---------- Build 339 (Mark): Add Channels > Archive.org ----------
+  // Each category is an archive.org collection; its channel plays the 20 most downloaded items
+  // in it (as they are: nothing is picked or filtered out). The list is asked for when the
+  // channel is tuned in and kept for half a day.
+  var ARCHIVE_CATS = [
+    { id: 'classic_tv', name: 'Classic TV', sub: 'Vintage series and episodes' },
+    { id: 'Film_Noir', name: 'Film Noir', sub: 'Shadowy crime dramas of the 1940s and 50s' },
+    { id: 'silent_films', name: 'Silent Films', sub: 'Chaplin, Keaton, Nosferatu and more' },
+    { id: 'SciFi_Horror', name: 'Sci-Fi & Horror', sub: 'B-movies and monster classics' },
+    { id: 'classic_cartoons', name: 'Classic Cartoons', sub: 'Popeye, Betty Boop, Superman and friends' },
+    { id: 'oldtimeradio', name: 'Old-Time Radio', sub: 'Golden-age radio dramas and comedies' },
+    { id: 'etree', name: 'Live Concerts', sub: 'Live Music Archive: fan-taped shows' },
+    { id: 'Comedy_Films', name: 'Comedy Films', sub: 'Slapstick and screwball', more: true },
+    { id: 'feature_films', name: 'Feature Films', sub: 'Public-domain movies', more: true },
+    { id: 'prelinger', name: 'Prelinger Archives', sub: 'Vintage ads, industrials and educational films', more: true },
+    { id: 'classic_tv_commercials', name: 'Classic TV Commercials', sub: 'Ads from the early days of TV', more: true },
+    { id: 'computerchronicles', name: 'Computer Chronicles', sub: 'The 1980s-90s computing TV series', more: true },
+    { id: 'FedFlix', name: 'Government Films', sub: 'US government and military films (FedFlix)', more: true },
+    { id: 'newsandpublicaffairs', name: 'News & Public Affairs', sub: 'Newsreels, reports and documentaries', more: true },
+    { id: 'GratefulDead', name: 'Grateful Dead', sub: 'Live shows from every era', more: true },
+    { id: '78rpm', name: '78 RPM Records', sub: 'Digitized shellac discs', more: true },
+    { id: 'netlabels', name: 'Netlabel Music', sub: 'Free independent releases', more: true },
+    { id: 'librivoxaudio', name: 'Audiobooks', sub: 'LibriVox volunteer readings', more: true }
+  ];
+  function archiveCat(id){ for(var i = 0; i < ARCHIVE_CATS.length; i++) if(ARCHIVE_CATS[i].id === id) return ARCHIVE_CATS[i]; return null; }
+  var ARCHIVE_TOP_KEY = 'radioPlayerArchiveTop';
+  var ARCHIVE_TOP_TTL = 12 * 3600 * 1000;
+  var archiveTopMem = {};
+  function archiveTopItems(id, force){
+    var e = archiveTopMem[id];
+    if(!e){ try{ e = (JSON.parse(localStorage.getItem(ARCHIVE_TOP_KEY) || '{}') || {})[id]; }catch(x){ e = null; } }
+    if(!force && e && e.items && e.items.length && Date.now() - e.t < ARCHIVE_TOP_TTL){ archiveTopMem[id] = e; return Promise.resolve(e.items); }
+    return extJson(archiveQueryUrl('collection:(' + id + ') AND ' + IA_MEDIA, 20), { 'Accept': 'application/json' }).then(function(d){
+      var items = archiveDocs(d);
+      if(items.length){
+        var rec = { t: Date.now(), items: items };
+        archiveTopMem[id] = rec;
+        try{ var all = JSON.parse(localStorage.getItem(ARCHIVE_TOP_KEY) || '{}') || {}; all[id] = rec; localStorage.setItem(ARCHIVE_TOP_KEY, JSON.stringify(all)); }catch(x){}
+      }
+      return items;
     });
+  }
+  function isArchiveChUrl(u){ return typeof u === 'string' && u.indexOf('amplify-archive:') === 0; }
+  function archiveCatChannel(cat){
+    return { id: 'archive:c:' + cat.id, name: cat.name, url: 'amplify-archive:c:' + cat.id, logo: archiveArtUrl(cat.id),
+      cats: ['archive.org'], src: 'archive', archive: { collection: cat.id } };
+  }
+  function archiveItemChannel(it){
+    return { id: 'archive:i:' + it.id, name: it.title, url: 'amplify-archive:i:' + it.id, logo: archiveArtUrl(it.id),
+      cats: ['archive.org'], src: 'archive', archive: { id: it.id, title: it.title, creator: it.creator, year: it.year, video: !!it.video } };
+  }
+  function archiveChannelMeta(url){
+    var ch = findVideoChannel(url);
+    if(ch && ch.archive) return ch.archive;
+    var m = /^amplify-archive:([ci]):(.+)$/.exec(url || '');
+    return m ? (m[1] === 'c' ? { collection: m[2] } : { id: m[2], title: m[2], video: true }) : null;
+  }
+  var archiveChToken = 0;
+  // Tunes in an Archive.org channel: the first playable item starts at once and the rest of the
+  // channel's items are lined up behind it as their file lists arrive.
+  function playArchiveChannel(url, opts){
+    opts = opts || {};
+    var meta = archiveChannelMeta(url);
+    if(!meta) return false;
+    var ch = findVideoChannel(url), cat = meta.collection ? archiveCat(meta.collection) : null;
+    var name = (ch && ch.name) || (cat && cat.name) || meta.title || 'Archive.org';
+    var token = ++archiveChToken;
+    var itemsP = meta.collection ? archiveTopItems(meta.collection)
+      : Promise.resolve([{ id: meta.id, title: meta.title || meta.id, creator: meta.creator || '', year: meta.year || '', video: !!meta.video }]);
+    itemsP.then(function(items){
+      if(token !== archiveChToken) return;
+      var i = 0, started = false, q = null;
+      function next(){
+        if(token !== archiveChToken) return;
+        if(i >= items.length){ if(!started) setStatus('Nothing playable on this channel right now.', true); return; }
+        var it = items[i++];
+        extJson('https://archive.org/metadata/' + encodeURIComponent(it.id), { 'Accept': 'application/json' }).then(function(md){
+          if(token !== archiveChToken) return;
+          var list = archivePlayables(md, it);
+          if(!list.length){ next(); return; }
+          if(!started){
+            started = true;
+            setQueue(list, list[0], name);
+            q = playQueue;
+            playStation(list[0]);
+            if(opts.open) openNowPlaying(list[0], true);
+          } else if(q && playQueue === q){
+            list.forEach(function(t){ q.push(t); });
+            updateStepButtons();
+          }
+          next();
+        }, function(){ next(); });
+      }
+      next();
+    }, function(){ if(token === archiveChToken) setStatus('Could not reach the Internet Archive.', true); });
+    return true;
   }
   function archiveSeconds(v){
     if(v == null || v === '') return 0;
@@ -41003,6 +41285,8 @@
     // Build 262: one of your own channels (a favourite, Continue Watching, the hero, the last
     // thing played): tuned in to what's on it now.
     if(track && track.liveCh && !track._liveTuned) return tuneLiveChannel(track.liveCh);
+    // Build 339: an Archive.org channel (a favourite, Continue Watching, the guide) tunes in.
+    if(track && isArchiveChUrl(track.urlToResolve)) return playArchiveChannel(track.urlToResolve);
     if(isArtistRadio(track)) return playArtistRadio(track);
     if(isPlaylistRadio(track)) return playPlaylistRadio(track);
     if(isCustomStation(track)) return playCustomStation(track);

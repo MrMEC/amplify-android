@@ -78,7 +78,7 @@ async def main():
         await sheet_search(pg, 'nosferatu')
         t = await tabs(pg)
         check(any(x.startswith('Archive') for x in t), f'Archive tab offered {t}')
-        check(any('collection:(' in q and 'mediatype:(movies OR audio)' in q and 'title:(nosferatu)' in q for q in seen['ia_search']), 'archive query shape')
+        check(any('collection:(' in q and 'mediatype:(movies OR audio OR etree)' in q and 'title:(nosferatu)' in q for q in seen['ia_search']), 'archive query shape')
         await click_tab(pg, 'Archive')
         nm = await names(pg)
         check(nm == ['Nosferatu (1922)', 'Nosferatu Soundtrack'], f'archive rows {nm}')
