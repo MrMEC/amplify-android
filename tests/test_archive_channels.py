@@ -74,6 +74,8 @@ async def main():
         cur = await pg.evaluate("({n: document.getElementById('playerName').textContent.trim()})")
         check(cur['n'] == 'Popeye Cartoon 1', f'plays item 1 {cur}')
         await pg.screenshot(path=f'{SHOTS}/archch-playing.png')
+        lay = await pg.evaluate("({ch: document.getElementById('nowPlayingScreen').classList.contains('np-channel'), tg: getComputedStyle(document.getElementById('npVideoToggle')).display})")
+        check(lay['ch'] and lay['tg'] == 'none', f'an archive video uses the video screen, no Turn On Video pill {lay}')
         # Next steps along the channel's items
         await pg.evaluate("document.getElementById('npNextBtn') && document.getElementById('npNextBtn').click()"); await pg.wait_for_timeout(800)
         cur2 = await pg.evaluate("({n: document.getElementById('playerName').textContent.trim()})")

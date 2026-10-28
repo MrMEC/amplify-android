@@ -10417,7 +10417,7 @@
     if(!isMobileLayout() || document.body.classList.contains('rotate-lock')) return;
     if(e.target.closest && e.target.closest('button, a, .np-video-wrap:not([hidden])')) return;
     var st = npTarget();
-    if(!st || isNpChannel(st) || isLocalVideo(st) || npVideoOn) return;
+    if(!st || isNpChannel(st) || isOwnVideo(st) || npVideoOn) return;
     setNpImmersive(!document.body.classList.contains('np-immersive'));
   });
 
@@ -10745,7 +10745,7 @@
       npEpDesc.style.display = text ? '' : 'none';
     }
     if(!npEpDesc) return;
-    if(!station || !isPodcastTrack(station) || isNpChannel(station)){ show(''); return; }
+    if(!station || !isPodcastTrack(station) || isNpChannel(station) || isArchiveVideo(station)){ show(''); return; }
     var text = episodeDescText(station.description);
     show(text);
     if(station.collectionId == null) return;
@@ -10935,7 +10935,7 @@
     npVideoToggle.setAttribute('aria-pressed', npVideoOn ? 'true' : 'false');
     var vm = document.getElementById('npVideoMenuBtn');
     if(vm){
-      vm.style.display = show && (isNpChannel(st) || isLocalVideo(st)) ? '' : 'none';
+      vm.style.display = show && (isNpChannel(st) || isOwnVideo(st)) ? '' : 'none';
       vm.innerHTML = (npVideoOn ? VIDEO_OFF_SVG : VIDEO_ON_SVG).replace('<svg ', '<svg class="menu-svg" ') +
         '<span>' + (npVideoOn ? 'Turn Off Video' : 'Turn On Video') + '</span>';
     }
@@ -11730,7 +11730,7 @@
   function renderNpRelated(station){
     var requestId = ++npRelatedRequestId;
     renderNpEpisodeDesc(station, requestId);
-    if(isNpChannel(station) || isLocalVideo(station) || isChartSong(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
+    if(isNpChannel(station) || isOwnVideo(station) || isChartSong(station)){ npRelated.style.display = 'none'; npRelatedGrid.innerHTML = ''; return; }
     if(isLocalTrack(station)){
       renderNpLibraryRelated(station);
       return;
@@ -11886,7 +11886,7 @@
   // the colour variables are cleared and every rule falls back to the theme's colours.
   function npTintTheme(){
     var st = npTarget();
-    return !!st && (isNpChannel(st) || isLocalVideo(st));
+    return !!st && (isNpChannel(st) || isOwnVideo(st));
   }
   function applyNpTint(colour){
     var themed = npTintTheme();
@@ -12101,7 +12101,7 @@
     var job = ++ringJob;
     if(ringWaitTimer){ clearTimeout(ringWaitTimer); ringWaitTimer = null; }
     var st = currentStation;
-    if(!st || isNpChannel(st) || isLocalVideo(st)){ applyRingColour(null); return; }
+    if(!st || isNpChannel(st) || isOwnVideo(st)){ applyRingColour(null); return; }
     var img = playerIcon && playerIcon.querySelector('img');
     var src = img ? (img.currentSrc || img.src) : '';
     var itemKey = favKey(st);
@@ -12249,7 +12249,7 @@
     renderNpSub(st);
     renderNpGenres(st);
     // A TV channel and a video of your own share the video layout.
-    var videoLayout = isNpChannel(st) || isLocalVideo(st);
+    var videoLayout = isNpChannel(st) || isOwnVideo(st);
     nowPlayingScreen.classList.toggle('np-channel', videoLayout);
     // Build 303: a real TV channel (not a video of your own in the same layout).
     nowPlayingScreen.classList.toggle('np-tv', isNpChannel(st));
@@ -22317,6 +22317,10 @@
     return u;
   }
   function isLocalVideo(t){ return !!t && t.type === 'video'; }
+  // Build 341 (Mark): a film or show from archive.org plays on the video screen (the picture on,
+  // as for a video on the phone), never the podcast screen with its "Turn On Video" button.
+  function isArchiveVideo(t){ return !!t && t.type === 'podcast' && !!t.archiveVideo; }
+  function isOwnVideo(t){ return isLocalVideo(t) || isArchiveVideo(t); }
 
   // ---- names
   var VIDEO_EXT_RE = /\.(mp4|m4v|mkv|webm|mov|avi|wmv|flv|mpg|mpeg|ts|m2ts|3gp|ogv)$/i;
@@ -39152,7 +39156,7 @@
       return { type: 'podcast', guid: 'ia:' + item.id + '/' + f.name, collectionId: '', collectionName: isVideo ? (item.creator || 'Internet Archive') : item.title,
         artistName: item.creator, name: isVideo ? item.title : (f.title || String(f.name).replace(/\.[^.]+$/, '')).replace(/^\s*\d{1,3}\s*[-.)]\s*/, ''),
         favicon: archiveArtUrl(item.id), releaseDate: '', duration: archiveSeconds(f.length), episodeUrl: url(f),
-        description: item.year ? 'Internet Archive · ' + item.year : 'Internet Archive', isVideo: isVideo };
+        description: item.year ? 'Internet Archive · ' + item.year : 'Internet Archive', isVideo: isVideo, archiveVideo: isVideo };
     }
     var usable = files.filter(function(f){ return f && f.name && !f.private && f.source !== 'metadata'; });
     var video = usable.filter(function(f){ return /^(h\.264|mpeg4|512kb mpeg4)$/i.test(f.format || '') || /\.(mp4|m4v)$/i.test(f.name); });
@@ -41763,6 +41767,8 @@
       resumePodcastPosition(episode);
       onPlaybackSuccess(episode);
       markPodcastEpisodePlayed(episode);
+      // Build 341: archive.org films and shows come up with their picture on.
+      if(episode.archiveVideo && !npVideoOn) setNpVideo(true);
     })['catch'](function(err){
       if(!stillWanted()) return;
       attemptInProgress = false;
