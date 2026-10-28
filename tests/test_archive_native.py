@@ -144,6 +144,7 @@ async def route2(r):
     u = urlparse(r.request.url)
     if 'archive.org' in u.netloc:
         if 'advancedsearch' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'response': {'docs': [{'identifier': 'pop%d' % i, 'title': 'Popeye %d' % i, 'mediatype': 'movies', 'downloads': 100 - i} for i in range(1, 4)]}}))
+        if '/metadata/show1' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'files': [{'name': 't%d.mp3' % i, 'format': 'VBR MP3', 'track': str(i), 'title': 'Song %d' % i, 'length': '200'} for i in (1, 2, 3)]}))
         if '/metadata/' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'files': [{'name': 'x.mp4', 'format': 'h.264', 'size': '10', 'length': '600'}]}))
         return await r.fulfill(status=200, content_type='image/png', headers=CORS, body=PNG)
     return await route(r)
@@ -154,24 +155,91 @@ async def main():
         ctx = await b.new_context(viewport={'width': 390, 'height': 860}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US', timezone_id='America/New_York')
         await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE); await ctx.add_init_script(SEED)
         await ctx.add_init_script("localStorage.setItem('radioPlayerVideoTab','channels');")
+        await ctx.add_init_script("window.__dt=0; (function(){ var n=Date.now; Date.now=function(){ return n.call(Date)+window.__dt; }; })();")
         pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e) + ' ' + (e.stack or '')[:300]))
         await pg.route('**/*', route2)
         await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
         await pg.evaluate("""localStorage.setItem('radioPlayerVideoChannels', JSON.stringify(JSON.parse(localStorage.getItem('radioPlayerVideoChannels')).concat([{ id: 'archive:c:classic_cartoons', name: 'Classic Cartoons', url: 'amplify-archive:c:classic_cartoons', logo: '', cats: ['archive.org'], catNames: ['Archive.org'], src: 'archive', archive: { collection: 'classic_cartoons' } }])))""")
         await pg.reload(); await pg.wait_for_timeout(2500)
-        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
-        await pg.evaluate("window.__loads=[]")
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2500)
+        # The schedule, worked out here: three 10-minute cartoons end to end from 2026-01-01 local midnight
+        def on_now(t):
+            off = (t - EPOCH) % 1800
+            return int(off // 600), off % 600, t - (off % 600)
+        g = await grid(pg)
+        row = [r for r in g['rows'] if r['url'] == 'amplify-archive:c:classic_cartoons'][0]
+        blocks = [b2 for b2 in row['blocks'] if b2['ss'] // 1000 > g['t0'] / 1000][:4]
+        okb = all(abs((b2['ee'] - b2['ss']) / 1000 - 600) < 2 and abs(((b2['ss'] / 1000 - EPOCH) % 600)) < 2 for b2 in blocks)
+        idx0 = int(((blocks[0]['ss'] / 1000 - EPOCH) % 1800) // 600) if blocks else -1
+        check(len(blocks) >= 3 and okb and blocks[0]['t'] == 'Popeye %d' % (idx0 + 1), f'guide: each cartoon at its real time, 10 minutes each {[(b2["t"], (b2["ee"]-b2["ss"])//1000) for b2 in blocks]}')
+        nowb = [b2 for b2 in row['blocks'] if b2['now']]
+        i_now, off_now, s_now = on_now(time.time())
+        check(len(nowb) == 1 and nowb[0]['t'] == 'Popeye %d' % (i_now + 1), f'what’s on now is the scheduled cartoon {[b2["t"] for b2 in nowb]} vs Popeye {i_now + 1}')
+        await pg.screenshot(path=f'{SHOTS}/archlive-guide.png')
+        # Tune in: the cartoon on now, joined where the schedule is
+        await pg.evaluate("window.__loads=[]; window.__seeks=[]")
         await tap_now(pg, 'amplify-archive:c:classic_cartoons'); await pg.wait_for_timeout(2500)
-        ld = await pg.evaluate("window.__loads.map(function(a){ return a.url; })")
-        check(ld and 'archive.org/download/pop1/' in ld[-1], f'the channel loads the first show in the native player {ld[-1:]}')
-        # the native player reports a picture: the page draws it through the native view (not its own <video>)
+        la = await pg.evaluate("window.__loads.length ? window.__loads[window.__loads.length-1] : null")
+        i_now, off_now, s_now = on_now(time.time())
+        check(la and ('archive.org/download/pop%d/' % (i_now + 1)) in la['url'], f'tuning in plays the cartoon on now {la and la["url"]}')
+        check(la and abs((la.get('start') or 0) - off_now) < 6 and la.get('engine') != 'vlc', f'it joins in progress where the schedule is ({la and la.get("start")} vs {off_now:.0f}s), on the phone’s player')
+        np = await pg.evaluate(NP)
+        check(np['open'] and np['channel'] and np['live'] and not np['seek'] and not np['skip'], f'Now Playing is live: LIVE, no seek bar, no skip buttons {np}')
+        check(np['name'] == 'Classic Cartoons' and np['sub'].startswith('Popeye %d' % (i_now + 1)), f'the channel’s name, the cartoon under it {np["name"]!r} {np["sub"]!r}')
+        check(np['grid'], 'the guide grid is under the video')
+        # the bar and the range can't be used to skip
+        rng = await pg.evaluate("(function(){ var r=document.getElementById('vctlRange'), l=document.getElementById('vctlLive'); return getComputedStyle(r).visibility + '|' + getComputedStyle(l).display; })()")
+        check(rng == 'hidden|block', f'the video controls show LIVE, no scrubber {rng}')
+        # and dragging it anyway does nothing
+        await pg.evaluate("window.__seeks=[]; var r=document.getElementById('vctlRange'); r.value='900'; r.dispatchEvent(new Event('input',{bubbles:true})); r.dispatchEvent(new Event('change',{bubbles:true}));"); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("window.__seeks.length") == 0, 'no seeking')
+        # the native player reports a picture: drawn natively
         cid = await pg.evaluate("window.__cur")
         await pg.evaluate("window.__emit('video', { id: %s, hasVideo: true, width: 640, height: 480 })" % json.dumps(cid)); await pg.wait_for_timeout(600)
-        st = await pg.evaluate("({on: document.getElementById('nowPlayingScreen').classList.contains('np-video-on'), stream: document.getElementById('nowPlayingScreen').classList.contains('np-video-stream'), vsrc: document.getElementById('npVideo').getAttribute('src') || ''})")
-        check(st['on'] and st['stream'] and not st['vsrc'], f'the picture is on by itself, drawn natively, not by the page’s <video> {st}')
-        np = await pg.evaluate("({ch: document.getElementById('nowPlayingScreen').classList.contains('np-channel'), tg: getComputedStyle(document.getElementById('npVideoToggle')).display, grid: !!document.querySelector('#npCollection .epg'), rows: Array.from(document.querySelectorAll('#npCollection .epg-row')).map(function(r){return r.dataset.chUrl;})})")
-        check(np['ch'] and np['tg'] == 'none' and np['grid'] and 'amplify-archive:c:classic_cartoons' in np['rows'], f'channel layout with the guide grid under the video {np}')
-        await pg.screenshot(path=f'{SHOTS}/archch-native.png')
+        st = await pg.evaluate("({on: document.getElementById('nowPlayingScreen').classList.contains('np-video-on'), stream: document.getElementById('nowPlayingScreen').classList.contains('np-video-stream')})")
+        check(st['on'] and st['stream'], f'the picture is on by itself, drawn by the native player {st}')
+        await pg.screenshot(path=f'{SHOTS}/archlive-np.png')
+        # It ends: the next cartoon comes on from its top
+        await pg.evaluate("window.__loads=[]")
+        await pg.evaluate("window.__emit('state', { id: %s, state: 'ended', isPlaying: false, playWhenReady: false, position: 600, duration: 600 })" % json.dumps(cid)); await pg.wait_for_timeout(2500)
+        la = await pg.evaluate("window.__loads.length ? window.__loads[window.__loads.length-1] : null")
+        nxt = (i_now + 1) % 3
+        check(la and ('archive.org/download/pop%d/' % (nxt + 1)) in la['url'] and (la.get('start') or 0) <= 3, f'when it ends, the next cartoon from its top {la and la["url"]} start={la and la.get("start")}')
+        np = await pg.evaluate(NP)
+        check(np['live'] and np['sub'].startswith('Popeye %d' % (nxt + 1)), f'Now Playing follows it, still live {np["sub"]!r}')
+        # Continue Watching keeps the channel, not the cartoon
+        hist = await pg.evaluate("(JSON.parse(localStorage.getItem('radioPlayerChannelHistory') || '[]')[0] || {}).url")
+        check(hist == 'amplify-archive:c:classic_cartoons', f'Continue Watching keeps the channel ({hist})')
+
+        # A concert (one item, three songs) on a channel of your own: one program in the guide; tuning
+        # in plays the song on now where it is. Nothing is known yet (first time): looked up, then played.
+        await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()")
+        await pg.evaluate("localStorage.removeItem('radioPlayerArchiveFiles'); localStorage.setItem('radioPlayerVideoChannels', JSON.stringify(JSON.parse(localStorage.getItem('radioPlayerVideoChannels')).concat([{ id: 'archive:m:x', name: 'Concerts', url: 'amplify-archive:m:x', logo: '', cats: ['archive.org'], catNames: ['Archive.org'], src: 'archive', archive: { items: [{ id: 'show1', title: 'Live 1977', creator: 'Band', year: '1977', video: false }, { id: 'pop1', title: 'Popeye 1', video: true }], order: 'sequence' } }])))")
+        await pg.reload(); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(200)
+        await pg.evaluate("window.__loads=[]")
+        await tap_now(pg, 'amplify-archive:m:x'); await pg.wait_for_timeout(3000)
+        la = await pg.evaluate("window.__loads.length ? window.__loads[window.__loads.length-1] : null")
+        off = (time.time() - EPOCH) % 1200
+        if off < 600:
+            want = 'show1/t%d.mp3' % (int(off // 200) + 1); want_off = off % 200
+        else:
+            want = 'pop1/x.mp4'; want_off = off - 600
+        check(la and want in la['url'] and abs((la.get('start') or 0) - want_off) < 6, f'first time: looked up, then the file on now, joined in progress ({la and la["url"]} @ {la and la.get("start")} vs {want} @ {want_off:.0f})')
+        await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1200)
+        g = await grid(pg)
+        row = [r for r in g['rows'] if r['url'] == 'amplify-archive:m:x'][0]
+        full = [(b2['t'], round((b2['ee'] - b2['ss']) / 1000)) for b2 in row['blocks'] if b2['ss'] // 1000 > g['t0'] / 1000][:3]
+        check(any(t == 'Live 1977' and d == 600 for t, d in full) and all(t != 'Song 2' for t, d in full), f'the concert is one program in the guide (its songs together) {full}')
+        # In the middle of the concert (the clock moved to 5 minutes into it): song 2, 100 seconds in
+        off = (time.time() - EPOCH) % 1200
+        await pg.evaluate("window.__dt = %f; window.__loads = []" % ((300 - off) * 1000))
+        await tap_now(pg, 'amplify-archive:m:x'); await pg.wait_for_timeout(2000)
+        la = await pg.evaluate("window.__loads.length ? window.__loads[window.__loads.length-1] : null")
+        check(la and 'show1/t2.mp3' in la['url'] and abs((la.get('start') or 0) - 100) < 6, f'mid-concert: the song on now, where it is ({la and la["url"]} @ {la and la.get("start")})')
+        np = await pg.evaluate(NP)
+        check(np['live'] and np['sub'].startswith('Song 2') and 'Live 1977' in np['sub'], f'Now Playing: the song and the show {np["sub"]!r}')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('FAILS', len(fails)); raise SystemExit(1 if fails else 0)

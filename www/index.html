@@ -18985,7 +18985,7 @@
   }
   function playChannel(ch){
     if(ch && isLiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true }); return; }
-    if(ch && isArchiveChUrl(ch.url)){ playArchiveChannel(ch.url, { open: true }); return; }
+    if(ch && isArchiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true }); return; }
     var st = channelToStation(ch);
     playStation(st);
     openNowPlaying(st, true);
@@ -19832,6 +19832,7 @@
   // the schedule still says it's on, it ended early, so the next one starts from the top).
   function tuneLiveChannel(url, opts){
     opts = opts || {};
+    if(isArchiveChUrl(url)) return tuneArchiveChannel(url, opts);   // build 344
     var ch = liveChannelByUrl(url);
     if(!ch) return false;
     var now = Date.now(), slot = liveChSlot(ch, now);
@@ -20432,7 +20433,7 @@
     var out = [], prevEnd = t0;
     // Build 262: your own channels' videos keep their real times (a 22-minute episode rounded
     // to half hours would vanish every other time).
-    var exact = isLiveChUrl(ch && ch.url);
+    var exact = isLiveChUrl(ch && ch.url) || isArchiveChUrl(ch && ch.url);
     guideItemsFor(ch).slice().sort(function(a, b){ return a.s - b.s; }).forEach(function(it){
       if(exact){
         var xs = Math.max(it.s, prevEnd), xe = Math.min(it.e, t1);
@@ -20874,7 +20875,8 @@
       } else {
         // The poster; without one, the backdrop or the episode's own still.
         try{
-          var lv = vlib().byId[st.id];
+          var lv = st.archive ? null : vlib().byId[st.id];
+          if(st.archive) src = st.favicon || '';
           if(lv){
             src = videoPosterUrl(lv) || '';
             if(!src) try{ src = lv.kind === 'episode' ? (episodeImageUrl(lv) || '') : (movieBackdropUrl(lv) || ''); }catch(e2){}
@@ -20971,6 +20973,7 @@
     if(!ch || !ch.url) return null;
     // Build 262: your own channels' schedules are worked out on the phone, nothing to fetch.
     if(isLiveChUrl(ch.url)) return { kind: 'live', key: 'live:' + ch.url.slice('amplify-live:'.length) };
+    if(isArchiveChUrl(ch.url)) return { kind: 'live', key: 'archive:' + ch.url };   // build 344: worked out here too
     if(ch.src === 'pluto' || isPlutoUrl(ch.url)){
       var id = plutoChannelId(ch.url);
       return id ? { kind: 'pluto', key: 'pluto:' + id, id: id } : null;
@@ -20980,6 +20983,7 @@
   }
   function guideItemsFor(ch){
     if(ch && isLiveChUrl(ch.url)) return liveChItems(ch);
+    if(ch && isArchiveChUrl(ch.url)) return archiveChItems(ch);
     var src = guideSource(ch), c = src && guideCache[src.key];
     return c && Array.isArray(c.items) ? c.items : [];
   }
@@ -25374,7 +25378,7 @@
   function videoPlayerMode(){ try{ return localStorage.getItem(VIDEO_PLAYER_KEY) === 'builtin' ? 'builtin' : 'vlc'; }catch(e){ return 'vlc'; } }
   function vlcHardware(){ try{ return localStorage.getItem(VLC_HW_KEY) !== 'off'; }catch(e){ return true; } }
   function vlcUsable(t){
-    return !!(audio && audio.isNative && t && isLocalVideo(t) && !t.plex && !t.plexTwin && !!t.uri);
+    return !!(audio && audio.isNative && t && isLocalVideo(t) && !t.plex && !t.plexTwin && !t.archive && !!t.uri);
   }
   function playLocalVideo(t){
     if(t){ t._useVlc = vlcUsable(t) && videoPlayerMode() === 'vlc'; t._otherTried = false; }
@@ -39212,6 +39216,180 @@
     var m = /^amplify-archive:([ci]):(.+)$/.exec(url || '');
     return m ? (m[1] === 'c' ? { collection: m[2] } : { id: m[2], title: m[2], video: true }) : null;
   }
+  // ---------- Build 344 (Mark): Archive.org channels are live ----------
+  // An Archive.org channel runs like a channel of your own: its shows end to end on a fixed
+  // schedule from the same start date (2026-01-01), repeating. Tuning in joins the show on now
+  // where it is; there is no seeking (LIVE), the next show follows, and the guide shows each show
+  // at its real time. A show's files and their lengths come from archive.org once and are kept
+  // (a month); a concert or radio show with several files is one program in the guide.
+  var ARCHIVE_FILES_KEY = 'radioPlayerArchiveFiles', ARCHIVE_FILES_TTL = 30 * 24 * 3600 * 1000;
+  var archiveFiles = null;
+  function archiveFilesAll(){
+    if(archiveFiles) return archiveFiles;
+    try{ archiveFiles = JSON.parse(localStorage.getItem(ARCHIVE_FILES_KEY) || '{}') || {}; }catch(e){ archiveFiles = {}; }
+    if(typeof archiveFiles !== 'object' || Array.isArray(archiveFiles)) archiveFiles = {};
+    return archiveFiles;
+  }
+  function archiveFilesSave(){ try{ localStorage.setItem(ARCHIVE_FILES_KEY, JSON.stringify(archiveFilesAll())); }catch(e){} }
+  function archiveUnits(id){
+    var r = archiveFilesAll()[id];
+    return r && Array.isArray(r.units) && Date.now() - (r.t || 0) < ARCHIVE_FILES_TTL ? r.units : null;
+  }
+  // The files an item plays, each with its length (one with no known length can't be scheduled).
+  function archiveProbe(items){
+    var todo = items.filter(function(it){ return !archiveUnits(it.id); }), i = 0;
+    if(!todo.length) return Promise.resolve();
+    function worker(){
+      if(i >= todo.length) return Promise.resolve();
+      var it = todo[i++];
+      return extJson('https://archive.org/metadata/' + encodeURIComponent(it.id), { 'Accept': 'application/json' }).then(function(md){
+        var units = archivePlayables(md, it).filter(function(ep){ return ep.duration > 0; }).map(function(ep){
+          return { id: ep.guid, url: ep.episodeUrl, dur: ep.duration, title: ep.name, video: !!ep.isVideo };
+        });
+        archiveFilesAll()[it.id] = { t: Date.now(), units: units };
+      }, function(){}).then(worker);
+    }
+    return Promise.all([worker(), worker(), worker(), worker()]).then(archiveFilesSave);
+  }
+  // What a channel plays, as it is known now (without asking archive.org).
+  function archiveChItemsNow(ch){
+    var meta = archiveChannelMeta(ch.url);
+    if(!meta) return null;
+    if(meta.collection){
+      var e = archiveTopMem[meta.collection];
+      if(!e){ try{ e = (JSON.parse(localStorage.getItem(ARCHIVE_TOP_KEY) || '{}') || {})[meta.collection]; }catch(x){ e = null; } if(e) archiveTopMem[meta.collection] = e; }
+      return e && e.items && e.items.length ? e.items : null;
+    }
+    if(meta.items) return meta.items;
+    return [{ id: meta.id, title: meta.title || meta.id, creator: meta.creator || '', year: meta.year || '', video: meta.video !== false }];
+  }
+  var archivePrep = {};
+  // Gets a channel ready: its list of items (a category's top 20, kept half a day) and every
+  // item's files. Done once per channel at a time; the guide and Now Playing redraw after.
+  function archiveChPrepare(ch){
+    if(archivePrep[ch.url]) return archivePrep[ch.url];
+    var meta = archiveChannelMeta(ch.url);
+    if(!meta) return Promise.resolve();
+    var itemsP = meta.collection ? archiveTopItems(meta.collection) : Promise.resolve(archiveChItemsNow(ch) || []);
+    var p = itemsP.then(function(items){ return archiveProbe(items || []); }).then(function(){
+      delete archivePrep[ch.url];
+      archiveLineups = {};
+      archiveRedraw();
+    }, function(){ delete archivePrep[ch.url]; });
+    archivePrep[ch.url] = p;
+    return p;
+  }
+  function archiveRedraw(){
+    try{ if(onGuideView) renderGuidePage(true); }catch(e){}
+    try{ if(onVideoView && !onAddChannelsView) rerenderVideoKeepingScroll(); }catch(e){}
+    try{ var st = npTarget(); if(st && isNpChannel(st) && nowPlayingScreen.style.display === 'flex') renderNpChannels(st); }catch(e){}
+  }
+  var archiveLineups = {};
+  function archiveChLineup(ch){
+    var items = archiveChItemsNow(ch);
+    if(!items){ archiveChPrepare(ch); return null; }
+    var meta = archiveChannelMeta(ch.url) || {};
+    if(meta.order === 'shuffle'){
+      items = items.slice().sort(function(a, b){
+        return (liveChHash(a.id + '|' + ch.url) - liveChHash(b.id + '|' + ch.url)) || (a.id < b.id ? -1 : 1);
+      });
+    }
+    var key = items.map(function(it){ return it.id; }).join(',');
+    var missing = false, units = [];
+    items.forEach(function(it){
+      var us = archiveUnits(it.id);
+      if(!us){ missing = true; return; }
+      us.forEach(function(u){ units.push({ id: u.id, url: u.url, dur: u.dur, title: u.title, video: u.video, item: it }); });
+    });
+    if(missing) archiveChPrepare(ch);
+    key += '|' + units.length;
+    var c = archiveLineups[ch.url];
+    if(c && c.key === key) return c.lu;
+    var starts = [], total = 0;
+    units.forEach(function(u){ starts.push(total); total += Math.round(u.dur * 1000); });
+    var lu = { units: units, starts: starts, total: total };
+    archiveLineups[ch.url] = { key: key, lu: lu, items: {} };
+    return lu;
+  }
+  function archiveChSlot(ch, t){
+    var lu = archiveChLineup(ch);
+    if(!lu || !lu.total) return null;
+    var base = liveChEpoch();
+    var off = ((t - base) % lu.total + lu.total) % lu.total;
+    var lo = 0, hi = lu.starts.length - 1;
+    while(lo < hi){
+      var mid = (lo + hi + 1) >> 1;
+      if(lu.starts[mid] <= off) lo = mid; else hi = mid - 1;
+    }
+    var s = t - (off - lu.starts[lo]), u = lu.units[lo];
+    return { u: u, s: s, e: s + Math.round(u.dur * 1000), i: lo };
+  }
+  // The guide's programs: one per show (a show's several files run together as one).
+  function archiveChItems(ch){
+    var lu = archiveChLineup(ch);
+    if(!lu || !lu.total) return [];
+    var now = Date.now(), from = epgStart(now) - 3600 * 1000, to = from + 14 * 3600 * 1000;
+    var cache = archiveLineups[ch.url];
+    if(cache.items[from]) return cache.items[from];
+    var out = [], slot = archiveChSlot(ch, from), guard = 0, cur = null;
+    while(slot && slot.s < to && guard++ < 2000){
+      var it = slot.u.item;
+      if(cur && cur.item === it.id && cur.e === slot.s) cur.e = slot.e;
+      else{
+        var pic = archiveArtUrl(it.id);
+        cur = { s: slot.s, e: slot.e, t: it.title || '', sub: [it.year, it.creator].filter(Boolean).join(' · '), code: '', d: '', r: '',
+          im: pic, sq: pic, raw: true, vid: slot.u.id, item: it.id };
+        out.push(cur);
+      }
+      slot = archiveChSlot(ch, slot.e);
+    }
+    cache.items = {};
+    cache.items[from] = out;
+    return out;
+  }
+  function archiveUnitTrack(ch, u){
+    var it = u.item || {};
+    var t = { type: 'video', id: u.id, uri: u.url, videoKind: 'archive', archive: true, favicon: archiveArtUrl(it.id), duration: u.dur,
+      name: ch.name, liveCh: ch.url, urlToResolve: ch.url,
+      liveTitle: u.video || u.title === it.title ? (it.title || u.title) : (u.title + ' · ' + (it.title || '')), year: it.year || '' };
+    Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
+    return t;
+  }
+  var archiveTuneToken = 0;
+  // Tunes in an Archive.org channel (see tuneLiveChannel, which hands these over).
+  function tuneArchiveChannel(url, opts){
+    opts = opts || {};
+    var ch = findVideoChannel(url);
+    if(!ch){
+      var m = /^amplify-archive:c:(.+)$/.exec(url || ''), cat = m ? archiveCat(m[1]) : null;
+      ch = cat ? archiveCatChannel(cat) : null;
+    }
+    if(!ch) return false;
+    var tok = ++archiveTuneToken;
+    var now = Date.now(), slot = archiveChSlot(ch, now);
+    if(!slot){
+      // Not ready yet (the first time): the channel's shows are looked up, then it tunes in.
+      setStatus('Tuning in to ' + ch.name + '…');
+      archiveChPrepare(ch).then(function(){
+        if(tok !== archiveTuneToken) return;
+        if(!archiveChSlot(ch, Date.now())){ setStatus('Nothing on ' + ch.name + ' can be played right now.', true); return; }
+        tuneArchiveChannel(url, opts);
+      });
+      return true;
+    }
+    if(opts.after && slot.u.id === opts.after){
+      // It ended before the schedule says: the next show from its top.
+      var nx = archiveChSlot(ch, slot.e);
+      if(!nx) return false;
+      slot = { u: nx.u, s: now, e: now + Math.round(nx.u.dur * 1000) };
+    }
+    var t = archiveUnitTrack(ch, slot.u);
+    t._liveItemStart = slot.s;
+    playStation(t);
+    if(opts.open) openNowPlaying(t, true);
+    else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
+    return true;
+  }
   var archiveChToken = 0;
   // Tunes in an Archive.org channel: the first playable item starts at once and the rest of the
   // channel's items are lined up behind it as their file lists arrive.
@@ -41607,7 +41785,7 @@
     // thing played): tuned in to what's on it now.
     if(track && track.liveCh && !track._liveTuned) return tuneLiveChannel(track.liveCh);
     // Build 339: an Archive.org channel (a favourite, Continue Watching, the guide) tunes in.
-    if(track && isArchiveChUrl(track.urlToResolve) && !track._archTuned) return playArchiveChannel(track.urlToResolve);
+    if(track && isArchiveChUrl(track.urlToResolve) && !track.liveCh) return tuneLiveChannel(track.urlToResolve);
     if(isArtistRadio(track)) return playArtistRadio(track);
     if(isPlaylistRadio(track)) return playPlaylistRadio(track);
     if(isCustomStation(track)) return playCustomStation(track);
