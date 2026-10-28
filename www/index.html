@@ -7748,6 +7748,11 @@
         <label id="liveChOrderLabel">Order</label>
         <div class="lc-opts lc-one-row" id="liveChOrder" role="radiogroup" aria-labelledby="liveChOrderLabel"></div>
       </div>
+      <div class="cs-field" id="liveChAdsField">
+        <label id="liveChAdsLabel">Commercials</label>
+        <div class="lc-opts lc-one-row" id="liveChAds" role="radiogroup" aria-labelledby="liveChAdsLabel"></div>
+        <p class="lc-note" id="liveChAdsNote">After each show, classic TV commercials from archive.org fill the rest of its half hour or hour. A break can run up to 30 seconds over.</p>
+      </div>
       <p class="lc-note" id="liveChSummary"></p>
     </div>
     <div class="art-url-actions lc-actions">
@@ -19566,6 +19571,15 @@
   }
   function liveChDayKey(t){ return guideDate(t); }
   function liveChDayStart(t){ var d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  // Build 342 (Mark): with commercials on, a video's place in the schedule is its length rounded
+  // up to the channel's slot (30 minutes or an hour); the rest of it is the commercial break. A
+  // video only a hair over a slot's end (two minutes or less) keeps that slot's end as it is.
+  function liveChSlotMs(def, v){
+    var d = Math.round(v.duration * 1000), g = (def && def.ads ? def.ads : 0) * 60000;
+    if(!g || v.mvItem) return d;
+    var k = Math.max(1, Math.ceil((d - 120000) / g));
+    return Math.max(d, k * g);
+  }
   // A channel's videos in order, each with its length (only videos whose length is known).
   // day: the date for a daily shuffle ('' otherwise).
   function liveChLineup(def, day){
@@ -19591,9 +19605,9 @@
         lists.forEach(function(l){ if(i < l.length){ items.push(l[i]); more = true; } });
       }
     }
-    var starts = [], total = 0;
-    items.forEach(function(v){ starts.push(total); total += Math.round(v.duration * 1000); });
-    var lu = { items: items, starts: starts, total: total, show: set.shows.length === 1 && !set.movies.length && !(set.mvs || []).length ? set.shows[0] : null, set: set };
+    var starts = [], slots = [], total = 0;
+    items.forEach(function(v){ var sl = liveChSlotMs(def, v); starts.push(total); slots.push(sl); total += sl; });
+    var lu = { items: items, starts: starts, slots: slots, total: total, show: set.shows.length === 1 && !set.movies.length && !(set.mvs || []).length ? set.shows[0] : null, set: set };
     st.lineups[key] = lu;
     return lu;
   }
@@ -19667,12 +19681,14 @@
     }
     var s = t - (off - lu.starts[lo]);
     var v = lu.items[lo];
-    var e = s + Math.round(v.duration * 1000);
+    var showEnd = s + Math.round(v.duration * 1000);
+    var e = s + (lu.slots ? lu.slots[lo] : Math.round(v.duration * 1000));
     if(daily){
       var next = liveChDayStart(base + 36 * 3600 * 1000);
       if(e > next) e = next;
     }
-    return { v: v, s: s, e: e, i: lo };
+    if(showEnd > e) showEnd = e;
+    return { v: v, s: s, e: e, i: lo, showEnd: showEnd };
   }
   // The schedule as guide programs, from an hour back to 13 hours ahead (worked out again each
   // half hour, or when the library or the channels change).
@@ -19726,6 +19742,90 @@
     if(t.videoKind === 'music') return [t.liveTitle, t.liveArtist].filter(Boolean).join(' · ');
     return [t.liveTitle, t.year].filter(Boolean).join(' · ');
   }
+  // ---------- Build 342 (Mark): commercial breaks ----------
+  // Classic TV commercials from archive.org: a pool of short spots (10 seconds to 2 and a half
+  // minutes), looked up once and kept for a week. A break after a show plays spots until its
+  // slot is full; the last one may run up to 30 seconds past the slot's end. Nothing here shows
+  // in the guide: the slot is the show's, under the show's name.
+  var AD_MIN_MS = 8000, AD_OVER_SEC = 30, AD_POOL_KEY = 'radioPlayerAdPool', AD_POOL_TTL = 7 * 24 * 3600 * 1000;
+  var adPool = null, adPoolBuilding = false, adRecent = [], adFails = 0;
+  function adPoolCached(){
+    if(adPool && adPool.length) return adPool;
+    try{
+      var o = JSON.parse(localStorage.getItem(AD_POOL_KEY) || 'null');
+      if(o && o.list && o.list.length && Date.now() - o.t < AD_POOL_TTL){ adPool = o.list; return adPool; }
+    }catch(e){}
+    return [];
+  }
+  function adPoolBuild(){
+    if(adPoolBuilding || adPoolCached().length) return;
+    adPoolBuilding = true;
+    extJson(archiveQueryUrl('collection:(classic_tv_commercials) AND mediatype:movies', 120), { 'Accept': 'application/json' }).then(function(d){
+      var items = archiveDocs(d), list = [], i = 0;
+      function worker(){
+        if(i >= items.length || list.length >= 40) return Promise.resolve();
+        var it = items[i++];
+        return extJson('https://archive.org/metadata/' + encodeURIComponent(it.id), { 'Accept': 'application/json' }).then(function(md){
+          var pl = archivePlayables(md, it)[0];
+          if(pl && pl.duration >= 8 && pl.duration <= 150) list.push({ id: it.id, title: it.title, url: pl.episodeUrl, dur: pl.duration });
+        }, function(){}).then(worker);
+      }
+      return Promise.all([worker(), worker(), worker(), worker(), worker()]).then(function(){
+        if(list.length){
+          adPool = list;
+          try{ localStorage.setItem(AD_POOL_KEY, JSON.stringify({ t: Date.now(), list: list })); }catch(e){}
+        }
+        adPoolBuilding = false;
+      });
+    })['catch'](function(){ adPoolBuilding = false; });
+  }
+  function pickAd(leftMs){
+    var pool = adPoolCached(), left = leftMs / 1000;
+    var c = pool.filter(function(a){ return a.dur <= left + AD_OVER_SEC && adRecent.indexOf(a.id) === -1; });
+    if(!c.length) c = pool.filter(function(a){ return a.dur <= left + AD_OVER_SEC; });
+    if(!c.length) return null;
+    var fit = c.filter(function(a){ return a.dur <= left; });
+    var from = fit.length ? fit : c, ad = from[Math.floor(Math.random() * from.length)];
+    adRecent.push(ad.id);
+    if(adRecent.length > 12) adRecent.shift();
+    return ad;
+  }
+  function adTrack(ch, info, ad){
+    var t = { type: 'podcast', guid: 'ia:ad:' + ad.id, collectionId: '', collectionName: ch.name, artistName: '', name: ad.title,
+      favicon: archiveArtUrl(ad.id), releaseDate: '', duration: ad.dur, episodeUrl: ad.url, description: '', isVideo: true, archiveVideo: true,
+      liveCh: ch.url, urlToResolve: ch.url, liveTitle: ad.title, liveAd: info };
+    Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
+    return t;
+  }
+  function playLiveBreak(ch, slot, opts){
+    opts = opts || {};
+    if(!adPoolCached().length){ adPoolBuild(); return false; }
+    var ad = pickAd(slot.e - Date.now());
+    if(!ad) return false;
+    adFails = 0;
+    var t = adTrack(ch, { ch: ch.url, showId: slot.v.id, slotEnd: slot.e }, ad);
+    playStation(t);
+    if(opts.open) openNowPlaying(t, true);
+    else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
+    return true;
+  }
+  // A spot ended (or failed): the next one while there is room, else the next show.
+  function onLiveAdEnded(t, failed){
+    var info = t && t.liveAd;
+    if(!info) return;
+    if(failed) adFails++;
+    var left = info.slotEnd - Date.now();
+    if(adFails < 3 && left >= AD_MIN_MS){
+      var ch = liveChannelByUrl(info.ch), ad = ch ? pickAd(left) : null;
+      if(ad){
+        var nt = adTrack(ch, info, ad);
+        playStation(nt);
+        if(nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(nt);
+        return;
+      }
+    }
+    tuneLiveChannel(info.ch, { after: info.showId, breakDone: true, follow: true });
+  }
   // Tunes in: plays what's on now from where it is. after: the video that just ended (when
   // the schedule still says it's on, it ended early, so the next one starts from the top).
   function tuneLiveChannel(url, opts){
@@ -19734,10 +19834,18 @@
     if(!ch) return false;
     var now = Date.now(), slot = liveChSlot(ch, now);
     if(!slot) return false;
+    var ldef = liveChDefOf(ch), adsOn = !!(ldef && ldef.ads) && !opts.breakDone;
     if(opts.after && slot.v.id === opts.after){
+      // Build 342: the show is over; the rest of its slot is a commercial break, then the next show.
+      if(adsOn && slot.e - now >= AD_MIN_MS && playLiveBreak(ch, slot, opts)) return true;
       var nx = liveChSlot(ch, slot.e);
       if(!nx) return false;
-      slot = { v: nx.v, s: now, e: now + Math.round(nx.v.duration * 1000) };
+      slot = { v: nx.v, s: now, e: now + (nx.e - nx.s), showEnd: now + Math.round(nx.v.duration * 1000) };
+    } else if(opts.after && opts.breakDone){
+      // The break ran a little over: the next show starts from its top, not part-way in.
+      slot = { v: slot.v, s: now, e: now + (slot.e - slot.s), showEnd: now + Math.round(slot.v.duration * 1000) };
+    } else if(adsOn && now >= slot.showEnd && slot.e - now >= AD_MIN_MS && playLiveBreak(ch, slot, opts)){
+      return true;
     }
     var t;
     if(slot.v.mvItem){
@@ -19753,7 +19861,7 @@
     t.name = ch.name;
     if(slot.v.mvItem){ /* title and artist set above */ }
     else if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
-    else{ var ldef = liveChDefOf(ch), llu = ldef ? liveChLineupAt(ldef, now) : null; if(llu && !llu.show) t.liveShow = slot.v.show || ''; }
+    else{ var llu = ldef ? liveChLineupAt(ldef, now) : null; if(llu && !llu.show) t.liveShow = slot.v.show || ''; }
     t._liveItemStart = slot.s;
     Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
     playStation(t);
@@ -19999,8 +20107,8 @@
     libraryShuffleBtn.style.display = 'none';
     setResultCount(null);
     resetStationsGrid();
-    liveChEd = def ? { id: def.id, isNew: false, name: def.name || '', src: JSON.parse(JSON.stringify(def.src)), order: def.order || 'sequence' }
-      : { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), isNew: true, name: '', src: { kind: 'pick', shows: [], movies: [] }, order: 'sequence' };
+    liveChEd = def ? { id: def.id, isNew: false, name: def.name || '', src: JSON.parse(JSON.stringify(def.src)), order: def.order || 'sequence', ads: def.ads || 0 }
+      : { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), isNew: true, name: '', src: { kind: 'pick', shows: [], movies: [] }, order: 'sequence', ads: 0 };
     lcEl('liveChTitle').textContent = title;
     lcEl('liveChName').value = liveChEd.name;
     lcEl('liveChSearch').value = '';
@@ -20038,7 +20146,7 @@
     else if(src.kind === 'genre') out.genre = src.genre || '';
     else if(src.kind === 'decade') out.decade = parseInt(src.decade, 10) || 0;
     else if(src.kind === 'mv'){ if(src.all) out.all = true; else out.artists = (src.artists || []).slice(); }
-    return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order };
+    return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order, ads: src.kind === 'mv' ? 0 : (liveChEd.ads || 0) };
   }
   function renderLiveChEditor(){
     var ed = liveChEd, lib = vlib(), src = ed.src;
@@ -20086,6 +20194,9 @@
       dsel.value = String(src.decade || '');
     }
     lcPills(lcEl('liveChOrder'), [['sequence', 'In Order'], ['shuffle', 'Shuffle'], ['daily', 'Daily Shuffle']], ed.order, function(v){ ed.order = v; renderLiveChEditor(); });
+    // Build 342 (Mark): commercial breaks after each show (not for music video channels).
+    lcEl('liveChAdsField').hidden = src.kind === 'mv';
+    lcPills(lcEl('liveChAds'), [['0', 'Off'], ['30', '30-Minute Slots'], ['60', '1-Hour Slots']], String(ed.ads || 0), function(v){ ed.ads = parseInt(v, 10) || 0; renderLiveChEditor(); });
     syncLiveChEditorBits();
   }
   // The name's hint, the picture, what the channel would hold, and whether Save is ready.
@@ -20260,9 +20371,10 @@
   lcEl('liveChSaveBtn').addEventListener('click', function(){
     if(!liveChEd || lcEl('liveChSaveBtn').disabled) return;
     var d = liveChEdDef(), cur = liveChDefById(d.id);
-    if(cur){ cur.name = d.name; cur.src = d.src; cur.order = d.order; }
+    if(cur){ cur.name = d.name; cur.src = d.src; cur.order = d.order; cur.ads = d.ads || 0; }
     else liveChDefs().push(d);
     saveLiveChDefs();
+    if(d.ads) adPoolBuild();
     closeLiveChEditor(true);
     try{ var st = npTarget(); if(st && isNpChannel(st) && nowPlayingScreen.style.display === 'flex') renderNpChannels(st); }catch(e){}
   });
@@ -22258,7 +22370,7 @@
     var n = 0;
     (Array.isArray(list) ? list : []).forEach(function(d){
       if(!liveChValidDef(d) || liveChDefById(d.id)) return;
-      liveChDefs().push({ id: String(d.id), name: String(d.name || ''), src: d.src, order: ['sequence', 'shuffle', 'daily'].indexOf(d.order) !== -1 ? d.order : 'sequence' });
+      liveChDefs().push({ id: String(d.id), name: String(d.name || ''), src: d.src, order: ['sequence', 'shuffle', 'daily'].indexOf(d.order) !== -1 ? d.order : 'sequence', ads: d.ads === 30 || d.ads === 60 ? d.ads : 0 });
       n++;
     });
     if(n){ saveLiveChDefs(); if(typeof refreshVideoPages === 'function') refreshVideoPages(); }
@@ -30613,6 +30725,7 @@
       return;
     }
     if(currentStation && isLocalVideo(currentStation)){ onLocalVideoEnded(); return; }
+    if(currentStation && currentStation.liveAd){ onLiveAdEnded(currentStation); return; }
     if(currentStation && isPodcastTrack(currentStation)){
       savePodcastProgress(currentStation, audio.duration || currentStation.duration || 0, audio.duration || currentStation.duration || 0);
       // Whatever the listener lined up plays next; with nothing lined up an episode just ends.
@@ -41764,14 +41877,15 @@
     tryPlayUrl(url).then(function(){
       if(!stillWanted()) return;
       try{ audio.playbackRate = loadPodcastSpeed(); }catch(e){}
-      resumePodcastPosition(episode);
+      if(!episode.liveAd) resumePodcastPosition(episode);
       onPlaybackSuccess(episode);
-      markPodcastEpisodePlayed(episode);
+      if(!episode.liveAd) markPodcastEpisodePlayed(episode);
       // Build 341: archive.org films and shows come up with their picture on.
       if(episode.archiveVideo && !npVideoOn) setNpVideo(true);
     })['catch'](function(err){
       if(!stillWanted()) return;
       attemptInProgress = false;
+      if(episode.liveAd){ onLiveAdEnded(episode, true); return; }
       showPlaybackFailure(episode, url, err);
     });
   }
