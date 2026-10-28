@@ -11082,7 +11082,7 @@
   var videoLastSent = '', videoRaf = 0, videoViewReply = '', videoBlockedBy = '', videoViewLog = [];
 
   function streamVideoCapable(st){
-    return !!(videoPlugin && streamVideo.has && st && (isLiveStream(st) || isLocalVideo(st)) && currentStation &&
+    return !!(videoPlugin && streamVideo.has && st && (isLiveStream(st) || isLocalVideo(st) || isArchiveVideo(st)) && currentStation &&
       favKey(st) === favKey(currentStation));
   }
   function setStreamVideoOn(on){
@@ -19290,6 +19290,8 @@
   function isNpChannel(st){
     // Build 262: tuned in to one of your own channels (a video playing as a channel).
     if(st && st.liveCh) return true;
+    // Build 343: a show tuned in on an Archive.org channel has the channel layout too (the guide under it).
+    if(st && st.archiveCh) return true;
     if(!st || !isLiveStream(st)) return false;
     var url = st.urlToResolve || st.url_resolved || st.url || '';
     return !!(st.videoChannel || (url && findVideoChannel(url)));
@@ -39233,6 +39235,10 @@
         extJson('https://archive.org/metadata/' + encodeURIComponent(it.id), { 'Accept': 'application/json' }).then(function(md){
           if(token !== archiveChToken) return;
           var list = archivePlayables(md, it);
+          list.forEach(function(t){
+            t.archiveCh = url; t.urlToResolve = url;
+            Object.defineProperty(t, '_archTuned', { value: true, enumerable: false });
+          });
           if(!list.length){ next(); return; }
           if(!started){
             started = true;
@@ -41601,7 +41607,7 @@
     // thing played): tuned in to what's on it now.
     if(track && track.liveCh && !track._liveTuned) return tuneLiveChannel(track.liveCh);
     // Build 339: an Archive.org channel (a favourite, Continue Watching, the guide) tunes in.
-    if(track && isArchiveChUrl(track.urlToResolve)) return playArchiveChannel(track.urlToResolve);
+    if(track && isArchiveChUrl(track.urlToResolve) && !track._archTuned) return playArchiveChannel(track.urlToResolve);
     if(isArtistRadio(track)) return playArtistRadio(track);
     if(isPlaylistRadio(track)) return playPlaylistRadio(track);
     if(isCustomStation(track)) return playCustomStation(track);
@@ -41880,8 +41886,8 @@
       if(!episode.liveAd) resumePodcastPosition(episode);
       onPlaybackSuccess(episode);
       if(!episode.liveAd) markPodcastEpisodePlayed(episode);
-      // Build 341: archive.org films and shows come up with their picture on.
-      if(episode.archiveVideo && !npVideoOn) setNpVideo(true);
+      // Build 343: an archive.org film or show is drawn by the native player (it reports its picture,
+      // see onStreamVideo), as a channel's or a phone video's is; the page's own <video> isn't used.
     })['catch'](function(err){
       if(!stillWanted()) return;
       attemptInProgress = false;
