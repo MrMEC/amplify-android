@@ -7597,6 +7597,15 @@
         <option value="200">200 miles</option>
       </select>
     </div>
+    <!-- Build 346 (Mark): Privacy. While on, searches aren't saved under Search and nothing played
+         goes into Continue Listening or Continue Watching. -->
+    <div class="settings-row">
+      <span class="settings-label" id="privacyLabel">Privacy</span>
+      <select class="settings-select" id="privacySelect" aria-labelledby="privacyLabel">
+        <option value="off">Off</option>
+        <option value="on">On</option>
+      </select>
+    </div>
     <!-- Build 265: the welcome tour, any time. -->
     <div class="settings-row settings-row--stack">
       <span class="settings-label">Tour of Amplify</span>
@@ -9449,6 +9458,17 @@
     try{ sel.value = localStorage.getItem('radioPlayerVideoPlayer') === 'builtin' ? 'builtin' : 'vlc'; hw.value = localStorage.getItem('radioPlayerVlcHw') === 'off' ? 'off' : 'on'; }catch(e){}
     sel.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVideoPlayer', sel.value); }catch(e){} });
     hw.addEventListener('change', function(){ try{ localStorage.setItem('radioPlayerVlcHw', hw.value); }catch(e){} });
+  })();
+  // Build 346 (Mark): Privacy. While on: no recent searches or last search saved, and nothing
+  // played is added to Continue Listening (songs, stations, episodes) or Continue Watching
+  // (videos, channels, music videos); a video's place in it isn't kept either.
+  var PRIVACY_KEY = 'radioPlayerPrivacy';
+  function privacyOn(){ try{ return localStorage.getItem(PRIVACY_KEY) === 'on'; }catch(e){ return false; } }
+  (function(){
+    var sel = document.getElementById('privacySelect');
+    if(!sel) return;
+    sel.value = privacyOn() ? 'on' : 'off';
+    sel.addEventListener('change', function(){ try{ localStorage.setItem(PRIVACY_KEY, sel.value === 'on' ? 'on' : 'off'); }catch(e){} });
   })();
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
@@ -16184,6 +16204,7 @@
   }
 
   function recordRecent(station){
+    if(privacyOn()) return;   // build 346
     if(isBlacklisted(station) || isChannelEntry(station)) return;
     recentStations = recentStations.filter(function(r){ return favKey(r) !== favKey(station); });
     recentStations.unshift(station);
@@ -24095,6 +24116,7 @@
   var cwHidden = vload(CW_HIDDEN_KEY, {});                // key -> when it was removed
   if(!Array.isArray(channelHistory)) channelHistory = [];
   function recordChannelWatch(st){
+    if(privacyOn()) return;   // build 346
     var url = st && (st.urlToResolve || st.url);
     if(!url) return;
     if(/^amplify-archive:i:/.test(url) && typeof archiveSearchAll === 'function' && archiveSearchAll()) return;   // build 345
@@ -24112,7 +24134,7 @@
   var chartVideoHistory = vload(CHART_VIDEO_KEY, []);
   if(!Array.isArray(chartVideoHistory)) chartVideoHistory = [];
   function noteChartVideo(item, video){
-    if(!item) return;
+    if(!item || privacyOn()) return;   // build 346
     var k = favKey(item);
     chartVideoHistory = chartVideoHistory.filter(function(h){ return favKey(h.item) !== k; });
     var it = {};
@@ -25496,6 +25518,7 @@
     var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
     var pos = audio.currentTime || 0;
     if(!pos && !force) return;
+    if(privacyOn()) return;   // build 346: its place isn't kept (nor sent to Plex), so it isn't in Continue Watching
     setVideoProgress(t.id, pos, dur);
     if(t.plex) plexReport(t.id, !!force && audio.paused);
   }
@@ -25516,9 +25539,8 @@
       return;
     }
     var dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (t.duration || 0);
-    setVideoProgress(t.id, dur, dur);
-    vsave(VIDEO_PROGRESS_KEY, videoProgress);
-    if(t.plex){ plexReport(t.id, true); plexStopSession(); }
+    if(!privacyOn()){ setVideoProgress(t.id, dur, dur); vsave(VIDEO_PROGRESS_KEY, videoProgress); }
+    if(t.plex){ if(!privacyOn()) plexReport(t.id, true); plexStopSession(); }
     // stopHere: the sleep timer stopped it at its end (build 230), so nothing follows.
     if(!stopHere && typeof playNextEpisodeAfter === 'function' && playNextEpisodeAfter(t)) return;
     // A music video: on to the next of the artist's videos (build 152).
@@ -39579,6 +39601,7 @@
   }catch(e){}
   var lastSearchSaveTimer = null;
   function saveLastSearch(){
+    if(privacyOn()) return;   // build 346: not kept for next time
     if(lastSearchSaveTimer) clearTimeout(lastSearchSaveTimer);
     lastSearchSaveTimer = setTimeout(function(){
       lastSearchSaveTimer = null;
@@ -40409,6 +40432,7 @@
   try{ recentSearches = (JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]') || []).filter(function(x){ return typeof x === 'string' && x; }); }catch(e){}
   function saveRecentSearches(){ try{ localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recentSearches)); }catch(e){} }
   function addRecentSearch(q){
+    if(privacyOn()) return;   // build 346
     q = String(q || '').trim();
     if(!q || isUrlLike(q)) return;
     var low = q.toLowerCase();
@@ -42426,6 +42450,7 @@
     return { k: favKey(st), r: 'item', it: it };
   }
   function noteHeroPlayed(st){
+    if(privacyOn()) return;   // build 346
     var ref = heroRefOf(st);
     if(!ref || !ref.k) return;
     var h = heroHistLoad().filter(function(x){ return x.k !== ref.k; });
