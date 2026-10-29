@@ -4055,6 +4055,14 @@
   .ia-items{ padding-left:12px; border-left:2px solid var(--border); margin-left:6px; }
   .ia-item .ch-name{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; }
   .ia-item .ch-sub{ white-space:normal; }
+  /* Build 345 (Mark): in Add Channels a name and its description each get up to four lines. */
+  #stationsGrid:has(> .ch-tools) .ch-row :is(.ch-name, .ch-sub){ white-space:normal; display:-webkit-box; -webkit-line-clamp:4; line-clamp:4;
+    -webkit-box-orient:vertical; overflow:hidden; text-overflow:clip; overflow-wrap:anywhere; }
+  /* ...and no mini Now Playing while typing anywhere in Add Channels (its tabs, the custom
+     channel sheet, the New Channel editor). */
+  body.kb-open:has(#stationsGrid > .ch-tools) .player-bar,
+  body.kb-open:has(.ia-sheet) .player-bar,
+  body.kb-open.lc-page-open .player-bar{ display:none !important; }
   .ia-combine{ margin-right:-4px; }
   .ia-custom-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 0 4px; }
   .ia-custom-tools .settings-select{ flex:0 0 auto; width:auto; min-width:0; }
@@ -21466,6 +21474,8 @@
 
   function openAddChannelsPage(){
     enterLibraryChrome();
+    // Build 345 (Mark): with Search everything on, an archive.org search isn't kept for next time.
+    if(typeof archiveSearchAll === 'function' && archiveSearchAll()) addChannelsState.archiveQ = '';
     if(addChannelsTab !== 'link'){
       addChannelsState.country = countryByTab[addChannelsTab] == null ? '' : countryByTab[addChannelsTab];
       addChannelsState.pickDefault = addChannelsTab === 'recommended' && countryByTab.recommended == null;
@@ -21597,6 +21607,7 @@
         b.addEventListener('click', function(){
           if(t[0] === 'plexsignin'){ openPlexAddChDialog(); return; }
           if(addChannelsTab !== 'link') countryByTab[addChannelsTab] = addChannelsState.country;
+          if(addChannelsTab === 'archive' && t[0] !== 'archive' && archiveSearchAll()) addChannelsState.archiveQ = '';   // build 345
           addChannelsTab = t[0]; addChannelsState.shown = 60; addChannelsState.cat = '';
           if(t[0] !== 'link') addChannelsState.country = countryByTab[t[0]] == null ? '' : countryByTab[t[0]];
           addChannelsState.pickDefault = t[0] === 'recommended' && countryByTab.recommended == null;
@@ -21720,7 +21731,7 @@
       paint();
     });
     row.appendChild(add);
-    row.addEventListener('click', function(){ playArchiveItem(it, row); });
+    row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: archiveSearchAll() && !!(addChannelsState.archiveQ || '').trim() }); });
     return row;
   }
   function renderArchiveTab(body){
@@ -24086,6 +24097,7 @@
   function recordChannelWatch(st){
     var url = st && (st.urlToResolve || st.url);
     if(!url) return;
+    if(/^amplify-archive:i:/.test(url) && typeof archiveSearchAll === 'function' && archiveSearchAll()) return;   // build 345
     var c = findVideoChannel(url) || st.channel || {};
     channelHistory = channelHistory.filter(function(h){ return h.url !== url; });
     channelHistory.unshift({ url: url, name: c.name || st.name, logo: c.logo || st.favicon || '', cats: c.cats || [],
@@ -28953,7 +28965,7 @@
     })['catch'](function(){ return []; });
   }
   function savePodcastProgress(episode, positionSec, durationSec){
-    if(!episode || !episode.guid) return Promise.resolve();
+    if(!episode || !episode.guid || episode.iaNoHistory) return Promise.resolve();
     return idbDo([LIB_STORE_PODCAST_EPISODES], 'readwrite', function(tx){
       var store = tx.objectStore(LIB_STORE_PODCAST_EPISODES);
       var getReq = store.get(episode.guid);
@@ -39050,7 +39062,23 @@
   // and by Add Channels' Archive.org tab.
   var ARCHIVE_ALL_KEY = 'radioPlayerArchiveAll';
   function archiveSearchAll(){ try{ return localStorage.getItem(ARCHIVE_ALL_KEY) === '1'; }catch(e){ return false; } }
-  function setArchiveSearchAll(on){ try{ localStorage.setItem(ARCHIVE_ALL_KEY, on ? '1' : '0'); }catch(e){} }
+  function setArchiveSearchAll(on){ try{ localStorage.setItem(ARCHIVE_ALL_KEY, on ? '1' : '0'); }catch(e){} if(on) archivePrivacySweep(); }
+  // Build 345 (Mark): with Search everything on, archive.org results aren't in Continue Listening or
+  // Continue Watching: anything already there from archive.org (an item played on its own, a
+  // one-item channel) is taken out, and nothing new goes in.
+  function archivePrivacySweep(){
+    try{
+      var before = recentStations.length;
+      recentStations = recentStations.filter(function(r){ return !(r && r.type === 'podcast' && /^ia:/.test(r.guid || '')); });
+      if(recentStations.length !== before){ saveRecent(); renderRecentList(); renderRecentSection(); }
+    }catch(e){}
+    try{
+      var n0 = channelHistory.length;
+      channelHistory = channelHistory.filter(function(h){ return !(h && /^amplify-archive:i:/.test(h.url || '')); });
+      if(channelHistory.length !== n0){ vsave(CHANNEL_HISTORY_KEY, channelHistory); refreshContinueWatching(); }
+    }catch(e){}
+  }
+  setTimeout(function(){ if(archiveSearchAll()) archivePrivacySweep(); }, 0);
   var IA_MEDIA = 'mediatype:(movies OR audio OR etree)';
   function archiveDocs(d){
     var docs = (d && d.response && d.response.docs) || [];
@@ -39477,11 +39505,14 @@
     if(!audio.length && video.length) return [ep(video[0], true)];
     return audio.slice(0, 200).map(function(f){ return ep(f, false); });
   }
-  function playArchiveItem(item, row){
+  function playArchiveItem(item, row, opts){
     if(row) row.classList.add('loading');
     extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
       if(row) row.classList.remove('loading');
       var list = archivePlayables(meta, item);
+      // Build 345 (Mark): a result found with Search everything on leaves no trace (Continue
+      // Listening, Continue Watching, its place in it).
+      if(opts && opts.noHistory) list.forEach(function(t){ t.iaNoHistory = true; });
       if(!list.length){ setStatus('Nothing playable in this Internet Archive item.', true); return; }
       if(list.length > 1) setQueue(list, list[0], item.title); else clearQueue();
       playStation(list[0]);
@@ -39511,7 +39542,7 @@
     sub.textContent = [item.video ? 'Video' : 'Audio', item.year, item.creator].filter(Boolean).join(' · ');
     body.appendChild(sub);
     row.appendChild(body);
-    row.addEventListener('click', function(){ playArchiveItem(item, row); });
+    row.addEventListener('click', function(){ playArchiveItem(item, row, { noHistory: archiveSearchAll() }); });
     return row;
   }
 
@@ -41945,6 +41976,7 @@
       setPlayingUI(true);
       return;
     }
+    if(station.iaNoHistory){ updatePlayerMeta(station, barSubFor(station)); setPlayingUI(true); return; }   // build 345
     if(typeof noteHeroPlayed === 'function') noteHeroPlayed(station);
     updatePlayerMeta(station, barSubFor(station));
     setPlayingUI(true);
@@ -42061,9 +42093,9 @@
     tryPlayUrl(url).then(function(){
       if(!stillWanted()) return;
       try{ audio.playbackRate = loadPodcastSpeed(); }catch(e){}
-      if(!episode.liveAd) resumePodcastPosition(episode);
+      if(!episode.liveAd && !episode.iaNoHistory) resumePodcastPosition(episode);
       onPlaybackSuccess(episode);
-      if(!episode.liveAd) markPodcastEpisodePlayed(episode);
+      if(!episode.liveAd && !episode.iaNoHistory) markPodcastEpisodePlayed(episode);
       // Build 343: an archive.org film or show is drawn by the native player (it reports its picture,
       // see onStreamVideo), as a channel's or a phone video's is; the page's own <video> isn't used.
     })['catch'](function(err){

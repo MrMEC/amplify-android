@@ -143,7 +143,7 @@ async def tap_now(pg, url, sel='#stationsGrid'):
 async def route2(r):
     u = urlparse(r.request.url)
     if 'archive.org' in u.netloc:
-        if 'advancedsearch' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'response': {'docs': [{'identifier': 'pop%d' % i, 'title': 'Popeye %d' % i, 'mediatype': 'movies', 'downloads': 100 - i} for i in range(1, 4)]}}))
+        if 'advancedsearch' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'response': {'docs': [{'identifier': 'pop%d' % i, 'title': 'Popeye %d' % i + (' and a remarkably long title that keeps going for many words to test wrapping' * (2 if i == 1 else 0)), 'creator': ('Fleischer Studios Paramount Famous Lasky Corporation ' * (4 if i == 1 else 0)) or None, 'year': '1950', 'mediatype': 'movies', 'downloads': 100 - i} for i in range(1, 4)]}}))
         if '/metadata/show1' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'files': [{'name': 't%d.mp3' % i, 'format': 'VBR MP3', 'track': str(i), 'title': 'Song %d' % i, 'length': '200'} for i in (1, 2, 3)]}))
         if '/metadata/' in u.path: return await r.fulfill(status=200, content_type='application/json', headers=CORS, body=json.dumps({'files': [{'name': 'x.mp4', 'format': 'h.264', 'size': '10', 'length': '600'}]}))
         return await r.fulfill(status=200, content_type='image/png', headers=CORS, body=PNG)
@@ -240,6 +240,43 @@ async def main():
         check(la and 'show1/t2.mp3' in la['url'] and abs((la.get('start') or 0) - 100) < 6, f'mid-concert: the song on now, where it is ({la and la["url"]} @ {la and la.get("start")})')
         np = await pg.evaluate(NP)
         check(np['live'] and np['sub'].startswith('Song 2') and 'Live 1977' in np['sub'], f'Now Playing: the song and the show {np["sub"]!r}')
+        # ---- Build 345: Add Channels > Archive.org with Search everything on
+        await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(300)
+        # something from archive.org already in Continue Listening / Continue Watching
+        await pg.evaluate("""(function(){ var r = JSON.parse(localStorage.getItem('radioPlayerRecent')||'[]'); r.unshift({ type:'podcast', guid:'ia:old/x.mp4', name:'Old Result', episodeUrl:'https://archive.org/download/old/x.mp4' }); localStorage.setItem('radioPlayerRecent', JSON.stringify(r));
+          var h = JSON.parse(localStorage.getItem('radioPlayerChannelHistory')||'[]'); h.unshift({ url:'amplify-archive:i:old', name:'Old Channel', at: Date.now() }); localStorage.setItem('radioPlayerChannelHistory', JSON.stringify(h)); })()""")
+        await pg.reload(); await pg.wait_for_timeout(2000)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("document.getElementById('videoAddHeaderBtn').click()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.ch-tools .home-tab'),function(t){return t.textContent.trim()==='Archive.org';}).click()"); await pg.wait_for_timeout(600)
+        await pg.evaluate("var c=document.querySelector('.ia-switch input'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true}));"); await pg.wait_for_timeout(300)
+        recent = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerRecent')||'[]').map(function(r){return r.guid||r.name;})")
+        hist = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerChannelHistory')||'[]').map(function(h){return h.url;})")
+        check(not any(str(x).startswith('ia:') for x in recent) and not any(str(x).startswith('amplify-archive:i:') for x in hist), f'turning it on takes archive.org results out of Continue Listening / Watching {recent[:3]} {hist[:3]}')
+        # typing: no mini player while the keyboard is up
+        await pg.focus('.ch-tools input[type=search]'); await pg.keyboard.type('popeye cartoon with a very long name'); await pg.wait_for_timeout(1400)
+        bar = await pg.evaluate("({kb: document.body.classList.contains('kb-open'), bar: getComputedStyle(document.getElementById('playerBar')).display})")
+        check(bar['kb'] and bar['bar'] == 'none', f'no mini Now Playing while typing in Add Channels {bar}')
+        await pg.screenshot(path=f'{SHOTS}/addch-typing.png')
+        # four lines at most for the name and for the description
+        cl = await pg.evaluate("""(function(){ var rows = document.querySelectorAll('.ia-item'); var one = function(sel){ return rows[1].querySelector(sel).getBoundingClientRect().height; };
+          return Array.prototype.map.call(rows, function(r){ var n=r.querySelector('.ch-name'), s=r.querySelector('.ch-sub');
+            return { n: Math.round(n.getBoundingClientRect().height / one('.ch-name')), s: Math.round(s.getBoundingClientRect().height / one('.ch-sub')), cn: getComputedStyle(n).webkitLineClamp, cs: getComputedStyle(s).webkitLineClamp }; }); })()""")
+        check(cl and all(c['n'] <= 4 and c['s'] <= 4 and c['cn'] == '4' and c['cs'] == '4' for c in cl) and cl[0]['n'] == 4 and cl[0]['s'] == 4, f'names and descriptions: up to four lines each {cl}')
+        await pg.evaluate("document.activeElement.blur()"); await pg.wait_for_timeout(300)
+        await pg.screenshot(path=f'{SHOTS}/addch-4lines.png')
+        # a result played: nothing goes into Continue Listening
+        await pg.evaluate("window.__loads=[]")
+        await pg.evaluate("document.querySelector('.ia-item').click()"); await pg.wait_for_timeout(2500)
+        ld = await pg.evaluate("window.__loads.map(function(a){return a.url;})")
+        recent = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerRecent')||'[]').map(function(r){return r.guid||r.name;})")
+        check(ld and 'archive.org/download/' in ld[-1] and not any(str(x).startswith('ia:') for x in recent), f'a result plays and stays out of Continue Listening {ld[-1:]} {recent[:3]}')
+        # the search isn't kept: leaving and coming back finds the box empty
+        await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.ch-tools .home-tab'),function(t){return t.textContent.trim()==='Pluto';}).click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("Array.prototype.find.call(document.querySelectorAll('.ch-tools .home-tab'),function(t){return t.textContent.trim()==='Archive.org';}).click()"); await pg.wait_for_timeout(500)
+        q = await pg.evaluate("document.querySelector('.ch-tools input[type=search]').value")
+        check(q == '', f'the archive.org search isn’t kept ({q!r})')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('FAILS', len(fails)); raise SystemExit(1 if fails else 0)
