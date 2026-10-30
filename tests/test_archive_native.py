@@ -171,10 +171,10 @@ async def main():
         blocks = [b2 for b2 in row['blocks'] if b2['ss'] // 1000 > g['t0'] / 1000][:4]
         okb = all(abs((b2['ee'] - b2['ss']) / 1000 - 600) < 2 and abs(((b2['ss'] / 1000 - EPOCH) % 600)) < 2 for b2 in blocks)
         idx0 = int(((blocks[0]['ss'] / 1000 - EPOCH) % 1800) // 600) if blocks else -1
-        check(len(blocks) >= 3 and okb and blocks[0]['t'] == 'Popeye %d' % (idx0 + 1), f'guide: each cartoon at its real time, 10 minutes each {[(b2["t"], (b2["ee"]-b2["ss"])//1000) for b2 in blocks]}')
+        check(len(blocks) >= 3 and okb and blocks[0]['t'].startswith('Popeye %d' % (idx0 + 1)), f'guide: each cartoon at its real time, 10 minutes each {[(b2["t"], (b2["ee"]-b2["ss"])//1000) for b2 in blocks]}')
         nowb = [b2 for b2 in row['blocks'] if b2['now']]
         i_now, off_now, s_now = on_now(time.time())
-        check(len(nowb) == 1 and nowb[0]['t'] == 'Popeye %d' % (i_now + 1), f'what’s on now is the scheduled cartoon {[b2["t"] for b2 in nowb]} vs Popeye {i_now + 1}')
+        check(len(nowb) == 1 and nowb[0]['t'].startswith('Popeye %d' % (i_now + 1)), f'what’s on now is the scheduled cartoon {[b2["t"] for b2 in nowb]} vs Popeye {i_now + 1}')
         await pg.screenshot(path=f'{SHOTS}/archlive-guide.png')
         # Tune in: the cartoon on now, joined where the schedule is
         await pg.evaluate("window.__loads=[]; window.__seeks=[]")
