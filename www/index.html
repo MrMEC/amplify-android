@@ -3407,6 +3407,8 @@
   .np-coll-head{ display:flex; align-items:center; gap:6px; margin:0 0 16px; }
   .np-coll-head > .np-related-heading{ margin:0; flex:1; min-width:0; }
   .np-coll-head > .np-foot-toggle{ display:none; }
+  /* Build 347: an archive.org result's video always has its title under it (no hide arrow). */
+  .now-playing-screen.np-ia .np-coll-head > .np-foot-toggle{ display:none !important; }
   .now-playing-screen.np-channel:not(.np-tv) .np-coll-head > .np-foot-toggle{ display:flex; }
   .np-coll-head > .epg-corner.np-foot-toggle{ width:34px; height:34px; flex:0 0 34px; margin-left:-8px; border-radius:50%; background:transparent; }
   .np-coll-head > .epg-corner.np-foot-toggle svg{ width:22px; height:22px; }
@@ -3641,7 +3643,8 @@
   /* The playing channel's details hidden (the corner's up arrow): none of its height left. */
   /* Build 309 (Mark): TV channels (the guide's corner) and your own videos (the arrow beside the
      list's heading) share one shown / hidden setting. */
-  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed .np-hero-foot{
+  /* Build 347: only while there's a list under them (with the arrow to bring them back). */
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed:not(.np-coll-empty):not(.np-ia) .np-hero-foot{
     height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
@@ -10581,10 +10584,12 @@
     return list[0];
   }
   function renderNpCollection(station){
+    nowPlayingScreen.classList.toggle('np-ia', !!(station && isArchiveVideo(station) && !isNpChannel(station)));   // build 347
     npCollectionGrid.classList.remove('np-ch-list');
     if(!isNpChannel(station)) npCollection.classList.remove('np-epg');
     if(isNpChannel(station)){ renderNpChannels(station); return; }
     if(isLocalVideo(station)){ renderNpVideoList(station); return; }
+    if(isArchiveVideo(station)){ renderNpArchiveList(station); return; }   // build 347
     var col = collectionForStation(station);
     npCollectionGrid.innerHTML = '';
     npCollectionGrid._ctxList = null;
@@ -20598,6 +20603,15 @@
   var npFootCollapsed = (function(){ try{ return localStorage.getItem(NP_FOOT_KEY) === '1'; }catch(e){ return false; } })();
   var npHeroFoot = document.querySelector('#nowPlayingScreen .np-hero-foot');
   nowPlayingScreen.classList.toggle('np-foot-collapsed', npFootCollapsed);
+  // Build 347 (Mark): with nothing under the video (no guide, no list) the details always show,
+  // whatever the hide-details arrow was last set to: there'd be no arrow to bring them back.
+  (function(){
+    var coll = document.getElementById('npCollection');
+    if(!coll) return;
+    function sync(){ nowPlayingScreen.classList.toggle('np-coll-empty', coll.style.display === 'none'); }
+    sync();
+    try{ new MutationObserver(sync).observe(coll, { attributes: true, attributeFilter: ['style'] }); }catch(e){}
+  })();
   var EPG_ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
   var EPG_ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   function syncEpgFootBtn(b){
@@ -21711,7 +21725,7 @@
   }
   function archiveCount(n){ return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0); }
   // One archive.org item as a row: tap to play it, + to make it a channel.
-  function archiveItemRow(it, rank){
+  function archiveItemRow(it, rank, list){
     var row = document.createElement('div');
     row.className = 'ch-row ch-mine ia-item';
     var logo = document.createElement('div');
@@ -21752,7 +21766,7 @@
       paint();
     });
     row.appendChild(add);
-    row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: archiveSearchAll() && !!(addChannelsState.archiveQ || '').trim() }); });
+    row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: archiveSearchAll() && !!(addChannelsState.archiveQ || '').trim(), list: list || [it] }); });
     return row;
   }
   function renderArchiveTab(body){
@@ -21769,7 +21783,7 @@
           setResultCount(0, 'item');
           return;
         }
-        items.forEach(function(it){ body.appendChild(archiveItemRow(it)); });
+        items.forEach(function(it){ body.appendChild(archiveItemRow(it, null, items)); });
         setResultCount(items.length, 'item');
       }, function(){
         if(!onAddChannelsView || addChannelsTab !== 'archive') return;
@@ -21906,7 +21920,7 @@
           if(open !== mine) return;
           mine.innerHTML = '';
           if(!items.length){ mine.innerHTML = '<div class="empty-state">Nothing came back for this category.</div>'; return; }
-          items.forEach(function(it, i){ mine.appendChild(archiveItemRow(it, i + 1)); });
+          items.forEach(function(it, i){ mine.appendChild(archiveItemRow(it, i + 1, items)); });
         }, function(){
           if(open !== mine) return;
           mine.innerHTML = '<div class="empty-state">Couldn’t reach archive.org. Check your connection and try again.</div>';
@@ -39527,7 +39541,39 @@
     if(!audio.length && video.length) return [ep(video[0], true)];
     return audio.slice(0, 200).map(function(f){ return ep(f, false); });
   }
+  // Build 347 (Mark): an archive.org video played from a list of results (Search, Add Channels)
+  // has its title under the picture and the other video results under that, to play next.
+  var archiveNpResults = null;   // { items, noHistory }
+  function renderNpArchiveList(st){
+    npCollectionGrid.innerHTML = '';
+    npCollectionGrid._ctxList = null;
+    npCollectionGrid.classList.remove('grid-songs');
+    npCollectionGrid.classList.add('np-ch-list');
+    var id = String(st.guid || '').replace(/^ia:/, '').split('/')[0];
+    var ctx = archiveNpResults;
+    var others = ctx ? ctx.items.filter(function(it){ return it && it.video && it.id !== id; }) : [];
+    if(!others.length){ npCollection.style.display = 'none'; return; }
+    npCollection.style.display = '';
+    npCollectionHeading.textContent = 'More Videos';
+    others.forEach(function(it){
+      var row = document.createElement('div');
+      row.className = 'ch-row ch-mine np-ia-row';
+      var logo = document.createElement('div');
+      logo.className = 'ch-logo';
+      logo.appendChild(vImg(archiveArtUrl(it.id)));
+      row.appendChild(logo);
+      var text = document.createElement('div');
+      text.className = 'ch-text';
+      var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = it.title; text.appendChild(n);
+      var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = [it.year, it.creator].filter(Boolean).join(' \u00b7 ') || 'Video'; text.appendChild(sb);
+      row.appendChild(text);
+      row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: ctx.noHistory, list: ctx.items }); });
+      npCollectionGrid.appendChild(row);
+    });
+  }
   function playArchiveItem(item, row, opts){
+    if(opts && opts.list) archiveNpResults = { items: opts.list.slice(), noHistory: !!opts.noHistory };
+    else archiveNpResults = null;
     if(row) row.classList.add('loading');
     extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
       if(row) row.classList.remove('loading');
@@ -39564,7 +39610,7 @@
     sub.textContent = [item.video ? 'Video' : 'Audio', item.year, item.creator].filter(Boolean).join(' · ');
     body.appendChild(sub);
     row.appendChild(body);
-    row.addEventListener('click', function(){ playArchiveItem(item, row, { noHistory: archiveSearchAll() }); });
+    row.addEventListener('click', function(){ playArchiveItem(item, row, { noHistory: archiveSearchAll(), list: (lastSearch && lastSearch.archive) || (searchState && searchState.archive) || [item] }); });
     return row;
   }
 
