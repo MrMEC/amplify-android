@@ -6551,6 +6551,18 @@
   .pf-edit-photo{ display:flex; align-items:center; gap:16px; margin:6px 0 18px; }
   .pf-avatar.pf-avatar-sm{ flex:0 0 72px; width:72px; height:72px; font-size:28px; }
   .pf-edit-photo-btns{ display:flex; flex-direction:column; gap:8px; flex:1; min-width:0; }
+  .pf-crop{ display:flex; flex-direction:column; align-items:center; gap:12px; margin:4px 0 14px; }
+  .pf-crop[hidden]{ display:none; }
+  .pf-crop-stage{ position:relative; width:220px; height:220px; border-radius:50%; overflow:hidden; background:var(--panel-2);
+    border:3px solid var(--accent); box-sizing:content-box; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
+  .pf-crop-stage.dragging{ cursor:grabbing; }
+  .pf-crop-stage img{ position:absolute; left:0; top:0; transform-origin:0 0; max-width:none; pointer-events:none; user-select:none; -webkit-user-drag:none; }
+  .pf-zoom{ display:flex; align-items:center; gap:10px; width:100%; max-width:260px; color:var(--text-dim); }
+  .pf-zoom input{ flex:1; min-width:0; accent-color:var(--accent); height:28px; margin:0; }
+  .pf-crop-hint{ margin:0; font-size:12.5px; color:var(--text-dim); text-align:center; }
+  .pf-crop:not([hidden]) ~ .pf-edit-photo .pf-avatar-sm{ display:none; }
+  .pf-crop:not([hidden]) ~ .pf-edit-photo .pf-edit-photo-btns{ flex-direction:row; }
+  .pf-crop:not([hidden]) ~ .pf-edit-photo .pf-small-btn{ flex:1; }
   .pf-small-btn{ min-height:38px; border-radius:10px; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; }
   .pf-label{ display:block; margin:0 0 6px; font-size:13px; font-weight:600; color:var(--text-dim); }
   .pf-input{ width:100%; box-sizing:border-box; height:46px; padding:0 14px; margin-bottom:20px; border-radius:10px; border:1px solid var(--border);
@@ -8033,6 +8045,16 @@
 <div class="confirm-overlay" id="pfEditOverlay" role="dialog" aria-modal="true" aria-labelledby="pfEditTitle">
   <div class="confirm-panel pf-edit-panel">
     <h2 class="confirm-title" id="pfEditTitle">Edit Profile</h2>
+    <!-- Build 364 (Mark): the photo can be moved and zoomed before it's saved. -->
+    <div class="pf-crop" id="pfCrop" hidden>
+      <div class="pf-crop-stage" id="pfCropStage" aria-label="Photo: drag to move, pinch to zoom"><img id="pfCropImg" alt="" draggable="false"></div>
+      <div class="pf-zoom">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12"/></svg>
+        <input type="range" id="pfZoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg>
+      </div>
+      <p class="pf-crop-hint">Drag to move. Pinch or slide to zoom.</p>
+    </div>
     <div class="pf-edit-photo">
       <div class="pf-avatar pf-avatar-sm" id="pfEditAvatar"></div>
       <div class="pf-edit-photo-btns">
@@ -11014,19 +11036,142 @@
       else if(go === 'genres') openGenresHome();
     });
   });
-  // Edit Profile
+  // Edit Profile. Build 364: a photo opens in a round frame where it can be dragged and zoomed
+  // (pinch, or the slider); Save cuts what's in the circle to a 320px JPEG. The photo as chosen
+  // (at most 1200px) and where it was placed are kept too, so it can be moved again later.
   var pfDraft = null;
+  var PF_STAGE = 220, PF_OUT = 320, PF_SRC_MAX = 1200;
+  var pfCrop = { img: null, w: 0, h: 0, z: 1, ox: 0, oy: 0 };
+  function pfBase(){ return PF_STAGE / Math.min(pfCrop.w, pfCrop.h); }
+  function pfClamp(){
+    var k = pfBase() * pfCrop.z;
+    pfCrop.ox = Math.min(0, Math.max(PF_STAGE - pfCrop.w * k, pfCrop.ox));
+    pfCrop.oy = Math.min(0, Math.max(PF_STAGE - pfCrop.h * k, pfCrop.oy));
+  }
+  function pfPaintCrop(){
+    var el = document.getElementById('pfCropImg'), k = pfBase() * pfCrop.z;
+    el.style.width = pfCrop.w + 'px';
+    el.style.height = pfCrop.h + 'px';
+    el.style.transform = 'translate(' + pfCrop.ox + 'px,' + pfCrop.oy + 'px) scale(' + k + ')';
+    document.getElementById('pfZoom').value = String(pfCrop.z);
+  }
+  // Zoom keeping the point under (px, py) in the frame still (the middle by default).
+  function pfZoomTo(z, px, py){
+    z = Math.max(1, Math.min(4, z));
+    if(px === undefined){ px = PF_STAGE / 2; py = PF_STAGE / 2; }
+    var k0 = pfBase() * pfCrop.z, k1 = pfBase() * z;
+    var ix = (px - pfCrop.ox) / k0, iy = (py - pfCrop.oy) / k0;
+    pfCrop.z = z;
+    pfCrop.ox = px - ix * k1;
+    pfCrop.oy = py - iy * k1;
+    pfClamp();
+    pfPaintCrop();
+  }
+  // Loads a picture (a data: URL) into the frame; crop {z, cx, cy}: zoom and the middle of the
+  // circle as a fraction of the picture (centred when none).
+  function pfLoadCrop(src, crop){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      img.onload = function(){
+        pfCrop.img = img; pfCrop.w = img.naturalWidth; pfCrop.h = img.naturalHeight;
+        pfCrop.z = crop && crop.z ? crop.z : 1;
+        var k = pfBase() * pfCrop.z;
+        var cx = crop && crop.cx !== undefined ? crop.cx : 0.5, cy = crop && crop.cy !== undefined ? crop.cy : 0.5;
+        pfCrop.ox = PF_STAGE / 2 - cx * pfCrop.w * k;
+        pfCrop.oy = PF_STAGE / 2 - cy * pfCrop.h * k;
+        pfClamp();
+        document.getElementById('pfCropImg').src = src;
+        pfPaintCrop();
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+  function pfCropState(){
+    var k = pfBase() * pfCrop.z;
+    return { z: Math.round(pfCrop.z * 1000) / 1000,
+      cx: Math.round(((PF_STAGE / 2 - pfCrop.ox) / k / pfCrop.w) * 10000) / 10000,
+      cy: Math.round(((PF_STAGE / 2 - pfCrop.oy) / k / pfCrop.h) * 10000) / 10000 };
+  }
+  function pfRenderCrop(){
+    var k = pfBase() * pfCrop.z, side = PF_STAGE / k;
+    var out = Math.max(1, Math.min(PF_OUT, Math.round(side)));
+    var c = document.createElement('canvas');
+    c.width = c.height = out;
+    var g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(pfCrop.img, -pfCrop.ox / k, -pfCrop.oy / k, side, side, 0, 0, out, out);
+    return c.toDataURL('image/jpeg', 0.88);
+  }
+  (function(){
+    var stage = document.getElementById('pfCropStage'), pts = {}, last = null;
+    function local(e){ var r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) * PF_STAGE / r.width, y: (e.clientY - r.top) * PF_STAGE / r.height }; }
+    function snapshot(){
+      var ids = Object.keys(pts);
+      if(ids.length >= 2){
+        var a = pts[ids[0]], b = pts[ids[1]];
+        return { pinch: true, d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+      }
+      if(ids.length === 1) return { pinch: false, x: pts[ids[0]].x, y: pts[ids[0]].y };
+      return null;
+    }
+    stage.addEventListener('pointerdown', function(e){
+      if(!pfCrop.img) return;
+      e.preventDefault();
+      try{ stage.setPointerCapture(e.pointerId); }catch(err){}
+      pts[e.pointerId] = local(e);
+      last = snapshot();
+      stage.classList.add('dragging');
+    });
+    stage.addEventListener('pointermove', function(e){
+      if(!pts[e.pointerId] || !last) return;
+      pts[e.pointerId] = local(e);
+      var now = snapshot();
+      if(!now) return;
+      if(now.pinch && last.pinch){
+        pfCrop.ox += now.mx - last.mx; pfCrop.oy += now.my - last.my;
+        pfZoomTo(pfCrop.z * now.d / last.d, now.mx, now.my);
+      } else if(!now.pinch && !last.pinch){
+        pfCrop.ox += now.x - last.x; pfCrop.oy += now.y - last.y;
+        pfClamp(); pfPaintCrop();
+      }
+      last = now;
+    });
+    function up(e){
+      delete pts[e.pointerId];
+      last = snapshot();
+      if(!last) stage.classList.remove('dragging');
+    }
+    stage.addEventListener('pointerup', up);
+    stage.addEventListener('pointercancel', up);
+    // A mouse wheel zooms too (a computer).
+    stage.addEventListener('wheel', function(e){
+      if(!pfCrop.img) return;
+      e.preventDefault();
+      var p = local(e);
+      pfZoomTo(pfCrop.z * (e.deltaY < 0 ? 1.08 : 1 / 1.08), p.x, p.y);
+    }, { passive: false });
+    document.getElementById('pfZoom').addEventListener('input', function(e){ if(pfCrop.img) pfZoomTo(parseFloat(e.target.value) || 1); });
+  })();
   function openProfileEdit(){
     var p = loadProfile();
-    pfDraft = { name: p.name || '', photo: p.photo || '' };
+    pfDraft = { name: p.name || '', src: p.photoSrc || p.photo || '', crop: p.photoSrc ? (p.crop || null) : null };
     document.getElementById('pfNameInput').value = pfDraft.name;
+    pfCrop.img = null;
     syncProfileEdit();
     pfEditOverlay.classList.add('open');
+    if(pfDraft.src){
+      var d = pfDraft;
+      pfLoadCrop(d.src, d.crop)['catch'](function(){ if(pfDraft === d){ d.src = ''; syncProfileEdit(); } });
+    }
   }
   function syncProfileEdit(){
-    paintAvatar(document.getElementById('pfEditAvatar'), { name: document.getElementById('pfNameInput').value, photo: pfDraft.photo });
-    document.getElementById('pfPhotoRemove').hidden = !pfDraft.photo;
-    document.getElementById('pfPhotoBtn').textContent = pfDraft.photo ? 'Change Photo' : 'Choose Photo';
+    var has = !!pfDraft.src;
+    document.getElementById('pfCrop').hidden = !has;
+    paintAvatar(document.getElementById('pfEditAvatar'), { name: document.getElementById('pfNameInput').value, photo: '' });
+    document.getElementById('pfPhotoRemove').hidden = !has;
+    document.getElementById('pfPhotoBtn').textContent = has ? 'Change Photo' : 'Choose Photo';
   }
   function closeProfileEdit(){ pfEditOverlay.classList.remove('open'); pfDraft = null; }
   document.getElementById('pfAvatarBtn').addEventListener('click', openProfileEdit);
@@ -11050,26 +11195,35 @@
     if(!f || !pfDraft) return;
     var url = URL.createObjectURL(f), img = new Image();
     img.onload = function(){
-      var side = Math.min(img.naturalWidth, img.naturalHeight), out = Math.min(320, side);
+      var sc = Math.min(1, PF_SRC_MAX / Math.max(img.naturalWidth, img.naturalHeight));
       var c = document.createElement('canvas');
-      c.width = c.height = out;
-      c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+      c.width = Math.max(1, Math.round(img.naturalWidth * sc));
+      c.height = Math.max(1, Math.round(img.naturalHeight * sc));
+      var g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
       if(!pfDraft) return;
-      pfDraft.photo = c.toDataURL('image/jpeg', 0.86);
+      pfDraft.src = c.toDataURL('image/jpeg', 0.88);
+      pfDraft.crop = null;
       syncProfileEdit();
+      pfLoadCrop(pfDraft.src, null);
     };
     img.onerror = function(){ URL.revokeObjectURL(url); showNotice({ kind: 'error', message: 'That picture couldn’t be opened.' }); };
     img.src = url;
   });
-  document.getElementById('pfPhotoRemove').addEventListener('click', function(){ if(pfDraft){ pfDraft.photo = ''; syncProfileEdit(); } });
+  document.getElementById('pfPhotoRemove').addEventListener('click', function(){ if(pfDraft){ pfDraft.src = ''; pfCrop.img = null; syncProfileEdit(); } });
   document.getElementById('pfEditCancel').addEventListener('click', closeProfileEdit);
   pfEditOverlay.addEventListener('click', function(e){ if(e.target === pfEditOverlay) closeProfileEdit(); });
   document.getElementById('pfEditSave').addEventListener('click', function(){
     if(!pfDraft) return;
     var p = loadProfile();
     p.name = document.getElementById('pfNameInput').value.trim();
-    if(pfDraft.photo) p.photo = pfDraft.photo; else delete p.photo;
+    if(pfDraft.src && pfCrop.img){
+      p.photo = pfRenderCrop();
+      p.photoSrc = pfDraft.src;
+      p.crop = pfCropState();
+    } else if(!pfDraft.src){ delete p.photo; delete p.photoSrc; delete p.crop; }
     saveProfile(p);
     closeProfileEdit();
     renderProfile();
