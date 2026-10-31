@@ -6569,6 +6569,54 @@
   .pf-input{ width:100%; box-sizing:border-box; height:46px; padding:0 14px; margin-bottom:20px; border-radius:10px; border:1px solid var(--border);
     background:var(--panel-2); color:var(--text); font:inherit; font-size:15px; }
   .pf-input:focus{ outline:2px solid var(--accent); outline-offset:0; }
+  /* ---------- Build 367 (Mark): listening time, and Listening Stats ---------- */
+  .pf-stats-link{ display:flex; align-items:center; justify-content:space-between; width:100%; margin:12px 0 0; padding:6px 0; background:none; border:0;
+    font:inherit; font-size:13.5px; font-weight:600; color:var(--accent); cursor:pointer; text-align:left; }
+  .stats-overlay{ z-index:1420; }
+  body.yt-open .stats-overlay{ z-index:3016; }
+  .st-top{ display:flex; align-items:center; height:60px; padding-top:4px; box-sizing:border-box; }
+  .st-back{ width:52px; height:52px; padding:0; margin:0; border:0; background:none; color:var(--text); font-size:24px; cursor:pointer;
+    display:flex; align-items:center; justify-content:flex-start; }
+  .st-back:active{ transform:scale(.92); }
+  .st-title{ margin:4px 0 0; font-size:22px; font-weight:800; letter-spacing:-.01em; line-height:1.2; color:var(--text); }
+  .st-since{ margin:4px 0 0; font-size:12.5px; color:var(--text-dim); }
+  .st-sec{ margin-top:28px; }
+  .st-h2{ margin:0 0 12px; font-size:17px; font-weight:800; color:var(--text); }
+  .st-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+  .st-card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .st-v{ font-size:22px; font-weight:800; line-height:1.2; color:var(--text); white-space:nowrap; overflow:hidden; }
+  .st-l{ font-size:12px; color:var(--text-dim); }
+  .st-chart{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 12px 10px; }
+  .st-bars{ display:grid; grid-template-columns:repeat(14, minmax(0, 1fr)); gap:5px; align-items:end; height:120px; }
+  .st-bar{ position:relative; height:100%; display:flex; align-items:flex-end; }
+  .st-bar i{ display:block; width:100%; min-height:2px; border-radius:4px 4px 2px 2px; background:var(--accent); }
+  .st-bar.zero i{ background:var(--border); }
+  .st-days{ display:grid; grid-template-columns:repeat(14, minmax(0, 1fr)); gap:5px; margin-top:6px; }
+  .st-days span{ font-size:10.5px; color:var(--text-dim); text-align:center; }
+  .st-days span.today{ color:var(--text); font-weight:700; }
+  .st-chart-note{ margin:10px 0 0; font-size:12.5px; color:var(--text-dim); }
+  .st-mix{ display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border); }
+  .st-mix i{ display:block; height:100%; }
+  .st-legend{ margin-top:12px; display:flex; flex-direction:column; }
+  .st-leg{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px; }
+  .st-leg:last-child{ border-bottom:none; }
+  .st-dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .st-leg-n{ flex:1; min-width:0; color:var(--text); font-weight:600; }
+  .st-leg-v{ color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .st-list{ display:flex; flex-direction:column; }
+  .st-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); min-width:0; }
+  .st-row:last-child{ border-bottom:none; }
+  .st-rank{ flex:0 0 18px; font-size:14px; font-weight:800; color:var(--accent); text-align:center; }
+  .st-row-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .st-row-n{ font-size:14.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .st-row-s{ font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .st-row-v{ flex-shrink:0; font-size:13px; font-weight:600; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .st-empty{ margin:0; font-size:13.5px; line-height:1.45; color:var(--text-dim); }
+  .st-facts{ display:flex; flex-direction:column; }
+  .st-fact{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px; }
+  .st-fact:last-child{ border-bottom:none; }
+  .st-fact span:first-child{ color:var(--text-dim); }
+  .st-fact span:last-child{ color:var(--text); font-weight:700; text-align:right; }
   /* ---------- Build 349 (Mark): Settings, full screen and in categories ----------
      A page of its own over everything (the floating video still above it), on the page's own
      background. The back arrow sits where every other page's does, on the menu button's line;
@@ -8022,6 +8070,7 @@
       <p class="pf-since" id="pfSince"></p>
     </div>
     <div class="pf-stats" id="pfStats"></div>
+    <button type="button" class="pf-stats-link" id="pfStatsLink"><span>See your listening stats</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     <section class="pf-sec">
       <h2 class="pf-h2">Shortcuts</h2>
       <div class="pf-links">
@@ -8040,6 +8089,17 @@
     <section class="pf-sec">
       <button type="button" class="pf-settings" id="pfSettingsBtn"><svg class="pf-ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9 1.65 1.65 0 0 0 20.83 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="pf-settings-text"><span class="pf-settings-name">Settings</span></span><svg class="pf-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     </section>
+  </div>
+</div>
+<!-- Build 367 (Mark): Listening Stats, from the profile's "See your listening stats". -->
+<div class="profile-overlay stats-overlay" id="statsOverlay" role="dialog" aria-modal="true" aria-labelledby="stTitle">
+  <div class="profile-page" id="statsPage">
+    <div class="st-top">
+      <button type="button" class="st-back" id="statsBackBtn" aria-label="Back" title="Back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+    </div>
+    <h1 class="st-title" id="stTitle">Listening Stats</h1>
+    <p class="st-since" id="stSince"></p>
+    <div class="st-body" id="statsBody"></div>
   </div>
 </div>
 <!-- Edit Profile: name and photo (kept on this phone). -->
@@ -10974,9 +11034,11 @@
       Object.keys(ap).forEach(function(k){ var a = ap[k]; if(a && a.count && (!top || a.count > top.count)) top = a; });
     }catch(e){}
     function fmt(n){ return n >= 1000 ? (n >= 10000 ? Math.round(n / 1000) + 'k' : (Math.round(n / 100) / 10) + 'k') : String(n); }
+    // Build 367: time listened this month in place of the play count (that's in Listening Stats).
+    var d = new Date(), month = listenBetween(dayKey(new Date(d.getFullYear(), d.getMonth(), 1)), dayKey(d));
     return [
       { v: artists ? fmt(artists) : '—', l: artists === 1 ? 'Artist' : 'Artists' },
-      { v: plays ? fmt(plays) : '—', l: plays === 1 ? 'Song played' : 'Songs played' },
+      { v: month >= 30 ? fmtListen(month) : '—', l: 'This month' },
       { v: top ? top.name : '—', l: 'Top artist' }
     ];
   }
@@ -11246,6 +11308,180 @@
     if(profileOverlay.classList.contains('open') && !settingsOverlay.classList.contains('open')) closeProfile();
   });
   window.addEventListener('resize', function(){ if(profileOverlay.classList.contains('open')) fitProfileName(); });
+
+  // ---------- Listening Stats (build 367, Mark) ----------
+  var statsOverlay = document.getElementById('statsOverlay');
+  var ST_KINDS = [{ k: 'm', n: 'Music' }, { k: 'r', n: 'Radio' }, { k: 'p', n: 'Podcasts' }, { k: 'v', n: 'Video & TV' }];
+  function stEl(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined) e.textContent = text; return e; }
+  function stSection(title){
+    var sec = stEl('section', 'st-sec');
+    sec.appendChild(stEl('h2', 'st-h2', title));
+    return sec;
+  }
+  function stList(rows, empty){
+    var box = stEl('div', 'st-list');
+    if(!rows.length){ box.appendChild(stEl('p', 'st-empty', empty)); return box; }
+    rows.forEach(function(r, i){
+      var row = stEl('div', 'st-row');
+      row.appendChild(stEl('span', 'st-rank', String(i + 1)));
+      var t = stEl('span', 'st-row-text');
+      t.appendChild(stEl('span', 'st-row-n', r.n));
+      if(r.s) t.appendChild(stEl('span', 'st-row-s', r.s));
+      row.appendChild(t);
+      row.appendChild(stEl('span', 'st-row-v', r.v));
+      box.appendChild(row);
+    });
+    return box;
+  }
+  // Four kinds told apart by lightness as well as colour.
+  function stKindColor(k){
+    return k === 'm' ? 'var(--accent)' : k === 'r' ? 'color-mix(in srgb, var(--accent) 50%, var(--text))'
+      : k === 'p' ? 'color-mix(in srgb, var(--accent) 45%, var(--panel-2))' : 'var(--text-dim)';
+  }
+  function hourName(h){
+    function nm(x){ x = x % 24; return (x % 12 || 12) + (x < 12 ? 'am' : 'pm'); }
+    return nm(h) + '–' + nm(h + 1);
+  }
+  function renderStats(){
+    var L = loadListen(), body = document.getElementById('statsBody'), now = new Date();
+    body.innerHTML = '';
+    var since = new Date(L.start || Date.now());
+    document.getElementById('stSince').textContent = 'Time listened is counted from ' + since.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) + '.';
+    var today = dayKey(now);
+    var dow = (now.getDay() + 6) % 7;   // weeks start on Monday
+    var weekStart = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow));
+    var monthStart = dayKey(new Date(now.getFullYear(), now.getMonth(), 1));
+    var yearStart = dayKey(new Date(now.getFullYear(), 0, 1));
+
+    var sec = stSection('Time listened');
+    var grid = stEl('div', 'st-grid');
+    [['Today', listenBetween(today, today)], ['This week', listenBetween(weekStart, today)],
+     ['This month', listenBetween(monthStart, today)], ['This year', listenBetween(yearStart, today)]].forEach(function(c){
+      var card = stEl('div', 'st-card');
+      card.appendChild(stEl('span', 'st-v', fmtListen(c[1])));
+      card.appendChild(stEl('span', 'st-l', c[0]));
+      grid.appendChild(card);
+    });
+    sec.appendChild(grid);
+    body.appendChild(sec);
+
+    sec = stSection('Last 14 days');
+    var chart = stEl('div', 'st-chart'), bars = stEl('div', 'st-bars'), labels = stEl('div', 'st-days');
+    bars.setAttribute('role', 'img');
+    var vals = [], max = 0;
+    for(var i = 13; i >= 0; i--){
+      var dd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      var v = (L.days[dayKey(dd)] || {}).t || 0;
+      vals.push({ d: dd, v: v }); if(v > max) max = v;
+    }
+    vals.forEach(function(x, idx){
+      var b = stEl('div', 'st-bar' + (x.v < 30 ? ' zero' : ''));
+      var fill = stEl('i');
+      fill.style.height = (max ? Math.max(2, Math.round(x.v / max * 100)) : 2) + '%';
+      b.title = x.d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ': ' + fmtListen(x.v);
+      b.appendChild(fill);
+      bars.appendChild(b);
+      labels.appendChild(stEl('span', idx === 13 ? 'today' : '', x.d.toLocaleDateString(undefined, { weekday: 'narrow' })));
+    });
+    var best = vals.reduce(function(a, x){ return x.v > a.v ? x : a; }, vals[0]);
+    var two = vals.reduce(function(n, x){ return n + x.v; }, 0);
+    bars.setAttribute('aria-label', 'Time listened each of the last 14 days. ' + vals.map(function(x){ return x.d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' + fmtListen(x.v); }).join(', '));
+    chart.appendChild(bars); chart.appendChild(labels);
+    chart.appendChild(stEl('p', 'st-chart-note', two >= 60
+      ? 'Most on ' + best.d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) + ' (' + fmtListen(best.v) + ').'
+      : 'Play something and your days fill in here.'));
+    sec.appendChild(chart);
+    body.appendChild(sec);
+
+    sec = stSection('This month by type');
+    var tot = listenBetween(monthStart, today);
+    var mix = stEl('div', 'st-mix'), legend = stEl('div', 'st-legend');
+    ST_KINDS.forEach(function(k){
+      var v = listenBetween(monthStart, today, k.k);
+      if(tot && v){ var seg = stEl('i'); seg.style.width = (v / tot * 100) + '%'; seg.style.background = stKindColor(k.k); mix.appendChild(seg); }
+      var row = stEl('div', 'st-leg');
+      var dot = stEl('span', 'st-dot'); dot.style.background = stKindColor(k.k);
+      row.appendChild(dot);
+      row.appendChild(stEl('span', 'st-leg-n', k.n));
+      row.appendChild(stEl('span', 'st-leg-v', fmtListen(v) + (tot ? ' · ' + Math.round(v / tot * 100) + '%' : '')));
+      legend.appendChild(row);
+    });
+    sec.appendChild(mix); sec.appendChild(legend);
+    body.appendChild(sec);
+
+    var ap = loadArtistPlays();
+    var arts = Object.keys(ap).map(function(k){ return ap[k]; }).filter(function(a){ return a && a.count && a.name; })
+      .sort(function(a, b){ return (b.count - a.count) || ((b.last || 0) - (a.last || 0)); }).slice(0, 5);
+    sec = stSection('Top artists');
+    sec.appendChild(stList(arts.map(function(a){
+      var t = L.artists[artistMatchKey(a.name)];
+      return { n: a.name, s: t && t.s >= 60 ? fmtListen(t.s) + ' listened' : '', v: a.count + (a.count === 1 ? ' play' : ' plays') };
+    }), 'Artists you play show up here.'));
+    body.appendChild(sec);
+
+    var sp = loadSongPlays();
+    var songs = Object.keys(sp).map(function(id){ return { id: id, c: (sp[id] || [])[0] || 0, l: (sp[id] || [])[1] || 0 }; })
+      .filter(function(x){ return x.c && libraryById[x.id]; })
+      .sort(function(a, b){ return (b.c - a.c) || (b.l - a.l); }).slice(0, 5);
+    sec = stSection('Top songs');
+    sec.appendChild(stList(songs.map(function(x){
+      var t = libraryById[x.id];
+      return { n: t.name || t.fileName || '', s: t.artist || '', v: x.c + (x.c === 1 ? ' play' : ' plays') };
+    }), 'Songs from your library you play show up here.'));
+    body.appendChild(sec);
+
+    function topItems(kind){
+      return Object.keys(L.items).map(function(k){ return L.items[k]; }).filter(function(x){ return x.k === kind && x.s >= 60 && x.n; })
+        .sort(function(a, b){ return b.s - a.s; }).slice(0, 5);
+    }
+    sec = stSection('Top stations');
+    sec.appendChild(stList(topItems('r').map(function(x){ return { n: x.n, v: fmtListen(x.s) }; }), 'Stations you listen to show up here.'));
+    body.appendChild(sec);
+    var pods = topItems('p');
+    if(pods.length){
+      sec = stSection('Top podcasts');
+      sec.appendChild(stList(pods.map(function(x){ return { n: x.a || x.n, s: x.a ? x.n : '', v: fmtListen(x.s) }; }), ''));
+      body.appendChild(sec);
+    }
+
+    sec = stSection('More');
+    var facts = stEl('div', 'st-facts');
+    function fact(k, v){ var r = stEl('div', 'st-fact'); r.appendChild(stEl('span', '', k)); r.appendChild(stEl('span', '', v)); facts.appendChild(r); }
+    var plays = 0, distinct = 0;
+    Object.keys(sp).forEach(function(k){ var c = (sp[k] || [])[0] || 0; plays += c; if(c) distinct++; });
+    fact('Songs played', plays.toLocaleString());
+    fact('Different songs played', distinct.toLocaleString());
+    fact('Time listened in all', fmtListen(listenBetween('0000-00-00', '9999-99-99')));
+    fact('Daily average this month', fmtListen(tot / now.getDate()));
+    var streak = 0;
+    for(var j = 0; j < 400; j++){
+      var dk = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - j));
+      if(((L.days[dk] || {}).t || 0) >= 60) streak++;
+      else if(j > 0) break;
+    }
+    fact('Days in a row', streak ? String(streak) : '—');
+    var hmax = 0, hbest = -1;
+    L.hours.forEach(function(v, h){ if(v > hmax){ hmax = v; hbest = h; } });
+    fact('Favorite time to listen', hmax >= 60 ? hourName(hbest) : '—');
+    var nAlbums = 0;
+    try{ nAlbums = buildAlbumIndex().filter(function(a){ return String(a.tracks[0].album || '').trim(); }).length; }catch(e){}
+    fact('In your library', (libraryTracks.length || 0).toLocaleString() + ' songs · ' + nAlbums.toLocaleString() + ' albums');
+    fact('Favorites', favorites.length.toLocaleString());
+    sec.appendChild(facts);
+    body.appendChild(sec);
+  }
+  function openStats(){
+    listenTick(); saveListen(true);
+    renderStats();
+    statsOverlay.classList.add('open');
+    document.getElementById('statsPage').scrollTop = 0;
+  }
+  function closeStats(){ statsOverlay.classList.remove('open'); if(profileOverlay.classList.contains('open')) renderProfile(); }
+  document.getElementById('pfStatsLink').addEventListener('click', openStats);
+  document.getElementById('statsBackBtn').addEventListener('click', closeStats);
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && statsOverlay.classList.contains('open') && !settingsOverlay.classList.contains('open')){ e.stopImmediatePropagation(); closeStats(); }
+  }, true);
 
   // ---- the header hides while scrolling down (builds 184-185) ----
   // Every page on a phone: the header (on album/artist pages the floating Menu button; on Now
@@ -15611,6 +15847,103 @@
       : null;
   }
   setInterval(playCountTick, 1000);
+
+  // ---------- Listening time (build 367, Mark) ----------
+  // Every second something plays (pauses don't count; a gap while the phone sleeps counts up
+  // to PLAY_TICK_MAX_MS), its time is added to: the day (and the kind: music, radio, podcasts,
+  // video), the hour of the day, the thing itself (stations, songs, shows) and its artist.
+  // Kept on the phone in LISTEN_KEY, written every 15 seconds and when the app goes to the
+  // background. Days are kept for 400 days; things and artists, the 400 most listened.
+  var LISTEN_KEY = 'radioPlayerListening';
+  var LISTEN_KEEP = 400;
+  var listenStats = null, listenLast = 0, listenDirty = false, listenSavedAt = 0;
+  function loadListen(){
+    if(listenStats) return listenStats;
+    try{ listenStats = JSON.parse(localStorage.getItem(LISTEN_KEY) || 'null'); }catch(e){ listenStats = null; }
+    if(!listenStats || typeof listenStats !== 'object' || !listenStats.days){
+      listenStats = { v: 1, start: Date.now(), days: {}, hours: [], items: {}, artists: {} };
+    }
+    if(!Array.isArray(listenStats.hours) || listenStats.hours.length !== 24){
+      listenStats.hours = []; for(var i = 0; i < 24; i++) listenStats.hours.push(0);
+    }
+    return listenStats;
+  }
+  function dayKey(d){
+    d = d || new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function listenKind(st){
+    if(!st) return '';
+    if(isLocalTrack(st)) return 'm';
+    if(isLocalVideo(st) || isArchiveVideo(st) || st.video || (typeof isNpChannel === 'function' && isNpChannel(st))) return 'v';
+    if(isPodcastTrack(st)) return 'p';
+    return 'r';
+  }
+  function trimTop(map, keep){
+    var keys = Object.keys(map);
+    if(keys.length <= keep) return;
+    keys.sort(function(a, b){ return ((map[a].s || map[a]) - (map[b].s || map[b])); });
+    keys.slice(0, keys.length - keep).forEach(function(k){ delete map[k]; });
+  }
+  function saveListen(force){
+    if(!listenDirty || !listenStats) return;
+    var now = Date.now();
+    if(!force && now - listenSavedAt < 15000) return;
+    listenSavedAt = now;
+    listenDirty = false;
+    var days = Object.keys(listenStats.days).sort();
+    if(days.length > LISTEN_KEEP) days.slice(0, days.length - LISTEN_KEEP).forEach(function(d){ delete listenStats.days[d]; });
+    trimTop(listenStats.items, LISTEN_KEEP);
+    trimTop(listenStats.artists, LISTEN_KEEP);
+    try{ localStorage.setItem(LISTEN_KEY, JSON.stringify(listenStats)); }catch(e){}
+  }
+  function listenTick(){
+    var now = Date.now();
+    var st = currentStation;
+    if(!listenLast || !uiIsPlaying || !st){ listenLast = now; saveListen(false); return; }
+    var secs = Math.min(now - listenLast, PLAY_TICK_MAX_MS) / 1000;
+    listenLast = now;
+    if(secs <= 0) return;
+    var L = loadListen(), d = new Date(), k = listenKind(st);
+    var day = L.days[dayKey(d)] || (L.days[dayKey(d)] = { t: 0 });
+    day.t += secs;
+    day[k] = (day[k] || 0) + secs;
+    L.hours[d.getHours()] += secs;
+    var key = favKey(st);
+    if(key){
+      var it = L.items[key] || (L.items[key] = { s: 0 });
+      it.s += secs; it.k = k; it.l = now;
+      it.n = (k === 'm' ? st.name : (typeof stripExclusively === 'function' ? stripExclusively(st.name || '') : st.name)) || it.n || '';
+      if(k === 'm' && st.artist) it.a = st.artist;
+      if(k === 'p' && (st.collectionName || st.podcastName)) it.a = st.collectionName || st.podcastName;
+    }
+    var artist = k === 'm' ? String(st.artist || '').trim() : (k === 'r' ? artistNameForPlay(st) : '');
+    if(artist){
+      var ak = artistMatchKey(artist);
+      var ar = L.artists[ak] || (L.artists[ak] = { s: 0 });
+      ar.s += secs; ar.n = artist;
+    }
+    listenDirty = true;
+    saveListen(false);
+  }
+  setInterval(listenTick, 1000);
+  document.addEventListener('visibilitychange', function(){ listenTick(); if(document.hidden) saveListen(true); });
+  window.addEventListener('pagehide', function(){ listenTick(); saveListen(true); });
+  // Seconds listened between two days (inclusive, 'YYYY-MM-DD'), optionally one kind.
+  function listenBetween(from, to, kind){
+    var L = loadListen(), n = 0;
+    Object.keys(L.days).forEach(function(d){ if(d >= from && d <= to) n += kind ? (L.days[d][kind] || 0) : (L.days[d].t || 0); });
+    return n;
+  }
+  function fmtListen(secs){
+    secs = Math.round(secs || 0);
+    if(secs < 60) return secs ? '<1m' : '0m';
+    var m = Math.round(secs / 60);
+    if(m < 60) return m + 'm';
+    var h = Math.floor(m / 60), r = m % 60;
+    if(h >= 100) return h.toLocaleString() + 'h';
+    return h + 'h' + (r ? ' ' + r + 'm' : '');
+  }
   function artistPlayCount(key){
     var rec = loadArtistPlays()[key];
     return rec ? (rec.count || 0) : 0;
