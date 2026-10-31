@@ -10918,7 +10918,15 @@
   function loadProfile(){
     try{ var v = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
   }
-  function saveProfile(p){ try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); }catch(e){ setStatus('Your profile couldn’t be saved on this phone.', true); } }
+  function saveProfile(p){
+    try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); return; }catch(e){}
+    // Build 364: no room for the full photo kept for moving it again: keep the cut one only.
+    if(p.photoSrc){
+      delete p.photoSrc; delete p.crop;
+      try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); return; }catch(e2){}
+    }
+    setStatus('Your profile couldn’t be saved on this phone.', true);
+  }
   function profileSince(p){
     if(!p.since){
       var t = Date.now();
@@ -11038,9 +11046,9 @@
   });
   // Edit Profile. Build 364: a photo opens in a round frame where it can be dragged and zoomed
   // (pinch, or the slider); Save cuts what's in the circle to a 320px JPEG. The photo as chosen
-  // (at most 1200px) and where it was placed are kept too, so it can be moved again later.
+  // (at most 1000px) and where it was placed are kept too, so it can be moved again later.
   var pfDraft = null;
-  var PF_STAGE = 220, PF_OUT = 320, PF_SRC_MAX = 1200;
+  var PF_STAGE = 220, PF_OUT = 320, PF_SRC_MAX = 1000;
   var pfCrop = { img: null, w: 0, h: 0, z: 1, ox: 0, oy: 0 };
   function pfBase(){ return PF_STAGE / Math.min(pfCrop.w, pfCrop.h); }
   function pfClamp(){
@@ -11204,7 +11212,7 @@
       g.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
       if(!pfDraft) return;
-      pfDraft.src = c.toDataURL('image/jpeg', 0.88);
+      pfDraft.src = c.toDataURL('image/jpeg', 0.85);
       pfDraft.crop = null;
       syncProfileEdit();
       pfLoadCrop(pfDraft.src, null);
