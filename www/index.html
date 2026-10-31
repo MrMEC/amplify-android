@@ -282,21 +282,10 @@
     .drawer-tab[aria-selected="true"]{ background:color-mix(in srgb, var(--accent) 20%, transparent); color:var(--accent); }
     .sidebar-scroll.shortcuts-on > :not(.drawer-head):not(.drawer-shortcuts){ display:none !important; }
     .sidebar-scroll.shortcuts-on > .drawer-shortcuts{ display:block; }
-    /* Build 226: Settings in the panel. The tabs give way to a back arrow (the same arrow as
-       every other Back, no label) and the title; everything else in the panel steps aside. */
-    .drawer-settings-head{ display:none; align-items:center; gap:6px; min-width:0; }
-    .sidebar-scroll.settings-on .drawer-tabs{ display:none; }
-    .sidebar-scroll.settings-on .drawer-settings-head{ display:flex; }
+    /* The back arrow drawn like every other Back (the drawer's own uses). */
     .drawer-back-btn{ width:36px; height:36px; margin-left:-8px; border:0; border-radius:50%; background:none;
       color:var(--text); font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .drawer-back-btn:active{ background:var(--panel-2); }
-    .drawer-settings-title{ font-size:18px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .sidebar-scroll.settings-on > :not(.drawer-head):not(.drawer-settings){ display:none !important; }
-    .sidebar-scroll.settings-on > .drawer-settings{ display:block; }
-    .drawer-settings #settingsPanel{ width:auto; max-height:none; overflow:visible; padding:0; margin:0;
-      background:none; border:0; border-radius:0; box-shadow:none; }
-    .drawer-settings #settingsPanel .settings-header{ display:none; }
-    .drawer-settings #settingsPanel .settings-header + .settings-row{ border-top:none; padding-top:4px; }
     /* Four covers a row at the narrowest drawer (minmax(0,1fr) so the tracks can shrink);
        cover art only, the name carried as the button's label for screen readers. */
     .drawer-shortcuts-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; }
@@ -6469,6 +6458,70 @@
   }
   .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-fav{ display:none; }
   @media (max-width: 900px){ .tile-grid.grid-artists > .tile[data-entity="artist"]{ padding-left:0; } }
+  /* ---------- Build 349 (Mark): Settings, full screen and in categories ----------
+     A page of its own over everything (the floating video still above it), on the page's own
+     background. The back arrow sits where every other page's does, on the menu button's line;
+     the title under it. The first page lists the categories the way Library lists its
+     sections (the bare icon in the accent colour, the name, a divider), each with a line
+     saying what is inside. The column keeps the page's left edge on a phone and is centred,
+     640px wide, on a wider screen. */
+  #settingsOverlay.settings-full{
+    z-index:1500; padding:0; background:var(--main-bg, var(--bg)); align-items:stretch; justify-content:stretch;
+  }
+  body.yt-open #settingsOverlay.settings-full{ z-index:3020; }
+  /* Dialogs Settings opens (accent colour, export/import notes...) come up over it. */
+  body.settings-open .settings-overlay:not(#settingsOverlay){ z-index:1600; }
+  #settingsOverlay #settingsPanel{
+    --set-pad:var(--main-pad);
+    width:100%; max-width:none; height:100%; max-height:none; margin:0; border:0; border-radius:0; box-shadow:none;
+    background:var(--main-bg, var(--bg)); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    padding:0 max(var(--set-pad), calc((100% - 640px) / 2)) calc(40px + env(safe-area-inset-bottom, 0px));
+  }
+  #settingsOverlay .settings-header{
+    position:sticky; top:0; z-index:3; display:flex; align-items:center; justify-content:flex-start;
+    margin:0 calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))); padding:4px max(var(--set-pad), calc((100vw - 640px) / 2)) 0;
+    height:56px; box-sizing:border-box; background:var(--main-bg, var(--bg));
+  }
+  #settingsOverlay .settings-back{
+    width:52px; height:52px; padding:0; margin:0; border:0; background:none; box-shadow:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:flex-start; font-size:24px; color:var(--text);
+    transition:opacity .15s ease, transform .15s ease;
+  }
+  #settingsOverlay .settings-back:active{ transform:scale(.92); }
+  #settingsOverlay .settings-title{
+    margin:6px 0 14px; font-size:22px; font-weight:800; letter-spacing:-.01em; line-height:1.2; color:var(--text);
+    white-space:nowrap; overflow:hidden;
+  }
+  /* The categories. */
+  .set-home{ display:flex; flex-direction:column; }
+  .set-home[hidden], .set-page[hidden], .set-cat[hidden], .set-sub[hidden]{ display:none !important; }
+  .set-cat{
+    display:flex; align-items:center; gap:14px; width:100%; padding:14px 0; margin:0;
+    background:none; border:0; border-bottom:1px solid var(--border); border-radius:0;
+    font:inherit; color:var(--text); text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
+  .set-home .set-cat:last-of-type{ border-bottom:none; }
+  .set-cat:active{ background:var(--panel-2); }
+  @media (hover:hover){ .set-cat:hover{ background:var(--panel-2); } }
+  .set-cat-icon{ flex:0 0 25px; width:25px; height:25px; margin-left:-3px; color:var(--accent); display:flex; }
+  .set-cat-icon svg{ width:25px; height:25px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .set-cat-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .set-cat-name{ font-size:15px; font-weight:600; line-height:1.3; color:var(--text); }
+  .set-cat-sub{ font-size:12.5px; line-height:1.35; color:var(--text-dim); }
+  .set-cat-chev{ flex-shrink:0; font-size:13px; color:var(--text-faint); }
+  /* A category's own page. */
+  #settingsPanel .set-page .settings-row{ padding:16px 0; }
+  #settingsPanel .set-page .settings-label{ font-size:15px; font-weight:600; color:var(--text); line-height:1.3; }
+  #settingsPanel .set-page .settings-row--stack{ row-gap:12px; }
+  #settingsPanel .set-text{ flex:1 1 160px; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  #settingsPanel .settings-row--stack > .set-text{ flex:none; }
+  /* Every drop-down the same width, so they line up down the page. */
+  #settingsPanel .set-page .settings-row > .settings-select{ flex:0 0 150px; width:150px; min-width:0; }
+  #settingsPanel .set-desc{ font-size:12.5px; line-height:1.4; color:var(--text-dim); font-weight:400; }
+  #settingsPanel .set-sub{ margin:18px 0 0; font-size:13px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); }
+  #settingsPanel .set-page > .set-sub:first-child{ margin-top:2px; }
+  #settingsPanel .set-sub + .settings-row{ border-top:none; }
+  #settingsPanel .set-page .settings-diagnostics{ margin:0 0 6px; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -6587,15 +6640,8 @@
         <button type="button" role="tab" class="drawer-tab" id="drawerTabMenu" aria-selected="true">Menu</button>
         <button type="button" role="tab" class="drawer-tab" id="drawerTabShortcuts" aria-selected="false" aria-controls="drawerShortcuts">Shortcuts</button>
       </div>
-      <!-- Build 226: in place of the tabs while Settings is showing in the panel. -->
-      <div class="drawer-settings-head">
-        <button type="button" class="drawer-back-btn" id="drawerSettingsBack" aria-label="Back to the menu" title="Back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
-        <span class="drawer-settings-title">Settings</span>
-      </div>
       <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close menu" title="Close menu"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <!-- Build 226: Settings opens here, in the panel, on a phone (the card moves in). -->
-    <div class="drawer-settings" id="drawerSettings"></div>
     <div class="drawer-shortcuts" id="drawerShortcuts" role="tabpanel" aria-labelledby="drawerTabShortcuts">
       <h3 class="drawer-sub">Favorites</h3>
       <div class="drawer-shortcuts-grid" id="drawerShortcutsGrid"></div>
@@ -7540,149 +7586,218 @@
     </div>
   </div>
 </div>
-<div class="settings-overlay" id="settingsOverlay">
+<!-- Build 349 (Mark): Settings opens full screen and is sorted into categories. The first page is
+     the list of categories; each opens its own page, and the back arrow goes from a category
+     to the list and from the list back to the page Settings was opened from. The rows
+     themselves (and their ids) are the same as before, only moved into their category. -->
+<div class="settings-overlay settings-full" id="settingsOverlay" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
   <div class="settings-panel" id="settingsPanel">
     <div class="settings-header">
-      <h2>Settings</h2>
-      <button class="settings-close" id="settingsCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="settings-back" id="settingsCloseBtn" aria-label="Back" title="Back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
     </div>
-    <!-- Wide controls (the theme switch, the two backup buttons, Check storage) sit on their
-         own line under their label, so nothing runs off the card on a phone -- including one
-         with Android's larger text size turned on. Small controls stay beside the label. -->
-    <div class="settings-row settings-row--stack">
-      <span class="settings-label" id="themeLabel">Theme</span>
-      <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
-        <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
-        <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
-        <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
+    <h2 class="settings-title" id="settingsTitle">Settings</h2>
+
+    <nav class="set-home" id="setHome" aria-label="Settings categories">
+      <button type="button" class="set-cat" data-set-cat="appearance">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11.2" r="1.1"/><circle cx="10.4" cy="7.4" r="1.1"/><circle cx="15" cy="7.7" r="1.1"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, accent color</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="playback">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h9.5M18.5 7H20M4 17h3.5M12.5 17H20"/><circle cx="16" cy="7" r="2.3"/><circle cx="10" cy="17" r="2.3"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Playback</span><span class="set-cat-sub">Volume leveling, equalizer, video player</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="library">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4" width="3.5" height="16" rx="1"/><rect x="9" y="4" width="3.5" height="16" rx="1"/><path d="m15.2 5.3 3.3-1 3 15.1-3.3 1z"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Library</span><span class="set-cat-sub">What shows in your Library</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="radio">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="10.5" r="1.8"/><path d="M8.4 6.9a5.1 5.1 0 0 0 0 7.2M15.6 6.9a5.1 5.1 0 0 1 0 7.2M5.6 4.1a9 9 0 0 0 0 12.8M18.4 4.1a9 9 0 0 1 0 12.8M12 12.3v8.2"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Radio</span><span class="set-cat-sub">Stations Near Me, search results</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="sources">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4" width="17" height="6.5" rx="1.6"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.6"/><path d="M7.5 7.25h.01M7.5 16.75h.01"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Sources</span><span class="set-cat-sub">Plex</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="privacy">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.2 4.8 6v5.6c0 4.4 3 8 7.2 9.2 4.2-1.2 7.2-4.8 7.2-9.2V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Privacy &amp; Backup</span><span class="set-cat-sub">Privacy, export and import</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="about">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 7.8h.01"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">About</span><span class="set-cat-sub">Tour, build, storage</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+    </nav>
+
+    <!-- Appearance -->
+    <section class="set-page" data-set-page="appearance" data-set-title="Appearance" hidden>
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="themeLabel">Theme</span>
+        <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
+          <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
+          <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
+          <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
+        </div>
       </div>
-    </div>
-    <div class="settings-row">
-      <span class="settings-label">Accent color</span>
-      <div class="accent-picker-wrap">
-        <button type="button" class="accent-color-input accent-swatch-btn" id="accentColorInput" aria-label="Accent color" aria-haspopup="dialog"></button>
-        <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
+      <div class="settings-row">
+        <span class="settings-label">Accent color</span>
+        <div class="accent-picker-wrap">
+          <button type="button" class="accent-color-input accent-swatch-btn" id="accentColorInput" aria-label="Accent color" aria-haspopup="dialog"></button>
+          <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
+        </div>
       </div>
-    </div>
-    <div class="settings-row">
-      <span class="settings-label">Search results</span>
-      <select class="settings-select" id="resultLimitSelect" title="How many stations each search asks the directory for" aria-label="Search results">
-        <option value="50">50</option>
-        <option value="100">100</option>
-        <option value="200">200</option>
-        <option value="300">300</option>
-        <option value="400">400</option>
-        <option value="500">500</option>
-      </select>
-    </div>
-    <!-- Build 265: whether artist radio stations (Exclusively channels) show in the Library. -->
-    <div class="settings-row">
-      <span class="settings-label" id="libArtistRadioLabel">Artist radio in Library</span>
-      <select class="settings-select" id="libArtistRadioSelect" aria-labelledby="libArtistRadioLabel">
-        <option value="on">Show</option>
-        <option value="off">Hide</option>
-      </select>
-    </div>
-    <!-- Build 310: Stations Near Me on Home (asks for location access when turned on). -->
-    <div class="settings-row">
-      <span class="settings-label" id="nearMeLabel">Stations Near Me</span>
-      <select class="settings-select" id="nearMeSelect" aria-labelledby="nearMeLabel">
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </div>
-    <!-- Build 312: how far out Stations Near Me looks (shown while it's on). -->
-    <div class="settings-row" id="nearRadiusRow" style="display:none;">
-      <span class="settings-label" id="nearRadiusLabel">Station proximity</span>
-      <select class="settings-select" id="nearRadiusSelect" aria-labelledby="nearRadiusLabel">
-        <option value="50">50 miles</option>
-        <option value="100">100 miles</option>
-        <option value="200">200 miles</option>
-      </select>
-    </div>
-    <!-- Build 346 (Mark): Privacy. While on, searches aren't saved under Search and nothing played
-         goes into Continue Listening or Continue Watching. -->
-    <div class="settings-row">
-      <span class="settings-label" id="privacyLabel">Privacy</span>
-      <select class="settings-select" id="privacySelect" aria-labelledby="privacyLabel">
-        <option value="off">Off</option>
-        <option value="on">On</option>
-      </select>
-    </div>
-    <!-- Build 265: the welcome tour, any time. -->
-    <div class="settings-row settings-row--stack">
-      <span class="settings-label">Tour of Amplify</span>
-      <button type="button" class="settings-data-btn settings-wide-btn" id="tourOpenBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Show the tour</button>
-    </div>
-    <!-- Build 231: volume leveling, evening out loud and quiet songs and stations (Android app). -->
-    <div class="settings-row" id="levelingRow" style="display:none;">
-      <span class="settings-label">Volume leveling</span>
-      <select class="settings-select" id="levelingSelect" aria-label="Volume leveling">
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </div>
-    <!-- Build 240: equalizer presets (Android app), applied by the phone's player before leveling. -->
-    <div class="settings-row" id="eqRow" style="display:none;">
-      <span class="settings-label">Equalizer</span>
-      <select class="settings-select" id="eqSelect" aria-label="Equalizer">
-        <option value="Off">Off</option>
-        <option value="Bass Boost">Bass Boost</option>
-        <option value="Treble Boost">Treble Boost</option>
-        <option value="Vocal">Vocal</option>
-        <option value="Rock">Rock</option>
-        <option value="Pop">Pop</option>
-        <option value="Jazz">Jazz</option>
-        <option value="Classical">Classical</option>
-        <option value="Dance">Dance</option>
-        <option value="Late Night">Late Night</option>
-      </select>
-    </div>
-    <!-- Build 159: which player plays the videos on the phone (movies, TV, music videos). VLC
-         is the default; the phone's own player stays as an alternative. -->
-    <div class="settings-row" id="videoPlayerRow" style="display:none;">
-      <span class="settings-label">Video player</span>
-      <select class="settings-select" id="videoPlayerSelect" aria-label="Video player">
-        <option value="vlc">VLC</option>
-        <option value="builtin">Phone's player</option>
-      </select>
-    </div>
-    <div class="settings-row" id="vlcHwRow" style="display:none;">
-      <span class="settings-label">VLC hardware decoding</span>
-      <select class="settings-select" id="vlcHwSelect" aria-label="VLC hardware decoding">
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </div>
-    <div class="settings-row settings-row--stack">
-      <span class="settings-label">Backup &amp; restore</span>
-      <div class="settings-data-actions settings-actions-pair">
-        <button type="button" class="settings-data-btn" id="exportFavBtn" title="Export favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-export"></i>Export</button>
-        <button type="button" class="settings-data-btn" id="importFavBtn" title="Import favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-import"></i>Import</button>
-        <input type="file" id="importFavInput" accept="application/json" hidden>
+    </section>
+
+    <!-- Playback (the Android app only; the category hides when none of its rows show). -->
+    <section class="set-page" data-set-page="playback" data-set-title="Playback" hidden>
+      <h3 class="set-sub">Audio</h3>
+      <!-- Build 231: volume leveling, evening out loud and quiet songs and stations (Android app). -->
+      <div class="settings-row" id="levelingRow" style="display:none;">
+        <div class="set-text"><span class="settings-label">Volume leveling</span><span class="set-desc">Evens out loud and quiet songs and stations</span></div>
+        <select class="settings-select" id="levelingSelect" aria-label="Volume leveling">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
       </div>
-    </div>
-    <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
-         and TV shows on its server join Video's Movies and TV Shows next to the phone's own
-         folders. Filled in by renderPlexSettings. -->
-    <div class="settings-row settings-row--stack" id="plexSettingsRow">
-      <div class="settings-row-head">
-        <span class="settings-label">Plex</span>
-        <span class="plex-status" id="plexStatus"></span>
+      <!-- Build 240: equalizer presets (Android app), applied by the phone's player before leveling. -->
+      <div class="settings-row" id="eqRow" style="display:none;">
+        <span class="settings-label">Equalizer</span>
+        <select class="settings-select" id="eqSelect" aria-label="Equalizer">
+          <option value="Off">Off</option>
+          <option value="Bass Boost">Bass Boost</option>
+          <option value="Treble Boost">Treble Boost</option>
+          <option value="Vocal">Vocal</option>
+          <option value="Rock">Rock</option>
+          <option value="Pop">Pop</option>
+          <option value="Jazz">Jazz</option>
+          <option value="Classical">Classical</option>
+          <option value="Dance">Dance</option>
+          <option value="Late Night">Late Night</option>
+        </select>
       </div>
-      <div class="plex-body" id="plexSettingsBody"></div>
-    </div>
-    <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
-         re-downloaded and opened from several places, and without this there is no way to
-         tell one build from another from inside the app. -->
-    <div class="settings-row settings-row--stack">
-      <div class="settings-row-head">
-        <span class="settings-label">Build</span>
-        <code class="build-stamp" id="buildStamp"></code>
+      <h3 class="set-sub">Video</h3>
+      <!-- Build 159: which player plays the videos on the phone (movies, TV, music videos). VLC
+           is the default; the phone's own player stays as an alternative. -->
+      <div class="settings-row" id="videoPlayerRow" style="display:none;">
+        <div class="set-text"><span class="settings-label">Video player</span><span class="set-desc">Plays movies, TV shows and music videos</span></div>
+        <select class="settings-select" id="videoPlayerSelect" aria-label="Video player">
+          <option value="vlc">VLC</option>
+          <option value="builtin">Phone's player</option>
+        </select>
       </div>
-      <button type="button" class="settings-data-btn settings-wide-btn" id="diagnosticsBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>Check storage</button>
-    </div>
-    <div class="settings-diagnostics" id="diagnostics" style="display:none;"></div>
+      <div class="settings-row" id="vlcHwRow" style="display:none;">
+        <div class="set-text"><span class="settings-label">VLC hardware decoding</span><span class="set-desc">Turn off if a video stutters or shows blocks</span></div>
+        <select class="settings-select" id="vlcHwSelect" aria-label="VLC hardware decoding">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Library -->
+    <section class="set-page" data-set-page="library" data-set-title="Library" hidden>
+      <!-- Build 265: whether artist radio stations (Exclusively channels) show in the Library. -->
+      <div class="settings-row">
+        <span class="settings-label" id="libArtistRadioLabel">Artist radio in Library</span>
+        <select class="settings-select" id="libArtistRadioSelect" aria-labelledby="libArtistRadioLabel">
+          <option value="on">Show</option>
+          <option value="off">Hide</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Radio -->
+    <section class="set-page" data-set-page="radio" data-set-title="Radio" hidden>
+      <!-- Build 310: Stations Near Me on Home (asks for location access when turned on). -->
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="nearMeLabel">Stations Near Me</span><span class="set-desc">A row of local stations on Home</span></div>
+        <select class="settings-select" id="nearMeSelect" aria-labelledby="nearMeLabel">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <!-- Build 312: how far out Stations Near Me looks (shown while it's on). -->
+      <div class="settings-row" id="nearRadiusRow" style="display:none;">
+        <span class="settings-label" id="nearRadiusLabel">Station proximity</span>
+        <select class="settings-select" id="nearRadiusSelect" aria-labelledby="nearRadiusLabel">
+          <option value="50">50 miles</option>
+          <option value="100">100 miles</option>
+          <option value="200">200 miles</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label">Search results</span><span class="set-desc">Stations each radio search returns</span></div>
+        <select class="settings-select" id="resultLimitSelect" title="How many stations each search asks the directory for" aria-label="Search results">
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="300">300</option>
+          <option value="400">400</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Sources -->
+    <section class="set-page" data-set-page="sources" data-set-title="Sources" hidden>
+      <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
+           and TV shows on its server join Video's Movies and TV Shows next to the phone's own
+           folders. Filled in by renderPlexSettings. -->
+      <div class="settings-row settings-row--stack" id="plexSettingsRow">
+        <div class="settings-row-head">
+          <span class="settings-label">Plex</span>
+          <span class="plex-status" id="plexStatus"></span>
+        </div>
+        <div class="plex-body" id="plexSettingsBody"></div>
+      </div>
+    </section>
+
+    <!-- Privacy & Backup -->
+    <section class="set-page" data-set-page="privacy" data-set-title="Privacy &amp; Backup" hidden>
+      <!-- Build 346 (Mark): Privacy. While on, searches aren't saved under Search and nothing played
+           goes into Continue Listening or Continue Watching. -->
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="privacyLabel">Privacy</span><span class="set-desc">Searches aren&rsquo;t saved and nothing is added to Continue Listening or Watching</span></div>
+        <select class="settings-select" id="privacySelect" aria-labelledby="privacyLabel">
+          <option value="off">Off</option>
+          <option value="on">On</option>
+        </select>
+      </div>
+      <div class="settings-row settings-row--stack">
+        <div class="set-text"><span class="settings-label">Backup &amp; restore</span><span class="set-desc">Favorites, playlists, custom art, searches and more</span></div>
+        <div class="settings-data-actions settings-actions-pair">
+          <button type="button" class="settings-data-btn" id="exportFavBtn" title="Export favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-export"></i>Export</button>
+          <button type="button" class="settings-data-btn" id="importFavBtn" title="Import favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-import"></i>Import</button>
+          <input type="file" id="importFavInput" accept="application/json" hidden>
+        </div>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section class="set-page" data-set-page="about" data-set-title="About" hidden>
+      <!-- Build 265: the welcome tour, any time. -->
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label">Tour of Amplify</span>
+        <button type="button" class="settings-data-btn settings-wide-btn" id="tourOpenBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Show the tour</button>
+      </div>
+      <!-- Which file is actually open, and what it can see. A single HTML file gets copied,
+           re-downloaded and opened from several places, and without this there is no way to
+           tell one build from another from inside the app. -->
+      <div class="settings-row settings-row--stack">
+        <div class="settings-row-head">
+          <span class="settings-label">Build</span>
+          <code class="build-stamp" id="buildStamp"></code>
+        </div>
+        <button type="button" class="settings-data-btn settings-wide-btn" id="diagnosticsBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>Check storage</button>
+      </div>
+      <div class="settings-diagnostics" id="diagnostics" style="display:none;"></div>
+    </section>
   </div>
 </div>
 
@@ -9730,45 +9845,78 @@
   }
   if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', renderDiagnostics);
 
-  // Build 226: on a phone Settings opens inside the menu panel (the card itself moves in, so
-  // everything wired to it keeps working); on a wider screen it is still the dialog.
+  // Build 349 (Mark): Settings is a full-screen page, sorted into categories. It opens on the
+  // list of categories (or straight on one, e.g. Sources from Watch's Plex row); a category's
+  // back arrow returns to the list, and the list's closes Settings, back to the page it was
+  // opened from. A category with nothing to show on this device (Playback outside the app) is
+  // left off the list.
   var settingsPanelEl = document.getElementById('settingsPanel');
-  var drawerSettingsHost = document.getElementById('drawerSettings');
-  function settingsInDrawer(){ return !!sidebarScroll && sidebarScroll.classList.contains('settings-on'); }
-  function openSettings(){
+  var setHomeEl = document.getElementById('setHome');
+  var settingsTitleEl = document.getElementById('settingsTitle');
+  var settingsCat = '';
+  function setPageEl(cat){ return settingsPanelEl.querySelector('.set-page[data-set-page="' + cat + '"]'); }
+  function setPageHasRows(page){
+    return Array.prototype.some.call(page.querySelectorAll('.settings-row'), function(r){ return r.style.display !== 'none'; });
+  }
+  function syncSettingsCats(){
+    Array.prototype.forEach.call(setHomeEl.querySelectorAll('.set-cat'), function(btn){
+      var page = setPageEl(btn.getAttribute('data-set-cat'));
+      btn.hidden = !page || !setPageHasRows(page);
+    });
+    // A sub-heading (Audio, Video) shows only with a row under it.
+    Array.prototype.forEach.call(settingsPanelEl.querySelectorAll('.set-sub'), function(h){
+      var any = false;
+      for(var n = h.nextElementSibling; n && !n.classList.contains('set-sub'); n = n.nextElementSibling){
+        if(n.classList.contains('settings-row') && n.style.display !== 'none'){ any = true; break; }
+      }
+      h.hidden = !any;
+    });
+  }
+  function showSettingsCat(cat){
+    var page = cat ? setPageEl(cat) : null;
+    if(!page) cat = '';
+    settingsCat = cat;
+    Array.prototype.forEach.call(settingsPanelEl.querySelectorAll('.set-page'), function(p){ p.hidden = p !== page; });
+    setHomeEl.hidden = !!cat;
+    settingsTitleEl.textContent = page ? page.getAttribute('data-set-title') : 'Settings';
+    settingsPanelEl.setAttribute('data-set-cat', cat || 'home');
+    settingsPanelEl.scrollTop = 0;
+    fitSettingsTitle();
+  }
+  // A heading never shows an ellipsis: it shrinks to fit instead.
+  function fitSettingsTitle(){
+    var h = settingsTitleEl;
+    h.style.fontSize = '';
+    if(!settingsOverlay.classList.contains('open')) return;
+    var size = parseFloat(getComputedStyle(h).fontSize) || 22;
+    while(h.scrollWidth > h.clientWidth + 1 && size > 16){ size -= 1; h.style.fontSize = size + 'px'; }
+  }
+  Array.prototype.forEach.call(setHomeEl.querySelectorAll('.set-cat'), function(btn){
+    btn.addEventListener('click', function(){ showSettingsCat(btn.getAttribute('data-set-cat')); });
+  });
+  function openSettings(cat){
     if(typeof renderPlexSettings === 'function') renderPlexSettings();
     // Build 310: the Stations Near Me switch shows whether location is still allowed.
     if(typeof nearAccessState === 'function') nearAccessState().then(function(st){ nearMeAccess = st; syncNearMeSetting(); });
-    if(isMobileLayout() && drawerSettingsHost){
-      if(settingsPanelEl.parentNode !== drawerSettingsHost) drawerSettingsHost.appendChild(settingsPanelEl);
-      settingsOverlay.classList.remove('open');
-      sidebarScroll.classList.add('settings-on');
-      sidebarScroll.scrollTop = 0;
-      if(!sidebarScroll.classList.contains('open')) openDrawer();
-      return;
-    }
-    if(settingsPanelEl.parentNode !== settingsOverlay) settingsOverlay.appendChild(settingsPanelEl);
-    sidebarScroll.classList.remove('settings-on');
+    if(sidebarScroll && sidebarScroll.classList.contains('open')) closeDrawer();
+    syncSettingsCats();
     settingsOverlay.classList.add('open');
+    document.body.classList.add('settings-open');
+    showSettingsCat(typeof cat === 'string' ? cat : '');
   }
-  // Back from Settings to the menu, the panel staying open.
-  function showDrawerMenu(){
-    sidebarScroll.classList.remove('settings-on');
-    sidebarScroll.scrollTop = 0;
-    var dh = document.querySelector('.drawer-head');
-    if(dh) dh.classList.remove('scrolled');
-  }
-  // Settings closed for good (Escape, a dialog it opened): the panel closes too.
+  // Settings closed for good (Escape, a dialog it opened).
   function closeSettings(){
     settingsOverlay.classList.remove('open');
-    if(settingsInDrawer()) closeDrawer();
+    document.body.classList.remove('settings-open');
   }
-  document.getElementById('drawerSettingsBack').addEventListener('click', showDrawerMenu);
-  settingsFab.addEventListener('click', openSettings);
-  settingsCloseBtn.addEventListener('click', closeSettings);
-  settingsOverlay.addEventListener('click', function(e){
-    if(e.target === settingsOverlay) closeSettings();
-  });
+  // Back: from a category to the list, from the list out of Settings.
+  function settingsBack(){
+    if(settingsCat) showSettingsCat('');
+    else closeSettings();
+  }
+  settingsFab.addEventListener('click', function(){ openSettings(); });
+  settingsCloseBtn.addEventListener('click', settingsBack);
+  window.addEventListener('resize', function(){ if(settingsOverlay.classList.contains('open')) fitSettingsTitle(); });
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
     closeSettings();
@@ -9873,10 +10021,6 @@
     hamburgerBtn.setAttribute('aria-expanded', 'true');
   }
   function closeDrawer(){
-    // Settings gives way to the menu once the panel has slid away, so it opens on the menu.
-    if(sidebarScroll.classList.contains('settings-on')){
-      setTimeout(function(){ if(!sidebarScroll.classList.contains('open')) showDrawerMenu(); }, 350);
-    }
     sidebarScroll.classList.remove('open');
     sidebarBackdrop.classList.remove('open');
     document.body.classList.remove('drawer-open');
@@ -24723,7 +24867,7 @@
       pname.className = 'v-folder-name';
       pname.textContent = 'Plex \u00b7 ' + plexServerName() + (plexBaseOk || plexSyncBusy ? '' : ' (not connected)');
       prow.appendChild(pname);
-      prow.addEventListener('click', function(){ renderPlexSettings(); openSettings(); });
+      prow.addEventListener('click', function(){ renderPlexSettings(); openSettings('sources'); });
       stationsGrid.appendChild(prow);
     }
     videoFolders.forEach(function(fo){
@@ -40949,8 +41093,8 @@
   syncPlayerBarHeight();
 
   document.getElementById('drawerSettingsBtn').addEventListener('click', function(){
-    // Build 226: the panel stays open and shows Settings (a dialog on wider screens).
-    if(!isMobileLayout()) closeDrawer();
+    // Build 349: Settings is a full-screen page; the menu closes behind it.
+    closeDrawer();
     openSettings();
   });
 
