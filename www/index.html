@@ -6563,6 +6563,7 @@
   .pf-crop:not([hidden]) ~ .pf-edit-photo .pf-avatar-sm{ display:none; }
   .pf-crop:not([hidden]) ~ .pf-edit-photo .pf-edit-photo-btns{ flex-direction:row; }
   .pf-crop:not([hidden]) ~ .pf-edit-photo .pf-small-btn{ flex:1; }
+  #pfEditOverlay button{ touch-action:manipulation; }   /* a tap right after a drag isn't taken for a double-tap */
   .pf-small-btn{ min-height:38px; border-radius:10px; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; }
   .pf-label{ display:block; margin:0 0 6px; font-size:13px; font-weight:600; color:var(--text-dim); }
   .pf-input{ width:100%; box-sizing:border-box; height:46px; padding:0 14px; margin-bottom:20px; border-radius:10px; border:1px solid var(--border);
@@ -11050,6 +11051,7 @@
   var pfDraft = null;
   var PF_STAGE = 220, PF_OUT = 320, PF_SRC_MAX = 1000;
   var pfCrop = { img: null, w: 0, h: 0, z: 1, ox: 0, oy: 0 };
+  var pfDragEnded = 0;   // a drag let go outside the dialog isn't a tap outside it
   function pfBase(){ return PF_STAGE / Math.min(pfCrop.w, pfCrop.h); }
   function pfClamp(){
     var k = pfBase() * pfCrop.z;
@@ -11104,7 +11106,7 @@
   }
   function pfRenderCrop(){
     var k = pfBase() * pfCrop.z, side = PF_STAGE / k;
-    var out = Math.max(1, Math.min(PF_OUT, Math.round(side)));
+    var out = PF_OUT;
     var c = document.createElement('canvas');
     c.width = c.height = out;
     var g = c.getContext('2d');
@@ -11150,6 +11152,7 @@
       delete pts[e.pointerId];
       last = snapshot();
       if(!last) stage.classList.remove('dragging');
+      pfDragEnded = Date.now();
     }
     stage.addEventListener('pointerup', up);
     stage.addEventListener('pointercancel', up);
@@ -11222,7 +11225,7 @@
   });
   document.getElementById('pfPhotoRemove').addEventListener('click', function(){ if(pfDraft){ pfDraft.src = ''; pfCrop.img = null; syncProfileEdit(); } });
   document.getElementById('pfEditCancel').addEventListener('click', closeProfileEdit);
-  pfEditOverlay.addEventListener('click', function(e){ if(e.target === pfEditOverlay) closeProfileEdit(); });
+  pfEditOverlay.addEventListener('click', function(e){ if(e.target === pfEditOverlay && Date.now() - pfDragEnded > 500) closeProfileEdit(); });
   document.getElementById('pfEditSave').addEventListener('click', function(){
     if(!pfDraft) return;
     var p = loadProfile();
