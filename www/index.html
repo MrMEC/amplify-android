@@ -10014,6 +10014,8 @@
     setHomeEl.hidden = !!cat;
     settingsTitleEl.textContent = page ? page.getAttribute('data-set-title') : 'Settings';
     settingsPanelEl.setAttribute('data-set-cat', cat || 'home');
+    // Build 358: back on Cleanup after fixing things, its counts are the current ones.
+    if(cat === 'cleanup' && cleanupState) renderCleanupCats();
     settingsPanelEl.scrollTop = 0;
     fitSettingsTitle();
   }
