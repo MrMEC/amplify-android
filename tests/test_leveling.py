@@ -11,7 +11,7 @@ shots = '/tmp/claude-0/t/shots'
 os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
-HOOK = "window.__t = { settings: function(){ openSettings(); } };\n"
+HOOK = "window.__t = { settings: function(){ openSettings('playback'); } };\n"
 _src = open(os.path.join(os.path.dirname(__file__), '..', 'www', 'index.html')).read()
 _mark = '  var coverFlow = null;\n'
 assert _src.count(_mark) == 1

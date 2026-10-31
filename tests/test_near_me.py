@@ -155,7 +155,7 @@ async def ev(page, js):
     return await page.evaluate('(js) => window.__h.ev(js)', js)
 
 async def turn_on(page):
-    await ev(page, 'openSettings()')
+    await ev(page, "openSettings('radio')")
     await page.wait_for_timeout(400)
     await page.select_option('#nearMeSelect', 'on')
     await page.wait_for_timeout(1500)
@@ -182,7 +182,7 @@ async def main():
         check(order == 'top100Section', 'section sits right under Top 100 (%s)' % order)
 
         # ---- Settings: On asks, then the row appears ----
-        await ev(page, 'openSettings()'); await page.wait_for_timeout(400)
+        await ev(page, "openSettings('radio')"); await page.wait_for_timeout(400)
         v = await page.evaluate("() => document.getElementById('nearMeSelect').value")
         check(v == 'off', 'Settings shows Off before permission (%s)' % v)
         await page.screenshot(path=OUT + '/nearme-settings.png')
@@ -324,7 +324,7 @@ async def main():
         await page.wait_for_timeout(1500)
 
         # ---- Station proximity (build 312) ----
-        await ev(page, 'openSettings()'); await page.wait_for_timeout(400)
+        await ev(page, "openSettings('radio')"); await page.wait_for_timeout(400)
         pr = await page.evaluate("() => { var r = document.getElementById('nearRadiusRow'), s = document.getElementById('nearRadiusSelect');"
             " return { shown: getComputedStyle(r).display !== 'none', v: s.value, opts: Array.from(s.options).map(o => o.textContent),"
             " after: r.previousElementSibling.querySelector('#nearMeSelect') !== null }; }")
@@ -345,7 +345,7 @@ async def main():
         await page.reload(); await page.wait_for_timeout(1500)
         v = await page.evaluate("() => document.getElementById('nearRadiusSelect').value")
         check(v == '200', 'proximity kept after a restart (%s)' % v)
-        await ev(page, 'openSettings()'); await page.wait_for_timeout(300)
+        await ev(page, "openSettings('radio')"); await page.wait_for_timeout(300)
         await page.select_option('#nearRadiusSelect', '50'); await page.wait_for_timeout(1800)
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
         rec = await page.evaluate("() => window.__nearMe.load()")
@@ -367,7 +367,7 @@ async def main():
 
         # ---- turning it off hides it, and the car folder empties ----
         await turn_on(page)  # already on: stays on
-        await ev(page, 'openSettings()'); await page.wait_for_timeout(300)
+        await ev(page, "openSettings('radio')"); await page.wait_for_timeout(300)
         await page.select_option('#nearMeSelect', 'off'); await page.wait_for_timeout(600)
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
         d = await page.evaluate("() => getComputedStyle(document.getElementById('nearMeSection')).display")
@@ -385,7 +385,7 @@ async def main():
 
         # ---- permission refused ----
         ctx, page, hits, errs = await context(b, loc={'state': 'prompt', 'grantOnAsk': False, 'lat': 28.549, 'lon': -81.773})
-        await ev(page, 'openSettings()'); await page.wait_for_timeout(300)
+        await ev(page, "openSettings('radio')"); await page.wait_for_timeout(300)
         await page.select_option('#nearMeSelect', 'on'); await page.wait_for_timeout(800)
         nt = await page.evaluate("""() => { var o = document.getElementById('noticeOverlay');
             return { open: o.classList.contains('open'), text: o.textContent, btns: Array.from(o.querySelectorAll('button')).map(b => b.textContent) }; }""")

@@ -136,7 +136,7 @@ OPEN = "window.__opened=[]; window.open=function(u){ window.__opened.push(u); re
 def plexreqs(sub):
     return [x for x in REQ if x[0] != 'WIKI' and sub in x[1]]
 async def settings(pg):
-    await pg.evaluate("openSettings ? document.getElementById('settingsFab').click() : 0"); await pg.wait_for_timeout(300)
+    await pg.evaluate("openSettings ? document.getElementById('settingsFab').click(), document.querySelector('.set-cat[data-set-cat=sources]').click() : 0"); await pg.wait_for_timeout(300)
 async def close_settings(pg):
     await pg.evaluate("document.getElementById('settingsCloseBtn').click()"); await pg.wait_for_timeout(300)
 async def plex_texts(pg):
@@ -165,7 +165,7 @@ async def main():
         await pg.evaluate("document.getElementById('videoAddHeaderBtn').click()"); await pg.wait_for_timeout(2000)
 
         # Settings: signed out
-        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(400)
+        await pg.evaluate("document.getElementById('settingsFab').click(), document.querySelector('.set-cat[data-set-cat=sources]').click()"); await pg.wait_for_timeout(400)
         t = await plex_texts(pg)
         check(t == ['Add the movies and TV shows on your Plex server to Watch.', 'Sign In with Plex'], f'Settings > Plex signed out {t}')
         await pg.evaluate("document.getElementById('plexSettingsRow').scrollIntoView()"); await pg.wait_for_timeout(200)
@@ -374,7 +374,7 @@ async def main():
         # bigger text at 360 wide: the Plex part of Settings still fits
         await pg.set_viewport_size({'width': 360, 'height': 780})
         await pg.add_style_tag(content='#settingsPanel .settings-data-btn, #settingsPanel .settings-select{ font-size:17px !important; } #settingsPanel .plex-line, #settingsPanel .plex-note{ font-size:17.5px !important; } #settingsPanel .settings-label, #settingsPanel .plex-status{ font-size:17.5px !important; } #settingsPanel .plex-code{ font-size:27px !important; }')
-        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(400)
+        await pg.evaluate("document.getElementById('settingsFab').click(), document.querySelector('.set-cat[data-set-cat=sources]').click()"); await pg.wait_for_timeout(400)
         await pg.evaluate("document.getElementById('plexSettingsRow').scrollIntoView()"); await pg.wait_for_timeout(200)
         over = await pg.evaluate("""(()=>{var p=document.getElementById('settingsPanel'),r=p.getBoundingClientRect(),bad=[];
           document.querySelectorAll('#plexSettingsRow *').forEach(function(e){var b=e.getBoundingClientRect(); if(b.width && (b.right>r.right+1||b.left<r.left-1)) bad.push(e.className||e.tagName);
@@ -389,7 +389,7 @@ async def main():
         sh = await names(pg, '#stationsGrid .tile.vposter .tile-name')
         cw = await names(pg, '#stationsGrid .vw-tile .tile-name')
         check(sorted(sh) == ['Breaking Bad', 'Friends', 'The Office'] and 'Severance' not in cw, f'TV Shows library off: its shows leave Video and Continue Watching {sh} {cw}')
-        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.getElementById('settingsFab').click(), document.querySelector('.set-cat[data-set-cat=sources]').click()"); await pg.wait_for_timeout(300)
         await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"2\"]').click()"); await pg.wait_for_timeout(300)
         await pg.evaluate("document.querySelector('#plexLibraries .plex-lib[data-key=\"4\"]').click()"); await pg.wait_for_timeout(300)
         await close_settings(pg)
@@ -399,7 +399,7 @@ async def main():
         await tab(pg, 'movies')
         mv = await names(pg, '#stationsGrid .tile.vposter .tile-name')
         check('Birthday Party' in mv, f'Home Movies back on {mv}')
-        await pg.evaluate("document.getElementById('settingsFab').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.getElementById('settingsFab').click(), document.querySelector('.set-cat[data-set-cat=sources]').click()"); await pg.wait_for_timeout(300)
         # Sign Out
         await pg.evaluate("document.getElementById('plexSignOutBtn').click()"); await pg.wait_for_timeout(600)
         t = await plex_texts(pg)
