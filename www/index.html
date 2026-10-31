@@ -6458,6 +6458,11 @@
   }
   .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-fav{ display:none; }
   @media (max-width: 900px){ .tile-grid.grid-artists > .tile[data-entity="artist"]{ padding-left:0; } }
+  /* ---------- Build 355 (Mark): station names one size everywhere ----------
+     A station tile's name (and the line under it) is Home's size on every page: Now Playing,
+     a station or genre page, search, See All. Home's Favorites keep their own sizes. */
+  .tile.station-tile:not(.tile-row):not(.fav-card) .tile-name{ font-size:13px; line-height:1.3; margin-top:8px; }
+  .tile.station-tile:not(.tile-row):not(.fav-card) .tile-sub{ font-size:11.5px; margin-top:2px; }
   /* ---------- Build 349 (Mark): Settings, full screen and in categories ----------
      A page of its own over everything (the floating video still above it), on the page's own
      background. The back arrow sits where every other page's does, on the menu button's line;
@@ -41446,7 +41451,7 @@
     // Same reasoning for a favourited album: it is a page, not a stream.
     if(!draggableMode && isAlbumFav(station)) return buildAlbumTile(albumEntryForFav(station));
     var tile = document.createElement('div');
-    tile.className = 'tile';
+    tile.className = 'tile station-tile';   // build 355: names at Home's size everywhere
     tile.dataset.key = favKey(station);
     tile._ctxItem = station;
     if(currentStation && favKey(currentStation) === favKey(station)) tile.classList.add('playing');
