@@ -1429,6 +1429,7 @@
   .confirm-actions button{ flex:1; min-height:44px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
   .confirm-cancel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); }
   .confirm-ok{ background:var(--danger); color:#fff; border:1px solid var(--danger); }
+  .confirm-ok.confirm-ok-safe{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
   /* ---------- Tour (build 265) ---------- */
   /* The welcome tour: one card in the dialogs' style (.confirm-panel), stepping through the
      main features. When a step's feature is on screen (a tab, the menu button, the mini
@@ -6555,6 +6556,25 @@
   .cl-name{ font-size:15px; font-weight:600; line-height:1.3; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cl-sub{ font-size:12.5px; line-height:1.35; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cl-more{ margin-top:14px; }
+  /* Build 358: finding fixes online, and the review. */
+  .cl-actions{ margin:8px 0 6px; }
+  .cl-actions:empty{ display:none; }
+  #settingsPanel .cl-find{ gap:8px; }
+  .cl-review-note{ margin:0; font-size:13.5px; line-height:1.45; color:var(--text); font-weight:600; }
+  .cl-new{ font-size:12.5px; line-height:1.35; color:var(--accent); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cl-new.none{ color:var(--text-faint); font-weight:400; }
+  img.cl-art.cl-art-new{ flex:0 0 48px; width:48px; height:48px; object-fit:cover; border-radius:6px; background:var(--panel-2); }
+  .cl-pick{ flex:0 0 auto; width:22px; height:22px; margin:0; accent-color:var(--accent); cursor:pointer; }
+  .cl-item-off .cl-name{ color:var(--text-dim); }
+  .cl-bar{
+    position:sticky; bottom:0; z-index:3; display:flex; justify-content:flex-end; gap:10px;
+    margin:12px calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))) 0; padding:12px max(var(--set-pad), calc((100vw - 640px) / 2)) calc(12px + env(safe-area-inset-bottom, 0px));
+    background:var(--main-bg, var(--bg)); border-top:1px solid var(--border);
+  }
+  .cl-bar[hidden]{ display:none; }
+  .cl-bar button{ flex:1; max-width:220px; min-height:44px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .cl-bar-save:disabled{ opacity:.45; cursor:default; }
+  .cl-has-bar{ padding-bottom:0 !important; }
   /* Build 352: On/Off settings are toggle switches (the drop-down behind each is hidden). */
   #settingsPanel select.set-switch-src{ display:none !important; }
   #settingsPanel .set-switch{
@@ -7770,7 +7790,12 @@
     </section>
     <section class="set-page" data-set-page="cleanuplist" data-set-title="" data-set-parent="cleanup" hidden>
       <p class="set-lead" id="cleanupListLead"></p>
+      <div class="cl-actions" id="cleanupActions"></div>
       <div class="cl-list" id="cleanupList"></div>
+      <div class="cl-bar" id="cleanupBar" hidden>
+        <button type="button" class="confirm-cancel cl-bar-cancel" id="cleanupCancelBtn">Cancel</button>
+        <button type="button" class="notice-ok cl-bar-save" id="cleanupSaveBtn">Save</button>
+      </div>
     </section>
 
     <!-- Radio -->
@@ -9983,6 +10008,7 @@
   function showSettingsCat(cat){
     var page = cat ? setPageEl(cat) : null;
     if(!page) cat = '';
+    if(cat !== 'cleanuplist' && typeof cleanupReview !== 'undefined') cleanupReview = null;   // build 358
     settingsCat = cat;
     Array.prototype.forEach.call(settingsPanelEl.querySelectorAll('.set-page'), function(p){ p.hidden = p !== page; });
     setHomeEl.hidden = !!cat;
@@ -10159,6 +10185,7 @@
     var st = cleanupState;
     if(!box || !st || !cleanupGroup) return;
     var list = st[cleanupGroup] || [];
+    renderCleanupActions(list);
     var shown = more ? Math.min(list.length, (box._shown || CLEANUP_PAGE) + CLEANUP_PAGE) : CLEANUP_PAGE;
     box._shown = shown;
     box.innerHTML = '';
@@ -10209,6 +10236,39 @@
     }
     text.appendChild(nm); text.appendChild(sub);
     b.appendChild(art); b.appendChild(text);
+    var rv = cleanupReview && cleanupReview.group === cleanupGroup ? cleanupReview : null;
+    if(rv){
+      var found = rv.found.get(x);
+      var line = document.createElement('span');
+      line.className = 'cl-new' + (found ? '' : ' none');
+      line.textContent = found ? found.label : (rv.looked.has(x) ? 'No match found' : 'Not looked up');
+      text.appendChild(line);
+      if(found && found.thumb){
+        var na = document.createElement('img');
+        na.className = 'cl-art cl-art-new';
+        na.alt = '';
+        na.src = found.thumb;
+        b.appendChild(na);
+      }
+      if(found){
+        var ck = document.createElement('input');
+        ck.type = 'checkbox';
+        ck.className = 'cl-pick';
+        ck.checked = rv.picked.has(x);
+        ck.setAttribute('aria-label', 'Use this');
+        ck.addEventListener('click', function(e){ e.stopPropagation(); });
+        ck.addEventListener('change', function(){
+          if(ck.checked) rv.picked.add(x); else rv.picked.delete(x);
+          syncCleanupBar();
+        });
+        b.appendChild(ck);
+        b.addEventListener('click', function(){ ck.checked = !ck.checked; ck.dispatchEvent(new Event('change')); });
+      } else {
+        b.classList.add('cl-item-off');
+        b.addEventListener('click', function(){ fixCleanupItem(x); });
+      }
+      return b;
+    }
     var chev = document.createElement('i');
     chev.className = 'fa-solid fa-chevron-right set-cat-chev';
     chev.setAttribute('aria-hidden', 'true');
@@ -10216,6 +10276,301 @@
     b.addEventListener('click', function(){ fixCleanupItem(x); });
     return b;
   }
+
+  // ---------- Library Cleanup, step 2 (build 358, Mark): fixes found online, in bulk ----------
+  // A list's "Find ... online" looks every entry up on MusicBrainz (one request a second, as it
+  // asks; Stop keeps what was found so far): a song by its artist and title (from its name, its
+  // file name, or the folder above its album's folder) for title, artist, album, year and track;
+  // an album for the year and genre it's missing; an album's cover on the Cover Art Archive,
+  // kept only when it's at least CLEANUP_MIN_ART pixels (and, for a small cover, bigger than the
+  // one there now). The list then shows what was found against each entry, ticked; nothing is
+  // written until Save, which asks first, then writes the files one by one.
+  var cleanupReview = null;
+  var CLEANUP_LOOKUP = {
+    songs: { button: 'Find details online', what: 'Tags', noun: ['song', 'songs'] },
+    albums: { button: 'Find year and genre online', what: 'Tags', noun: ['album', 'albums'] },
+    noart: { button: 'Find covers online', what: 'Covers', noun: ['album', 'albums'] },
+    lowart: { button: 'Find sharper covers online', what: 'Covers', noun: ['album', 'albums'] }
+  };
+  function clNorm(v){
+    return String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').replace(/^the /, '').trim();
+  }
+  function clSameArtist(a, b){
+    a = clNorm(a); b = clNorm(b);
+    return !!a && !!b && (a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0);
+  }
+  function clTitleCase(v){ return String(v || '').replace(/\b([a-z])/g, function(m){ return m.toUpperCase(); }); }
+  function renderCleanupActions(list){
+    var box = document.getElementById('cleanupActions');
+    if(!box) return;
+    box.innerHTML = '';
+    var cfg = CLEANUP_LOOKUP[cleanupGroup];
+    var rv = cleanupReview && cleanupReview.group === cleanupGroup ? cleanupReview : null;
+    if(!cfg || !list.length){ syncCleanupBar(); return; }
+    if(rv){
+      var n = rv.found.size, of = list.length;
+      var p = document.createElement('p');
+      p.className = 'cl-review-note';
+      p.textContent = n ? ('Found ' + n + ' of ' + of + '. Untick any you don\u2019t want, then Save.')
+        : 'Nothing was found online for these. Tap one to fix it by hand.';
+      box.appendChild(p);
+    } else {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'settings-data-btn settings-wide-btn cl-find';
+      b.id = 'cleanupFindBtn';
+      b.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>';
+      b.appendChild(document.createTextNode(cfg.button));
+      b.addEventListener('click', function(){ startCleanupLookup(); });
+      box.appendChild(b);
+    }
+    syncCleanupBar();
+  }
+  function syncCleanupBar(){
+    var bar = document.getElementById('cleanupBar'), btn = document.getElementById('cleanupSaveBtn');
+    var rv = cleanupReview && cleanupReview.group === cleanupGroup ? cleanupReview : null;
+    bar.hidden = !rv || !rv.found.size;
+    if(!rv) return;
+    var n = rv.picked.size;
+    btn.disabled = !n;
+    btn.textContent = n ? 'Save ' + n : 'Save';
+  }
+  // --- the lookups: each resolves { label, thumb?, ...what to write } or null ---
+  function clLookupSong(t){
+    var g = guessFromFilename(t.fileName || '');
+    var parts = String(t.relPath || '').split('/');
+    var folderArtist = parts.length >= 4 ? parts[parts.length - 3] : '';
+    var folderAlbum = parts.length >= 3 ? parts[parts.length - 2] : '';
+    var title = String((t.metaKey === '' ? '' : t.name) || g.title || t.name || '').trim();
+    if(g.artist && !String(t.artist || '').trim()) title = g.title || title;
+    var artist = String(t.artist || g.artist || folderArtist || '').trim();
+    if(!title || !artist) return Promise.resolve(null);
+    var q = 'recording:' + luceneQuote(sanitizeArtistName(title) || title) + ' AND artist:' + luceneQuote(sanitizeArtistName(artist) || artist);
+    return mbGet('recording/?limit=15&query=' + encodeURIComponent(q)).then(function(d){
+      var recs = ((d && d.recordings) || []).filter(function(r){
+        return (r.score || 0) >= 85 && clNorm(r.title) === clNorm(title) && clSameArtist(creditName(r), artist);
+      });
+      if(!recs.length) return null;
+      function relRank(rel){
+        var rg = rel['release-group'] || {};
+        var sec = (rg['secondary-types'] || []).length;
+        var rank = (rel.status === 'Official' ? 0 : 4) + (rg['primary-type'] === 'Album' ? 0 : 2) + (sec ? 1 : 0);
+        if(folderAlbum && clNorm(rel.title) === clNorm(folderAlbum)) rank -= 10;
+        return rank;
+      }
+      var best = null, bestRec = recs[0];
+      recs.forEach(function(r){
+        (r.releases || []).forEach(function(rel){
+          var k = [relRank(rel), rel.date || '9999'];
+          if(!best || k[0] < best.k[0] || (k[0] === best.k[0] && k[1] < best.k[1])){ best = { rel: rel, k: k }; bestRec = r; }
+        });
+      });
+      var rel = best && best.rel;
+      var out = { title: bestRec.title, artist: creditName(bestRec) || artist };
+      if(rel){
+        out.album = rel.title;
+        out.year = yearOf(rel.date || bestRec['first-release-date']);
+        var m = (rel.media || [])[0], tr = m && (m.track || [])[0];
+        var num = tr && parseInt(tr.number, 10);
+        var cnt = (m && (m['track-count'] || m['track-count'] === 0) ? m['track-count'] : rel['track-count']) || 0;
+        if(num) out.track = num + (cnt ? '/' + cnt : '');
+      } else out.year = yearOf(bestRec['first-release-date']);
+      Object.keys(out).forEach(function(k){ if(!out[k]) delete out[k]; });
+      out.label = out.title + ' \u00b7 ' + out.artist + (out.album ? ' \u00b7 ' + out.album : '') + (out.year ? ' (' + out.year + ')' : '');
+      return out;
+    });
+  }
+  function clMbAlbumGroups(a){
+    var art = a.various ? '' : (sanitizeArtistName(a.artist) || a.artist);
+    var t = sanitizeArtistName(a.album) || a.album;
+    var q = 'releasegroup:' + luceneQuote(t) + (art ? ' AND artist:' + luceneQuote(art) : '');
+    return mbGet('release-group/?limit=10&query=' + encodeURIComponent(q)).then(function(d){
+      var gs = ((d && d['release-groups']) || []).filter(function(g){
+        return (g.score || 0) >= 85 && clNorm(g.title) === clNorm(a.album) && (a.various || clSameArtist(creditName(g), a.artist));
+      });
+      gs.sort(function(x, y){ return (x['primary-type'] === 'Album' ? 0 : 1) - (y['primary-type'] === 'Album' ? 0 : 1); });
+      return gs;
+    });
+  }
+  function clLookupAlbum(a){
+    var needYear = a.tracks.some(function(t){ return !String(t.year || '').trim(); });
+    var needGenre = a.tracks.some(function(t){ return !String(t.genre || '').trim(); });
+    return clMbAlbumGroups(a).then(function(gs){
+      var g = gs[0];
+      if(!g) return null;
+      var out = {};
+      if(needYear && yearOf(g['first-release-date'])) out.year = yearOf(g['first-release-date']);
+      var pickGenre = function(list){
+        list = (list || []).slice().sort(function(x, y){ return (y.count || 0) - (x.count || 0); });
+        return list[0] && list[0].name ? clTitleCase(list[0].name) : '';
+      };
+      var genre = needGenre ? pickGenre(g.genres || g.tags) : '';
+      var more = needGenre && !g.genres ? mbGet('release-group/' + g.id + '?inc=genres').then(function(full){
+        return pickGenre(full && full.genres) || genre;
+      })['catch'](function(){ return genre; }) : Promise.resolve(genre);
+      return more.then(function(gn){
+        if(gn) out.genre = gn;
+        if(!out.year && !out.genre) return null;
+        out.label = [out.year, out.genre].filter(Boolean).join(' \u00b7 ');
+        return out;
+      });
+    });
+  }
+  function clImageSize(url){
+    return new Promise(function(res){
+      var img = new Image(), done = false;
+      var timer = setTimeout(function(){ if(!done){ done = true; res(null); } }, 20000);
+      img.onload = function(){ if(done) return; done = true; clearTimeout(timer); res({ w: img.naturalWidth, h: img.naturalHeight }); };
+      img.onerror = function(){ if(done) return; done = true; clearTimeout(timer); res(null); };
+      img.src = url;
+    });
+  }
+  function clLookupCover(a){
+    var now = a._artSize ? Math.min(a._artSize.w, a._artSize.h) : 0;
+    return clMbAlbumGroups(a).then(function(gs){
+      var tries = gs.slice(0, 3);
+      function next(){
+        var g = tries.shift();
+        if(!g) return null;
+        var c = caaCover('release-group', g.id);
+        return c.full().then(function(url){
+          return clImageSize(url).then(function(sz){
+            var side = sz ? Math.min(sz.w, sz.h) : 0;
+            if(side >= CLEANUP_MIN_ART && side > now){
+              return { cover: url, thumb: c.thumb, w: sz.w, h: sz.h, label: 'New cover \u00b7 ' + sz.w + ' \u00d7 ' + sz.h };
+            }
+            return next();
+          });
+        }, next);
+      }
+      return next();
+    });
+  }
+  function startCleanupLookup(){
+    var group = cleanupGroup, list = (cleanupState && cleanupState[group] || []).slice();
+    if(!list.length) return;
+    var look = group === 'songs' ? clLookupSong : group === 'albums' ? clLookupAlbum : clLookupCover;
+    var rv = { group: group, found: new Map(), picked: new Set(), looked: new Set(), stopped: false };
+    var i = 0, cfg = CLEANUP_LOOKUP[group];
+    var seq = showNotice({ kind: 'working', title: 'Looking up ' + (list.length === 1 ? '1 ' + cfg.noun[0] : list.length + ' ' + cfg.noun[1]),
+      message: 'Checking MusicBrainz\u2026', autoClose: false,
+      actions: [{ label: 'Stop', run: function(){ rv.stopped = true; } }] });
+    function progress(){
+      var m = document.getElementById('noticeMsg');
+      if(m && noticeShown && noticeShown.seq === seq) m.textContent = (i + 1) + ' of ' + list.length + (rv.found.size ? ' \u00b7 found ' + rv.found.size : '');
+    }
+    function done(){
+      closeNotice(seq);
+      if(cleanupGroup !== group || settingsCat !== 'cleanuplist') return;
+      cleanupReview = rv;
+      renderCleanupList();
+    }
+    function one(){
+      if(rv.stopped || i >= list.length){ done(); return; }
+      var x = list[i];
+      progress();
+      look(x).then(function(r){
+        rv.looked.add(x);
+        if(r){ rv.found.set(x, r); rv.picked.add(x); }
+      }, function(){ rv.looked.add(x); }).then(function(){ i++; one(); });
+    }
+    one();
+  }
+  // --- saving what was kept ---
+  function cleanupSave(){
+    var rv = cleanupReview;
+    if(!rv || !rv.picked.size) return;
+    var group = rv.group, cfg = CLEANUP_LOOKUP[group];
+    var picked = (cleanupState[group] || []).filter(function(x){ return rv.picked.has(x); });
+    var tracks = [], fixFor = new Map();
+    picked.forEach(function(x){
+      var f = rv.found.get(x);
+      (group === 'songs' ? [x] : x.tracks).forEach(function(t){ tracks.push(t); fixFor.set(t, f); });
+    });
+    var nSongs = tracks.length;
+    confirmDelete({
+      title: 'Save in ' + (nSongs === 1 ? '1 song file' : nSongs + ' song files') + '?',
+      message: group === 'songs' || group === 'albums'
+        ? 'The details found are written into the music files.'
+        : 'The new covers are written into the music files, in place of any cover they have.',
+      ok: 'Save', safe: true
+    }).then(function(ok){
+      if(!ok) return;
+      var seq = 0, covers = new Map();
+      function say(msg){
+        var m = document.getElementById('noticeMsg');
+        if(m && noticeShown && noticeShown.seq === seq) m.textContent = msg;
+      }
+      function getCovers(){
+        if(group !== 'noart' && group !== 'lowart') return Promise.resolve();
+        var k = 0;
+        return picked.reduce(function(pr, a){
+          return pr.then(function(){
+            k++;
+            say('Getting covers \u00b7 ' + k + ' of ' + picked.length);
+            return coverFromImage(rv.found.get(a).cover).then(function(c){ covers.set(a, c); }, function(){});
+          });
+        }, Promise.resolve());
+      }
+      function changesFor(doc, t){
+        var f = fixFor.get(t), c = {};
+        if(!f) return c;
+        if(group === 'noart' || group === 'lowart'){
+          var a = picked.filter(function(x){ return x.tracks.indexOf(t) !== -1; })[0];
+          var cv = a && covers.get(a);
+          if(cv) c.cover = cv;
+          return c;
+        }
+        var keys = group === 'songs' ? ['title', 'artist', 'album', 'year', 'track'] : ['year', 'genre'];
+        keys.forEach(function(k){
+          if(!f[k]) return;
+          var cur = String(doc.values[k] || '').trim();
+          // An album's year or genre only goes where the song has none.
+          if(group === 'albums' && cur) return;
+          if(cur !== f[k]) c[k] = f[k];
+        });
+        return c;
+      }
+      function finished(res){
+        closeNotice(seq);
+        cleanupReview = null;
+        showNotice({ kind: res.skipped.length && !res.saved.length ? 'error' : 'done', title: cfg.what + ' saved',
+          message: batchSummary(res, cfg.what), autoClose: false });
+        cleanupScan();
+        if(settingsCat === 'cleanuplist') renderCleanupList();
+      }
+      function failed(err){
+        closeNotice(seq);
+        if(err && err.code === 'NO_WRITE'){
+          showNotice({ kind: 'info', title: 'Allow Amplify to change the files', message: folderPermissionText(err.tree), autoClose: false,
+            actions: [{ label: 'Not Now' }, { label: 'Allow', primary: true, run: function(){
+              askFolderWrite(err.tree).then(function(r){
+                if(r !== 'ok'){
+                  showNotice({ kind: 'error', message: r === 'other' ? 'That was a different folder. Choose \u201c' + folderNameOfTree(err.tree) + '\u201d.' : 'The rest wasn\u2019t saved.' });
+                  return;
+                }
+                seq = showNotice({ kind: 'working', title: 'Saving', message: '', autoClose: false, actions: [] });
+                err.resume().then(finished, failed);
+              }, function(){ showNotice({ kind: 'error', message: 'Permission wasn\u2019t given, so the rest wasn\u2019t saved.' }); });
+            } }] });
+          return;
+        }
+        showNotice({ kind: 'error', message: 'The changes couldn\u2019t be saved' + (err && err.message ? ': ' + err.message : '.') });
+        cleanupScan();
+        if(settingsCat === 'cleanuplist') renderCleanupList();
+      }
+      seq = showNotice({ kind: 'working', title: 'Saving', message: '', autoClose: false, actions: [] });
+      getCovers().then(function(){
+        return saveTagsToTracks(tracks, changesFor, function(i, n){ say((i + 1) + ' of ' + n + ' songs'); });
+      }).then(finished, failed);
+    });
+  }
+  document.getElementById('cleanupSaveBtn').addEventListener('click', cleanupSave);
+  document.getElementById('cleanupCancelBtn').addEventListener('click', function(){
+    cleanupReview = null;
+    renderCleanupList();
+  });
   function fixCleanupItem(x){
     if(cleanupGroup === 'songs'){ openTagSheet(x); return; }
     if(cleanupGroup === 'albums'){ openAlbumTagSheet(x); return; }
@@ -28407,6 +28762,8 @@
     document.getElementById('confirmTitle').textContent = o.title || 'Delete?';
     document.getElementById('confirmMsg').textContent = o.message || '';
     document.getElementById('confirmOk').textContent = o.ok || 'Delete';
+    // Build 358: a confirmation that isn't a delete (writing files) gets the plain accent button.
+    document.getElementById('confirmOk').classList.toggle('confirm-ok-safe', !!o.safe);
     confirmOverlayEl.classList.add('open');
     // Keyboard users land on Cancel; on a touch screen nothing is focused (no ring).
     var coarse = false;
