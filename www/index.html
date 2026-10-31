@@ -7749,7 +7749,7 @@
       <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
            and TV shows on its server join Video's Movies and TV Shows next to the phone's own
            folders. Filled in by renderPlexSettings. -->
-      <!-- Build 350 (Mark): Pluto TV and archive.org, each can be turned off. -->
+      <!-- Build 351 (Mark): Pluto TV and archive.org, each can be turned off. -->
       <div class="settings-row" id="plutoSourceRow">
         <div class="set-text"><span class="settings-label" id="plutoSourceLabel">Pluto TV</span><span class="set-desc">Pluto channels on Live TV and in Add Channels</span></div>
         <select class="settings-select" id="plutoSourceSelect" aria-labelledby="plutoSourceLabel">
@@ -19120,7 +19120,7 @@
     return (e.cats || []).some(function(c){ return c === 'xxx' || ADULT_GROUP_RE.test(String(c)); }) ||
       ADULT_GROUP_RE.test(String(e.group || ''));
   }
-  // Build 350 (Mark): Pluto TV and archive.org can be turned off in Settings > Sources. Off, a
+  // Build 351 (Mark): Pluto TV and archive.org can be turned off in Settings > Sources. Off, a
   // source's channels leave Live TV, the guide, channel search and Continue Watching, its tab
   // leaves Add Channels and (archive.org) Search's Archive tab goes; the channels themselves
   // are kept, so turning it back on brings them all back.
@@ -21828,7 +21828,7 @@
       tabs.className = 'home-tabs scroll-tabs';
       // Short labels. Plex only while signed in to Plex.
       if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
-      if((addChannelsTab === 'pluto' || addChannelsTab === 'archive') && !sourceOn(addChannelsTab)) addChannelsTab = 'recommended';   // build 350
+      if((addChannelsTab === 'pluto' || addChannelsTab === 'archive') && !sourceOn(addChannelsTab)) addChannelsTab = 'recommended';   // build 351
       var tabList = [['mine', 'My Shows & Movies'], ['recommended', 'Recommended'], ['all', 'All']];
       if(sourceOn('pluto')) tabList.push(['pluto', 'Pluto']);
       if(sourceOn('archive')) tabList.push(['archive', 'Archive.org']);
