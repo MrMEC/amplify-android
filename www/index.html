@@ -6527,6 +6527,34 @@
   #settingsPanel .set-page > .set-sub:first-child{ margin-top:2px; }
   #settingsPanel .set-sub + .settings-row{ border-top:none; }
   #settingsPanel .set-page .settings-diagnostics{ margin:0 0 6px; }
+  /* Build 356: a row that opens a page (Library Cleanup), and the Cleanup pages. */
+  #settingsPanel .set-link-row{
+    width:100%; margin:0; background:none; border:0; border-top:1px solid var(--border); border-radius:0;
+    font:inherit; color:var(--text); text-align:left; cursor:pointer; flex-wrap:nowrap; align-items:center; -webkit-tap-highlight-color:transparent;
+  }
+  #settingsPanel .set-link-row:active{ background:var(--panel-2); }
+  #settingsPanel .set-lead{ margin:0 0 6px; font-size:13.5px; line-height:1.45; color:var(--text-dim); }
+  .cl-cats{ display:flex; flex-direction:column; }
+  .cl-cats .set-cat:last-child{ border-bottom:none; }
+  .cl-cat:disabled{ cursor:default; opacity:1; }
+  .cl-cat:disabled:active{ background:none; }
+  .cl-cat.cl-done .set-cat-icon{ color:var(--text-faint); }
+  .cl-count{ flex-shrink:0; font-size:14px; font-weight:600; color:var(--text-dim); }
+  .cl-ok{ flex-shrink:0; font-size:15px; color:var(--accent); }
+  .cl-empty{ margin:24px 0; font-size:14px; line-height:1.45; color:var(--text-dim); text-align:center; }
+  .cl-list{ display:flex; flex-direction:column; }
+  .cl-item{
+    display:flex; align-items:center; gap:14px; width:100%; padding:9px 0; margin:0; background:none; border:0;
+    border-bottom:1px solid var(--border); border-radius:0; font:inherit; color:var(--text); text-align:left; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .cl-item:active{ background:var(--panel-2); }
+  .cl-item:last-of-type{ border-bottom:none; }
+  .cl-art.tile-art{ flex:0 0 48px; width:48px; height:48px; aspect-ratio:auto; margin:0; border-radius:6px; overflow:hidden; font-size:16px; }
+  .cl-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .cl-name{ font-size:15px; font-weight:600; line-height:1.3; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cl-sub{ font-size:12.5px; line-height:1.35; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cl-more{ margin-top:14px; }
   /* Build 352: On/Off settings are toggle switches (the drop-down behind each is hidden). */
   #settingsPanel select.set-switch-src{ display:none !important; }
   #settingsPanel .set-switch{
@@ -7728,6 +7756,21 @@
           <option value="off">Hide</option>
         </select>
       </div>
+      <!-- Build 356 (Mark): Library Cleanup, the whole library checked for missing tags and covers. -->
+      <button type="button" class="settings-row set-link-row" id="cleanupOpenBtn">
+        <span class="set-text"><span class="settings-label">Library Cleanup</span><span class="set-desc">Find songs with missing tags and albums without a good cover, and fix them</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+    </section>
+
+    <!-- Library Cleanup (build 356): what needs fixing, in four groups; each opens its list. -->
+    <section class="set-page" data-set-page="cleanup" data-set-title="Library Cleanup" data-set-parent="library" hidden>
+      <p class="set-lead">Songs and albums whose files are missing details or a good cover. Tap one to fix it; the changes are saved in the music files.</p>
+      <div class="cl-cats" id="cleanupCats"></div>
+    </section>
+    <section class="set-page" data-set-page="cleanuplist" data-set-title="" data-set-parent="cleanup" hidden>
+      <p class="set-lead" id="cleanupListLead"></p>
+      <div class="cl-list" id="cleanupList"></div>
     </section>
 
     <!-- Radio -->
@@ -9974,12 +10017,255 @@
     settingsOverlay.classList.remove('open');
     document.body.classList.remove('settings-open');
   }
-  // Back: from a category to the list, from the list out of Settings.
+  // Back: from a page inside a category to the category (build 356), from a category to the
+  // list, from the list out of Settings.
   function settingsBack(){
-    if(settingsCat) showSettingsCat('');
+    var page = settingsCat ? setPageEl(settingsCat) : null;
+    var parent = page ? page.getAttribute('data-set-parent') : '';
+    if(parent) showSettingsCat(parent);
+    else if(settingsCat) showSettingsCat('');
     else closeSettings();
   }
   settingsFab.addEventListener('click', function(){ openSettings(); });
+
+  // ---------- Library Cleanup (build 356, Mark) ----------
+  // The whole library checked against what its files say: songs whose title, artist or album
+  // isn't in the file (Amplify is going on the file name), albums missing a year or genre,
+  // albums with no cover in their files, and covers smaller than CLEANUP_MIN_ART pixels. Each
+  // group opens a list; a song opens its Info & Tags, an album its album Info & Tags or its
+  // cover (with MusicBrainz suggestions, saved into every song's file). The tags and covers
+  // are checked in memory at once; a cover's size is measured from its picture, a few at a
+  // time, and kept until the picture changes.
+  var CLEANUP_MIN_ART = 500;
+  var cleanupArtSize = {};          // localId|artSig -> {w, h}
+  var cleanupState = null, cleanupGroup = '', cleanupArtRun = 0;
+  var CLEANUP_GROUPS = [
+    { id: 'songs', name: 'Missing song details', sub: 'Title, artist or album isn\u2019t in the file',
+      lead: 'Amplify is going on the file name for these songs. Tap one to fill in its title, artist and album.',
+      icon: '<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><path d="M8 8h.01"/>' },
+    { id: 'albums', name: 'Missing album details', sub: 'Year or genre',
+      lead: 'Some songs on these albums have no year or genre. Tap one to fill them in for the whole album.',
+      icon: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5"/>' },
+    { id: 'noart', name: 'No cover art', sub: 'No picture in the album\u2019s files',
+      lead: 'None of these albums\u2019 songs has a cover in its file. Tap one to choose a cover.',
+      icon: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="m3.5 16 5-5 4 4M14 13l2-2 4.5 4.5"/><path d="M4 4l16 16"/>' },
+    { id: 'lowart', name: 'Low-resolution covers', sub: 'Smaller than ' + CLEANUP_MIN_ART + ' \u00d7 ' + CLEANUP_MIN_ART,
+      lead: 'These covers are smaller than ' + CLEANUP_MIN_ART + ' \u00d7 ' + CLEANUP_MIN_ART + ' pixels. Tap one to pick a sharper one.',
+      icon: '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M7 7h3v3H7zM14 7h3v3h-3zM7 14h3v3H7zM14 14h3v3h-3z"/>' }
+  ];
+  function cleanupSongMissing(t){
+    if(t.metaKey === '') return true;
+    if(t.metaKey === undefined) return !String(t.album || '').trim() || !String(t.artist || '').trim();
+    return false;
+  }
+  function cleanupScan(){
+    var songs = (libraryTracks || []).filter(function(t){ return isLocalTrack(t) && !isBlacklisted(t); });
+    var albums = buildAlbumIndex(songs).filter(function(a){ return String(a.tracks[0].album || '').trim(); });
+    var st = {
+      total: songs.length,
+      songs: songs.filter(cleanupSongMissing).sort(function(a, b){ return alphaCompare(alphaSortKey(a.name || ''), alphaSortKey(b.name || '')); }),
+      albums: albums.filter(function(a){ return a.tracks.some(function(t){ return !String(t.year || '').trim() || !String(t.genre || '').trim(); }); }),
+      noart: albums.filter(function(a){ return !a.tracks.some(function(t){ return t.hasArt; }); }),
+      withArt: albums.filter(function(a){ return a.tracks.some(function(t){ return t.hasArt; }); }),
+      lowart: [], artPending: true
+    };
+    cleanupState = st;
+    cleanupMeasureArt(st);
+    return st;
+  }
+  function cleanupArtKey(t){ return favKey(t) + '|' + (t.artSig || ''); }
+  function cleanupMeasureArt(st){
+    var run = ++cleanupArtRun, queue = st.withArt.slice(), busy = 0;
+    function measure(t){
+      var k = cleanupArtKey(t);
+      if(cleanupArtSize[k]) return Promise.resolve(cleanupArtSize[k]);
+      return localArtUrl(t).then(function(url){
+        if(!url) return null;
+        return new Promise(function(res){
+          var img = new Image();
+          img.onload = function(){ res({ w: img.naturalWidth, h: img.naturalHeight }); };
+          img.onerror = function(){ res(null); };
+          img.src = url;
+        });
+      }).then(function(sz){ if(sz) cleanupArtSize[k] = sz; return sz; });
+    }
+    function next(){
+      if(run !== cleanupArtRun) return;
+      if(!queue.length){
+        if(!busy){
+          st.artPending = false;
+          st.lowart.sort(function(a, b){ return alphaCompare(alphaSortKey(a.album), alphaSortKey(b.album)); });
+          cleanupRedraw();
+        }
+        return;
+      }
+      var a = queue.shift(), t = artSourceForTracks(a.tracks);
+      busy++;
+      measure(t).then(function(sz){
+        busy--;
+        if(run !== cleanupArtRun) return;
+        if(sz && Math.min(sz.w, sz.h) < CLEANUP_MIN_ART){ a._artSize = sz; st.lowart.push(a); }
+        next();
+      }, function(){ busy--; next(); });
+    }
+    for(var i = 0; i < 4; i++) next();
+  }
+  function cleanupSvg(paths){
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + paths + '</svg>';
+  }
+  function renderCleanupCats(){
+    var box = document.getElementById('cleanupCats');
+    if(!box) return;
+    var st = cleanupState || cleanupScan();
+    box.innerHTML = '';
+    if(!st.total){
+      var e = document.createElement('p');
+      e.className = 'cl-empty';
+      e.textContent = 'Your library has no songs yet. Add a music folder from Library and they\u2019ll be checked here.';
+      box.appendChild(e);
+      return;
+    }
+    CLEANUP_GROUPS.forEach(function(g){
+      var list = st[g.id], pending = g.id === 'lowart' && st.artPending;
+      var n = list.length, b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'set-cat cl-cat' + (!n && !pending ? ' cl-done' : '');
+      b.dataset.clGroup = g.id;
+      b.innerHTML = '<span class="set-cat-icon">' + cleanupSvg(g.icon) + '</span>'
+        + '<span class="set-cat-text"><span class="set-cat-name"></span><span class="set-cat-sub"></span></span>'
+        + (pending ? '' : n ? '<span class="cl-count"></span><i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>'
+          : '<i class="fa-solid fa-check cl-ok" aria-hidden="true"></i>');
+      b.querySelector('.set-cat-name').textContent = g.name;
+      b.querySelector('.set-cat-sub').textContent = pending ? 'Checking covers\u2026' : n ? g.sub : 'Nothing to fix';
+      if(n && !pending) b.querySelector('.cl-count').textContent = String(n);
+      if(!n || pending) b.disabled = true;
+      else b.addEventListener('click', function(){ openCleanupList(g.id); });
+      box.appendChild(b);
+    });
+  }
+  function openCleanupList(id){
+    var g = CLEANUP_GROUPS.filter(function(x){ return x.id === id; })[0];
+    if(!g) return;
+    cleanupGroup = id;
+    var page = setPageEl('cleanuplist');
+    page.setAttribute('data-set-title', g.name);
+    document.getElementById('cleanupListLead').textContent = g.lead;
+    renderCleanupList();
+    showSettingsCat('cleanuplist');
+  }
+  var CLEANUP_PAGE = 150;
+  function renderCleanupList(more){
+    var box = document.getElementById('cleanupList');
+    var st = cleanupState;
+    if(!box || !st || !cleanupGroup) return;
+    var list = st[cleanupGroup] || [];
+    var shown = more ? Math.min(list.length, (box._shown || CLEANUP_PAGE) + CLEANUP_PAGE) : CLEANUP_PAGE;
+    box._shown = shown;
+    box.innerHTML = '';
+    if(!list.length){
+      var e = document.createElement('p');
+      e.className = 'cl-empty';
+      e.textContent = 'All fixed.';
+      box.appendChild(e);
+      return;
+    }
+    list.slice(0, shown).forEach(function(x){ box.appendChild(buildCleanupRow(x)); });
+    if(list.length > shown){
+      var m = document.createElement('button');
+      m.type = 'button';
+      m.className = 'settings-data-btn settings-wide-btn cl-more';
+      m.textContent = 'Show more';
+      m.addEventListener('click', function(){ renderCleanupList(true); });
+      box.appendChild(m);
+    }
+  }
+  function buildCleanupRow(x){
+    var isSong = cleanupGroup === 'songs';
+    var t = isSong ? x : artSourceForTracks(x.tracks);
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cl-item';
+    var art = document.createElement('span');
+    art.className = 'cl-art tile-art';
+    try{ renderStationArt(art, t); }catch(e){}
+    var text = document.createElement('span');
+    text.className = 'cl-text';
+    var nm = document.createElement('span'); nm.className = 'cl-name';
+    var sub = document.createElement('span'); sub.className = 'cl-sub';
+    if(isSong){
+      nm.textContent = x.name || x.fileName || '';
+      sub.textContent = x.relPath || x.fileName || '';
+    } else {
+      nm.textContent = x.album;
+      var bits = [x.artist];
+      if(cleanupGroup === 'albums'){
+        var noYear = x.tracks.some(function(t){ return !String(t.year || '').trim(); });
+        var noGenre = x.tracks.some(function(t){ return !String(t.genre || '').trim(); });
+        bits.push(noYear && noGenre ? 'No year or genre' : noYear ? 'No year' : 'No genre');
+      } else if(cleanupGroup === 'lowart' && x._artSize){
+        bits.push(x._artSize.w + ' \u00d7 ' + x._artSize.h);
+      }
+      sub.textContent = bits.filter(Boolean).join(' \u00b7 ');
+    }
+    text.appendChild(nm); text.appendChild(sub);
+    b.appendChild(art); b.appendChild(text);
+    var chev = document.createElement('i');
+    chev.className = 'fa-solid fa-chevron-right set-cat-chev';
+    chev.setAttribute('aria-hidden', 'true');
+    b.appendChild(chev);
+    b.addEventListener('click', function(){ fixCleanupItem(x); });
+    return b;
+  }
+  function fixCleanupItem(x){
+    if(cleanupGroup === 'songs'){ openTagSheet(x); return; }
+    if(cleanupGroup === 'albums'){ openAlbumTagSheet(x); return; }
+    var akey = x.key;
+    openArtUrlDialogFor({
+      key: 'album:' + akey,
+      files: x.tracks.slice(),
+      name: x.album + (x.artist && !x.various ? ' ' + x.artist : ''),
+      title: 'Album Cover',
+      suggest: { kind: 'album', artist: x.various ? '' : x.artist, album: x.album },
+      refresh: function(){ refreshAlbumArt(akey); cleanupRescanSoon(); }
+    });
+  }
+  // After a fix (a tag sheet or the cover dialog closing), everything is checked again.
+  var cleanupRescanTimer = null;
+  function cleanupRescanSoon(){
+    if(cleanupRescanTimer) clearTimeout(cleanupRescanTimer);
+    cleanupRescanTimer = setTimeout(function(){
+      cleanupRescanTimer = null;
+      if(!settingsOverlay.classList.contains('open') || (settingsCat !== 'cleanup' && settingsCat !== 'cleanuplist')) return;
+      cleanupScan();
+      cleanupRedraw();
+    }, 400);
+  }
+  function cleanupRedraw(){
+    if(!settingsOverlay.classList.contains('open')) return;
+    if(settingsCat === 'cleanup') renderCleanupCats();
+    else if(settingsCat === 'cleanuplist'){
+      var box = document.getElementById('cleanupList'), y = settingsPanelEl.scrollTop;
+      var keep = box && box._shown;
+      renderCleanupList();
+      if(keep && keep > CLEANUP_PAGE){ box._shown = keep - CLEANUP_PAGE; renderCleanupList(true); }
+      settingsPanelEl.scrollTop = y;
+    }
+  }
+  document.getElementById('cleanupOpenBtn').addEventListener('click', function(){
+    cleanupScan();
+    renderCleanupCats();
+    showSettingsCat('cleanup');
+  });
+  ['tagOverlay', 'artUrlOverlay'].forEach(function(id){
+    var o = document.getElementById(id);
+    if(!o || !window.MutationObserver) return;
+    var was = false;
+    new MutationObserver(function(){
+      var now = o.classList.contains('open');
+      if(was && !now) cleanupRescanSoon();
+      was = now;
+    }).observe(o, { attributes: true, attributeFilter: ['class'] });
+  });
   settingsCloseBtn.addEventListener('click', settingsBack);
   window.addEventListener('resize', function(){ if(settingsOverlay.classList.contains('open')) fitSettingsTitle(); });
   document.addEventListener('keydown', function(e){
