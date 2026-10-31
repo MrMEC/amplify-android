@@ -10226,6 +10226,7 @@
       name: x.album + (x.artist && !x.various ? ' ' + x.artist : ''),
       title: 'Album Cover',
       suggest: { kind: 'album', artist: x.various ? '' : x.artist, album: x.album },
+      filesOn: true,
       refresh: function(){ refreshAlbumArt(akey); cleanupRescanSoon(); }
     });
   }
@@ -13095,6 +13096,9 @@
     artPendingFile = null;
     var nFiles = (target.files || []).filter(isLocalTrack).length;
     artToFilesRow.hidden = !nFiles;
+    // Build 356: from Library Cleanup the cover goes into the files (that is the point there);
+    // anywhere else the box starts as it was last left.
+    try{ artToFilesChk.checked = target.filesOn ? true : localStorage.getItem(ART_TO_FILES_KEY) === '1'; }catch(e){}
     artToFilesLabel.textContent = nFiles > 1 ? 'Also save in the album’s song files' : 'Also save in the song file';
     setArtFilesNote('');
     artFilesBusy = false;
