@@ -6496,6 +6496,8 @@
   .pf-stat{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 12px; display:flex; flex-direction:column; gap:2px; min-width:0; }
   .pf-stat-v{ font-size:20px; font-weight:800; line-height:1.2; color:var(--text); white-space:nowrap; overflow:hidden; }
   .pf-stat-l{ font-size:11.5px; color:var(--text-dim); }
+  .pf-stat-v.pf-wrap{ white-space:normal; overflow-wrap:anywhere; line-height:1.15; }
+  .pf-stat{ justify-content:flex-end; }
   .pf-sec{ margin-top:30px; }
   .pf-h2{ margin:0 0 14px; font-size:20px; font-weight:800; color:var(--text); }
   .pf-links{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
@@ -10898,6 +10900,13 @@
     h.style.fontSize = '';
     var size = parseFloat(getComputedStyle(h).fontSize) || 28;
     while(h.scrollWidth > h.clientWidth + 1 && size > 15){ size -= 1; h.style.fontSize = size + 'px'; }
+    // The numbers too (a long top artist): smaller, then onto a second line, never cut off.
+    Array.prototype.forEach.call(document.querySelectorAll('#pfStats .pf-stat-v'), function(v){
+      v.style.fontSize = ''; v.classList.remove('pf-wrap');
+      var sz = parseFloat(getComputedStyle(v).fontSize) || 20;
+      while(v.scrollWidth > v.clientWidth + 1 && sz > 13){ sz -= 1; v.style.fontSize = sz + 'px'; }
+      if(v.scrollWidth > v.clientWidth + 1) v.classList.add('pf-wrap');
+    });
   }
   function profileStats(){
     var artists = 0;
