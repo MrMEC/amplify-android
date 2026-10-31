@@ -192,7 +192,13 @@ async def main():
         await pg.evaluate("document.getElementById('settingsFab') && document.getElementById('settingsFab').click()")
         await pg.wait_for_timeout(600)
         await pg.screenshot(path=f'{OUT}/tour-settings.png')
-        vis = await pg.evaluate("(()=>{ const b = document.getElementById('tourOpenBtn').getBoundingClientRect(), s = document.getElementById('libArtistRadioSelect').getBoundingClientRect(); return [b.width > 0 && b.height > 0, s.width > 0 && s.height > 0]; })()")
+        # Build 349: Settings is in categories (the artist radio choice under Library, the tour under About); build 352: it's a switch.
+        await pg.click('.set-cat[data-set-cat=library]'); await pg.wait_for_timeout(300)
+        s_ok = await pg.evaluate("(()=>{ const s = document.getElementById('libArtistRadioSelectSwitch').getBoundingClientRect(); return s.width > 0 && s.height > 0; })()")
+        await pg.click('#settingsCloseBtn'); await pg.wait_for_timeout(200)
+        await pg.click('.set-cat[data-set-cat=about]'); await pg.wait_for_timeout(300)
+        b_ok = await pg.evaluate("(()=>{ const b = document.getElementById('tourOpenBtn').getBoundingClientRect(); return b.width > 0 && b.height > 0; })()")
+        vis = [b_ok, s_ok]
         check(vis == [True, True], f'Settings shows the tour button and the artist radio choice {vis}')
         await pg.evaluate("document.getElementById('tourOpenBtn').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{OUT}/tour-settings-rows.png')

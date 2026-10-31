@@ -157,7 +157,7 @@ async def ev(page, js):
 async def turn_on(page):
     await ev(page, "openSettings('radio')")
     await page.wait_for_timeout(400)
-    await page.select_option('#nearMeSelect', 'on')
+    (await page.click('#nearMeSelectSwitch')) if (await page.evaluate("document.getElementById('nearMeSelect').value")) != 'on' else None
     await page.wait_for_timeout(1500)
     await ev(page, 'closeSettings && closeSettings()')
     await page.wait_for_timeout(300)
@@ -186,7 +186,7 @@ async def main():
         v = await page.evaluate("() => document.getElementById('nearMeSelect').value")
         check(v == 'off', 'Settings shows Off before permission (%s)' % v)
         await page.screenshot(path=OUT + '/nearme-settings.png')
-        await page.select_option('#nearMeSelect', 'on'); await page.wait_for_timeout(1500)
+        (await page.click('#nearMeSelectSwitch')) if (await page.evaluate("document.getElementById('nearMeSelect').value")) != 'on' else None; await page.wait_for_timeout(1500)
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(400)
         n = await page.evaluate('() => __nat.reqCalls')
         check(n == 1, 'turning it on asked for permission once (%d)' % n)
@@ -368,7 +368,7 @@ async def main():
         # ---- turning it off hides it, and the car folder empties ----
         await turn_on(page)  # already on: stays on
         await ev(page, "openSettings('radio')"); await page.wait_for_timeout(300)
-        await page.select_option('#nearMeSelect', 'off'); await page.wait_for_timeout(600)
+        (await page.click('#nearMeSelectSwitch')) if (await page.evaluate("document.getElementById('nearMeSelect').value")) != 'off' else None; await page.wait_for_timeout(600)
         await ev(page, 'closeSettings && closeSettings()'); await page.wait_for_timeout(300)
         d = await page.evaluate("() => getComputedStyle(document.getElementById('nearMeSection')).display")
         check(d == 'none', 'Off hides the row (%s)' % d)
@@ -386,7 +386,7 @@ async def main():
         # ---- permission refused ----
         ctx, page, hits, errs = await context(b, loc={'state': 'prompt', 'grantOnAsk': False, 'lat': 28.549, 'lon': -81.773})
         await ev(page, "openSettings('radio')"); await page.wait_for_timeout(300)
-        await page.select_option('#nearMeSelect', 'on'); await page.wait_for_timeout(800)
+        (await page.click('#nearMeSelectSwitch')) if (await page.evaluate("document.getElementById('nearMeSelect').value")) != 'on' else None; await page.wait_for_timeout(800)
         nt = await page.evaluate("""() => { var o = document.getElementById('noticeOverlay');
             return { open: o.classList.contains('open'), text: o.textContent, btns: Array.from(o.querySelectorAll('button')).map(b => b.textContent) }; }""")
         check(nt['open'] and 'Open Settings' in nt['btns'], 'refused: a notice offers Open Settings (%s)' % nt['btns'])
