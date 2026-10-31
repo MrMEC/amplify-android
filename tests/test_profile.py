@@ -42,7 +42,7 @@ async def run(B, theme):
       Array.prototype.map.call(document.querySelectorAll('.pf-fav-name'), function(s){ return s.textContent; })]""")
     check(info[0] == 'Add your name', f'{T} no name yet: "Add your name" {info[0]!r}')
     check(info[1] == 'Listening since August 2026', f'{T} listening since the first counted play {info[1]!r}')
-    check(info[2] == ['—Artists', '42Songs played', 'The SupremesTop artist'], f'{T} numbers from the app {info[2]}')
+    check(info[2] == ['—Artists', '—This month', 'The SupremesTop artist'], f'{T} numbers from the app (no time listened yet) {info[2]}')
     check(len(info[3]) == 8 and info[3][0] == "80's 80's", f'{T} first eight favorites, named {info[3]}')
     fit = await pg.evaluate("Array.prototype.every.call(document.querySelectorAll('.pf-stat-v'), function(v){ return v.scrollWidth <= v.clientWidth + 1; })")
     check(fit, f'{T} no number is cut off (a long top artist shrinks)')

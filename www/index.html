@@ -11335,8 +11335,9 @@
   }
   // Four kinds told apart by lightness as well as colour.
   function stKindColor(k){
-    return k === 'm' ? 'var(--accent)' : k === 'r' ? 'color-mix(in srgb, var(--accent) 50%, var(--text))'
-      : k === 'p' ? 'color-mix(in srgb, var(--accent) 45%, var(--panel-2))' : 'var(--text-dim)';
+    // Full accent, then the accent faded toward the page background in two steps, then grey.
+    return k === 'm' ? 'var(--accent)' : k === 'r' ? 'color-mix(in srgb, var(--accent) 60%, var(--main-bg, var(--bg)))'
+      : k === 'p' ? 'color-mix(in srgb, var(--accent) 40%, var(--main-bg, var(--bg)))' : 'var(--text-faint)';
   }
   function hourName(h){
     function nm(x){ x = x % 24; return (x % 12 || 12) + (x < 12 ? 'am' : 'pm'); }
