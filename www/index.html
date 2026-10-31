@@ -7620,7 +7620,7 @@
       </button>
       <button type="button" class="set-cat" data-set-cat="sources">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4" width="17" height="6.5" rx="1.6"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.6"/><path d="M7.5 7.25h.01M7.5 16.75h.01"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Sources</span><span class="set-cat-sub">Plex</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Sources</span><span class="set-cat-sub">Plex, Pluto TV, archive.org</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="privacy">
@@ -7749,6 +7749,21 @@
       <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
            and TV shows on its server join Video's Movies and TV Shows next to the phone's own
            folders. Filled in by renderPlexSettings. -->
+      <!-- Build 350 (Mark): Pluto TV and archive.org, each can be turned off. -->
+      <div class="settings-row" id="plutoSourceRow">
+        <div class="set-text"><span class="settings-label" id="plutoSourceLabel">Pluto TV</span><span class="set-desc">Pluto channels on Live TV and in Add Channels</span></div>
+        <select class="settings-select" id="plutoSourceSelect" aria-labelledby="plutoSourceLabel">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <div class="settings-row" id="archiveSourceRow">
+        <div class="set-text"><span class="settings-label" id="archiveSourceLabel">Archive.org</span><span class="set-desc">The Archive tab in Search, archive.org channels and Add Channels</span></div>
+        <select class="settings-select" id="archiveSourceSelect" aria-labelledby="archiveSourceLabel">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
       <div class="settings-row settings-row--stack" id="plexSettingsRow">
         <div class="settings-row-head">
           <span class="settings-label">Plex</span>
@@ -19105,7 +19120,51 @@
     return (e.cats || []).some(function(c){ return c === 'xxx' || ADULT_GROUP_RE.test(String(c)); }) ||
       ADULT_GROUP_RE.test(String(e.group || ''));
   }
-  function channelVisible(e){ return !isAdultChannel(e); }
+  // Build 350 (Mark): Pluto TV and archive.org can be turned off in Settings > Sources. Off, a
+  // source's channels leave Live TV, the guide, channel search and Continue Watching, its tab
+  // leaves Add Channels and (archive.org) Search's Archive tab goes; the channels themselves
+  // are kept, so turning it back on brings them all back.
+  var SOURCES_OFF_KEY = 'radioPlayerSourcesOff';
+  var sourcesOff = null;
+  function sourceOn(id){
+    if(!sourcesOff){ try{ sourcesOff = JSON.parse(localStorage.getItem(SOURCES_OFF_KEY) || '{}') || {}; }catch(e){ sourcesOff = {}; } }
+    return !sourcesOff[id];
+  }
+  function setSourceOn(id, on){
+    sourceOn(id);
+    if(on) delete sourcesOff[id]; else sourcesOff[id] = true;
+    try{ localStorage.setItem(SOURCES_OFF_KEY, JSON.stringify(sourcesOff)); }catch(e){}
+  }
+  function channelSourceId(c){
+    if(!c) return '';
+    var u = c.url || c.urlToResolve || '';
+    if(c.src === 'pluto' || isPlutoUrl(u)) return 'pluto';
+    if(c.src === 'archive' || isArchiveChUrl(u)) return 'archive';
+    return '';
+  }
+  function channelSourceOn(c){ var id = channelSourceId(c); return !id || sourceOn(id); }
+  function channelVisible(e){ return !isAdultChannel(e) && channelSourceOn(e); }
+  // The two switches in Settings > Sources; whatever is showing behind Settings is redrawn.
+  (function(){
+    [['pluto', 'plutoSourceSelect'], ['archive', 'archiveSourceSelect']].forEach(function(pair){
+      var sel = document.getElementById(pair[1]);
+      if(!sel) return;
+      sel.value = sourceOn(pair[0]) ? 'on' : 'off';
+      sel.addEventListener('change', function(){
+        setSourceOn(pair[0], sel.value === 'on');
+        refreshAfterSourceChange();
+      });
+    });
+  })();
+  function refreshAfterSourceChange(){
+    try{
+      if(typeof onAddChannelsView !== 'undefined' && onAddChannelsView) renderAddChannels();
+      else if(typeof onGuideView !== 'undefined' && onGuideView) renderGuidePage();
+      else if(typeof onVideoView !== 'undefined' && onVideoView) renderVideoHome();
+      if(typeof refreshContinueWatching === 'function') refreshContinueWatching();
+      if(searchState && searchState.q) runSearch(searchState.q);
+    }catch(e){}
+  }
   // My Channels runs A to Z by name unless Manual is chosen (in edit mode), in which case
   // it's the order the channels were last dragged into (new ones go on the end). The stored
   // list keeps that manual order whichever is showing, so switching back finds it intact.
@@ -21478,7 +21537,7 @@
     videoChannels.forEach(function(c){ byUrl[c.url] = c; });
     var re = order.map(function(u){ return byUrl[u]; }).filter(Boolean);
     // Hidden (adult) channels keep their place at the end of the order.
-    var hidden = videoChannels.filter(function(c){ return !channelVisible(c); });
+    var hidden = videoChannels.filter(function(c){ return !channelVisible(c); });   // adult, or a source turned off
     if(re.length + hidden.length === videoChannels.length){ videoChannels = re.concat(hidden); saveVideoChannels(); }
   }
   videoReorderHeaderBtnEl.addEventListener('click', function(e){
@@ -21769,9 +21828,10 @@
       tabs.className = 'home-tabs scroll-tabs';
       // Short labels. Plex only while signed in to Plex.
       if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
+      if((addChannelsTab === 'pluto' || addChannelsTab === 'archive') && !sourceOn(addChannelsTab)) addChannelsTab = 'recommended';   // build 350
       var tabList = [['mine', 'My Shows & Movies'], ['recommended', 'Recommended'], ['all', 'All']];
-      tabList.push(['pluto', 'Pluto']);
-      tabList.push(['archive', 'Archive.org']);
+      if(sourceOn('pluto')) tabList.push(['pluto', 'Pluto']);
+      if(sourceOn('archive')) tabList.push(['archive', 'Archive.org']);
       if(plexSignedIn()) tabList.push(['plex', 'Plex']);
       // Build 268: signed out, a Plex button in the same place opens a how-to dialog instead
       // of a tab, unless "No thanks" put it away (until Plex is signed in from Settings).
@@ -24321,7 +24381,7 @@
         if(n) out.push({ kind: 'video', v: n, at: at });
       } else if(isInProgress(v)) out.push({ kind: 'video', v: v, at: at });
     });
-    channelHistory.forEach(function(h){ out.push({ kind: 'channel', ch: h, at: h.at || 0 }); });
+    channelHistory.forEach(function(h){ if(channelSourceOn(h)) out.push({ kind: 'channel', ch: h, at: h.at || 0 }); });
     chartVideoHistory.forEach(function(h){ if(h && h.item) out.push({ kind: 'chart', item: h.item, vid: h.vid, at: h.at || 0 }); });
     out = out.filter(function(e){ var hid = cwHidden[cwKey(e)]; return !(hid && hid >= e.at); });
     out.sort(function(a, b){ return b.at - a.at; });
@@ -39969,7 +40029,7 @@
       tab: prevTab,
       pending: true,
       podcastsPending: true,
-      archivePending: true
+      archivePending: sourceOn('archive')
     };
     lastSearch = searchState;
     var st = searchState;
@@ -39989,7 +40049,7 @@
     // The answers belong to this search (st), even after a newer one replaced it.
     function stale(){ return lastSearch !== st; }
 
-    archiveSearchItems(remoteQ).then(function(items){
+    if(sourceOn('archive')) archiveSearchItems(remoteQ).then(function(items){
       if(stale()) return;
       st.archive = rankByMatch(items.filter(function(it){
         return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases });
@@ -40229,8 +40289,8 @@
     var seen = {};
     mine.forEach(function(c){ seen[c.url] = true; });
     var dir = [];
-    peekPluto();
-    [iptvIndex && iptvIndex.list, freeTvList, plutoList].forEach(function(list){
+    if(sourceOn('pluto')) peekPluto();
+    [iptvIndex && iptvIndex.list, freeTvList, sourceOn('pluto') ? plutoList : null].forEach(function(list){
       (list || []).forEach(function(c){
         if(seen[c.url] || isAdultChannel(c) || !matchesQuery([c.name], pq)) return;
         seen[c.url] = true; dir.push(c);
