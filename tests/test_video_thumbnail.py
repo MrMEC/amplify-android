@@ -51,7 +51,7 @@ async def run(b, theme):
     check(st[0] and st[1] == 'Great Song · Bob' and st[2] == 0, f'{T} long press: Choose Thumbnail for that video, and it does not play {st}')
     await pg.wait_for_timeout(300)
     f0 = await pg.evaluate("[window.__frames.map(function(f){ return [f.ms, !!f.exact]; }), document.getElementById('tpImg').src, document.getElementById('tpTime').textContent, document.getElementById('tpAuto').hidden, document.getElementById('tpFrame').classList.contains('loading')]")
-    check(f0[0] == [[20833, False], [20833, True]] and 'ms=20833' in f0[1] and f0[2] == '0:20.8 / 2:05' and f0[3] and not f0[4], f'{T} opens on the automatic point (a sixth in): a quick frame, then the exact one; the spinner stops {f0}')
+    check(f0[0] == [[20833, False]] and 'ms=20833' in f0[1] and f0[2] == '0:20.8 / 2:05' and f0[3] and not f0[4], f'{T} opens on the automatic point (a sixth in) with one quick frame (never the exact one, which stalls some phones); the spinner stops {f0}')
     one = await pg.evaluate("(function(){ var t = document.getElementById('tpTime'); return t.getBoundingClientRect().height < 26; })()")
     check(one, f'{T} the time stays on one line')
     await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-open.png')
@@ -61,7 +61,7 @@ async def run(b, theme):
       s.value = 61200; s.dispatchEvent(new Event('change')); })()""")
     await pg.wait_for_timeout(500)
     fr = await pg.evaluate("window.__frames.map(function(f){ return [f.ms, !!f.exact]; })")
-    check(fr[0] == [30000, False] and fr[-1] == [61200, True] and len(fr) <= 3, f'{T} dragging asks for quick frames, only the latest while one is coming; letting go the exact one {fr}')
+    check(fr[0] == [30000, False] and fr[-1] == [61200, False] and len(fr) <= 3 and not any(x[1] for x in fr), f'{T} dragging asks for quick frames, only the latest while one is coming; never an exact one {fr}')
     await pg.click('#tpFwd'); await pg.wait_for_timeout(300)
     t = await pg.evaluate("[document.getElementById('tpTime').textContent, window.__frames[window.__frames.length - 1].ms]")
     check(t == ['1:02.2 / 2:05', 62200], f'{T} + 1s nudges it {t}')
@@ -70,7 +70,7 @@ async def run(b, theme):
     await pg.click('#tpSave'); await pg.wait_for_timeout(500)
     sv = await pg.evaluate("""(function(){ var f = window.__frames[window.__frames.length - 1]; var t = document.querySelector('#stationsGrid .mv-tile img');
       return [f.save, f.ms, document.getElementById('thumbPickOverlay').classList.contains('open'), t && t.getAttribute('src'), window.__frameDone || 0]; })()""")
-    check(sv[0] and sv[1] == 62200 and not sv[2] and sv[3] and 'still2.jpg' in sv[3] and sv[4] >= 1, f'{T} Use This Frame: saved at that point, the tile shows it, the reader is let go {sv}')
+    check(sv[0] and not await pg.evaluate("!!window.__frames[window.__frames.length - 1].exact") and sv[1] == 62200 and not sv[2] and sv[3] and 'still2.jpg' in sv[3] and sv[4] >= 1, f'{T} Use This Frame: saved at that point, the tile shows it, the reader is let go {sv}')
     await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-saved.png')
     # it stays after a reload, and the Watch tiles show it too
     await pg.reload(); await pg.wait_for_timeout(3000)

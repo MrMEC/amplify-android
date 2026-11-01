@@ -1655,7 +1655,9 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     }
     final long ms = call.getData().optLong("ms", 0);
     final boolean save = Boolean.TRUE.equals(call.getBoolean("save", false));
-    final boolean exact = save || Boolean.TRUE.equals(call.getBoolean("exact", false));
+    // Build 383: the exact frame (OPTION_CLOSEST) stalled the decoder on Mark's phone; the
+    // nearest key frame is used unless the page asks for exact on purpose (it no longer does).
+    final boolean exact = Boolean.TRUE.equals(call.getBoolean("exact", false));
     final Context ctx = getContext();
     frames.execute(
         () -> {
@@ -1663,7 +1665,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             android.media.MediaMetadataRetriever r = frameReaderFor(ctx, u);
             JSObject o;
             try {
-              o = frameWithin(ctx, r, u, ms, exact, save, exact ? 8 : 5);
+              o = frameWithin(ctx, r, u, ms, exact, save, 6);
             } catch (java.util.concurrent.TimeoutException te) {
               // That reader is stuck: leave it, and ask a new one for the nearest key frame.
               frameReader = null;
