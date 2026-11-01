@@ -1584,21 +1584,51 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   // ---- Choose Thumbnail (build 380): any frame of a video as its still ----
   // One reader stays open on the video while the person looks for a frame (opening it is the
-  // slow part); frames are asked for one after another, and Done lets it go.
+  // slow part). Build 381: a frame that takes too long gives up on that reader (some phones'
+  // decoders stall on an exact frame) and tries again with a new one and the nearest key frame;
+  // anything going wrong is reported rather than leaving the page waiting.
   private final java.util.concurrent.ExecutorService frames =
       java.util.concurrent.Executors.newSingleThreadExecutor();
+  private final java.util.concurrent.ExecutorService frameWork =
+      java.util.concurrent.Executors.newCachedThreadPool();
   private android.media.MediaMetadataRetriever frameReader;
   private String frameUri;
 
   private void releaseFrameReader() {
     if (frameReader != null) {
-      try {
-        frameReader.release();
-      } catch (Exception ignored) {
-      }
+      final android.media.MediaMetadataRetriever r = frameReader;
+      frameWork.execute(
+          () -> {
+            try {
+              r.release();
+            } catch (Throwable ignored) {
+            }
+          });
     }
     frameReader = null;
     frameUri = null;
+  }
+
+  private android.media.MediaMetadataRetriever frameReaderFor(Context ctx, String u) throws Exception {
+    if (frameReader == null || !u.equals(frameUri)) {
+      releaseFrameReader();
+      android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+      r.setDataSource(ctx, Uri.parse(u));
+      frameReader = r;
+      frameUri = u;
+    }
+    return frameReader;
+  }
+
+  private JSObject frameWithin(Context ctx, android.media.MediaMetadataRetriever r, String u, long ms, boolean exact, boolean save, long secs)
+      throws Exception {
+    java.util.concurrent.Future<JSObject> f = frameWork.submit(() -> VideoLibrary.frame(ctx, r, u, ms, exact, save));
+    try {
+      return f.get(secs, java.util.concurrent.TimeUnit.SECONDS);
+    } catch (java.util.concurrent.ExecutionException e) {
+      Throwable c = e.getCause();
+      throw new Exception(c == null || c.getMessage() == null ? "The picture couldn't be read" : c.getMessage());
+    }
   }
 
   @PluginMethod
@@ -1615,15 +1645,25 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     frames.execute(
         () -> {
           try {
-            if (frameReader == null || !u.equals(frameUri)) {
-              releaseFrameReader();
-              android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
-              r.setDataSource(ctx, Uri.parse(u));
-              frameReader = r;
-              frameUri = u;
+            android.media.MediaMetadataRetriever r = frameReaderFor(ctx, u);
+            JSObject o;
+            try {
+              o = frameWithin(ctx, r, u, ms, exact, save, exact ? 8 : 5);
+            } catch (java.util.concurrent.TimeoutException te) {
+              // That reader is stuck: leave it, and ask a new one for the nearest key frame.
+              frameReader = null;
+              frameUri = null;
+              android.media.MediaMetadataRetriever r2 = frameReaderFor(ctx, u);
+              try {
+                o = frameWithin(ctx, r2, u, ms, false, save, 8);
+              } catch (java.util.concurrent.TimeoutException te2) {
+                frameReader = null;
+                frameUri = null;
+                throw new Exception("The phone is taking too long to read this video");
+              }
             }
-            call.resolve(VideoLibrary.frame(ctx, frameReader, u, ms, exact, save));
-          } catch (Exception e) {
+            call.resolve(o);
+          } catch (Throwable e) {
             call.reject(e.getMessage() == null ? "The video can't be read" : e.getMessage());
           }
         });

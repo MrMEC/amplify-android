@@ -226,6 +226,34 @@ final class VideoLibrary {
     return frame;
   }
 
+  /**
+   * Build 381: some phones give nothing (or fail) for one way of asking; the others are tried in
+   * turn: the exact frame, the nearest key frame, then the plain full-size frame, scaled here.
+   */
+  @Nullable
+  static Bitmap grabAny(MediaMetadataRetriever r, long atUs, boolean exact, int maxW, int w, int h) {
+    boolean[] ways = exact ? new boolean[] {true, false} : new boolean[] {false};
+    for (boolean ex : ways) {
+      try {
+        Bitmap b = grab(r, atUs, ex, maxW, w, h);
+        if (b != null) return b;
+      } catch (Throwable ignored) {
+      }
+    }
+    try {
+      Bitmap b = r.getFrameAtTime(atUs);
+      if (b != null && b.getWidth() > maxW) {
+        int th = Math.max(1, Math.round((float) maxW * b.getHeight() / b.getWidth()));
+        Bitmap s = Bitmap.createScaledBitmap(b, maxW, th, true);
+        if (s != b) b.recycle();
+        b = s;
+      }
+      return b;
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
   /** Mostly black: the average brightness of a grid of points is very low. */
   static boolean dark(Bitmap b) {
     int bw = b.getWidth(), bh = b.getHeight();
@@ -252,7 +280,7 @@ final class VideoLibrary {
     int w = (int) parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
     int h = (int) parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
     long dur = parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
-    Bitmap frame = grab(r, Math.max(0, ms) * 1000L, exact, save ? 1280 : 480, w, h);
+    Bitmap frame = grabAny(r, Math.max(0, ms) * 1000L, exact, save ? 1280 : 480, w, h);
     if (frame == null) throw new Exception("No picture at that point");
     JSObject o = new JSObject();
     o.put("duration", dur);

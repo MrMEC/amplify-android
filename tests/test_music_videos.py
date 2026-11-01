@@ -13,7 +13,7 @@ shots = '/tmp/claude-0/t/shots'
 os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
-HOOK = ("window.__t = { tracks: function(){ return libraryTracks.map(function(t){ return t.name + '|' + t.artist; }); },"
+HOOK = ("window.__t = { mvPage: function(n){ pushView(); openMusicVideoArtist(artistMatchKey(n)); }, tracks: function(){ return libraryTracks.map(function(t){ return t.name + '|' + t.artist; }); },"
         " openArtist: function(n){ openArtistPage(artistMatchKey(n)); },"
         " q: function(){ return { list: playQueue.map(function(s){ return s.name; }), idx: queueIndex, label: queueLabel, cur: currentStation && currentStation.name, type: currentStation && currentStation.type, kind: currentStation && currentStation.videoKind }; },"
         " mv: function(k){ return musicVideosFor(artistMatchKey(k)).map(function(v){ return v.name; }); },"

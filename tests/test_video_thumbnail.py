@@ -10,6 +10,7 @@ _setup = open(os.path.join(HERE, 'test_music_videos.py')).read().split('fails = 
 _setup = _setup.replace('PORT = 8814', 'PORT = 8883').replace("root = '/tmp/claude-0/t/srv_mv'", "root = '/tmp/claude-0/t/srv_tp'")
 _setup = _setup.replace("os.path.dirname(__file__)", repr(HERE))
 _setup = _setup.replace("   addListener: function(n, f)", """   videoFrame: function(o){ (window.__frames = window.__frames || []).push(o);
+     if(window.__frameFail) return Promise.reject(new Error('setDataSource failed'));
      if(o.save) return Promise.resolve({ thumb: 'http://127.0.0.1:8883/still2.jpg', duration: 125000 });
      return new Promise(function(r){ setTimeout(function(){ r({ data: 'http://127.0.0.1:8883/still2.jpg?ms=' + o.ms, duration: 125000 }); }, 60); }); },
    videoFrameDone: function(){ window.__frameDone = (window.__frameDone || 0) + 1; return Promise.resolve({}); },
@@ -20,9 +21,9 @@ fails = []
 def check(cond, msg):
     print(('PASS ' if cond else 'FAIL ') + msg)
     if not cond: fails.append(msg)
-async def longpress(pg, sel, ms=650):
+async def longpress(pg, sel, ms=650, idx=0):
     cdp = await pg.context.new_cdp_session(pg)
-    r = await pg.evaluate("(s)=>{ var b = document.querySelector(s).getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 3]; }", sel)
+    r = await pg.evaluate("(a)=>{ var b = document.querySelectorAll(a[0])[a[1]].getBoundingClientRect(); return [b.left + b.width / 3, b.top + b.height / 2]; }", [sel, idx])
     pt = [{'x': r[0], 'y': r[1]}]
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': pt})
     await pg.wait_for_timeout(ms)
@@ -48,8 +49,10 @@ async def run(b, theme):
     st = await pg.evaluate("[!!document.getElementById('thumbPickOverlay') && document.getElementById('thumbPickOverlay').classList.contains('open'), document.getElementById('tpName') && document.getElementById('tpName').textContent, window.__loaded ? 1 : 0]")
     check(st[0] and st[1] == 'Great Song · Bob' and st[2] == 0, f'{T} long press: Choose Thumbnail for that video, and it does not play {st}')
     await pg.wait_for_timeout(300)
-    f0 = await pg.evaluate("[window.__frames.length, window.__frames[0], document.getElementById('tpImg').src, document.getElementById('tpTime').textContent, document.getElementById('tpAuto').hidden]")
-    check(f0[0] >= 1 and f0[1]['ms'] == 20833 and f0[1]['exact'] and 'ms=20833' in f0[2] and f0[3] == '0:20.8 / 2:05' and f0[4], f'{T} opens on the automatic point (a sixth in), exact frame shown {f0}')
+    f0 = await pg.evaluate("[window.__frames.map(function(f){ return [f.ms, !!f.exact]; }), document.getElementById('tpImg').src, document.getElementById('tpTime').textContent, document.getElementById('tpAuto').hidden, document.getElementById('tpFrame').classList.contains('loading')]")
+    check(f0[0] == [[20833, False], [20833, True]] and 'ms=20833' in f0[1] and f0[2] == '0:20.8 / 2:05' and f0[3] and not f0[4], f'{T} opens on the automatic point (a sixth in): a quick frame, then the exact one; the spinner stops {f0}')
+    one = await pg.evaluate("(function(){ var t = document.getElementById('tpTime'); return t.getBoundingClientRect().height < 26; })()")
+    check(one, f'{T} the time stays on one line')
     await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-open.png')
     # dragging: quick frames, only the latest asked for while one is coming; letting go: exact
     await pg.evaluate("""(function(){ var s = document.getElementById('tpSlider'); window.__frames = [];
@@ -80,8 +83,33 @@ async def run(b, theme):
     await pg.click('#tpAuto'); await pg.wait_for_timeout(500)
     src = await pg.evaluate("(document.querySelector('#stationsGrid .mv-tile img') || {}).src || ''")
     check(auto is False and src.endswith('/still.jpg'), f'{T} Use Automatic shows with a chosen still, and puts the original back {auto} {src}')
+    # a frame that can't be read: said so, and the spinner stops
+    await longpress(pg, '#stationsGrid .mv-tile'); await pg.wait_for_timeout(300)
+    await pg.evaluate("window.__frameFail = true; var s = document.getElementById('tpSlider'); s.value = 90000; s.dispatchEvent(new Event('change'))"); await pg.wait_for_timeout(400)
+    er = await pg.evaluate("[document.getElementById('tpMsg').hidden, document.getElementById('tpMsg').textContent, document.getElementById('tpFrame').classList.contains('loading')]")
+    check(er[0] is False and 'setDataSource failed' in er[1] and not er[2], f'{T} a frame that fails says why, and the spinner stops {er}')
+    await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-error.png')
+    await pg.evaluate("window.__frameFail = false"); await pg.click('#tpFwd'); await pg.wait_for_timeout(300)
+    check(await pg.evaluate("document.getElementById('tpMsg').hidden"), f'{T} and the message goes once a frame comes')
+    await pg.click('#tpCancel'); await pg.wait_for_timeout(200)
+    # the Music Videos page: the row's menu has Choose Thumbnail, and a long press on a row works too
+    await pg.evaluate("__t.mvPage('Bob')"); await pg.wait_for_timeout(1000)
+    await pg.evaluate("document.querySelector('.mv-row .row-more-btn').click()"); await pg.wait_for_timeout(300)
+    mi = await pg.evaluate("getComputedStyle(document.getElementById('rowMenuThumb')).display")
+    await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-rowmenu.png')
+    await pg.evaluate("document.getElementById('rowMenuThumb').click()"); await pg.wait_for_timeout(400)
+    op = await pg.evaluate("[document.getElementById('thumbPickOverlay').classList.contains('open'), document.getElementById('tpName').textContent]")
+    check(mi != 'none' and op[0] and op[1].startswith('Great Song'), f'{T} Music Videos page: the row menu has Choose Thumbnail, and it opens the picker {mi} {op}')
+    await pg.click('#tpSave'); await pg.wait_for_timeout(500)
+    rs = await pg.evaluate("(document.querySelector('.mv-row .vep-thumb img') || {}).src || ''")
+    check('still2.jpg' in rs, f'{T} the row shows the new picture {rs}')
+    await pg.evaluate("document.querySelectorAll('.mv-row')[1].scrollIntoView({block:'center'})"); await pg.wait_for_timeout(200)
+    await longpress(pg, '.mv-row', idx=1)
+    op = await pg.evaluate("[document.getElementById('thumbPickOverlay').classList.contains('open'), document.getElementById('tpName').textContent, window.__loaded ? 1 : 0]")
+    check(op[0] and op[1].startswith('Live at Wembley') and op[2] == 0, f'{T} a long press on a row opens it too, without playing {op}')
+    await pg.click('#tpCancel'); await pg.wait_for_timeout(200)
     # a plain tap still plays
-    await pg.tap('#stationsGrid .mv-tile'); await pg.wait_for_timeout(1000)
+    await pg.tap('.mv-row'); await pg.wait_for_timeout(1000)
     check(await pg.evaluate("!!window.__loaded"), f'{T} a tap still plays the video')
     check(not errs, f'{T} no page errors {errs}')
     await ctx.close()
