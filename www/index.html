@@ -6965,6 +6965,18 @@
   .shape-preview .sp-art.sp-artist{ border-radius:var(--r-artist); }
   .shape-preview .sp-line{ display:block; height:8px; width:80%; border-radius:4px; background:var(--border); }
   .shape-preview .sp-btn{ margin-left:auto; padding:9px 18px; font-size:13px; font-weight:700; background:var(--accent); color:var(--accent-text); border-radius:var(--r-btn); }
+  /* Build 397 (Mark): rows on Home keep to two lines of title and one of detail (fewer if Sizes & text
+     says). A row is as tall as its tallest tile, so with no title running on, every section ends the
+     same distance above the next heading (tests/test_home_spacing.py measures it). */
+  :root{ --hl-title:2; --hl-sub:1; }
+  body.home-stacked :is(.home-section, .recent-col) .home-row > .tile-grid > :is(.tile:not(.tile-row):not(.song-row):not(.fav-card), .vw-tile) .tile-name,
+  body.home-stacked :is(.home-section, .recent-col) .home-row > .tile-grid > .yt-tile .yt-title{
+    display:-webkit-box !important; -webkit-box-orient:vertical !important; overflow:hidden !important; white-space:normal !important; -webkit-line-clamp:var(--hl-title) !important; }
+  body.home-stacked :is(.home-section, .recent-col) .home-row > .tile-grid > :is(.tile:not(.tile-row):not(.song-row):not(.fav-card), .vw-tile) .tile-sub,
+  body.home-stacked :is(.home-section, .recent-col) .home-row > .tile-grid > .yt-tile .yt-date{
+    display:-webkit-box !important; -webkit-box-orient:vertical !important; overflow:hidden !important; white-space:normal !important; -webkit-line-clamp:var(--hl-sub) !important; }
+  body.home-stacked .recent-split{ gap:26px; }
+  body.home-stacked #madeForYouSection{ padding-bottom:6px; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -10392,6 +10404,8 @@
     st.setProperty('--fs-album', String(p.albumfs / 100));
     st.setProperty('--lines-title', p.titleLines ? String(p.titleLines) : 'none');
     st.setProperty('--lines-sub', p.subLines ? String(p.subLines) : 'none');
+    st.setProperty('--hl-title', String(p.titleLines ? Math.min(p.titleLines, 2) : 2));   // build 397: Home rows
+    st.setProperty('--hl-sub', String(p.subLines ? Math.min(p.subLines, 1) : 1));
     st.setProperty('--album-cols', String(layoutCols(p.album / 100 * dz)));
     st.setProperty('--poster-cols', String(layoutCols(p.poster / 100 * dz)));
   }
@@ -10435,39 +10449,6 @@
   })();
   shapeApply();
   window.addEventListener('resize', function(){ layoutApply(); });
-  // Build 396 (Mark): sections on Home sat different distances apart, because a row is as tall as its
-  // tallest title and detail line (up to three lines and two), so one long name left a big gap under
-  // its row and a row of short names left a small one. Every row on Home now reserves the same text
-  // height (two lines of title, one of detail), so each ends the same distance above the next heading.
-  var homeEqTimer = 0;
-  function homeTextEqualize(){
-    homeEqTimer = 0;
-    var grids = Array.prototype.slice.call(document.querySelectorAll('body.home-stacked .home-section .home-row > .tile-grid, body.home-stacked .recent-col > .tile-grid')).filter(function(g){ return g.offsetParent && g.id !== 'favoritesGrid' && g.id !== 'madeForYouGrid'; });
-    var items = [];
-    grids.forEach(function(g){
-      var tiles = Array.prototype.slice.call(g.children).filter(function(t){ return t.offsetParent && !t.matches('.song-row, .tile-row, .fav-card, .empty-state, .loading-state'); });
-      tiles.forEach(function(t){ t.style.minHeight = ''; });
-      var rows = {};
-      tiles.forEach(function(t){ var a = t.querySelector('.tile-art, .yt-thumb'); if(!a) return; (rows[t.offsetTop] = rows[t.offsetTop] || []).push({ t: t, art: a.getBoundingClientRect().height }); });
-      var tops = Object.keys(rows).map(Number).sort(function(x, y){ return x - y; });
-      if(tops.length) items.push(rows[tops[tops.length - 1]]);   // only a grid's last row: rows within a grid keep their own spacing
-    });
-    if(!items.length) return;
-    // The allowance is two lines of title and one of detail, the usual cover; a longer name just
-    // runs on below it, so the odd long title doesn't open a gap under every row on the page.
-    var nm = document.querySelector('body.home-stacked .tile-name'), fs = nm ? (parseFloat(getComputedStyle(nm).fontSize) || 13) : 13;
-    var allow = Math.ceil(fs * 1.3 * 2 + 8 + fs * 0.9 * 1.3 + 2);
-    items.forEach(function(r){ r.forEach(function(o){ o.t.style.minHeight = Math.ceil(o.art + allow) + 'px'; }); });
-  }
-  function homeTextEqualizeSoon(){ if(!homeEqTimer) homeEqTimer = setTimeout(homeTextEqualize, 120); }
-  (function(){
-    var bv = document.getElementById('browseView');
-    if(bv && window.MutationObserver) new MutationObserver(homeTextEqualizeSoon).observe(bv, { childList: true, subtree: true });
-    window.addEventListener('resize', homeTextEqualizeSoon);
-    document.addEventListener('change', homeTextEqualizeSoon, true);
-    if(document.fonts && document.fonts.ready) document.fonts.ready.then(homeTextEqualizeSoon);
-    homeTextEqualizeSoon();
-  })();
   var AMOLED_KEY = 'radioPlayerAmoled';
   var amoledSel = document.getElementById('amoledSelect');
   function amoledApply(){
@@ -20490,7 +20471,19 @@
       }
       return t;
     }
-    if(!isLocalTrack(s)) return buildTile(s);
+    if(!isLocalTrack(s)){
+      // Build 397: a station gets a detail line too (its country), like the songs and episodes beside
+      // it, so the row's text lines up and Continue Listening ends the same distance above the next row.
+      var st = buildTile(s);
+      if(!st.querySelector('.tile-sub')){
+        var ss = document.createElement('div');
+        ss.className = 'tile-sub';
+        ss.textContent = (s.country && displayCountry(s.country)) || 'Radio station';
+        var sn = st.querySelector('.tile-name');
+        if(sn && sn.nextSibling) st.insertBefore(ss, sn.nextSibling); else st.appendChild(ss);
+      }
+      return st;
+    }
     return buildEntityTile({
       key: favKey(s),
       entity: 'song',
