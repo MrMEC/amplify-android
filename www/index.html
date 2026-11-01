@@ -43879,7 +43879,7 @@
         var t1 = document.createElement('span'); t1.className = 'bk-file-name';
         t1.textContent = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (m && m[6] ? ' · before a restore' : '');
         var t2 = document.createElement('span'); t2.className = 'bk-file-sub';
-        t2.textContent = (f.lastModified ? 'Saved ' + whenText(f.lastModified) + ' · ' : '') + Math.max(1, Math.round((f.size || 0) / 1024)).toLocaleString() + ' KB';
+        t2.textContent = (f.lastModified > 946684800000 ? 'Saved ' + whenText(f.lastModified) + ' · ' : '') + Math.max(1, Math.round((f.size || 0) / 1024)).toLocaleString() + ' KB';
         btn.appendChild(t1); btn.appendChild(t2);
         btn.addEventListener('click', function(){
           closeNotice(seq);
