@@ -6919,15 +6919,20 @@
   .tile[data-entity="album"]:not(.tile-row):not(.song-row):not(.fav-card) .tile-sub, .tile.station-tile:not(.tile-row):not(.fav-card) .tile-sub{ font-size:calc(var(--fs-tile-sub) * var(--fs-album)) !important; }
   /* Names and details in lists */
   .song-row .song-row-title, .mfy-row .song-row-title, .tile.tile-row .tile-name, .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-name, .row-name, .ch-name,
-  .chart-vrow-title, .queue-row-title, .cf-track-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name{ font-size:var(--fs-row-name) !important; }
-  .song-row-sub, .mfy-row .song-row-sub, .tile.tile-row .tile-sub, .row-item .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .cf-track-artist, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub{ font-size:var(--fs-row-sub) !important; }
+  .chart-vrow-title, .queue-row-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name{ font-size:var(--fs-row-name) !important; }
+  .song-row-sub, .mfy-row .song-row-sub, .tile.tile-row .tile-sub, .row-item .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub{ font-size:var(--fs-row-sub) !important; }
+  /* Cover Flow's track rows keep one line (the time sits beside them), at the list sizes. */
+  .cf-track-title{ font-size:var(--fs-row-name) !important; }
+  .cf-track-artist{ font-size:var(--fs-row-sub) !important; }
+  /* Add Channels keeps four lines for names and descriptions (its own rule). */
+  #stationsGrid:has(> .ch-tools) .ch-row :is(.ch-name, .ch-sub){ -webkit-line-clamp:4 !important; }
   /* Longest a name or a detail line may run before it is cut (Settings > Appearance > Sizes & text) */
-  :is(.tile-name, .song-row-title, .row-name, .yt-title, .ch-name, .chart-vrow-title, .queue-row-title, .cf-track-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name),
-  :is(.tile-sub, .song-row-sub, .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .cf-track-artist, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub){
+  :is(.tile-name, .song-row-title, .row-name, .yt-title, .ch-name, .chart-vrow-title, .queue-row-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name),
+  :is(.tile-sub, .song-row-sub, .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub){
     display:-webkit-box !important; -webkit-box-orient:vertical !important; white-space:normal !important; overflow:hidden !important; text-overflow:ellipsis !important; overflow-wrap:anywhere;
   }
-  :is(.tile-name, .song-row-title, .row-name, .yt-title, .ch-name, .chart-vrow-title, .queue-row-title, .cf-track-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name){ -webkit-line-clamp:var(--lines-title) !important; }
-  :is(.tile-sub, .song-row-sub, .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .cf-track-artist, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub){ -webkit-line-clamp:var(--lines-sub) !important; }
+  :is(.tile-name, .song-row-title, .row-name, .yt-title, .ch-name, .chart-vrow-title, .queue-row-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name){ -webkit-line-clamp:var(--lines-title) !important; }
+  :is(.tile-sub, .song-row-sub, .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub){ -webkit-line-clamp:var(--lines-sub) !important; }
   /* Settings > Appearance > Sizes & text */
   .sz-row{ display:flex; flex-direction:column; gap:2px; width:100%; }
   .sz-row-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
