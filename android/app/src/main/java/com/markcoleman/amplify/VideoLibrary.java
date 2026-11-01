@@ -169,18 +169,19 @@ final class VideoLibrary {
       if (wantThumb) {
         if (!thumb.exists()) {
           long at = dur > 0 ? Math.min(dur / 6, 8 * 60 * 1000L) * 1000L : 5_000_000L;
-          Bitmap frame;
-          if (Build.VERSION.SDK_INT >= 27 && w > 0 && h > 0) {
-            int tw = Math.min(640, w);
-            int th = Math.max(1, Math.round(tw * (float) h / w));
-            frame = r.getScaledFrameAtTime(at, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, tw, th);
-          } else {
-            frame = r.getFrameAtTime(at, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-            if (frame != null && frame.getWidth() > 640) {
-              int th = Math.max(1, Math.round(640f * frame.getHeight() / frame.getWidth()));
-              Bitmap s = Bitmap.createScaledBitmap(frame, 640, th, true);
-              if (s != frame) frame.recycle();
-              frame = s;
+          Bitmap frame = grab(r, at, false, 640, w, h);
+          // Build 380: a black (or nearly black) frame says nothing; a few later points are
+          // tried, and the first with something to see is used.
+          if (frame != null && dark(frame) && dur > 0) {
+            for (double f : new double[] {0.3, 0.45, 0.6, 0.1}) {
+              Bitmap b = grab(r, (long) (dur * f) * 1000L, false, 640, w, h);
+              if (b == null) continue;
+              if (!dark(b)) {
+                frame.recycle();
+                frame = b;
+                break;
+              }
+              b.recycle();
             }
           }
           if (frame != null) {
@@ -200,6 +201,80 @@ final class VideoLibrary {
         r.release();
       } catch (Exception ignored) {
       }
+    }
+    return o;
+  }
+
+  /** One frame, at most `maxW` wide; `exact` takes the very frame, not the nearest key frame. */
+  @Nullable
+  static Bitmap grab(MediaMetadataRetriever r, long atUs, boolean exact, int maxW, int w, int h) {
+    int opt = exact ? MediaMetadataRetriever.OPTION_CLOSEST : MediaMetadataRetriever.OPTION_CLOSEST_SYNC;
+    Bitmap frame;
+    if (Build.VERSION.SDK_INT >= 27 && w > 0 && h > 0) {
+      int tw = Math.min(maxW, w);
+      int th = Math.max(1, Math.round(tw * (float) h / w));
+      frame = r.getScaledFrameAtTime(atUs, opt, tw, th);
+    } else {
+      frame = r.getFrameAtTime(atUs, opt);
+      if (frame != null && frame.getWidth() > maxW) {
+        int th = Math.max(1, Math.round((float) maxW * frame.getHeight() / frame.getWidth()));
+        Bitmap s = Bitmap.createScaledBitmap(frame, maxW, th, true);
+        if (s != frame) frame.recycle();
+        frame = s;
+      }
+    }
+    return frame;
+  }
+
+  /** Mostly black: the average brightness of a grid of points is very low. */
+  static boolean dark(Bitmap b) {
+    int bw = b.getWidth(), bh = b.getHeight();
+    if (bw < 2 || bh < 2) return false;
+    long sum = 0;
+    int n = 0;
+    for (int y = 1; y <= 9; y++) {
+      for (int x = 1; x <= 16; x++) {
+        int c = b.getPixel(x * (bw - 1) / 17, y * (bh - 1) / 10);
+        sum += (((c >> 16) & 255) * 299 + ((c >> 8) & 255) * 587 + (c & 255) * 114) / 1000;
+        n++;
+      }
+    }
+    return sum / n < 20;
+  }
+
+  /**
+   * Build 380: a frame chosen by the person. As a preview (a small JPEG as a data URL), or
+   * saved as the video's still: a new file each time (so nothing shows an old copy), the one
+   * chosen before removed.
+   */
+  static JSObject frame(Context context, MediaMetadataRetriever r, String uriString, long ms, boolean exact, boolean save)
+      throws Exception {
+    int w = (int) parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+    int h = (int) parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+    long dur = parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+    Bitmap frame = grab(r, Math.max(0, ms) * 1000L, exact, save ? 1280 : 480, w, h);
+    if (frame == null) throw new Exception("No picture at that point");
+    JSObject o = new JSObject();
+    o.put("duration", dur);
+    try {
+      if (save) {
+        File dir = new File(context.getFilesDir(), "vthumbs");
+        if (!dir.exists()) dir.mkdirs();
+        String base = hash(uriString) + "-c";
+        File[] old = dir.listFiles((d, n) -> n.startsWith(base));
+        File out = new File(dir, base + System.currentTimeMillis() + ".jpg");
+        try (FileOutputStream os = new FileOutputStream(out)) {
+          frame.compress(Bitmap.CompressFormat.JPEG, 88, os);
+        }
+        if (old != null) for (File f : old) f.delete();
+        o.put("thumb", Uri.fromFile(out).toString());
+      } else {
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        frame.compress(Bitmap.CompressFormat.JPEG, 72, bos);
+        o.put("data", "data:image/jpeg;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP));
+      }
+    } finally {
+      frame.recycle();
     }
     return o;
   }

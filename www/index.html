@@ -6646,6 +6646,22 @@
   .bk-file:active{ background:var(--panel-2); }
   .bk-file-name{ font-size:14.5px; font-weight:600; }
   .bk-file-sub{ font-size:12.5px; color:var(--text-dim); }
+  /* Build 380: Choose Thumbnail. */
+  .mv-tile{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  .tp-panel{ max-width:440px; }
+  .tp-name{ margin:-4px 0 12px; font-size:13px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tp-frame{ position:relative; aspect-ratio:16/9; border-radius:10px; overflow:hidden; background:#000; border:1px solid var(--border); }
+  .tp-frame img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .tp-spin{ position:absolute; right:10px; top:10px; width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; opacity:0; animation:spinner-rotate .8s linear infinite; transition:opacity .15s; }
+  .tp-frame.loading .tp-spin{ opacity:1; }
+  #tpSlider{ width:100%; margin:16px 0 6px; accent-color:var(--accent); }
+  .tp-nudge{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .tp-step{ min-width:64px; padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:var(--panel); color:var(--text); font:inherit; font-size:13.5px; font-weight:700; cursor:pointer; }
+  .tp-step:active{ background:var(--panel-2); }
+  .tp-time{ font-size:14px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums; }
+  .tp-auto{ display:block; margin:12px auto 0; padding:4px 8px; background:none; border:0; font:inherit; font-size:13px; font-weight:600; color:var(--accent); cursor:pointer; }
+  .tp-auto[hidden]{ display:none; }
+  .tp-panel .confirm-actions{ margin-top:18px; }
   /* Build 379: Download to Library on archive.org items. */
   .ia-dl.working{ font-size:11px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
   .ia-dl.done{ color:var(--accent); }
@@ -24992,8 +25008,179 @@
     b._paintDur = function(){ d.textContent = durText(); };
     b.appendChild(th); b.appendChild(t); b.appendChild(d);
     b.addEventListener('click', function(){ playMusicVideo(v, list); });
+    b._v = v;
     return b;
   }
+  // ---------- Choose Thumbnail (build 380, Mark) ----------
+  // Long-press a music video's tile (Watch, Recently Added, an artist's Videos) and any frame
+  // of it can be its picture: drag along the video (a quick, close frame shows while dragging,
+  // the exact one when you let go), nudge a second either way, then Use This Frame. The phone
+  // cuts the frame (VideoLibrary.frame); the chosen still is kept with the video's details and
+  // stays until another is chosen or Use Automatic puts the original back.
+  var TP_HOLD_MS = 480;
+  function thumbPlugin(){
+    var C = window.Capacitor, P = C && C.Plugins && C.Plugins.AmplifyPlayer;
+    return P && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && typeof P.videoFrame === 'function' ? P : null;
+  }
+  var tp = null;   // { v, dur, ms, busy, pending, el }
+  function tpTime(ms){ var s = Math.max(0, ms) / 1000; return formatTime(Math.floor(s)) + '.' + Math.floor((s % 1) * 10); }
+  function openThumbPicker(v){
+    var P = thumbPlugin();
+    if(!P || !v || !v.uri) return;
+    var info = videoInfo[v.uri] || {};
+    var dur = Math.round((v.duration || info.d || 0) * 1000);
+    var ov = document.getElementById('thumbPickOverlay');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.className = 'confirm-overlay';
+      ov.id = 'thumbPickOverlay';
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'tpTitle');
+      ov.innerHTML = '<div class="confirm-panel tp-panel">'
+        + '<h2 class="confirm-title" id="tpTitle">Choose Thumbnail</h2>'
+        + '<p class="tp-name" id="tpName"></p>'
+        + '<div class="tp-frame" id="tpFrame"><img id="tpImg" alt=""><span class="tp-spin" aria-hidden="true"></span></div>'
+        + '<input type="range" id="tpSlider" min="0" max="1000" step="100" value="0" aria-label="Where in the video">'
+        + '<div class="tp-nudge"><button type="button" class="tp-step" id="tpBack" aria-label="Back one second">− 1s</button>'
+        + '<span class="tp-time" id="tpTime">0:00.0</span>'
+        + '<button type="button" class="tp-step" id="tpFwd" aria-label="Forward one second">+ 1s</button></div>'
+        + '<button type="button" class="tp-auto" id="tpAuto">Use Automatic</button>'
+        + '<div class="confirm-actions"><button type="button" class="confirm-cancel" id="tpCancel">Cancel</button>'
+        + '<button type="button" class="confirm-ok confirm-ok-safe" id="tpSave">Use This Frame</button></div></div>';
+      document.body.appendChild(ov);
+      var sl = ov.querySelector('#tpSlider');
+      sl.addEventListener('input', function(){ if(tp){ tp.ms = Number(sl.value); tpShow(false); } });
+      sl.addEventListener('change', function(){ if(tp){ tp.ms = Number(sl.value); tpShow(true); } });
+      ov.querySelector('#tpBack').addEventListener('click', function(){ tpNudge(-1000); });
+      ov.querySelector('#tpFwd').addEventListener('click', function(){ tpNudge(1000); });
+      ov.querySelector('#tpCancel').addEventListener('click', closeThumbPicker);
+      ov.querySelector('#tpSave').addEventListener('click', saveThumbPick);
+      ov.querySelector('#tpAuto').addEventListener('click', autoThumbPick);
+      ov.addEventListener('click', function(e){ if(e.target === ov) closeThumbPicker(); });
+    }
+    tp = { v: v, dur: dur, ms: dur ? Math.round(Math.min(dur / 6, 8 * 60 * 1000)) : 5000, busy: false, pending: null, el: ov };
+    ov.querySelector('#tpName').textContent = v.name + (v.artist ? ' · ' + v.artist : '');
+    ov.querySelector('#tpAuto').hidden = !info.c;
+    var img = ov.querySelector('#tpImg');
+    img.removeAttribute('src');
+    if(v.still) img.src = capUrl(v.still);
+    tpSync();
+    ov.classList.add('open');
+    tpShow(true);
+  }
+  function tpSync(){
+    if(!tp) return;
+    var sl = tp.el.querySelector('#tpSlider');
+    sl.max = String(Math.max(1000, tp.dur || 1000));
+    sl.value = String(tp.ms);
+    tp.el.querySelector('#tpTime').textContent = tpTime(tp.ms) + (tp.dur ? ' / ' + formatTime(Math.floor(tp.dur / 1000)) : '');
+  }
+  function tpNudge(d){
+    if(!tp) return;
+    tp.ms = Math.max(0, Math.min(tp.dur || Infinity, tp.ms + d));
+    tpShow(true);
+  }
+  // Frames are asked for one at a time; while one is coming, only the latest wish is kept.
+  function tpShow(exact){
+    if(!tp) return;
+    tpSync();
+    if(tp.busy){ tp.pending = { exact: exact }; return; }
+    var P = thumbPlugin(), want = tp.ms, cur = tp;
+    cur.busy = true;
+    cur.el.querySelector('#tpFrame').classList.add('loading');
+    P.videoFrame({ uri: cur.v.uri, ms: want, exact: !!exact }).then(function(r){
+      if(tp !== cur) return;
+      if(r && r.duration && !cur.dur){ cur.dur = r.duration; tpSync(); }
+      if(r && r.data) cur.el.querySelector('#tpImg').src = r.data;
+      cur.shownMs = want;
+    }, function(){}).then(function(){
+      cur.busy = false;
+      if(tp !== cur) return;
+      var p = cur.pending; cur.pending = null;
+      if(p) tpShow(p.exact);
+      else cur.el.querySelector('#tpFrame').classList.remove('loading');
+    });
+  }
+  function closeThumbPicker(){
+    var ov = document.getElementById('thumbPickOverlay');
+    if(ov) ov.classList.remove('open');
+    tp = null;
+    var P = thumbPlugin();
+    if(P && typeof P.videoFrameDone === 'function') P.videoFrameDone()['catch'](function(){});
+  }
+  // The still changes everywhere the video shows.
+  function applyVideoStill(uri, still, custom){
+    var info = videoInfo[uri] = videoInfo[uri] || { d: 0, w: 0, h: 0, t: '' };
+    info.t = still || '';
+    if(custom) info.c = 1; else delete info.c;
+    vsave(VIDEO_INFO_KEY, videoInfo);
+    mvIndexCache = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.mv-tile'), function(b){
+      if(b._v && b._v.uri === uri){ b._v.still = info.t; b._v.favicon = info.t ? capUrl(info.t) : ''; b._paintStill(); }
+    });
+    if(currentStation && currentStation.uri === uri){ currentStation.still = info.t; currentStation.favicon = info.t ? capUrl(info.t) : ''; }
+  }
+  function saveThumbPick(){
+    if(!tp) return;
+    var P = thumbPlugin(), cur = tp, btn = cur.el.querySelector('#tpSave');
+    btn.disabled = true;
+    P.videoFrame({ uri: cur.v.uri, ms: cur.ms, save: true }).then(function(r){
+      btn.disabled = false;
+      if(!r || !r.thumb) throw new Error('No picture');
+      applyVideoStill(cur.v.uri, r.thumb, true);
+      closeThumbPicker();
+      showNotice({ kind: 'done', message: 'Thumbnail changed.' });
+    })['catch'](function(err){
+      btn.disabled = false;
+      showNotice({ kind: 'error', message: 'That frame couldn’t be saved' + (err && err.message ? ': ' + err.message : '.') });
+    });
+  }
+  function autoThumbPick(){
+    if(!tp) return;
+    var P = thumbPlugin(), cur = tp;
+    P.videoInfo({ uri: cur.v.uri }).then(function(r){
+      applyVideoStill(cur.v.uri, (r && r.thumb) || '', false);
+      closeThumbPicker();
+    }, function(){ closeThumbPicker(); });
+  }
+  // The long press on a music video's tile.
+  (function(){
+    var press = null, eatUntil = 0;
+    function tileOf(t){ return t && t.closest ? t.closest('.mv-tile') : null; }
+    function hold(on){ try{ var P = thumbPlugin(); if(P && P.holdTouch) P.holdTouch({ on: !!on })['catch'](function(){}); }catch(e){} }
+    function cancel(){ if(press){ clearTimeout(press.timer); press = null; hold(false); } }
+    function fire(tile){
+      eatUntil = Date.now() + 700;
+      try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+      openThumbPicker(tile._v);
+    }
+    document.addEventListener('touchstart', function(e){
+      var tile = tileOf(e.target);
+      if(!tile || !tile._v || !thumbPlugin() || e.touches.length !== 1) return;
+      cancel();
+      var p = e.touches[0];
+      press = { tile: tile, x: p.clientX, y: p.clientY, timer: setTimeout(function(){ var t = press && press.tile; cancel(); if(t) fire(t); }, TP_HOLD_MS) };
+      hold(true);
+    }, { passive: true, capture: true });
+    document.addEventListener('touchmove', function(e){
+      if(!press) return;
+      var p = e.touches[0];
+      if(Math.abs(p.clientX - press.x) > 10 || Math.abs(p.clientY - press.y) > 10) cancel();
+    }, { passive: true, capture: true });
+    document.addEventListener('touchend', cancel, true);
+    document.addEventListener('touchcancel', cancel, true);
+    // A right-click (or the phone's own long-press menu) on a tile is the same thing, once.
+    document.addEventListener('contextmenu', function(e){
+      var tile = tileOf(e.target);
+      if(!tile || !tile._v || !thumbPlugin()) return;
+      e.preventDefault();
+      if(Date.now() < eatUntil) return;
+      cancel(); fire(tile);
+    }, true);
+    // The tap that ends a long press doesn't also play the video.
+    document.addEventListener('click', function(e){
+      if(Date.now() < eatUntil && tileOf(e.target)){ e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  })();
   function appendArtistMusicVideos(entry){
     var list = musicVideosFor(entry.key);
     if(!list.length) return 0;

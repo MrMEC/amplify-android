@@ -1582,6 +1582,59 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     new Thread(() -> call.resolve(VideoLibrary.info(ctx, u, thumb))).start();
   }
 
+  // ---- Choose Thumbnail (build 380): any frame of a video as its still ----
+  // One reader stays open on the video while the person looks for a frame (opening it is the
+  // slow part); frames are asked for one after another, and Done lets it go.
+  private final java.util.concurrent.ExecutorService frames =
+      java.util.concurrent.Executors.newSingleThreadExecutor();
+  private android.media.MediaMetadataRetriever frameReader;
+  private String frameUri;
+
+  private void releaseFrameReader() {
+    if (frameReader != null) {
+      try {
+        frameReader.release();
+      } catch (Exception ignored) {
+      }
+    }
+    frameReader = null;
+    frameUri = null;
+  }
+
+  @PluginMethod
+  public void videoFrame(PluginCall call) {
+    final String u = call.getString("uri");
+    if (u == null || u.isEmpty()) {
+      call.reject("No uri");
+      return;
+    }
+    final long ms = call.getData().optLong("ms", 0);
+    final boolean save = Boolean.TRUE.equals(call.getBoolean("save", false));
+    final boolean exact = save || Boolean.TRUE.equals(call.getBoolean("exact", false));
+    final Context ctx = getContext();
+    frames.execute(
+        () -> {
+          try {
+            if (frameReader == null || !u.equals(frameUri)) {
+              releaseFrameReader();
+              android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+              r.setDataSource(ctx, Uri.parse(u));
+              frameReader = r;
+              frameUri = u;
+            }
+            call.resolve(VideoLibrary.frame(ctx, frameReader, u, ms, exact, save));
+          } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "The video can't be read" : e.getMessage());
+          }
+        });
+  }
+
+  @PluginMethod
+  public void videoFrameDone(PluginCall call) {
+    frames.execute(this::releaseFrameReader);
+    call.resolve();
+  }
+
   /** The name a folder's files are listed under (the start of each relPath). */
   private static String treeRootName(ContentResolver cr, Uri tree) {
     String rootId = DocumentsContract.getTreeDocumentId(tree);
