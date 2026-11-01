@@ -2061,6 +2061,15 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     }
   }
 
+  // Listening time (build 369): the player's own count of time spent playing (see ListenClock).
+  @PluginMethod
+  public void listenClock(PluginCall call) {
+    JSObject o = new JSObject();
+    o.put("ms", ListenClock.ms());
+    o.put("playing", ListenClock.isPlaying());
+    call.resolve(o);
+  }
+
   @PluginMethod
   public void takeCarHistory(PluginCall pluginCall) {
     JSObject jSObject = new JSObject();

@@ -1034,6 +1034,7 @@ public class PlaybackService extends MediaLibraryService {
 
     @Override // androidx.media3.common.Player.Listener
     public void onIsPlayingChanged(boolean z) {
+      ListenClock.playing(z);
       if (z) PlaybackService.this.sleep.playStarted();
       PlaybackService.this.saveCarProgress();
       if (!z) {

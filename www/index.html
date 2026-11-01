@@ -6582,6 +6582,7 @@
   .st-since{ margin:4px 0 0; font-size:12.5px; color:var(--text-dim); }
   .st-sec{ margin-top:28px; }
   .st-h2{ margin:0 0 12px; font-size:17px; font-weight:800; color:var(--text); }
+  .st-h3{ margin:18px 0 4px; font-size:14px; font-weight:700; color:var(--text-dim); }
   .st-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
   .st-card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:2px; min-width:0; }
   .st-v{ font-size:22px; font-weight:800; line-height:1.2; color:var(--text); white-space:nowrap; overflow:hidden; }
@@ -6713,6 +6714,13 @@
   .cl-actions{ margin:8px 0 6px; }
   .cl-actions:empty{ display:none; }
   #settingsPanel .cl-find{ gap:8px; }
+  .cl-action-row{ display:flex; gap:10px; }
+  #settingsPanel .cl-action-row .cl-find{ flex:1; width:auto; }
+  #settingsPanel .cl-select{ flex:0 0 auto; padding:0 18px; justify-content:center; }
+  .cl-pickall{ display:flex; gap:18px; margin-top:6px; }
+  .cl-pickall button{ background:none; border:0; padding:6px 0; font:inherit; font-size:13.5px; font-weight:600; color:var(--accent); cursor:pointer; }
+  .cl-pickall button:disabled{ color:var(--text-faint); cursor:default; }
+  .cl-new.guess{ color:color-mix(in srgb, var(--accent) 70%, var(--text-dim)); }
   .cl-review-note{ margin:0; font-size:13.5px; line-height:1.45; color:var(--text); font-weight:600; }
   .cl-new{ font-size:12.5px; line-height:1.35; color:var(--accent); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cl-new.none{ color:var(--text-faint); font-weight:400; }
@@ -10238,7 +10246,7 @@
   function showSettingsCat(cat){
     var page = cat ? setPageEl(cat) : null;
     if(!page) cat = '';
-    if(cat !== 'cleanuplist' && typeof cleanupReview !== 'undefined') cleanupReview = null;   // build 358
+    if(cat !== 'cleanuplist' && typeof cleanupReview !== 'undefined'){ cleanupReview = null; cleanupSelect = null; }   // build 358
     settingsCat = cat;
     Array.prototype.forEach.call(settingsPanelEl.querySelectorAll('.set-page'), function(p){ p.hidden = p !== page; });
     setHomeEl.hidden = !!cat;
@@ -10469,10 +10477,23 @@
     text.appendChild(nm); text.appendChild(sub);
     b.appendChild(art); b.appendChild(text);
     var rv = cleanupReview && cleanupReview.group === cleanupGroup ? cleanupReview : null;
+    var csel = !rv && cleanupSelect && cleanupSelect.group === cleanupGroup ? cleanupSelect : null;
+    if(csel){
+      var sk = document.createElement('input');
+      sk.type = 'checkbox';
+      sk.className = 'cl-pick';
+      sk.checked = csel.set.has(x);
+      sk.setAttribute('aria-label', 'Select');
+      sk.addEventListener('click', function(e){ e.stopPropagation(); });
+      sk.addEventListener('change', function(){ if(sk.checked) csel.set.add(x); else csel.set.delete(x); renderCleanupActions(cleanupState[cleanupGroup] || []); });
+      b.appendChild(sk);
+      b.addEventListener('click', function(){ sk.checked = !sk.checked; sk.dispatchEvent(new Event('change')); });
+      return b;
+    }
     if(rv){
       var found = rv.found.get(x);
       var line = document.createElement('span');
-      line.className = 'cl-new' + (found ? '' : ' none');
+      line.className = 'cl-new' + (found ? (found.guess ? ' guess' : '') : ' none');
       line.textContent = found ? found.label : (rv.looked.has(x) ? 'No match found' : 'Not looked up');
       text.appendChild(line);
       if(found && found.thumb){
@@ -10545,8 +10566,21 @@
       var p = document.createElement('p');
       p.className = 'cl-review-note';
       p.textContent = n ? ('Found ' + n + ' of ' + of + '. Untick any you don\u2019t want, then Save.')
-        : 'Nothing was found online for these. Tap one to fix it by hand.';
+        : 'Nothing was found for these. Tap Select to edit several together.';
       box.appendChild(p);
+      if(n) box.appendChild(clPickAllRow(function(on){
+        rv.found.forEach(function(v, x){ if(on) rv.picked.add(x); else rv.picked.delete(x); });
+        renderCleanupList();
+      }, rv.picked.size === n));
+    } else if(cleanupSelect && cleanupSelect.group === cleanupGroup){
+      var sp = document.createElement('p');
+      sp.className = 'cl-review-note';
+      sp.textContent = 'Tap the ' + (cleanupGroup === 'songs' ? 'songs' : 'albums') + ' to change together, then Edit Together.';
+      box.appendChild(sp);
+      box.appendChild(clPickAllRow(function(on){
+        list.forEach(function(x){ if(on) cleanupSelect.set.add(x); else cleanupSelect.set.delete(x); });
+        renderCleanupList();
+      }, cleanupSelect.set.size === list.length));
     } else {
       var b = document.createElement('button');
       b.type = 'button';
@@ -10555,13 +10589,54 @@
       b.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>';
       b.appendChild(document.createTextNode(cfg.button));
       b.addEventListener('click', function(){ startCleanupLookup(); });
-      box.appendChild(b);
+      var row = document.createElement('div');
+      row.className = 'cl-action-row';
+      row.appendChild(b);
+      // Build 369: several songs (or albums) at once, by hand.
+      if(cleanupGroup === 'songs' || cleanupGroup === 'albums'){
+        var sel = document.createElement('button');
+        sel.type = 'button';
+        sel.className = 'settings-data-btn cl-select';
+        sel.id = 'cleanupSelectBtn';
+        sel.textContent = 'Select';
+        sel.addEventListener('click', function(){ cleanupSelect = { group: cleanupGroup, set: new Set() }; renderCleanupList(); });
+        row.appendChild(sel);
+      }
+      box.appendChild(row);
     }
     syncCleanupBar();
+  }
+  function clPickAllRow(fn, allOn){
+    var r = document.createElement('div');
+    r.className = 'cl-pickall';
+    var a = document.createElement('button'); a.type = 'button'; a.textContent = 'Select all'; a.disabled = allOn;
+    var nn = document.createElement('button'); nn.type = 'button'; nn.textContent = 'Select none';
+    a.addEventListener('click', function(){ fn(true); });
+    nn.addEventListener('click', function(){ fn(false); });
+    r.appendChild(a); r.appendChild(nn);
+    return r;
+  }
+  var cleanupSelect = null;
+  function cleanupEditTogether(){
+    var cs = cleanupSelect;
+    if(!cs || !cs.set.size) return;
+    var picked = (cleanupState[cs.group] || []).filter(function(x){ return cs.set.has(x); });
+    var tracks = [];
+    picked.forEach(function(x){ (cs.group === 'songs' ? [x] : x.tracks).forEach(function(t){ if(tracks.indexOf(t) === -1) tracks.push(t); }); });
+    if(!tracks.length) return;
+    var name = cs.group === 'songs' ? (tracks.length === 1 ? '1 song' : tracks.length + ' songs') : (picked.length === 1 ? picked[0].album : picked.length + ' albums');
+    openAlbumTagSheet({ key: 'cleanup-together', album: name, artist: '', tracks: tracks });
   }
   function syncCleanupBar(){
     var bar = document.getElementById('cleanupBar'), btn = document.getElementById('cleanupSaveBtn');
     var rv = cleanupReview && cleanupReview.group === cleanupGroup ? cleanupReview : null;
+    var cs = !rv && cleanupSelect && cleanupSelect.group === cleanupGroup ? cleanupSelect : null;
+    if(cs){
+      bar.hidden = false;
+      btn.disabled = !cs.set.size;
+      btn.textContent = cs.set.size ? 'Edit ' + cs.set.size + ' Together' : 'Edit Together';
+      return;
+    }
     bar.hidden = !rv || !rv.found.size;
     if(!rv) return;
     var n = rv.picked.size;
@@ -10569,7 +10644,27 @@
     btn.textContent = n ? 'Save ' + n : 'Save';
   }
   // --- the lookups: each resolves { label, thumb?, ...what to write } or null ---
+  // Build 369: when MusicBrainz has no match, what the file and folder names say (artist and
+  // title from "Artist - Title", the artist's and album's folders, a leading track number),
+  // offered the same way, marked "From the file name", so nothing has to be done one by one.
+  function clGuessSong(t){
+    var g = guessFromFilename(t.fileName || '');
+    var parts = String(t.relPath || '').split('/');
+    var folderArtist = parts.length >= 4 ? parts[parts.length - 3].trim() : '';
+    var folderAlbum = parts.length >= 4 ? parts[parts.length - 2].trim() : '';
+    var artist = String(t.artist || g.artist || folderArtist || '').trim();
+    var title = String(g.title || '').trim();
+    if(!artist || !title) return null;
+    var out = { title: title, artist: artist, guess: true };
+    if(folderAlbum && clNorm(folderAlbum) !== clNorm(artist)) out.album = folderAlbum;
+    if(g.trackNo) out.track = String(g.trackNo);
+    out.label = 'From the file name \u00b7 ' + out.title + ' \u00b7 ' + out.artist + (out.album ? ' \u00b7 ' + out.album : '');
+    return out;
+  }
   function clLookupSong(t){
+    return clLookupSongOnline(t).then(function(r){ return r || clGuessSong(t); }, function(){ return clGuessSong(t); });
+  }
+  function clLookupSongOnline(t){
     var g = guessFromFilename(t.fileName || '');
     var parts = String(t.relPath || '').split('/');
     var folderArtist = parts.length >= 4 ? parts[parts.length - 3] : '';
@@ -10755,6 +10850,8 @@
           return c;
         }
         var keys = group === 'songs' ? ['title', 'artist', 'album', 'year', 'track'] : ['year', 'genre'];
+        // A guess from the file name only fills what the file doesn't have.
+        if(f.guess) keys = keys.filter(function(k){ return !String(doc.values[k] || '').trim(); });
         keys.forEach(function(k){
           if(!f[k]) return;
           var cur = String(doc.values[k] || '').trim();
@@ -10798,9 +10895,13 @@
       }).then(finished, failed);
     });
   }
-  document.getElementById('cleanupSaveBtn').addEventListener('click', cleanupSave);
+  document.getElementById('cleanupSaveBtn').addEventListener('click', function(){
+    if(cleanupSelect && cleanupSelect.group === cleanupGroup && !(cleanupReview && cleanupReview.group === cleanupGroup)) cleanupEditTogether();
+    else cleanupSave();
+  });
   document.getElementById('cleanupCancelBtn').addEventListener('click', function(){
     cleanupReview = null;
+    cleanupSelect = null;
     renderCleanupList();
   });
   function fixCleanupItem(x){
@@ -10824,6 +10925,7 @@
     cleanupRescanTimer = setTimeout(function(){
       cleanupRescanTimer = null;
       if(!settingsOverlay.classList.contains('open') || (settingsCat !== 'cleanup' && settingsCat !== 'cleanuplist')) return;
+      cleanupSelect = null;
       cleanupScan();
       cleanupRedraw();
     }, 400);
@@ -11038,7 +11140,7 @@
     var d = new Date(), month = listenBetween(dayKey(new Date(d.getFullYear(), d.getMonth(), 1)), dayKey(d));
     return [
       { v: artists ? fmt(artists) : '—', l: artists === 1 ? 'Artist' : 'Artists' },
-      { v: month >= 30 ? fmtListen(month) : '—', l: 'This month' },
+      { v: month >= 30 ? fmtListenShort(month) : '—', l: 'This month' },
       { v: top ? top.name : '—', l: 'Top artist' }
     ];
   }
@@ -11438,12 +11540,48 @@
     sec = stSection('Top stations');
     sec.appendChild(stList(topItems('r').map(function(x){ return { n: x.n, v: fmtListen(x.s) }; }), 'Stations you listen to show up here.'));
     body.appendChild(sec);
-    var pods = topItems('p');
-    if(pods.length){
-      sec = stSection('Top podcasts');
-      sec.appendChild(stList(pods.map(function(x){ return { n: x.a || x.n, s: x.a ? x.n : '', v: fmtListen(x.s) }; }), ''));
-      body.appendChild(sec);
+    // Build 369: Podcasts. Time listened (from the listening count), episodes started and
+    // finished (from each episode's saved place), shows followed, and the top shows by time.
+    sec = stSection('Podcasts');
+    var podGrid = stEl('div', 'st-grid');
+    function podCard(v, l, id){
+      var card = stEl('div', 'st-card');
+      var vv = stEl('span', 'st-v', v); if(id) vv.id = id;
+      card.appendChild(vv); card.appendChild(stEl('span', 'st-l', l));
+      podGrid.appendChild(card);
     }
+    podCard(fmtListen(listenBetween(monthStart, today, 'p')), 'This month');
+    podCard(fmtListen(listenBetween('0000-00-00', '9999-99-99', 'p')), 'In all');
+    podCard('…', 'Episodes finished', 'stPodDone');
+    podCard(String(podcastSubs.length), podcastSubs.length === 1 ? 'Show followed' : 'Shows followed');
+    sec.appendChild(podGrid);
+    var shows = {};
+    Object.keys(L.items).forEach(function(k){
+      var x = L.items[k];
+      if(x.k !== 'p' || !x.s) return;
+      var nm = x.a || x.n;
+      if(!nm) return;
+      var sh = shows[nm] || (shows[nm] = { n: nm, s: 0, eps: 0 });
+      sh.s += x.s; if(x.s >= 60) sh.eps++;
+    });
+    var topShows = Object.keys(shows).map(function(k){ return shows[k]; }).filter(function(x){ return x.s >= 60; })
+      .sort(function(a, b){ return b.s - a.s; }).slice(0, 5);
+    var podSub = stEl('h3', 'st-h3', 'Top shows');
+    sec.appendChild(podSub);
+    sec.appendChild(stList(topShows.map(function(x){
+      return { n: x.n, s: x.eps ? x.eps + (x.eps === 1 ? ' episode' : ' episodes') : '', v: fmtListen(x.s) };
+    }), 'Shows you listen to show up here.'));
+    body.appendChild(sec);
+    getAllPodcastProgress().then(function(recs){
+      var el = document.getElementById('stPodDone');
+      if(!el) return;
+      var eps = (recs || []).filter(function(r){ return r && !r.isVideo; });
+      var done = eps.filter(function(r){ return r.completed; }).length;
+      el.textContent = done.toLocaleString();
+      var started = eps.length;
+      var lab = el.nextSibling;
+      if(lab) lab.textContent = (done === 1 ? 'Episode finished' : 'Episodes finished') + (started ? ' of ' + started + ' started' : '');
+    }, function(){ var el = document.getElementById('stPodDone'); if(el) el.textContent = '—'; });
 
     sec = stSection('More');
     var facts = stEl('div', 'st-facts');
@@ -15898,13 +16036,14 @@
     trimTop(listenStats.artists, LISTEN_KEEP);
     try{ localStorage.setItem(LISTEN_KEY, JSON.stringify(listenStats)); }catch(e){}
   }
-  function listenTick(){
+  // Build 369: in the app the player keeps its own count of time spent playing (ListenClock),
+  // which goes on while the screen is off and the page's timers are stopped; each tick credits
+  // the difference since the last one. Anything that player doesn't play (VLC, Cast, the
+  // YouTube player) and the browser go by the clock, as before.
+  var listenNative = null, listenAsking = false;
+  function listenCredit(st, secs){
+    if(!st || !(secs > 0)) return;
     var now = Date.now();
-    var st = currentStation;
-    if(!listenLast || !uiIsPlaying || !st){ listenLast = now; saveListen(false); return; }
-    var secs = Math.min(now - listenLast, PLAY_TICK_MAX_MS) / 1000;
-    listenLast = now;
-    if(secs <= 0) return;
     var L = loadListen(), d = new Date(), k = listenKind(st);
     var day = L.days[dayKey(d)] || (L.days[dayKey(d)] = { t: 0 });
     day.t += secs;
@@ -15918,7 +16057,8 @@
       if(k === 'm' && st.artist) it.a = st.artist;
       if(k === 'p' && (st.collectionName || st.podcastName)) it.a = st.collectionName || st.podcastName;
     }
-    var artist = k === 'm' ? String(st.artist || '').trim() : (k === 'r' ? artistNameForPlay(st) : '');
+    var artist = '';
+    try{ artist = k === 'm' ? String(st.artist || '').trim() : (k === 'r' ? artistNameForPlay(st) : ''); }catch(e){}
     if(artist){
       var ak = artistMatchKey(artist);
       var ar = L.artists[ak] || (L.artists[ak] = { s: 0 });
@@ -15926,6 +16066,31 @@
     }
     listenDirty = true;
     saveListen(false);
+  }
+  function listenTick(){
+    var now = Date.now(), st = currentStation, playing = uiIsPlaying;
+    var gap = listenLast ? Math.min(now - listenLast, PLAY_TICK_MAX_MS) : 0;
+    listenLast = now;
+    var Cap = window.Capacitor, P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    var native = P && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform() && typeof P.listenClock === 'function';
+    if(!native){ if(playing && st) listenCredit(st, gap / 1000); else saveListen(false); return; }
+    if(listenAsking){ return; }
+    listenAsking = true;
+    P.listenClock().then(function(r){
+      listenAsking = false;
+      var ms = r && typeof r.ms === 'number' ? r.ms : null;
+      var secs = 0;
+      if(ms !== null){
+        if(listenNative !== null && ms >= listenNative) secs = (ms - listenNative) / 1000;
+        listenNative = ms;
+      }
+      // Not the app's own player (VLC, Cast, YouTube): the clock, while it says it's playing.
+      if(!secs && playing && !(r && r.playing)) secs = gap / 1000;
+      if(playing || secs > 1.5) listenCredit(st, secs); else saveListen(false);
+    }, function(){
+      listenAsking = false;
+      if(playing && st) listenCredit(st, gap / 1000);
+    });
   }
   setInterval(listenTick, 1000);
   document.addEventListener('visibilitychange', function(){ listenTick(); if(document.hidden) saveListen(true); });
@@ -15935,6 +16100,13 @@
     var L = loadListen(), n = 0;
     Object.keys(L.days).forEach(function(d){ if(d >= from && d <= to) n += kind ? (L.days[d][kind] || 0) : (L.days[d].t || 0); });
     return n;
+  }
+  // Build 369: one short figure for a small card (the profile): hours once there's an hour.
+  function fmtListenShort(secs){
+    secs = Math.round(secs || 0);
+    if(secs < 3600) return Math.max(1, Math.round(secs / 60)) + 'm';
+    var h = Math.round(secs / 3600);
+    return (h >= 1000 ? h.toLocaleString() : h) + 'h';
   }
   function fmtListen(secs){
     secs = Math.round(secs || 0);
