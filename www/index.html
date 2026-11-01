@@ -6982,6 +6982,14 @@
     margin:0 calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))); padding:4px max(var(--set-pad), calc((100vw - 640px) / 2)) 10px;
     border-bottom:1px solid var(--border); }
   #settingsOverlay .set-sticky-preview > .font-preview, #settingsOverlay .set-sticky-preview > .shape-preview{ margin:0; }
+  /* Build 401 (Mark): the Home carousel follows Corner radius; play buttons follow Play button shape. */
+  :root{ --r-hero:22px; --r-play:999px; }
+  .nph-track{ border-radius:var(--r-hero) !important; }
+  .nph-play, .np-play-btn, body.rotate-lock .np-play-btn, body.rotate-lock .now-playing-screen .np-play-btn, .album-play-pill{ border-radius:var(--r-play) !important; }
+  .shape-preview .sp-play{ display:flex; align-items:center; justify-content:center; width:48px; height:48px; flex:0 0 48px; margin-left:auto; align-self:center;
+    background:var(--text); color:var(--bg); font-size:16px; border-radius:var(--r-play); }
+  .shape-preview .sp-play i{ margin-left:2px; }
+  .shape-preview .sp-play + .sp-btn{ margin-left:0; align-self:center; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -8204,10 +8212,10 @@
     <!-- Build 395: corner radius, density, and the shape of artist portraits. -->
     <section class="set-page" data-set-page="appearance-shape" data-set-title="Shape &amp; density" data-set-parent="appearance" hidden>
       <div class="set-sticky-preview">
-        <div class="shape-preview" id="shapePreview" aria-hidden="true"><div class="sp-tile"><span class="sp-art"></span><span class="sp-line"></span></div><div class="sp-tile"><span class="sp-art sp-artist"></span><span class="sp-line"></span></div><span class="sp-btn">Button</span></div>
+        <div class="shape-preview" id="shapePreview" aria-hidden="true"><div class="sp-tile"><span class="sp-art"></span><span class="sp-line"></span></div><div class="sp-tile"><span class="sp-art sp-artist"></span><span class="sp-line"></span></div><span class="sp-play"><i class="fa-solid fa-play" aria-hidden="true"></i></span><span class="sp-btn">Button</span></div>
       </div>
       <div class="settings-row">
-        <div class="set-text"><span class="settings-label" id="shapeRadiusLabel">Corner radius</span><span class="set-desc">Covers, tiles, cards and buttons</span></div>
+        <div class="set-text"><span class="settings-label" id="shapeRadiusLabel">Corner radius</span><span class="set-desc">Covers, tiles, cards, buttons and the Home carousel</span></div>
         <select class="settings-select" id="shapeRadiusSelect" aria-labelledby="shapeRadiusLabel"><option value="square">Square</option><option value="soft">Soft</option><option value="round">Round</option></select>
       </div>
       <div class="settings-row">
@@ -8217,6 +8225,10 @@
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="shapeArtistLabel">Artist portraits</span><span class="set-desc">Top Artists, Favorite Artists and artist lists</span></div>
         <select class="settings-select" id="shapeArtistSelect" aria-labelledby="shapeArtistLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
+      </div>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="shapePlayLabel">Play button</span><span class="set-desc">Home carousel, Now Playing, and artist and album pages</span></div>
+        <select class="settings-select" id="shapePlaySelect" aria-labelledby="shapePlayLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
       </div>
       <div class="settings-row">
         <span class="settings-label">Reset shape &amp; density</span>
@@ -10326,20 +10338,22 @@
   // the shape of artist portraits. Each becomes CSS variables the "Build 395" stylesheet block uses.
   var SHAPE_KEY = 'radioPlayerShape';
   var SHAPE_RADII = {
-    square: { tile: '0px', small: '0px', btn: '0px', card: '0px', pill: '0px' },
-    soft: { tile: '8.5px', small: '6px', btn: '10px', card: '14px', pill: '999px' },
-    round: { tile: '18px', small: '12px', btn: '999px', card: '22px', pill: '999px' }
+    square: { tile: '0px', small: '0px', btn: '0px', card: '0px', pill: '0px', hero: '0px' },
+    soft: { tile: '8.5px', small: '6px', btn: '10px', card: '14px', pill: '999px', hero: '22px' },
+    round: { tile: '18px', small: '12px', btn: '999px', card: '22px', pill: '999px', hero: '32px' }
   };
   var SHAPE_DENS = { compact: { size: 0.9, sp: 0.55 }, comfortable: { size: 1, sp: 1 }, roomy: { size: 1.1, sp: 1.5 } };
   var SHAPE_ARTIST = { circle: '50%', rounded: '16%', square: '0px' };
+  var SHAPE_PLAY = { circle: '999px', rounded: '16px', square: '0px' };   // build 401: play buttons
   function shapeLoad(){
-    var d = { radius: 'soft', density: 'comfortable', artist: 'circle' };
+    var d = { radius: 'soft', density: 'comfortable', artist: 'circle', play: 'circle' };
     try{
       var o = JSON.parse(localStorage.getItem(SHAPE_KEY) || 'null');
       if(o && typeof o === 'object'){
         if(SHAPE_RADII[o.radius]) d.radius = o.radius;
         if(SHAPE_DENS[o.density]) d.density = o.density;
         if(SHAPE_ARTIST[o.artist]) d.artist = o.artist;
+        if(SHAPE_PLAY[o.play]) d.play = o.play;
       }
     }catch(e){}
     return d;
@@ -10348,13 +10362,18 @@
   function shapeApply(){
     var st = document.documentElement.style, r = SHAPE_RADII[shapePrefs.radius];
     st.setProperty('--r-tile', r.tile); st.setProperty('--r-small', r.small); st.setProperty('--r-btn', r.btn);
-    st.setProperty('--r-card', r.card); st.setProperty('--r-pill', r.pill);
+    st.setProperty('--r-card', r.card); st.setProperty('--r-pill', r.pill); st.setProperty('--r-hero', r.hero);
+    st.setProperty('--r-play', SHAPE_PLAY[shapePrefs.play]);
+    // The carousel is a scroller whose slides carry masked layers; Chrome keeps its old rounded clip
+    // until it repaints, so it is nudged onto a fresh layer and back (scroll position untouched).
+    var trk = document.querySelector('.nph-track');
+    if(trk){ trk.style.transform = 'translateZ(0)'; void trk.offsetWidth; requestAnimationFrame(function(){ trk.style.transform = ''; }); }
     st.setProperty('--r-artist', SHAPE_ARTIST[shapePrefs.artist]);
     st.setProperty('--dens-sp', String(SHAPE_DENS[shapePrefs.density].sp));
     if(typeof layoutApply === 'function') layoutApply();
   }
   (function(){
-    var sels = { radius: document.getElementById('shapeRadiusSelect'), density: document.getElementById('shapeDensitySelect'), artist: document.getElementById('shapeArtistSelect') };
+    var sels = { radius: document.getElementById('shapeRadiusSelect'), density: document.getElementById('shapeDensitySelect'), artist: document.getElementById('shapeArtistSelect'), play: document.getElementById('shapePlaySelect') };
     function paint(){ Object.keys(sels).forEach(function(k){ sels[k].value = shapePrefs[k]; }); }
     Object.keys(sels).forEach(function(k){
       sels[k].addEventListener('change', function(){
@@ -10364,7 +10383,7 @@
       });
     });
     document.getElementById('shapeResetBtn').addEventListener('click', function(){
-      shapePrefs = { radius: 'soft', density: 'comfortable', artist: 'circle' };
+      shapePrefs = { radius: 'soft', density: 'comfortable', artist: 'circle', play: 'circle' };
       try{ localStorage.setItem(SHAPE_KEY, JSON.stringify(shapePrefs)); }catch(e){}
       paint(); shapeApply();
     });

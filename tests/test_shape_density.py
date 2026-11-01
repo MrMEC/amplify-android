@@ -74,6 +74,40 @@ async def main():
                 await pg.click('#shapeResetBtn'); await pg.wait_for_timeout(200)
                 await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(400)
                 check((await pg.evaluate(probe))['tile'] == '8.5px', 'reset restores defaults')
+                # ---- build 401: the Home carousel follows Corner radius; Play button shape on carousel, Now Playing, artist page ----
+                await pg.evaluate("""(function(){ var ov=document.getElementById('addMusicOverlay'); if(ov) ov.classList.add('open');
+                  var btn=document.getElementById('addMusicFolderBtn'); btn.disabled=false; btn.click(); })()""")
+                for _ in range(60):
+                    await pg.wait_for_timeout(500)
+                    if await pg.evaluate('__v.tracks()') >= 5: break
+                await pg.evaluate("document.getElementById('addMusicOverlay').classList.remove('open')"); await pg.wait_for_timeout(300); await pg.evaluate('__v.hide()')
+                R = """(()=>{ function r(sel){ var e=document.querySelector(sel); return e && e.offsetParent ? getComputedStyle(e).borderTopLeftRadius : null; }
+                  return { hero: r('.nph-track'), heroPlay: r('.nph-play'), np: r('.now-playing-screen .np-play-btn'), artist: r('#artistPlayBtn') }; })()"""
+                async def home():
+                    await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(300)
+                    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(900)
+                await pg.evaluate("__t.ev('openSettings(\"appearance-shape\")')"); await pg.wait_for_timeout(300)
+                names = await pg.evaluate("Array.from(document.querySelectorAll('[data-set-page=appearance-shape] .settings-label')).map(e=>e.textContent)")
+                check('Play button' in names, f'Shape & density has a Play button setting {names}')
+                check(await pg.evaluate("document.getElementById('shapePlaySelect').value") == 'circle', 'play buttons default to circular')
+                await home(); d = await pg.evaluate(R)
+                check(d['hero'] == '22px' and d['heroPlay'] == '999px', f'defaults: carousel corners 22px, round play button {d}')
+                for rad, play, hero, pr in (('round', 'square', '32px', '0px'), ('square', 'rounded', '0px', '16px')):
+                    await pg.evaluate("__t.ev('openSettings(\"appearance-shape\")')"); await pg.wait_for_timeout(300)
+                    await setsel('shapeRadiusSelect', rad); await setsel('shapePlaySelect', play)
+                    await pg.screenshot(path=f'{shots}/play-shape-settings-{play}.png')
+                    await home(); a = await pg.evaluate(R); await pg.screenshot(path=f'{shots}/play-shape-home-{play}.png')
+                    check(a['hero'] == hero and a['heroPlay'] == pr, f'{rad} corners + {play} play: carousel {a["hero"]}, its play button {a["heroPlay"]}')
+                    await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(1500)
+                    a = await pg.evaluate(R); await pg.screenshot(path=f'{shots}/play-shape-artist-{play}.png')
+                    check(a['artist'] == pr, f'{play}: artist page Play button {a["artist"]}')
+                    await pg.evaluate("__v.play()"); await pg.evaluate("__t.ev('openNowPlaying(currentStation, false)')"); await pg.wait_for_timeout(900)
+                    a = await pg.evaluate(R); await pg.screenshot(path=f'{shots}/play-shape-np-{play}.png')
+                    check(a['np'] == pr, f'{play}: Now Playing play button {a["np"]}')
+                    await pg.evaluate("__t.ev('closeNowPlaying()')"); await pg.wait_for_timeout(500)
+                await pg.evaluate("__t.ev('openSettings(\"appearance-shape\")')"); await pg.wait_for_timeout(300)
+                await pg.click('#shapeResetBtn'); await pg.wait_for_timeout(200)
+                check(await pg.evaluate("document.getElementById('shapePlaySelect').value") == 'circle', 'Reset puts the play button back to circular')
             check(not errs, f'no page errors {errs[:3]}')
             await ctx.close()
         await b.close()
