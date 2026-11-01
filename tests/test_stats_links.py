@@ -49,7 +49,7 @@ async def run(B, theme):
     await pg.evaluate("__t.ev('playStation = function(st){ if(st) window.__t.played.push(st.name); }; 0')")
     heading = "document.getElementById('stationsHeading').textContent"
     async def profile():
-        await pg.evaluate("document.getElementById('statsOverlay').classList.remove('open')")
+        await pg.evaluate("document.getElementById('statsOverlay').classList.remove('open'); __t.ev('closeProfile()')"); await pg.wait_for_timeout(50)
         await pg.tap('#hamburgerBtn'); await pg.wait_for_timeout(350)
     async def state():
         return await pg.evaluate(f"[document.getElementById('profileOverlay').classList.contains('open'), document.getElementById('statsOverlay').classList.contains('open'), {heading}]")
@@ -97,6 +97,46 @@ async def run(B, theme):
     await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#statsBody .st-row'), function(r){ return r.querySelector('.st-row-n').textContent === 'Talk Is Jericho'; })[0].click()"); await pg.wait_for_timeout(500)
     sh = await pg.evaluate("__t.ev('activeShowCollectionId')")
     check(str(sh) == '4242', f'{T} a followed show -> its page {sh}')
+    # --- Back (build 378): from wherever a link went, Back returns to the screen it was tapped on
+    async def back():
+        await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(500)
+    async def where():
+        return await pg.evaluate("[document.getElementById('profileOverlay').classList.contains('open'), document.getElementById('statsOverlay').classList.contains('open'), document.getElementById('statsPage').scrollTop, document.getElementById('profilePage').scrollTop]")
+    async def stats_row(name):
+        await profile(); await pg.tap('#pfStats .pf-stat[data-pf-go=stats]'); await pg.wait_for_timeout(400)
+        await pg.evaluate("(n)=>{ var r = Array.prototype.filter.call(document.querySelectorAll('#statsBody .st-row, #statsBody .st-leg'), function(r){ var e = r.querySelector('.st-row-n, .st-leg-n'); return e && e.textContent === n; })[0]; r.scrollIntoView({block:'center'}); window.__y = document.getElementById('statsPage').scrollTop; r.click(); }", name)
+        await pg.wait_for_timeout(500)
+    await stats_row('Prince')
+    lab = await pg.evaluate("[getComputedStyle(document.getElementById('detailBackBtn')).display, document.getElementById('detailBackLabel').textContent]")
+    await back(); w = await where(); y = await pg.evaluate("window.__y")
+    check(lab[0] != 'none' and w[0] and w[1] and abs(w[2] - y) < 3, f'{T} artist page, Back -> Listening Stats where it was (over the profile) {lab} {w} y={y}')
+    await pg.screenshot(path=f'{SHOTS}/statslinks-{theme}-back.png')
+    for name, want in [('Music', 'Library'), ('Podcasts', 'Podcasts'), ('Video & TV', 'Watch'), ('Radio', 'My Stations')]:
+        await stats_row(name)
+        lab = await pg.evaluate("[getComputedStyle(document.getElementById('detailBackBtn')).display, document.getElementById('detailBackLabel').textContent, getComputedStyle(document.getElementById('sectionHeadingRow')).display]")
+        if name == 'Music': await pg.screenshot(path=f'{SHOTS}/statslinks-{theme}-library-back.png')
+        await back(); w = await where()
+        check(lab[0] != 'none' and lab[1] == 'Listening Stats' and w[1], f'{T} {want} (from {name}) has Back, and it returns to Listening Stats {lab} {w}')
+    # roots keep it while on them, and lose it when you move on
+    await stats_row('Music')
+    await pg.evaluate("__t.ev('openMyLibraryHome()')"); await pg.wait_for_timeout(200)
+    k = await pg.evaluate("getComputedStyle(document.getElementById('detailBackBtn')).display")
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(400)
+    k2 = await pg.evaluate("[getComputedStyle(document.getElementById('detailBackBtn')).display, document.getElementById('detailBackLabel').textContent]")
+    check(k != 'none' and k2[0] == 'none', f'{T} Library keeps its Back while it re-renders; Watch from the tab bar is a top page again (no Back) {k} {k2}')
+    # the profile: Top Artists, a shortcut, Favorites -> Back -> the profile
+    for sel, nm in [('#pfStats .pf-stat[data-pf-go=topArtists]', 'Top Artists'), ('#pfStats .pf-stat[data-pf-go=artists]', 'Artists'), ('.pf-link[data-pf-go=stations]', 'My Stations'), ('#pfFavAll', 'Favorites')]:
+        await profile()
+        await pg.evaluate("document.getElementById('profilePage').scrollTop = 120")
+        await pg.evaluate("(s)=>document.querySelector(s).click()", sel); await pg.wait_for_timeout(500)
+        lab = await pg.evaluate("document.getElementById('detailBackLabel').textContent")
+        await back(); w = await where()
+        check(lab == 'Profile' and w[0] and not w[1], f'{T} {nm} from the profile, Back -> the profile {lab} {w}')
+    # closed with X, nothing is recorded: Back from a page opened later goes where it should
+    await profile(); await pg.tap('#profileCloseBtn'); await pg.wait_for_timeout(200)
+    await pg.evaluate("__t.ev('openHomeSectionPage(\"favorites\")')"); await pg.wait_for_timeout(300)
+    lab = await pg.evaluate("document.getElementById('detailBackLabel').textContent")
+    check(lab != 'Profile', f'{T} closing the profile with X leaves no trail {lab}')
     # --- a station played now keeps enough to play it again
     await pg.evaluate("__t.ev('listenCredit({name:\"Jazz FM\", urlToResolve:\"http://x/jazz\", stationuuid:\"j1\", favicon:\"\"}, 120)')")
     L = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerListening')).items")

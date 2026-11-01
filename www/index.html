@@ -10347,6 +10347,7 @@
   }
   // Settings closed for good (Escape, a dialog it opened).
   function closeSettings(){
+    if(settingsOverlay.classList.contains('open') && typeof noteOverlayLeaving === 'function') noteOverlayLeaving();
     settingsOverlay.classList.remove('open');
     document.body.classList.remove('settings-open');
   }
@@ -11341,6 +11342,7 @@
     document.getElementById('profilePage').scrollTop = 0;
   }
   function closeProfile(){
+    if(profileOverlay.classList.contains('open')) noteOverlayLeaving();
     profileOverlay.classList.remove('open');
     document.body.classList.remove('profile-open');
     hamburgerBtn.setAttribute('aria-expanded', 'false');
@@ -11827,7 +11829,7 @@
     statsOverlay.classList.add('open');
     document.getElementById('statsPage').scrollTop = 0;
   }
-  function closeStats(){ statsOverlay.classList.remove('open'); if(profileOverlay.classList.contains('open')) renderProfile(); }
+  function closeStats(){ if(statsOverlay.classList.contains('open')) noteOverlayLeaving(); statsOverlay.classList.remove('open'); if(profileOverlay.classList.contains('open')) renderProfile(); }
   document.getElementById('pfStatsLink').addEventListener('click', openStats);
   document.getElementById('statsBackBtn').addEventListener('click', closeStats);
   document.addEventListener('keydown', function(e){
@@ -34466,6 +34468,37 @@
   // Build 304: a page opened from a link on Now Playing (the artist's name, say) comes back to Now
   // Playing on Back, over the page that was under it.
   var navFromNp = null;
+  // Build 378 (Mark: Back from an artist opened in Listening Stats didn't return to Listening
+  // Stats). The screens that sit over the pages -- the profile, Listening Stats, Settings -- are
+  // places too. When one is closed to follow a link in it, what was open (and where it was
+  // scrolled) is noted, and the page that link opens records it, so Back reopens exactly that,
+  // over the page that was under it. Closed any other way (X, its own back arrow), nothing is
+  // recorded: the note lasts only until the tap that closed it has been handled.
+  var navFromOverlay = null, navFromOverlayTimer = 0;
+  function overlaySnapshot(){
+    var prof = profileOverlay.classList.contains('open'), stats = statsOverlay.classList.contains('open'),
+        sett = settingsOverlay.classList.contains('open');
+    if(!prof && !stats && !sett) return null;
+    var pfY = (document.getElementById('profilePage') || {}).scrollTop || 0,
+        stY = (document.getElementById('statsPage') || {}).scrollTop || 0,
+        cat = settingsCat, setEls = [settingsOverlay, document.getElementById('settingsPanel')],
+        setY = setEls.map(function(e){ return e ? e.scrollTop : 0; });
+    var label = stats ? 'Listening Stats' : sett ? 'Settings' : 'Profile';
+    return { label: label, open: function(){
+      if(prof){ openProfile(); var pp = document.getElementById('profilePage'); if(pp) pp.scrollTop = pfY; }
+      if(stats){ openStats(); var sp = document.getElementById('statsPage'); if(sp) sp.scrollTop = stY; }
+      if(sett){
+        openSettings(cat);
+        requestAnimationFrame(function(){ setEls.forEach(function(e, i){ if(e) e.scrollTop = setY[i]; }); });
+      }
+    } };
+  }
+  function noteOverlayLeaving(){
+    if(navReplaying || navFromOverlay) return;
+    navFromOverlay = overlaySnapshot();
+    clearTimeout(navFromOverlayTimer);
+    navFromOverlayTimer = setTimeout(function(){ navFromOverlay = null; }, 0);
+  }
   function pushView(){
     if(navReplaying) return;
     var snap = snapshotView();
@@ -34473,6 +34506,13 @@
       var st = navFromNp, under = snap.open;
       navFromNp = null;
       snap = { label: 'Now Playing', scroll: snap.scroll, open: function(){ under(); openNowPlaying(st); } };
+    }
+    if(navFromOverlay){
+      var ov = navFromOverlay, under2 = snap.open;
+      navFromOverlay = null;
+      snap = { label: ov.label, scroll: snap.scroll, overlay: true, fresh: true, open: function(){ under2(); ov.open(); } };
+      var fresh = snap;
+      setTimeout(function(){ fresh.fresh = false; }, 0);
     }
     viewHistory.push(snap);
     if(viewHistory.length > VIEW_HISTORY_MAX) viewHistory.shift();
@@ -34503,6 +34543,22 @@
   function clearViewHistory(){ if(!navReplaying && viewHistory) viewHistory.length = 0; }
 
   function setDetailBack(label, handler){
+    // Build 378: a page with no back button of its own (Library, Watch, Podcasts, Home) that was
+    // opened from the profile, Listening Stats or Settings still gets one, back to that screen,
+    // for as long as it is that same page (it re-renders itself now and then).
+    if(!label && !navReplaying && viewHistory && viewHistory.length){
+      var top = viewHistory[viewHistory.length - 1];
+      if(top.overlay){
+        var here = '';
+        try{ here = snapshotView().label; }catch(e){}
+        if(!top.rootOf && top.fresh) top.rootOf = here;
+        if(top.rootOf && top.rootOf === here){
+          viewHistory.length = 0; viewHistory.push(top);
+          label = top.label;
+          handler = function(){ goBack(); };
+        }
+      }
+    }
     if(!label){
       // A view with no back button is a root: Home, a library index, a genre, a search. The
       // trail that led here ends at it. Done in this one place rather than at each of those
