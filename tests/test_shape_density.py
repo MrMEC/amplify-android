@@ -1,0 +1,68 @@
+"""Build 395: Appearance split into sub-pages; Shape & density (corner radius, density, artist portrait shape).
+Run: python3 tests/test_shape_density.py (screenshots in /tmp/claude-0/t/shots)"""
+import asyncio, json, sys, os
+HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
+__file__ = os.path.join(HERE, 'test_artist_videos.py')
+_src = open(__file__).read().split("async def main():")[0].replace("PORT = 8802", "PORT = 8884").replace("srv_artvid", "srv_shape")
+exec(_src)
+BACKUP = json.load(open(os.path.join(HERE, 'fixtures', 'layout_backup.json')))
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
+        for scheme in ('dark', 'light'):
+            ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=scheme)
+            await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
+            pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+            await pg.route('**/*', route)
+            await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
+            await pg.evaluate("(d)=>{ __t.ev('importBackupData')(d, 'merge'); }", BACKUP); await pg.wait_for_timeout(2000)
+            await pg.evaluate("document.querySelectorAll('button').forEach(x=>{ if(x.textContent.trim()==='OK' && x.offsetParent) x.click(); })"); await pg.wait_for_timeout(400)
+            await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
+            probe = """(()=>{ var t=document.querySelector('#favoritesGrid .tile-art'), a=document.querySelector('.tile[data-entity=artist]:not(.fav-card) .tile-art');
+              return { tile: t&&getComputedStyle(t).borderTopLeftRadius, tw: t&&Math.round(t.getBoundingClientRect().width), artist: a?getComputedStyle(a).borderTopLeftRadius:'none' }; })()"""
+            d0 = await pg.evaluate(probe)
+            check(d0['tile'] == '8.5px' and d0['artist'] in ('50%', 'none'), f'defaults unchanged {d0}')
+            await pg.screenshot(path=f'{shots}/shape-home-default-{scheme}.png')
+            # hub
+            await pg.evaluate("__t.ev('openSettings(\"appearance\")')"); await pg.wait_for_timeout(500)
+            names = await pg.evaluate("Array.from(document.querySelectorAll('.set-subcats .set-cat-name')).map(e=>e.textContent)")
+            check(names == ['Theme & color', 'Sizes & text', 'Typography', 'Shape & density'], f'hub lists four groups {names}')
+            await pg.screenshot(path=f'{shots}/shape-hub-{scheme}.png')
+            await pg.click('.set-subcats .set-cat[data-set-cat=appearance-shape]'); await pg.wait_for_timeout(400)
+            title = await pg.evaluate("document.getElementById('settingsTitle').textContent")
+            check(title == 'Shape & density', f'sub-page title {title}')
+            await pg.screenshot(path=f'{shots}/shape-page-{scheme}.png')
+            await pg.click('#settingsCloseBtn'); await pg.wait_for_timeout(300)
+            check(await pg.evaluate("document.getElementById('settingsTitle').textContent") == 'Appearance', 'back goes to the Appearance list')
+            for cat, ttl in (('appearance-theme', 'Theme & color'), ('appearance-sizes', 'Sizes & text'), ('appearance-type', 'Typography')):
+                await pg.click(f'.set-subcats .set-cat[data-set-cat={cat}]'); await pg.wait_for_timeout(300)
+                check(await pg.evaluate("document.getElementById('settingsTitle').textContent") == ttl, f'opens {ttl}')
+                await pg.screenshot(path=f'{shots}/shape-{cat}-{scheme}.png')
+                await pg.click('#settingsCloseBtn'); await pg.wait_for_timeout(250)
+            if scheme == 'dark':
+                async def setsel(i, v):
+                    await pg.evaluate("([i,v])=>{ var s=document.getElementById(i); s.value=v; s.dispatchEvent(new Event('change')); }", [i, v]); await pg.wait_for_timeout(200)
+                await pg.click('.set-subcats .set-cat[data-set-cat=appearance-shape]'); await pg.wait_for_timeout(300)
+                await setsel('shapeRadiusSelect', 'square'); await setsel('shapeArtistSelect', 'square'); await setsel('shapeDensitySelect', 'compact')
+                await pg.screenshot(path=f'{shots}/shape-page-square.png')
+                await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(500)
+                d1 = await pg.evaluate(probe); await pg.screenshot(path=f'{shots}/shape-home-square.png')
+                check(d1['tile'] == '0px' and d1['artist'] in ('0px','none') and d1['tw'] < d0['tw'], f'square + compact applied {d1}')
+                await pg.evaluate("__t.ev('openSettings(\"appearance-shape\")')"); await pg.wait_for_timeout(300)
+                await setsel('shapeRadiusSelect', 'round'); await setsel('shapeArtistSelect', 'rounded'); await setsel('shapeDensitySelect', 'roomy')
+                await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(500)
+                d2 = await pg.evaluate(probe); await pg.screenshot(path=f'{shots}/shape-home-round.png')
+                check(d2['tile'] == '18px' and d2['artist'] != '50%' and d2['tw'] > d0['tw'], f'round + roomy applied {d2}')
+                await pg.reload(); await pg.wait_for_timeout(2500)
+                await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
+                check((await pg.evaluate(probe))['tile'] == '18px', 'choice survives reload')
+                check('radioPlayerShape' in await pg.evaluate("window.__amplifyKvKeys"), 'saved in backups')
+                await pg.evaluate("__t.ev('openSettings(\"appearance-shape\")')"); await pg.wait_for_timeout(300)
+                await pg.click('#shapeResetBtn'); await pg.wait_for_timeout(200)
+                await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(400)
+                check((await pg.evaluate(probe))['tile'] == '8.5px', 'reset restores defaults')
+            check(not errs, f'no page errors {errs[:3]}')
+            await ctx.close()
+        await b.close()
+    print('FAILED %s' % fails if fails else 'ALL PASSED')
+asyncio.run(main())

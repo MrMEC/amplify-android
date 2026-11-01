@@ -6938,6 +6938,33 @@
   .sz-row-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
   .sz-val{ color:var(--text-dim); font-weight:600; font-size:13px; }
 
+
+  /* Build 395 (Mark): corner radius, density, artist portrait shape, and the Appearance sub-list.
+     Soft + Comfortable + Circular are the look the app always had. */
+  :root{ --r-tile:8.5px; --r-small:6px; --r-btn:10px; --r-card:14px; --r-pill:999px; --r-artist:50%; --dens-sp:1; }
+  .tile:not([data-entity="artist"]):not(.mv-other):not(.fav-card) .tile-art, .fav-card, .tile.vposter .tile-art.vposter-art,
+  .vd-poster, .pf-fav .shortcut, .pf-fav .shortcut-art, .yt-tile .yt-thumb{ border-radius:var(--r-tile) !important; }
+  .row-item, .song-row, .song-row .song-row-art:not(.round):not(.search-more-art):not(.video-result-art), .tile-grid > .row-item .row-thumb,
+  .tile.tile-row.ch-item .tile-art, .artist-bio-avatar.vbio-poster{ border-radius:var(--r-small) !important; }
+  .song-row, .row-item{ border-radius:calc(var(--r-small) * 1.6) !important; }
+  .vw-thumb.vw-logo .tile-art, .fav-card .tile-art{ border-radius:0 !important; }
+  .accent-reset-btn, .settings-data-btn, .pf-small-btn, .confirm-actions button, .tour-choice-opts button, .tag-cover-btn,
+  .art-files-note button, #settingsPanel .settings-select{ border-radius:var(--r-btn) !important; }
+  .fav-order-btn, .mv-seg-btn, .chart-v-actions button{ border-radius:var(--r-pill) !important; }
+  .st-card, .guide-card, .ch-custom-card, .ch-start-card{ border-radius:var(--r-card) !important; }
+  .tile[data-entity="artist"]:not(.fav-card) .tile-art, .fav-artists-list .row-thumb.fav-artist-thumb, .song-row .song-row-art.round{ border-radius:var(--r-artist) !important; }
+  .song-row{ padding-top:calc(8px * var(--dens-sp)) !important; padding-bottom:calc(8px * var(--dens-sp)) !important; }
+  .row-item{ padding-top:calc(6px * var(--dens-sp)) !important; padding-bottom:calc(6px * var(--dens-sp)) !important; }
+  .fav-artists-list .row-item{ padding-top:calc(7px * var(--dens-sp)) !important; padding-bottom:calc(7px * var(--dens-sp)) !important; }
+  .tile-grid{ row-gap:calc(24px * var(--dens-sp)); }
+  #settingsPanel .set-subcats{ display:flex; flex-direction:column; }
+  #settingsPanel .set-subcats .set-cat:last-child{ border-bottom:none; }
+  .shape-preview{ display:flex; align-items:flex-end; gap:16px; padding:16px; margin:6px 0 0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-card); }
+  .shape-preview .sp-tile{ display:flex; flex-direction:column; gap:6px; width:72px; }
+  .shape-preview .sp-art{ display:block; width:72px; height:72px; background:linear-gradient(135deg,var(--accent),var(--panel-2)); border-radius:var(--r-tile); }
+  .shape-preview .sp-art.sp-artist{ border-radius:var(--r-artist); }
+  .shape-preview .sp-line{ display:block; height:8px; width:80%; border-radius:4px; background:var(--border); }
+  .shape-preview .sp-btn{ margin-left:auto; padding:9px 18px; font-size:13px; font-weight:700; background:var(--accent); color:var(--accent-text); border-radius:var(--r-btn); }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -8021,7 +8048,7 @@
     <nav class="set-home" id="setHome" aria-label="Settings categories">
       <button type="button" class="set-cat" data-set-cat="appearance">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11.2" r="1.1"/><circle cx="10.4" cy="7.4" r="1.1"/><circle cx="15" cy="7.7" r="1.1"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, accent color, fonts</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, colors, sizes, fonts, shape</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="playback">
@@ -8057,7 +8084,33 @@
     </nav>
 
     <!-- Appearance -->
+    <!-- Build 395 (Mark): Appearance is a short list; each group has its own page. -->
     <section class="set-page" data-set-page="appearance" data-set-title="Appearance" hidden>
+      <div class="set-subcats">
+      <button type="button" class="set-cat" data-set-cat="appearance-theme">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11" r="1"/><circle cx="10.6" cy="7.6" r="1"/><circle cx="15" cy="7.8" r="1"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Theme &amp; color</span><span class="set-cat-sub">Light or dark, AMOLED black, presets, accent</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="appearance-sizes">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/><rect x="14.5" y="14.5" width="6" height="6" rx="1.2"/><path d="M14 6h6M17 3v6"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Sizes &amp; text</span><span class="set-cat-sub">Cover and artwork sizes, lines of text</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="appearance-type">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 19 11 5h2l6 14M7.6 13.5h8.8"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Typography</span><span class="set-cat-sub">Fonts, text size and weight</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="appearance-shape">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="6"/><path d="M4 12h16M12 4v16"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Shape &amp; density</span><span class="set-cat-sub">Corners, spacing, artist portrait shape</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      </div>
+    </section>
+
+    <section class="set-page" data-set-page="appearance-theme" data-set-title="Theme &amp; color" data-set-parent="appearance" hidden>
       <div class="settings-row settings-row--stack">
         <span class="settings-label" id="themeLabel">Theme</span>
         <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
@@ -8084,11 +8137,13 @@
           <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
         </div>
       </div>
-      <!-- Build 393: sizes and line limits. -->
-      <h3 class="set-sub">Sizes &amp; text</h3>
+    </section>
+
+    <section class="set-page" data-set-page="appearance-sizes" data-set-title="Sizes &amp; text" data-set-parent="appearance" hidden>
       <div class="sz-rows" id="szRows"></div>
-      <!-- Build 391: fonts. -->
-      <h3 class="set-sub">Typography</h3>
+    </section>
+
+    <section class="set-page" data-set-page="appearance-type" data-set-title="Typography" data-set-parent="appearance" hidden>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="fontBodyLabel">App font</span><span class="set-desc">Built in, from your phone, or a font file of your own</span></div>
         <select class="settings-select" id="fontBodySelect" aria-labelledby="fontBodyLabel"></select>
@@ -8124,6 +8179,27 @@
       <div class="settings-row">
         <span class="settings-label">Reset typography</span>
         <button class="accent-reset-btn" id="fontResetBtn">Reset</button>
+      </div>
+    </section>
+
+    <!-- Build 395: corner radius, density, and the shape of artist portraits. -->
+    <section class="set-page" data-set-page="appearance-shape" data-set-title="Shape &amp; density" data-set-parent="appearance" hidden>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="shapeRadiusLabel">Corner radius</span><span class="set-desc">Covers, tiles, cards and buttons</span></div>
+        <select class="settings-select" id="shapeRadiusSelect" aria-labelledby="shapeRadiusLabel"><option value="square">Square</option><option value="soft">Soft</option><option value="round">Round</option></select>
+      </div>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="shapeDensityLabel">Density</span><span class="set-desc">List spacing and the size of covers and tiles</span></div>
+        <select class="settings-select" id="shapeDensitySelect" aria-labelledby="shapeDensityLabel"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="roomy">Roomy</option></select>
+      </div>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="shapeArtistLabel">Artist portraits</span><span class="set-desc">Top Artists, Favorite Artists and artist lists</span></div>
+        <select class="settings-select" id="shapeArtistSelect" aria-labelledby="shapeArtistLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
+      </div>
+      <div class="shape-preview" id="shapePreview" aria-hidden="true"><div class="sp-tile"><span class="sp-art"></span><span class="sp-line"></span></div><div class="sp-tile"><span class="sp-art sp-artist"></span><span class="sp-line"></span></div><span class="sp-btn">Button</span></div>
+      <div class="settings-row">
+        <span class="settings-label">Reset shape &amp; density</span>
+        <button class="accent-reset-btn" id="shapeResetBtn">Reset</button>
       </div>
     </section>
 
@@ -9500,7 +9576,7 @@
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
-    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont', 'radioPlayerAmoled', 'radioPlayerLayout',
+    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont', 'radioPlayerAmoled', 'radioPlayerLayout', 'radioPlayerShape',
     'radioPlayerLibArtistRadio', 'radioPlayerTourDone'];
   var MIRROR = {};
   if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
@@ -10224,6 +10300,55 @@
     presetGridEl.appendChild(b);
   });
 
+  // ---------- Build 395 (Mark): shape and density ----------
+  // Corner radius (tiles, covers, cards, buttons), density (list spacing and cover/tile sizes) and
+  // the shape of artist portraits. Each becomes CSS variables the "Build 395" stylesheet block uses.
+  var SHAPE_KEY = 'radioPlayerShape';
+  var SHAPE_RADII = {
+    square: { tile: '0px', small: '0px', btn: '0px', card: '0px', pill: '0px' },
+    soft: { tile: '8.5px', small: '6px', btn: '10px', card: '14px', pill: '999px' },
+    round: { tile: '18px', small: '12px', btn: '999px', card: '22px', pill: '999px' }
+  };
+  var SHAPE_DENS = { compact: { size: 0.9, sp: 0.55 }, comfortable: { size: 1, sp: 1 }, roomy: { size: 1.1, sp: 1.5 } };
+  var SHAPE_ARTIST = { circle: '50%', rounded: '16%', square: '0px' };
+  function shapeLoad(){
+    var d = { radius: 'soft', density: 'comfortable', artist: 'circle' };
+    try{
+      var o = JSON.parse(localStorage.getItem(SHAPE_KEY) || 'null');
+      if(o && typeof o === 'object'){
+        if(SHAPE_RADII[o.radius]) d.radius = o.radius;
+        if(SHAPE_DENS[o.density]) d.density = o.density;
+        if(SHAPE_ARTIST[o.artist]) d.artist = o.artist;
+      }
+    }catch(e){}
+    return d;
+  }
+  var shapePrefs = shapeLoad();
+  function shapeApply(){
+    var st = document.documentElement.style, r = SHAPE_RADII[shapePrefs.radius];
+    st.setProperty('--r-tile', r.tile); st.setProperty('--r-small', r.small); st.setProperty('--r-btn', r.btn);
+    st.setProperty('--r-card', r.card); st.setProperty('--r-pill', r.pill);
+    st.setProperty('--r-artist', SHAPE_ARTIST[shapePrefs.artist]);
+    st.setProperty('--dens-sp', String(SHAPE_DENS[shapePrefs.density].sp));
+    if(typeof layoutApply === 'function') layoutApply();
+  }
+  (function(){
+    var sels = { radius: document.getElementById('shapeRadiusSelect'), density: document.getElementById('shapeDensitySelect'), artist: document.getElementById('shapeArtistSelect') };
+    function paint(){ Object.keys(sels).forEach(function(k){ sels[k].value = shapePrefs[k]; }); }
+    Object.keys(sels).forEach(function(k){
+      sels[k].addEventListener('change', function(){
+        shapePrefs[k] = sels[k].value;
+        try{ localStorage.setItem(SHAPE_KEY, JSON.stringify(shapePrefs)); }catch(e){}
+        shapeApply();
+      });
+    });
+    document.getElementById('shapeResetBtn').addEventListener('click', function(){
+      shapePrefs = { radius: 'soft', density: 'comfortable', artist: 'circle' };
+      try{ localStorage.setItem(SHAPE_KEY, JSON.stringify(shapePrefs)); }catch(e){}
+      paint(); shapeApply();
+    });
+    paint();
+  })();
   // ---------- Build 393 (Mark): cover sizes, text size for albums/stations, and line limits ----------
   // Each group of covers has its own size (a percentage of the standard one); rows size exactly, and
   // grids on a phone (posters, albums, stations) change how many covers sit across a row. The
@@ -10258,16 +10383,17 @@
   }
   function layoutApply(){
     var st = document.documentElement.style, p = layoutPrefs;
-    st.setProperty('--sz-cover', String(p.cover / 100));
-    st.setProperty('--sz-artist', String(p.artist / 100));
-    st.setProperty('--sz-video', String(p.video / 100));
-    st.setProperty('--sz-poster', String(p.poster / 100));
-    st.setProperty('--sz-album', String(p.album / 100));
+    var dz = SHAPE_DENS[shapePrefs.density].size;   // build 395: density scales every cover size
+    st.setProperty('--sz-cover', String(p.cover / 100 * dz));
+    st.setProperty('--sz-artist', String(p.artist / 100 * dz));
+    st.setProperty('--sz-video', String(p.video / 100 * dz));
+    st.setProperty('--sz-poster', String(p.poster / 100 * dz));
+    st.setProperty('--sz-album', String(p.album / 100 * dz));
     st.setProperty('--fs-album', String(p.albumfs / 100));
     st.setProperty('--lines-title', p.titleLines ? String(p.titleLines) : 'none');
     st.setProperty('--lines-sub', p.subLines ? String(p.subLines) : 'none');
-    st.setProperty('--album-cols', String(layoutCols(p.album / 100)));
-    st.setProperty('--poster-cols', String(layoutCols(p.poster / 100)));
+    st.setProperty('--album-cols', String(layoutCols(p.album / 100 * dz)));
+    st.setProperty('--poster-cols', String(layoutCols(p.poster / 100 * dz)));
   }
   function layoutSave(){ try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutPrefs)); }catch(e){} }
   (function(){
@@ -10307,7 +10433,7 @@
     function paintAll(){ paintVals(); selects.titleLines.value = String(layoutPrefs.titleLines); selects.subLines.value = String(layoutPrefs.subLines); }
     paintAll();
   })();
-  layoutApply();
+  shapeApply();
   window.addEventListener('resize', function(){ layoutApply(); });
   var AMOLED_KEY = 'radioPlayerAmoled';
   var amoledSel = document.getElementById('amoledSelect');
@@ -10868,7 +10994,7 @@
   var settingsCat = '';
   function setPageEl(cat){ return settingsPanelEl.querySelector('.set-page[data-set-page="' + cat + '"]'); }
   function setPageHasRows(page){
-    return Array.prototype.some.call(page.querySelectorAll('.settings-row'), function(r){ return r.style.display !== 'none'; });
+    return Array.prototype.some.call(page.querySelectorAll('.settings-row, .set-cat'), function(r){ return r.style.display !== 'none'; });
   }
   function syncSettingsCats(){
     Array.prototype.forEach.call(setHomeEl.querySelectorAll('.set-cat'), function(btn){
@@ -10906,7 +11032,7 @@
     var size = parseFloat(getComputedStyle(h).fontSize) || 22;
     while(h.scrollWidth > h.clientWidth + 1 && size > 16){ size -= 1; h.style.fontSize = size + 'px'; }
   }
-  Array.prototype.forEach.call(setHomeEl.querySelectorAll('.set-cat'), function(btn){
+  Array.prototype.forEach.call(settingsPanelEl.querySelectorAll('#setHome .set-cat, .set-subcats .set-cat'), function(btn){
     btn.addEventListener('click', function(){ showSettingsCat(btn.getAttribute('data-set-cat')); });
   });
   function openSettings(cat){

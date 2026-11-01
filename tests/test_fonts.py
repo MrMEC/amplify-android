@@ -37,7 +37,7 @@ async def run(B, theme, w, h, mobile):
     base_w = await cs(pg, '.grid-section-label', 'fontWeight')
     check('Poppins' in await cs(pg, 'body', 'fontFamily'), f'{T} default app font is Poppins')
     check(await pg.evaluate("document.getElementById('ampFontStyle').textContent") == '', f'{T} defaults add no style rules')
-    await pg.evaluate("__t.set('appearance')"); await pg.wait_for_timeout(400)
+    await pg.evaluate("__t.set('appearance-type')"); await pg.wait_for_timeout(400)
     sub = await pg.evaluate("document.querySelector('.set-cat[data-set-cat=appearance] .set-cat-sub').textContent")
     check('font' in sub.lower(), f'{T} category line mentions fonts {sub!r}')
     opts = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#fontBodySelect option'), o => o.textContent)")
@@ -87,7 +87,7 @@ async def run(B, theme, w, h, mobile):
     small2 = float((await cs(pg, '.grid-section-label', 'fontSize'))[:-2])
     check(abs(small2 - base_gsl * 0.8) < 0.6, f'{T} after a restart the size is kept')
     # reset
-    await pg.evaluate("__t.set('appearance')"); await pg.wait_for_timeout(300)
+    await pg.evaluate("__t.set('appearance-type')"); await pg.wait_for_timeout(300)
     await pg.click('#fontResetBtn'); await pg.wait_for_timeout(300)
     check(abs(float((await cs(pg, '.grid-section-label', 'fontSize'))[:-2]) - base_gsl) < 0.1 and await cs(pg, '.grid-section-label', 'fontWeight') == base_w, f'{T} Reset puts size and weight back')
     # a bad file
@@ -114,7 +114,7 @@ async def run(B, theme, w, h, mobile):
     await pg.evaluate("""__t.ev("idbDo([LIB_STORE_META], 'readwrite', function(tx){ return tx.objectStore(LIB_STORE_META)['delete']('userFont:' + fontPrefs.custom[0].id); })")"""); await pg.wait_for_timeout(500)
     await pg.reload(); await pg.wait_for_timeout(2200); await pg.evaluate(PROBE)
     check('AmpFont_' not in await cs(pg, 'body', 'fontFamily') and 'Poppins' in await cs(pg, 'body', 'fontFamily'), f'{T} missing file: Poppins is used')
-    await pg.evaluate("__t.set('appearance')"); await pg.wait_for_timeout(300)
+    await pg.evaluate("__t.set('appearance-type')"); await pg.wait_for_timeout(300)
     st = await pg.evaluate("document.querySelector('.font-custom-state') && document.querySelector('.font-custom-state').textContent")
     check(st == 'File missing' and await pg.is_visible('#fontNote'), f'{T} and the list says File missing ({st})')
     await pg.screenshot(path=f'{SHOTS}/fonts_missing_{theme}_{w}.png')
