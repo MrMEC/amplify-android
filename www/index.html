@@ -6998,6 +6998,81 @@
   .shape-preview .sp-btn{ flex:0 1 auto; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-sizing:border-box; }
   /* Build 402: a choice never cuts off its own text (big text sizes): the box grows to fit it. */
   #settingsPanel .set-page .settings-row > .settings-select{ flex:0 0 auto; width:auto; min-width:150px; max-width:100%; }
+  /* ---------- Build 403 (Mark): Genres browse grid and the genre page ---------- */
+  .gb-search{ grid-column:1/-1; display:flex; align-items:center; gap:10px; height:46px; padding:0 14px; margin:0 0 22px;
+    border-radius:var(--r-btn, 10px); background:#f2f3f5; color:#2a2c31; box-sizing:border-box; cursor:text; }
+  html[data-theme="light"] .gb-search{ background:var(--panel-2); color:var(--text-dim); border:1px solid var(--border); }
+  .gb-search svg{ width:20px; height:20px; flex:0 0 20px; }
+  .gb-search input{ flex:1; min-width:0; border:0; outline:none; background:none; font:inherit; font-size:15px; font-weight:500; color:#111214; }
+  html[data-theme="light"] .gb-search input{ color:var(--text); }
+  .gb-search input::placeholder{ color:#5c6068; }
+  .gb-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .gb-head{ grid-column:1/-1; margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); line-height:1.25; }
+  .gb-head[hidden], .gb-top[hidden], .gb-card[hidden], .gb-none[hidden]{ display:none !important; }
+  .gb-top{ grid-column:1/-1; display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; margin:0 calc(-1 * var(--main-pad)) 26px; padding:0 var(--main-pad);
+    scroll-snap-type:x proximity; scroll-padding-left:var(--main-pad); scrollbar-width:none; overscroll-behavior-x:contain; }
+  .gb-top::-webkit-scrollbar{ display:none; }
+  .gb-topcard{ position:relative; flex:0 0 min(236px, 64vw); height:132px; border-radius:var(--r-tile, 8.5px); background:var(--gc); color:#fff;
+    overflow:hidden; cursor:pointer; scroll-snap-align:start; -webkit-tap-highlight-color:transparent; }
+  .gb-topcard:active, .gb-card:active{ transform:scale(.98); }
+  .gb-topcard-text{ position:absolute; left:16px; top:14px; right:84px; display:flex; flex-direction:column; gap:6px; }
+  .gb-topcard-name{ font-size:22px; font-weight:800; line-height:1.1; overflow-wrap:anywhere; }
+  .gb-topcard-blurb{ font-size:12.5px; font-weight:500; line-height:1.35; color:rgba(255,255,255,.88); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+  .gb-topcard-icon{ position:absolute; right:-12px; bottom:-14px; width:96px; height:96px; transform:rotate(22deg); color:rgba(255,255,255,.9); pointer-events:none; }
+  .gb-topcard-play{ position:absolute; left:14px; bottom:12px; width:44px; height:44px; border:0; padding:0; border-radius:var(--r-play, 999px);
+    background:rgba(0,0,0,.28); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .gb-topcard-play svg{ width:17px; height:17px; margin-left:2px; }
+  .gb-grid{ grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:12px; }
+  @media (max-width: 900px){ .gb-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  .gb-card{ position:relative; height:96px; border:0; padding:0; margin:0; border-radius:var(--r-tile, 8.5px); background:var(--gc); color:#fff; overflow:hidden;
+    text-align:left; font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .gb-card-name{ position:absolute; left:14px; top:12px; right:46px; font-size:17px; font-weight:700; line-height:1.15; overflow-wrap:anywhere; }
+  .gb-card-icon{ position:absolute; right:-8px; bottom:-8px; width:64px; height:64px; transform:rotate(22deg); color:rgba(255,255,255,.92); pointer-events:none; }
+  .gb-none{ grid-column:1/-1; margin:4px 0 0; font-size:14px; color:var(--text-dim); }
+  body.genre-open #stationsGrid, body.genres-open #stationsGrid{ row-gap:0; }
+  .gp-grid{ grid-column:1/-1; margin:0 0 24px; }
+
+  /* The genre page: a header in the genre's colour (the text always sits on the colour), fading into the page. */
+  body.genre-open #stationsHeading{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  @media (max-width: 900px){
+    body.genre-open #sectionHeadingRow{ position:absolute; top:12px; left:var(--main-pad); z-index:5; margin:0; width:auto; }
+    body.genre-open #detailBackBtn{ color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.45)); margin-bottom:0; }
+  }
+  @media (min-width: 901px){
+    body.genre-open .gp-hero{ padding-top:36px; margin-left:0; margin-right:0; border-radius:var(--r-card, 14px) var(--r-card, 14px) 0 0; }
+    body.genre-open .gp-acts{ margin-left:0; margin-right:0; padding-left:var(--main-pad); }
+    body.genre-open .gp-hero{ padding-left:var(--main-pad); }
+  }
+  .gp-hero{ grid-column:1/-1; position:relative; overflow:hidden; margin:calc(-1 * var(--gp-top, 0px)) calc(-1 * var(--main-pad)) 0;
+    padding:76px var(--main-pad) 26px; background:var(--gc); color:#fff; }
+  .gp-hero::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:0; }
+  .gp-hero-icon{ position:absolute; right:-50px; top:-6px; width:250px; height:250px; transform:rotate(18deg); color:rgba(255,255,255,.16); pointer-events:none; }
+  .gp-hero-text{ position:relative; }
+  .gp-eyebrow{ font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.86); }
+  .gp-title{ margin:4px 0 0; font-size:44px; font-weight:800; line-height:1.02; letter-spacing:-.02em; overflow-wrap:anywhere; }
+  .gp-blurb{ margin-top:8px; font-size:14px; font-weight:500; line-height:1.4; color:rgba(255,255,255,.9); }
+  .gp-acts{ grid-column:1/-1; position:relative; display:flex; align-items:center; gap:14px; margin:0 calc(-1 * var(--main-pad)) 18px;
+    padding:18px var(--main-pad) 0; background:linear-gradient(to bottom, color-mix(in srgb, var(--gc) 55%, transparent), transparent 84px); }
+  .gp-play{ width:58px; height:58px; flex:0 0 58px; border:0; padding:0; border-radius:var(--r-play, 999px); background:var(--accent); color:var(--accent-text, #0b0c0e);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.35); }
+  .gp-play svg{ width:22px; height:22px; margin-left:2px; }
+  .gp-round{ width:48px; height:48px; flex:0 0 48px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--text); padding:0;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .gp-round svg{ width:20px; height:20px; }
+  .gp-play:disabled, .gp-round:disabled{ opacity:.45; cursor:default; }
+  .gp-meta{ flex:1; min-width:0; font-size:13px; color:var(--text-dim); line-height:1.35; }
+  .gp-chips{ grid-column:1/-1; display:flex; gap:8px; overflow-x:auto; margin:0 calc(-1 * var(--main-pad)) 22px; padding:0 var(--main-pad); scrollbar-width:none; }
+  .gp-chips::-webkit-scrollbar{ display:none; }
+  .gp-chip{ flex:0 0 auto; height:36px; padding:0 15px; border-radius:var(--r-pill, 999px); border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+    font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  .tile-grid > .gp-head.grid-section-label, .tile-grid > .gp-head{ margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); letter-spacing:0; }
+  .gp-row{ grid-column:1/-1; display:flex; gap:14px; overflow-x:auto; overflow-y:hidden; margin:0 calc(-1 * var(--main-pad)) 28px; padding:0 var(--main-pad) 4px;
+    scroll-snap-type:x proximity; scroll-padding-left:var(--main-pad); scrollbar-width:none; }
+  .gp-row::-webkit-scrollbar{ display:none; }
+  .gp-row > .tile{ flex:0 0 var(--w-cover); width:var(--w-cover); min-width:0; scroll-snap-align:start; }
+  .gp-songs{ grid-column:1/-1; display:flex; flex-direction:column; margin:0 0 8px; }
+  .gp-more{ grid-column:1/-1; justify-self:start; margin:0 0 28px; height:38px; padding:0 16px; border-radius:var(--r-pill, 999px); border:1px solid var(--border);
+    background:none; color:var(--text); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -9754,6 +9829,7 @@
   // Emptying the grid has to drop the layout modifier too, or a song list's tight row
   // spacing survives into whatever view is drawn next.
   function resetStationsGrid(){
+    document.body.classList.remove('genre-open', 'genres-open');   // build 403
     var allArtists = document.getElementById('allArtistsLink');
     if(allArtists) allArtists.style.display = 'none';
     sectionHeadingRow.classList.remove('has-side-link');
@@ -29483,8 +29559,8 @@
     renderPlaylistsGrid();
   }
 
-  // Same split as renderStationsGrid(), for Genres.
-  function renderGenresGrid(){
+  // Same split as renderStationsGrid(), for Genres. Build 403: rearranging keeps this list.
+  function renderGenresRows(){
     resetStationsGrid();
     genreOrder.forEach(function(g){
       stationsGrid.appendChild(buildEntityTile({
@@ -29499,6 +29575,134 @@
         onReorder: function(){ reorderGenresFromGrid(); renderGenreNav(); },
         onClick: function(){ pushView(); searchInput.value = ''; searchByTag(g); }
       }));
+    });
+  }
+
+  // ---------- Build 403 (Mark): Genres as a browse grid, and a genre page with a header ----------
+  // Every genre is a card in its own colour with its icon tilted into the corner; the ones
+  // this listener plays most (songs in the library with that genre, recent and favourite
+  // stations tagged with it) lead in a row of bigger cards with a play button. A genre opens a
+  // page with a header in the same colour, Play and Shuffle, related styles, its top stations,
+  // the library's songs of that genre, and the rest of its stations.
+  var GENRE_LOOK = {
+    'jazz': ['#8f5420', 'Smooth, bebop and fusion', ['Smooth Jazz', 'Bebop', 'Swing', 'Jazz Fusion', 'Vocal Jazz']],
+    '80s': ['#a3245f', 'Synth-pop, new wave and big hits', ['New Wave', 'Synthpop', '80s Pop', '80s Rock']],
+    'ambient': ['#1f6a73', 'Drones, space and soundscapes', ['Chillout', 'Downtempo', 'Drone', 'Space']],
+    'chill': ['#3d4fb0', 'Lo-fi, downtempo and late-night', ['Lounge', 'Lofi', 'Chillout', 'Downtempo']],
+    'classical': ['#6b4c94', 'Orchestral, piano and choral', ['Baroque', 'Opera', 'Piano', 'Orchestral']],
+    'electronic': ['#146b52', 'House, techno and trance', ['House', 'Techno', 'Trance', 'Drum and Bass']],
+    'pop': ['#b8302b', 'Today\u2019s hits and throwbacks', ['Top 40', 'Dance Pop', 'Indie Pop', '90s']],
+    'news': ['#3f4756', 'Live headlines around the clock', ['World News', 'Business News', 'Public Radio']],
+    'rock': ['#8a2626', 'Classic, alternative and indie', ['Classic Rock', 'Alternative', 'Indie Rock', 'Hard Rock']],
+    'talk': ['#255f9e', 'Conversation, comedy and sport', ['Comedy', 'Sports Talk', 'Public Radio']],
+    'reggae': ['#256341', 'Roots, dub and dancehall', ['Roots Reggae', 'Dub', 'Dancehall', 'Ska']],
+    'hip hop': ['#8a5814', 'Rap, R&B and old school', ['Rap', 'R&B', 'Trap', 'Old School']],
+    'country': ['#7d4214', 'Classic, Americana and bluegrass', ['Classic Country', 'Americana', 'Bluegrass', 'Folk']],
+    'metal': ['#33343c', 'Heavy, thrash and metalcore', ['Heavy Metal', 'Thrash Metal', 'Metalcore', 'Hard Rock']],
+    'blues': ['#284b7d', 'Delta, electric and soul', ['Blues Rock', 'Delta Blues', 'Soul', 'Rhythm and Blues']]
+  };
+  var GENRE_PALETTE = ['#8f5420', '#a3245f', '#1f6a73', '#3d4fb0', '#6b4c94', '#146b52', '#b8302b', '#255f9e'];
+  function genreLook(g){
+    var k = String(g || '').trim().toLowerCase(), l = GENRE_LOOK[k];
+    if(l) return { color: l[0], blurb: l[1], subs: l[2] };
+    var h = 0; for(var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+    return { color: GENRE_PALETTE[h % GENRE_PALETTE.length], blurb: 'Stations and songs', subs: [] };
+  }
+  function genreIconSvg(g, cls){
+    var body = GENRE_ICONS[String(g || '').trim().toLowerCase()] || '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
+    return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>';
+  }
+  // How much of each genre this listener plays: library songs with it, and recent and favourite
+  // stations tagged with it (a station counts more: it is a choice made again and again).
+  function topGenres(){
+    var seen = recentStations.concat(favorites);
+    var scored = genreOrder.map(function(g, i){
+      var w = g.toLowerCase(), n = localTracksWithTag(g).length;
+      seen.forEach(function(st){ if(st && !isLocalTrack(st) && String(st.tags || '').toLowerCase().indexOf(w) !== -1) n += 5; });
+      return { g: g, n: n, i: i };
+    }).filter(function(x){ return x.n > 0; });
+    scored.sort(function(a, b){ return b.n - a.n || a.i - b.i; });
+    return scored.slice(0, 4).map(function(x){ return x.g; });
+  }
+  var genreStationCache = {};
+  function genreStations(tag){
+    if(genreStationCache[tag]) return Promise.resolve(genreStationCache[tag]);
+    return apiFetch('/json/stations/search?tag=' + encodeURIComponent(tag.toLowerCase()) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
+      .then(function(data){
+        var list = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        if(list.length) genreStationCache[tag] = list;
+        return list;
+      });
+  }
+  function playGenre(tag, shuffle){
+    return genreStations(tag).then(function(list){
+      if(!list.length){ setStatus('No stations found for ' + tag + ' right now.', true); return; }
+      var q = list.slice();
+      if(shuffle){ for(var i = q.length - 1; i > 0; i--){ var j = Math.floor(Math.random() * (i + 1)), t = q[i]; q[i] = q[j]; q[j] = t; } }
+      setQueue(q, q[0], tag); playStation(q[0]);
+    })['catch'](function(err){ setStatus((err && err.message) || 'Stations could not be reached.', true); });
+  }
+  function openGenre(g){ pushView(); searchInput.value = ''; searchByTag(g); }
+  function renderGenresGrid(){
+    if(genresEditing){ renderGenresRows(); return; }
+    resetStationsGrid();
+    document.body.classList.add('genres-open');
+    // A field to narrow the cards; Enter on a style that isn't a card looks it up.
+    var search = document.createElement('label');
+    search.className = 'gb-search';
+    search.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'
+      + '<span class="gb-sr">Find a genre</span><input type="search" id="genreFindInput" placeholder="What do you want to hear?" autocomplete="off" enterkeyhint="search">';
+    stationsGrid.appendChild(search);
+    var input = search.querySelector('input');
+    var top = topGenres(), topHead = null, topRow = null;
+    if(top.length >= 2){
+      topHead = document.createElement('h2'); topHead.className = 'gb-head'; topHead.textContent = 'Your top genres';
+      topRow = document.createElement('div'); topRow.className = 'gb-top';
+      top.forEach(function(g){
+        var look = genreLook(g), card = document.createElement('div');
+        card.className = 'gb-topcard'; card.style.setProperty('--gc', look.color);
+        card.setAttribute('role', 'button'); card.tabIndex = 0; card.setAttribute('aria-label', g);
+        card.innerHTML = '<span class="gb-topcard-text"><span class="gb-topcard-name"></span><span class="gb-topcard-blurb"></span></span>'
+          + genreIconSvg(g, 'gb-topcard-icon')
+          + '<button type="button" class="gb-topcard-play" aria-label="Play ' + escapeHtml(g) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>';
+        card.querySelector('.gb-topcard-name').textContent = g;
+        card.querySelector('.gb-topcard-blurb').textContent = look.blurb;
+        card.addEventListener('click', function(){ openGenre(g); });
+        card.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openGenre(g); } });
+        card.querySelector('.gb-topcard-play').addEventListener('click', function(e){ e.stopPropagation(); playGenre(g, false); });
+        topRow.appendChild(card);
+      });
+      stationsGrid.appendChild(topHead); stationsGrid.appendChild(topRow);
+    }
+    var allHead = document.createElement('h2'); allHead.className = 'gb-head'; allHead.textContent = 'Browse all';
+    var grid = document.createElement('div'); grid.className = 'gb-grid';
+    var cards = genreOrder.map(function(g){
+      var look = genreLook(g), card = document.createElement('button');
+      card.type = 'button'; card.className = 'gb-card'; card.style.setProperty('--gc', look.color); card.dataset.genre = g;
+      card.innerHTML = '<span class="gb-card-name"></span>' + genreIconSvg(g, 'gb-card-icon');
+      card.querySelector('.gb-card-name').textContent = g;
+      card.addEventListener('click', function(){ openGenre(g); });
+      grid.appendChild(card);
+      return card;
+    });
+    var none = document.createElement('div'); none.className = 'gb-none'; none.hidden = true;
+    stationsGrid.appendChild(allHead); stationsGrid.appendChild(grid); stationsGrid.appendChild(none);
+    function apply(){
+      var q = input.value.trim().toLowerCase(), shown = 0;
+      cards.forEach(function(c){ var on = !q || c.dataset.genre.toLowerCase().indexOf(q) !== -1; c.hidden = !on; if(on) shown++; });
+      if(topHead){ topHead.hidden = !!q; topRow.hidden = !!q; }
+      allHead.textContent = q ? 'Genres' : 'Browse all';
+      none.hidden = !(q && !shown);
+      if(q && !shown) none.textContent = 'No genre called \u201c' + input.value.trim() + '\u201d. Press Enter to find stations for it.';
+    }
+    input.addEventListener('input', apply);
+    input.addEventListener('keydown', function(e){
+      if(e.key !== 'Enter') return;
+      var q = input.value.trim();
+      if(!q) return;
+      var exact = genreOrder.filter(function(g){ return g.toLowerCase() === q.toLowerCase(); })[0];
+      var only = cards.filter(function(c){ return !c.hidden; });
+      openGenre(exact || (only.length === 1 ? only[0].dataset.genre : q));
     });
   }
 
@@ -44580,6 +44784,7 @@
       .then(function(data){
         if(genrePage !== g || activeGenre !== tag) return;
         g.stations = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        if(g.stations.length) genreStationCache[tag] = g.stations;
         g.pending = false;
         renderGenrePage();
       })
@@ -44599,63 +44804,110 @@
     var g = genrePage;
     if(!g) return;
     resetStationsGrid();
+    document.body.classList.add('genre-open');   // build 403: the header takes the top of the page
+    var look = genreLook(g.tag);
     var songs = g.songs.filter(function(t){ return !isBlacklisted(t); }).sort(byNameAsc);
-    var have = { songs: songs.length > 0, stations: g.stations.length > 0 };
-    var both = have.songs && have.stations;
-    if(!g.tab || !have[g.tab]) g.tab = have.songs ? 'songs' : 'stations';
-    if(both){
-      var tabs = document.createElement('div');
-      tabs.className = 'home-tabs video-tabs genre-tabs';
-      tabs.setAttribute('role', 'tablist');
-      GENRE_TABS.forEach(function(t){
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'home-tab genre-tab' + (g.tab === t[0] ? ' active' : '');
-        b.setAttribute('role', 'tab');
-        b.setAttribute('aria-selected', g.tab === t[0] ? 'true' : 'false');
-        b.dataset.gtab = t[0];
-        b.textContent = t[1];
-        b.addEventListener('click', function(){
-          if(g.tab === t[0]) return;
-          g.tab = t[0];
-          renderGenrePage();
-          window.scrollTo(0, 0);
-        });
-        tabs.appendChild(b);
-      });
-      stationsGrid.appendChild(tabs);
-    }
-    if(g.tab === 'songs' && have.songs){
-      stationsGrid.classList.add('grid-songs');
-      if(songs.length > 1) stationsGrid.appendChild(buildShuffleAllRow(songs, g.tag));
-      songs.forEach(function(t){ stationsGrid.appendChild(buildSongRow(t, { queueList: songs, queueLabel: g.tag })); });
-      setResultCount(songs.length, 'song');
-      // While the stations are still on their way, say so under the songs.
-      if(g.pending){
-        var spin = document.createElement('div');
-        spin.className = 'loading-state genre-loading';
-        spin.innerHTML = '<div class="spinner"></div>';
-        stationsGrid.appendChild(spin);
+    var hero = document.createElement('div');
+    hero.className = 'gp-hero';
+    hero.style.setProperty('--gc', look.color);
+    hero.innerHTML = genreIconSvg(g.tag, 'gp-hero-icon')
+      + '<div class="gp-hero-text"><div class="gp-eyebrow">Genre</div><h1 class="gp-title"></h1><div class="gp-blurb"></div></div>';
+    hero.querySelector('.gp-title').textContent = g.tag;
+    hero.querySelector('.gp-blurb').textContent = look.blurb;
+    stationsGrid.appendChild(hero);
+    // On a phone the header runs up to the top of the screen, under Back and the profile button.
+    var heroTop = hero.getBoundingClientRect().top + window.scrollY;
+    if(heroTop > 0 && heroTop < 48 && window.innerWidth <= 900) hero.style.marginTop = (-heroTop) + 'px';
+    var acts = document.createElement('div');
+    acts.className = 'gp-acts';
+    acts.style.setProperty('--gc', look.color);
+    var play = document.createElement('button');
+    play.type = 'button'; play.className = 'gp-play'; play.setAttribute('aria-label', 'Play ' + g.tag);
+    play.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+    var shuf = document.createElement('button');
+    shuf.type = 'button'; shuf.className = 'gp-round'; shuf.setAttribute('aria-label', 'Shuffle ' + g.tag);
+    shuf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/><path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>';
+    function start(shuffle){
+      if(g.stations.length){
+        var q = g.stations.slice();
+        if(shuffle){ for(var i = q.length - 1; i > 0; i--){ var j = Math.floor(Math.random() * (i + 1)), t = q[i]; q[i] = q[j]; q[j] = t; } }
+        setQueue(q, q[0], g.tag); playStation(q[0]);
+      } else if(songs.length){
+        var s2 = songs.slice();
+        if(shuffle){ for(var k = s2.length - 1; k > 0; k--){ var m = Math.floor(Math.random() * (k + 1)), u = s2[k]; s2[k] = s2[m]; s2[m] = u; } }
+        playTrackInList(s2, s2[0], g.tag);
       }
-      return;
     }
-    if(have.stations){
-      g.stations.forEach(function(st){
-        var tile = buildTile(st);
-        markStationVideo(tile, st);
-        stationsGrid.appendChild(tile);
+    var can = g.stations.length || songs.length;
+    play.disabled = !can; shuf.disabled = !can;
+    play.addEventListener('click', function(){ start(false); });
+    shuf.addEventListener('click', function(){ start(true); });
+    acts.appendChild(play); acts.appendChild(shuf);
+    var meta = document.createElement('span');
+    meta.className = 'gp-meta';
+    var bits = [];
+    if(g.stations.length) bits.push(g.stations.length + (g.stations.length === 1 ? ' station' : ' stations'));
+    if(songs.length) bits.push(songs.length + (songs.length === 1 ? ' song' : ' songs') + ' in your library');
+    meta.textContent = bits.join(' \u00b7 ');
+    acts.appendChild(meta);
+    stationsGrid.appendChild(acts);
+    if(look.subs.length){
+      var chips = document.createElement('div');
+      chips.className = 'gp-chips';
+      look.subs.forEach(function(sub){
+        var c = document.createElement('button');
+        c.type = 'button'; c.className = 'gp-chip'; c.textContent = sub;
+        c.addEventListener('click', function(){ openGenre(sub); });
+        chips.appendChild(c);
       });
-      setResultCount(g.stations.length, 'station');
-      return;
+      stationsGrid.appendChild(chips);
+    }
+    function head(text){ var h = document.createElement('h2'); h.className = 'gp-head grid-section-label'; h.textContent = text; stationsGrid.appendChild(h); }
+    var TOP = 10;
+    if(g.stations.length){
+      head('Top stations');
+      var row = document.createElement('div');
+      row.className = 'gp-row';
+      g.stations.slice(0, TOP).forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); row.appendChild(t); });
+      row._ctxList = g.stations.slice(0, TOP);
+      stationsGrid.appendChild(row);
+    }
+    if(songs.length){
+      head('In your library');
+      var list = document.createElement('div');
+      list.className = 'gp-songs grid-songs';
+      if(songs.length > 1) list.appendChild(buildShuffleAllRow(songs, g.tag));
+      (g.allSongs ? songs : songs.slice(0, 5)).forEach(function(t){ list.appendChild(buildSongRow(t, { queueList: songs, queueLabel: g.tag })); });
+      stationsGrid.appendChild(list);
+      if(songs.length > 5){
+        var more = document.createElement('button');
+        more.type = 'button'; more.className = 'gp-more';
+        more.textContent = g.allSongs ? 'Show fewer' : 'See all ' + songs.length + ' songs';
+        more.addEventListener('click', function(){ g.allSongs = !g.allSongs; var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); });
+        stationsGrid.appendChild(more);
+      }
+    }
+    if(g.stations.length > TOP){
+      head('More ' + g.tag + ' stations');
+      var moreGrid = document.createElement('div');
+      moreGrid.className = 'tile-grid gp-grid';
+      g.stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); moreGrid.appendChild(tile); });
+      stationsGrid.appendChild(moreGrid);
     }
     if(g.pending){
-      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-      setResultCount(null);
-      return;
+      var spin = document.createElement('div');
+      spin.className = 'loading-state genre-loading';
+      spin.innerHTML = '<div class="spinner"></div>';
+      stationsGrid.appendChild(spin);
+    } else if(!g.stations.length && !songs.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No songs or stations found for ' + g.tag + '.';
+      stationsGrid.appendChild(empty);
     }
-    stationsGrid.innerHTML = '<div class="empty-state">No songs or stations found for ' + escapeHtml(g.tag) + '.</div>';
-    setResultCount(0, 'station');
+    setResultCount(null);
   }
+
 
   function isUrlLike(v){ return /^https?:\/\//i.test(v.trim()); }
 
