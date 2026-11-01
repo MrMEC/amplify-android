@@ -18,7 +18,7 @@ async def main():
             await pg.evaluate("(d)=>{ __t.ev('importBackupData')(d, 'merge'); }", BACKUP); await pg.wait_for_timeout(2000)
             await pg.evaluate("document.querySelectorAll('button').forEach(x=>{ if(x.textContent.trim()==='OK' && x.offsetParent) x.click(); })"); await pg.wait_for_timeout(400)
             await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(700)
-            probe = """(()=>{ var t=document.querySelector('#favoritesGrid .tile-art'), a=document.querySelector('.tile[data-entity=artist]:not(.fav-card) .tile-art');
+            probe = """(()=>{ var t=document.querySelector('#latestPodcastsGrid .tile-art, #recentGrid .tile-art'), a=document.querySelector('.tile[data-entity=artist]:not(.fav-card) .tile-art');
               return { tile: t&&getComputedStyle(t).borderTopLeftRadius, tw: t&&Math.round(t.getBoundingClientRect().width), artist: a?getComputedStyle(a).borderTopLeftRadius:'none' }; })()"""
             d0 = await pg.evaluate(probe)
             check(d0['tile'] == '8.5px' and d0['artist'] in ('50%', 'none'), f'defaults unchanged {d0}')

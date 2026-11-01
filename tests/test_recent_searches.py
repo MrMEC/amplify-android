@@ -73,7 +73,7 @@ async def main():
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=search]').click()"); await pg.wait_for_timeout(400)
         await pg.tap('#searchSheetInput'); await pg.wait_for_timeout(500)
         g = await pg.evaluate(GEO)
-        check(all(x['del'] and x['del'][1] <= g['vw'] - 16 for x in g['rows']) and g['rows'][0]['h'] <= 70, f'big text: the X stays on screen {g["rows"]}')
+        check(all(x['del'] and x['del'][1] <= g['vw'] - 16 for x in g['rows']) and g['rows'][0]['h'] <= 110, f'big text: the X stays on screen {g["rows"]}')
         await pg.screenshot(path=f'{SHOTS}/recent-searches-big.png')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()

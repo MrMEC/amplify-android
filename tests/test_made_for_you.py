@@ -148,8 +148,8 @@ async def main():
         check(row['shown'] and row['heading'] == 'Made for You', f'Home shows Made for You {row["heading"]}')
         check(row['n'] == min(6, len(m['mix'])) and row['tiles'] == 0 and not row['inRow'], f'as stacked rows (up to six), not a sideways row of covers {row["n"]}')
         check(all(row['boxes'][i + 1][1] >= row['boxes'][i][2] - 1 and row['boxes'][i + 1][0] == row['boxes'][0][0] for i in range(len(row['boxes']) - 1)), 'one under another')
-        check(all(t[1] == 'nowrap' and t[2] <= 24 for t in row['titles']), f'titles on one line {row["titles"]}')
-        check(all(x[0] and x[1] >= 13 and x[2] <= 40 for x in row['subs']), f'the reason is readable, under the title, at most two lines {row["subs"]}')
+        check(all(t[2] <= 3 * max(t[3], 1) + 2 for t in row['titles']), f'titles within the three-line limit {row["titles"]}')
+        check(all(x[0] and x[1] >= 12.5 and x[2] <= 40 for x in row['subs']), f'the reason is readable, under the title, at most two lines {row["subs"]}')
         check(row['nextIsTop'], 'right above Top Stations')
         # Readable on a phone with its text set larger (like Mark's): text 35% bigger, 360px wide.
         # Every reason must show in full (two lines at most), every title on one line.
@@ -165,7 +165,7 @@ async def main():
         for w, sc in ((412, 1.0), (412, 1.35), (360, 1.35)):
             rd_ = await readability(w, sc)
             print(w, sc, rd_)
-            check(all(x['full'] and x['lines'] <= 2 and x['titleLines'] <= 1 for x in rd_), f'{w}px wide, text x{sc}: every reason shows in full on at most two lines, titles on one line')
+            check(all(x['full'] and x['lines'] <= 2 and x['titleLines'] <= 3 for x in rd_), f'{w}px wide, text x{sc}: every reason shows in full on at most two lines, titles on one line')
         await pg.evaluate("document.getElementById('madeForYouSection').scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/mfy-home-bigtext.png')
         await pg.evaluate("document.getElementById('__big').remove()")

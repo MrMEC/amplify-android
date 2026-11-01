@@ -6953,7 +6953,7 @@
   .fav-order-btn, .mv-seg-btn, .chart-v-actions button{ border-radius:var(--r-pill) !important; }
   .st-card, .guide-card, .ch-custom-card, .ch-start-card{ border-radius:var(--r-card) !important; }
   .tile[data-entity="artist"]:not(.fav-card) .tile-art, .fav-artists-list .row-thumb.fav-artist-thumb, .song-row .song-row-art.round{ border-radius:var(--r-artist) !important; }
-  .song-row{ padding-top:calc(8px * var(--dens-sp)) !important; padding-bottom:calc(8px * var(--dens-sp)) !important; }
+  .song-row:not(.recent-search-row){ padding-top:calc(8px * var(--dens-sp)) !important; padding-bottom:calc(8px * var(--dens-sp)) !important; }
   .row-item{ padding-top:calc(6px * var(--dens-sp)) !important; padding-bottom:calc(6px * var(--dens-sp)) !important; }
   .fav-artists-list .row-item{ padding-top:calc(7px * var(--dens-sp)) !important; padding-bottom:calc(7px * var(--dens-sp)) !important; }
   .tile-grid{ row-gap:calc(24px * var(--dens-sp)); }
@@ -10435,6 +10435,31 @@
   })();
   shapeApply();
   window.addEventListener('resize', function(){ layoutApply(); });
+  // Build 396 (Mark): sections on Home sat different distances apart, because a row is as tall as its
+  // tallest title and detail line (up to three lines and two), so one long name left a big gap under
+  // its row and a row of short names left a small one. Every cover on Home now reserves the same text
+  // height, the tallest of any on the page, so each row ends the same distance above the next heading.
+  var homeEqTimer = 0;
+  function homeTextEqualize(){
+    homeEqTimer = 0;
+    var tiles = Array.prototype.slice.call(document.querySelectorAll('body.home-stacked .home-section .home-row > .tile-grid > .tile:not(.tile-row):not(.song-row):not(.fav-card):not(.tile[data-entity="artist"]), body.home-stacked .recent-col > .tile-grid > .tile:not(.tile-row):not(.song-row)'))
+      .filter(function(t){ return t.offsetParent; });
+    tiles.forEach(function(t){ t.style.minHeight = ''; });
+    var arts = tiles.map(function(t){ var a = t.querySelector('.tile-art, .vw-poster, .yt-thumb'); return a ? a.getBoundingClientRect().height : 0; });
+    var max = 0;
+    tiles.forEach(function(t, i){ if(arts[i]) max = Math.max(max, Math.ceil(t.getBoundingClientRect().height - arts[i])); });
+    if(!max) return;
+    tiles.forEach(function(t, i){ if(arts[i]) t.style.minHeight = Math.ceil(arts[i] + max) + 'px'; });
+  }
+  function homeTextEqualizeSoon(){ if(!homeEqTimer) homeEqTimer = setTimeout(homeTextEqualize, 120); }
+  (function(){
+    var bv = document.getElementById('browseView');
+    if(bv && window.MutationObserver) new MutationObserver(homeTextEqualizeSoon).observe(bv, { childList: true, subtree: true });
+    window.addEventListener('resize', homeTextEqualizeSoon);
+    document.addEventListener('change', homeTextEqualizeSoon, true);
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(homeTextEqualizeSoon);
+    homeTextEqualizeSoon();
+  })();
   var AMOLED_KEY = 'radioPlayerAmoled';
   var amoledSel = document.getElementById('amoledSelect');
   function amoledApply(){
