@@ -62,7 +62,9 @@ async def run(B, theme, seed):
     await pg.tap('#hamburgerBtn'); await pg.wait_for_timeout(400)
     stats = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.pf-stat'), function(s){ return s.textContent; })")
     month_secs = sum(v['t'] for k, v in days.items() if k >= today.replace(day=1).isoformat())
-    check(stats[1].endswith('This month') and stats[1].startswith(str(int(month_secs // 3600)) + 'h'), f'{T} the profile shows time listened this month {stats} ({month_secs}s)')
+    check(stats[1] == str(round(month_secs / 3600)) + 'hThis month', f'{T} the profile shows this month as one short figure {stats} ({month_secs}s)')
+    lines = await pg.evaluate("(()=>{ var v = document.querySelectorAll('.pf-stat-v')[1]; return Math.round(v.getBoundingClientRect().height / parseFloat(getComputedStyle(v).lineHeight)); })()")
+    check(lines == 1, f'{T} on one line ({lines})')
     await pg.screenshot(path=f'{SHOTS}/stats-{theme}-profile.png')
     await pg.tap('#pfStatsLink'); await pg.wait_for_timeout(400)
     check(await pg.evaluate("document.getElementById('statsOverlay').classList.contains('open')"), f'{T} the link opens Listening Stats')
@@ -74,7 +76,9 @@ async def run(B, theme, seed):
     d = dict((t[0], t[1]) for t in tops)
     check(d.get('Top artists', [])[:2] == ['The Supremes', 'Madonna'], f'{T} top artists by plays (a tie goes to the latest) {d.get("Top artists")}')
     check(d.get('Top stations', [])[:2] == ['Motown Radio', "80's 80's"], f'{T} top stations by time {d.get("Top stations")}')
-    check(d.get('Top podcasts', [])[:1] == ['Talk Is Jericho'], f'{T} top podcasts by show {d.get("Top podcasts")}')
+    check(d.get('Podcasts', [])[:1] == ['Talk Is Jericho'], f'{T} Podcasts: top shows {d.get("Podcasts")}')
+    pc = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.st-sec'), function(s){ return s; }).filter(function(s){ return s.querySelector('.st-h2').textContent === 'Podcasts'; }).map(function(s){ return Array.prototype.map.call(s.querySelectorAll('.st-card'), function(c){ return c.textContent; }); })[0]")
+    check(pc and pc[1] == '1h 13mIn all' and pc[2].startswith('0Episodes finished') and pc[3] == '0Shows followed', f'{T} Podcasts: time, episodes finished, shows followed {pc}')
     facts = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.st-fact'), function(f){ return f.textContent; })")
     check('Songs played42' in facts and 'Favorite time to listen8pm–9pm' in facts, f'{T} plays and favorite time {facts}')
     await pg.screenshot(path=f'{SHOTS}/stats-{theme}-1.png')
@@ -85,10 +89,33 @@ async def run(B, theme, seed):
     check(await pg.evaluate("!document.getElementById('statsOverlay').classList.contains('open') && document.getElementById('profileOverlay').classList.contains('open')"), f'{T} back returns to the profile')
     check(not errs, f'{T} no page errors {errs}')
     await c.close()
+NATIVE = """(function(){ window.__clock = 0; var listeners = {};
+  var P = new Proxy({}, {get:function(t,k){ if(k==='then') return undefined; if(k==='setCarLibraryPart') return undefined;
+    if(k==='listenClock') return function(){ return Promise.resolve({ ms: window.__clock, playing: true }); };
+    if(k==='addListener') return function(n,f){ return Promise.resolve({remove:function(){}}); };
+    return function(){ return Promise.resolve({}); }; }});
+  window.Capacitor = { isNativePlatform:function(){return true;}, getPlatform:function(){return 'android';}, registerPlugin:function(){ return P; }, Plugins:{AmplifyPlayer:P}, convertFileSrc:function(u){return u;} };
+})();"""
+async def native(B):
+    T = '[app]'
+    c = await B.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+    await c.add_init_script(NATIVE); await c.add_init_script(AUTO_NOTICE)
+    pg = await c.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+    await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2000)
+    await pg.evaluate("__t.play({name:'Motown Radio', urlToResolve:'http://x/m', stationuuid:'mm'}, true)")
+    await pg.evaluate("window.__clock = 1000"); await pg.wait_for_timeout(1500)
+    # the screen goes off for ten minutes: the page's timers stop, the player's clock doesn't
+    await pg.evaluate("window.__clock = 1000 + 600000"); await pg.wait_for_timeout(1500)
+    L = await pg.evaluate("__t.L()")
+    it = [v for v in L['items'].values() if v.get('n') == 'Motown Radio']
+    check(it and 595 <= it[0]['s'] <= 605, f'{T} ten minutes played with the screen off are counted from the player\'s clock {it}')
+    check(not errs, f'{T} no page errors {errs}')
+    await c.close()
 async def main():
     async with async_playwright() as p:
         B = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         await run(B, 'dark', False)
+        await native(B)
         for th in ('dark', 'light'): await run(B, th, True)
         await B.close()
     print('ALL PASSED' if not fails else f'FAILS {len(fails)}')

@@ -87,6 +87,7 @@ MOCK = """
      if(window.__noWrite) return Promise.reject(err('no', 'NO_WRITE'));
      return fetch('/__write', { method: 'POST', body: JSON.stringify(o) }).then(function(r){ return r.json(); }).then(function(j){ if(j.error) throw err('changed', j.error); return j; });
    },
+   fetchText: function(o){ return fetch(o.url).then(function(r){ return r.text(); }).then(function(t){ return { text: t }; }, function(){ return {}; }); },
    grantFolderWrite: function(o){ window.__grants++; window.__noWrite = false; return Promise.resolve({ treeUri: o.treeUri, matches: true, canWrite: true }); },
    addListener: function(n, f){ (listeners[n] = listeners[n] || []).push(f); return Promise.resolve({remove:function(){}}); }
  };
@@ -128,6 +129,26 @@ def mb_answer(url):
     if '/release-group/rg-bare' in path:
         return {'id': 'rg-bare', 'genres': [{'name': 'shoegaze', 'count': 1}, {'name': 'indie rock', 'count': 5}]}
     return {}
+
+dz_asked = []
+DZC = 'https://e-cdns-images.dzcdn.net/images/cover/'
+def dz_answer(url):
+    u = urlparse(url); q = parse_qs(u.query).get('q', [''])[0]; path = u.path
+    dz_asked.append(path + ' ' + q)
+    if path == '/search/track':
+        if 'Untitled Thing' in q and 'Some Artist' in q:
+            return {'data': [{'id': 11, 'title': 'Untitled Thing', 'title_short': 'Untitled Thing', 'artist': {'name': 'Some Artist'}, 'album': {'id': 91, 'title': 'Greatest Hits'}},
+                             {'id': 12, 'title': 'Untitled Thing', 'title_short': 'Untitled Thing', 'artist': {'name': 'Some Artist'}, 'album': {'id': 92, 'title': 'Great Record'}}]}
+        return {'data': []}
+    if path == '/track/12': return {'id': 12, 'track_position': 3, 'release_date': '1987-05-01', 'album': {'title': 'Great Record'}}
+    if path == '/track/11': return {'id': 11, 'track_position': 12, 'release_date': '1995-01-01'}
+    if path == '/search/album':
+        for title, art, aid in (('Bare Album', 'Cat', 201), ('Plain Album', 'Dan', 202), ('Small Cover', 'Bob', 203)):
+            if title in q:
+                return {'data': [{'id': aid, 'title': title, 'artist': {'name': art}, 'cover_xl': DZC + 'h%d/big.jpg' % aid, 'cover_medium': DZC + 'h%d/thumb.jpg' % aid}]}
+        return {'data': []}
+    if path == '/album/201': return {'id': 201, 'release_date': '1994-02-02', 'genres': {'data': [{'name': 'Indie Rock'}]}}
+    return {'data': []}
 
 fails = []
 def check(cond, msg):
@@ -190,6 +211,8 @@ async def run(scheme):
         async def router(route):
             u = route.request.url
             if '127.0.0.1' in u: return await route.continue_()
+            if 'api.deezer.com/' in u: return await route.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps(dz_answer(u)))
+            if 'dzcdn.net' in u: return await route.fulfill(path=f'{root}/' + ('thumb.jpg' if 'thumb' in u else 'big.jpg'), content_type='image/jpeg', headers={'Access-Control-Allow-Origin': '*'})
             if 'musicbrainz.org/ws/2/' in u: return await route.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body=json.dumps(mb_answer(u)))
             m = re.search(r'coverartarchive\.org/release-group/([^/?]+)(/front-250)?', u)
             if m:
@@ -223,7 +246,7 @@ async def run(scheme):
         t, msg = await confirm_and_wait(pg, T, allow=True)
         check(t == 'Tags saved' and '1 song file' in msg, f'{T} songs saved: {t!r} {msg!r}')
         tg = tags_of('Loose/Some Artist - Untitled Thing.mp3')
-        check(tg['title'] == 'Untitled Thing' and tg['artist'] == 'Some Artist' and tg['album'] == 'Great Record' and tg['year'].startswith('1987') and tg['track'] == '3/10', f'{T} the file has its tags (the original album, not the compilation) {tg}')
+        check(tg['title'] == 'Untitled Thing' and tg['artist'] == 'Some Artist' and tg['album'] == 'Great Record' and tg['year'].startswith('1987') and tg['track'] == '3', f'{T} the file has its tags (the original album, not the compilation) {tg}')
         items = await pg.evaluate(ITEMS)
         check([i[0] for i in items] == ['track07'], f'{T} the fixed song leaves the list {items}')
         await pg.tap('#settingsCloseBtn'); await pg.wait_for_timeout(300)
@@ -240,7 +263,7 @@ async def run(scheme):
         await pg.tap('#settingsCloseBtn'); await pg.wait_for_timeout(300)
 
         # No cover
-        await find_and_save(pg, 'noart', T, [['Great Record', 'No match found', None], ['Plain Album', 'New cover · 800 × 800', True]], 'noart')
+        await find_and_save(pg, 'noart', T, [['Great Record', 'No match found', None], ['Plain Album', 'New cover · 1000 × 1000', True]], 'noart')
         thumbs = await pg.evaluate("document.querySelectorAll('#cleanupList img.cl-art-new').length")
         check(thumbs == 1, f'{T} the new cover is shown beside the album ({thumbs})')
         await pg.tap('#cleanupSaveBtn')
@@ -250,7 +273,13 @@ async def run(scheme):
         await pg.tap('#settingsCloseBtn'); await pg.wait_for_timeout(300)
 
         # Low-res: untick, nothing saved; then save
-        await find_and_save(pg, 'lowart', T, [['Small Cover', 'New cover · 800 × 800', True]], 'lowart')
+        await find_and_save(pg, 'lowart', T, [['Small Cover', 'New cover · 1000 × 1000', True]], 'lowart')
+        # long names and sizes wrap rather than end in "..." (build 369)
+        await pg.evaluate("var r = document.querySelector('#cleanupList .cl-item:not(.cl-item-off)'); r.querySelector('.cl-name').textContent = 'A Few Small Repairs (20th Anniversary Edition)'; r.querySelector('.cl-sub').textContent = 'Shawn Colvin · 400 × 400'")
+        await pg.wait_for_timeout(100)
+        cut = await pg.evaluate("Array.prototype.some.call(document.querySelectorAll('#cleanupList .cl-item .cl-name, #cleanupList .cl-item .cl-sub, #cleanupList .cl-item .cl-new'), function(e){ return e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis'; })")
+        check(not cut, f'{T} names, sizes and the new cover size wrap, never cut off')
+        await pg.screenshot(path=f'{shots}/cleanupbulk-wrap.png')
         await pg.tap('#cleanupList .cl-item:not(.cl-item-off)'); await pg.wait_for_timeout(200)
         bar = await pg.evaluate("[document.getElementById('cleanupSaveBtn').disabled, document.getElementById('cleanupSaveBtn').textContent]")
         check(bar == [True, 'Save'], f'{T} untick: Save turns off {bar}')
@@ -267,6 +296,7 @@ async def run(scheme):
         cats = await pg.evaluate(CATS)
         check(cats == {'songs': '1', 'albums': '1', 'noart': '1', 'lowart': '0'}, f'{T} after: only track07 and the new Great Record are left {cats}')
         await pg.screenshot(path=f'{shots}/cleanupbulk-after.png')
+        check(not [x for x in mb_asked], f'{T} MusicBrainz isn\'t asked any more (Deezer is) {mb_asked[:3]}')
         check(await pg.evaluate("window.__grants") == 1, f'{T} folder access asked once')
         check(not errs, f'{T} no page errors {errs}')
         await b.close()

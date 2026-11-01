@@ -6720,6 +6720,8 @@
   .cl-pickall{ display:flex; gap:18px; margin-top:6px; }
   .cl-pickall button{ background:none; border:0; padding:6px 0; font:inherit; font-size:13.5px; font-weight:600; color:var(--accent); cursor:pointer; }
   .cl-pickall button:disabled{ color:var(--text-faint); cursor:default; }
+  /* Build 369: names, sizes and what was found wrap rather than end in "…" (the review rows are narrow). */
+  .cl-item .cl-name, .cl-item .cl-sub, .cl-item .cl-new{ white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
   .cl-new.guess{ color:color-mix(in srgb, var(--accent) 70%, var(--text-dim)); }
   .cl-review-note{ margin:0; font-size:13.5px; line-height:1.45; color:var(--text); font-weight:600; }
   .cl-new{ font-size:12.5px; line-height:1.35; color:var(--accent); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -10566,7 +10568,7 @@
       var p = document.createElement('p');
       p.className = 'cl-review-note';
       p.textContent = n ? ('Found ' + n + ' of ' + of + '. Untick any you don\u2019t want, then Save.')
-        : 'Nothing was found for these. Tap Select to edit several together.';
+        : 'Nothing was found online for these. Tap one to fix it by hand.';
       box.appendChild(p);
       if(n) box.appendChild(clPickAllRow(function(on){
         rv.found.forEach(function(v, x){ if(on) rv.picked.add(x); else rv.picked.delete(x); });
@@ -10592,16 +10594,6 @@
       var row = document.createElement('div');
       row.className = 'cl-action-row';
       row.appendChild(b);
-      // Build 369: several songs (or albums) at once, by hand.
-      if(cleanupGroup === 'songs' || cleanupGroup === 'albums'){
-        var sel = document.createElement('button');
-        sel.type = 'button';
-        sel.className = 'settings-data-btn cl-select';
-        sel.id = 'cleanupSelectBtn';
-        sel.textContent = 'Select';
-        sel.addEventListener('click', function(){ cleanupSelect = { group: cleanupGroup, set: new Set() }; renderCleanupList(); });
-        row.appendChild(sel);
-      }
       box.appendChild(row);
     }
     syncCleanupBar();
@@ -10644,27 +10636,8 @@
     btn.textContent = n ? 'Save ' + n : 'Save';
   }
   // --- the lookups: each resolves { label, thumb?, ...what to write } or null ---
-  // Build 369: when MusicBrainz has no match, what the file and folder names say (artist and
-  // title from "Artist - Title", the artist's and album's folders, a leading track number),
-  // offered the same way, marked "From the file name", so nothing has to be done one by one.
-  function clGuessSong(t){
-    var g = guessFromFilename(t.fileName || '');
-    var parts = String(t.relPath || '').split('/');
-    var folderArtist = parts.length >= 4 ? parts[parts.length - 3].trim() : '';
-    var folderAlbum = parts.length >= 4 ? parts[parts.length - 2].trim() : '';
-    var artist = String(t.artist || g.artist || folderArtist || '').trim();
-    var title = String(g.title || '').trim();
-    if(!artist || !title) return null;
-    var out = { title: title, artist: artist, guess: true };
-    if(folderAlbum && clNorm(folderAlbum) !== clNorm(artist)) out.album = folderAlbum;
-    if(g.trackNo) out.track = String(g.trackNo);
-    out.label = 'From the file name \u00b7 ' + out.title + ' \u00b7 ' + out.artist + (out.album ? ' \u00b7 ' + out.album : '');
-    return out;
-  }
-  function clLookupSong(t){
-    return clLookupSongOnline(t).then(function(r){ return r || clGuessSong(t); }, function(){ return clGuessSong(t); });
-  }
-  function clLookupSongOnline(t){
+  function clLookupSong(t){ return clLookupSongOnline(t); }
+  function clLookupSongMb(t){
     var g = guessFromFilename(t.fileName || '');
     var parts = String(t.relPath || '').split('/');
     var folderArtist = parts.length >= 4 ? parts[parts.length - 3] : '';
@@ -10720,7 +10693,7 @@
       return gs;
     });
   }
-  function clLookupAlbum(a){
+  function clLookupAlbumMb(a){
     var needYear = a.tracks.some(function(t){ return !String(t.year || '').trim(); });
     var needGenre = a.tracks.some(function(t){ return !String(t.genre || '').trim(); });
     return clMbAlbumGroups(a).then(function(gs){
@@ -10753,7 +10726,7 @@
       img.src = url;
     });
   }
-  function clLookupCover(a){
+  function clLookupCoverMb(a){
     var now = a._artSize ? Math.min(a._artSize.w, a._artSize.h) : 0;
     return clMbAlbumGroups(a).then(function(gs){
       var tries = gs.slice(0, 3);
@@ -10774,6 +10747,99 @@
       return next();
     });
   }
+  // ---------- Build 369 (Mark): the lookups go to Deezer ----------
+  // MusicBrainz asks for one request a second, which made a thousand albums take most of an
+  // hour. Deezer answers several a second (deezerAsk keeps to its pace and waits out "busy"),
+  // its album covers are 1000 x 1000 (cover_xl, so nothing has to be downloaded to measure
+  // them), and its albums carry their release date and genre. Several entries are looked up
+  // at once (CLEANUP_PARALLEL).
+  var DZ = 'https://api.deezer.com/';
+  var DZ_COVER = 1000;
+  function dzQ(s){ return '"' + String(s || '').replace(/"/g, '') + '"'; }
+  function dzAlbumFor(a){
+    var art = a.various ? '' : (sanitizeArtistName(a.artist) || a.artist);
+    var t = sanitizeArtistName(a.album) || a.album;
+    var q = (art ? 'artist:' + dzQ(art) + ' ' : '') + 'album:' + dzQ(t);
+    function pick(d){
+      var want = clNorm(a.album);
+      return ((d && d.data) || []).filter(function(x){
+        return x && clNorm(x.title) === want && (a.various || clSameArtist(x.artist && x.artist.name, a.artist));
+      })[0] || null;
+    }
+    return deezerAsk(DZ + 'search/album?limit=15&q=' + encodeURIComponent(q)).then(function(d){
+      var hit = pick(d);
+      if(hit || !art) return hit;
+      // A looser try: the words alone.
+      return deezerAsk(DZ + 'search/album?limit=15&q=' + encodeURIComponent(art + ' ' + t)).then(pick);
+    });
+  }
+  function clLookupCover(a){
+    var now = a._artSize ? Math.min(a._artSize.w, a._artSize.h) : 0;
+    if(now >= DZ_COVER) return Promise.resolve(null);
+    return dzAlbumFor(a).then(function(hit){
+      if(!hit || !hit.cover_xl || /\/images\/cover\/\//.test(hit.cover_xl)) return null;
+      return { cover: hit.cover_xl, thumb: hit.cover_medium || hit.cover_xl, w: DZ_COVER, h: DZ_COVER,
+        label: 'New cover · ' + DZ_COVER + ' × ' + DZ_COVER };
+    });
+  }
+  function clLookupAlbum(a){
+    var needYear = a.tracks.some(function(t){ return !String(t.year || '').trim(); });
+    var needGenre = a.tracks.some(function(t){ return !String(t.genre || '').trim(); });
+    return dzAlbumFor(a).then(function(hit){
+      if(!hit) return null;
+      return deezerAsk(DZ + 'album/' + hit.id).then(function(full){
+        var out = {};
+        var y = full && full.release_date ? String(full.release_date).slice(0, 4) : '';
+        if(needYear && /^\d{4}$/.test(y) && y !== '0000') out.year = y;
+        var g = full && full.genres && full.genres.data && full.genres.data[0] && full.genres.data[0].name;
+        if(needGenre && g) out.genre = g;
+        if(!out.year && !out.genre) return null;
+        out.label = [out.year, out.genre].filter(Boolean).join(' · ');
+        return out;
+      });
+    });
+  }
+  function clLookupSongOnline(t){
+    var g = guessFromFilename(t.fileName || '');
+    var parts = String(t.relPath || '').split('/');
+    var folderArtist = parts.length >= 4 ? parts[parts.length - 3] : '';
+    var folderAlbum = parts.length >= 3 ? parts[parts.length - 2] : '';
+    var title = String((t.metaKey === '' ? '' : t.name) || g.title || t.name || '').trim();
+    if(g.artist && !String(t.artist || '').trim()) title = g.title || title;
+    var artist = String(t.artist || g.artist || folderArtist || '').trim();
+    if(!title || !artist) return Promise.resolve(null);
+    var q = 'artist:' + dzQ(sanitizeArtistName(artist) || artist) + ' track:' + dzQ(title);
+    return deezerAsk(DZ + 'search/track?limit=25&q=' + encodeURIComponent(q)).then(function(d){
+      var hits = ((d && d.data) || []).filter(function(x){
+        return x && clNorm(x.title_short || x.title) === clNorm(title) && clSameArtist(x.artist && x.artist.name, artist);
+      });
+      if(!hits.length) return null;
+      // The album named by the song's folder first, then a plain album over a compilation.
+      hits.sort(function(x, y){
+        function rank(h){
+          var al = (h.album && h.album.title) || '';
+          return (folderAlbum && clNorm(al) === clNorm(folderAlbum) ? -10 : 0) + (/hits|best of|greatest|collection|anthology|essential/i.test(al) ? 2 : 0);
+        }
+        return rank(x) - rank(y);
+      });
+      var hit = hits[0];
+      return deezerAsk(DZ + 'track/' + hit.id).then(function(full){
+        var out = { title: hit.title_short || hit.title, artist: (hit.artist && hit.artist.name) || artist };
+        if(hit.album && hit.album.title) out.album = hit.album.title;
+        var rd = (full && (full.release_date || (full.album && full.album.release_date))) || '';
+        if(/^\d{4}/.test(rd) && rd.slice(0, 4) !== '0000') out.year = rd.slice(0, 4);
+        if(full && full.track_position) out.track = String(full.track_position);
+        out.label = out.title + ' · ' + out.artist + (out.album ? ' · ' + out.album : '') + (out.year ? ' (' + out.year + ')' : '');
+        return out;
+      }, function(){
+        var out = { title: hit.title_short || hit.title, artist: (hit.artist && hit.artist.name) || artist };
+        if(hit.album && hit.album.title) out.album = hit.album.title;
+        out.label = out.title + ' · ' + out.artist + (out.album ? ' · ' + out.album : '');
+        return out;
+      });
+    });
+  }
+  var CLEANUP_PARALLEL = 6;
   function startCleanupLookup(){
     var group = cleanupGroup, list = (cleanupState && cleanupState[group] || []).slice();
     if(!list.length) return;
@@ -10781,11 +10847,11 @@
     var rv = { group: group, found: new Map(), picked: new Set(), looked: new Set(), stopped: false };
     var i = 0, cfg = CLEANUP_LOOKUP[group];
     var seq = showNotice({ kind: 'working', title: 'Looking up ' + (list.length === 1 ? '1 ' + cfg.noun[0] : list.length + ' ' + cfg.noun[1]),
-      message: 'Checking MusicBrainz\u2026', autoClose: false,
+      message: '0 of ' + list.length, autoClose: false,
       actions: [{ label: 'Stop', run: function(){ rv.stopped = true; } }] });
     function progress(){
       var m = document.getElementById('noticeMsg');
-      if(m && noticeShown && noticeShown.seq === seq) m.textContent = (i + 1) + ' of ' + list.length + (rv.found.size ? ' \u00b7 found ' + rv.found.size : '');
+      if(m && noticeShown && noticeShown.seq === seq) m.textContent = Math.min(i, list.length) + ' of ' + list.length + (rv.found.size ? ' \u00b7 found ' + rv.found.size : '');
     }
     function done(){
       closeNotice(seq);
@@ -10793,16 +10859,23 @@
       cleanupReview = rv;
       renderCleanupList();
     }
-    function one(){
-      if(rv.stopped || i >= list.length){ done(); return; }
-      var x = list[i];
-      progress();
-      look(x).then(function(r){
-        rv.looked.add(x);
-        if(r){ rv.found.set(x, r); rv.picked.add(x); }
-      }, function(){ rv.looked.add(x); }).then(function(){ i++; one(); });
+    // Several at once (build 369); i counts the ones finished.
+    var next = 0, running = 0, ended = false;
+    function pump(){
+      if(ended) return;
+      if(rv.stopped || (next >= list.length && !running)){ ended = true; done(); return; }
+      while(running < CLEANUP_PARALLEL && next < list.length && !rv.stopped){
+        var x = list[next++];
+        running++;
+        (function(x){
+          look(x).then(function(r){
+            rv.looked.add(x);
+            if(r){ rv.found.set(x, r); rv.picked.add(x); }
+          }, function(){ rv.looked.add(x); }).then(function(){ running--; i++; progress(); pump(); });
+        })(x);
+      }
     }
-    one();
+    pump();
   }
   // --- saving what was kept ---
   function cleanupSave(){
