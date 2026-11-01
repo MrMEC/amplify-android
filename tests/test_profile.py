@@ -17,7 +17,7 @@ subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'test
 H = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT); H.log_message = lambda *a: None
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
 ST = [{'name': n, 'urlToResolve': 'http://x/%d' % i, 'favicon': '', 'tags': '80s', 'stationuuid': 'u%d' % i} for i, n in enumerate(
-    ["80's 80's", 'Motown Radio', 'Positively Radio', '80s80s Alternative', "80's Sitcom Flashback", '24 Hour Free Movies', 'ABC', '80s80s Bowie', 'Ninth Station'])]
+    ["80's 80's", 'Motown Radio', 'Positively Radio', '80s80s Alternative', "80's Sitcom Flashback", '24 Hour Free Movies', 'ABC', '80s80s Bowie', 'Ninth Station'])] + [{'name': 'My Office TV', 'urlToResolve': 'amplify-live:office', 'favicon': ''}]
 SEED = ("if(!sessionStorage.getItem('s')){ sessionStorage.setItem('s','1'); localStorage.setItem('radioPlayerFavorites', %s);"
         " localStorage.setItem('radioPlayerArtistPlays', JSON.stringify({motown:{name:'The Supremes',count:42,last:1},b:{name:'Prince',count:9,last:1}}));"
         " localStorage.setItem('radioPlayerSongPlays', JSON.stringify({a:[30,1],b:[12,1]})); localStorage.setItem('radioPlayerArtistPlaysReset1', String(Date.UTC(2026,7,22))); }") % json.dumps(json.dumps(ST))
@@ -43,7 +43,25 @@ async def run(B, theme):
     check(info[0] == 'Add your name', f'{T} no name yet: "Add your name" {info[0]!r}')
     check(info[1] == 'Listening since August 2026', f'{T} listening since the first counted play {info[1]!r}')
     check(info[2] == ['—Artists', '—This month', 'The SupremesTop artist'], f'{T} numbers from the app (no time listened yet) {info[2]}')
-    check(len(info[3]) == 8 and info[3][0] == "80's 80's", f'{T} first eight favorites, named {info[3]}')
+    check(len(info[3]) == 9 and info[3][0] == "80's 80's" and 'My Office TV' not in info[3], f'{T} every favorite, named, but not your own channels {info[3]}')
+    lay = await pg.evaluate("""(function(){
+      var box = document.getElementById('pfFavs'), tiles = document.querySelectorAll('.pf-fav'), r0 = tiles[0].getBoundingClientRect(), r1 = tiles[1].getBoundingClientRect();
+      var secs = Array.prototype.map.call(document.querySelectorAll('#profilePage .pf-h2'), function(h){ return h.textContent.trim(); });
+      var fs = Array.prototype.map.call(document.querySelectorAll('#profilePage .pf-h2'), function(h){ return getComputedStyle(h.querySelector('button') || h).fontSize + '/' + getComputedStyle(h.querySelector('button') || h).fontWeight; });
+      var ys = {}; Array.prototype.forEach.call(tiles, function(t){ ys[Math.round(t.getBoundingClientRect().top)] = 1; });
+      return { rows: Object.keys(ys).length, stacked: Math.abs(r0.left - r1.left) < 2 && r1.top > r0.bottom, scrolls: box.scrollWidth > box.clientWidth + 20,
+        edge: Math.round(box.getBoundingClientRect().left) + ',' + Math.round(box.getBoundingClientRect().right), secs: secs, fs: fs,
+        seeAll: !!document.querySelector('.pf-see-all') };
+    })()""")
+    check(lay['rows'] == 2 and lay['stacked'] and lay['scrolls'], f'{T} two rows in one strip that scrolls sideways {lay}')
+    check(lay['edge'] == '0,390', f'{T} the strip runs to the screen edges {lay["edge"]}')
+    check(lay['secs'][:2] == ['Favorites', 'Shortcuts'] and lay['fs'][0] == lay['fs'][1] and not lay['seeAll'], f'{T} Favorites (no See all) comes first, its heading the size of Shortcuts {lay["secs"]} {lay["fs"]}')
+    await pg.evaluate("document.getElementById('pfFavs').scrollLeft = 1000"); await pg.wait_for_timeout(200)
+    end = await pg.evaluate("(function(){ var b = document.getElementById('pfFavs').getBoundingClientRect(); var t = document.querySelectorAll('.pf-fav'); var a = t[t.length-1].getBoundingClientRect(), z = t[t.length-2].getBoundingClientRect(); return [a.right <= b.right + 1, a.left > b.left, Math.round(a.left) === Math.round(z.left) || a.top < z.bottom]; })()")
+    check(all(end), f'{T} scrolled to the end, the last favorites are in view, both rows having moved together {end}')
+    await pg.evaluate("document.getElementById('pfFavs').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(100)
+    await pg.screenshot(path=f'{SHOTS}/profile-{theme}-favs-end.png')
+    await pg.evaluate("document.getElementById('pfFavs').scrollLeft = 0; document.getElementById('profilePage').scrollTop = 0"); await pg.wait_for_timeout(100)
     fit = await pg.evaluate("Array.prototype.every.call(document.querySelectorAll('.pf-stat-v, .pf-stat-l'), function(v){ return v.scrollWidth <= v.clientWidth + 1; })")
     check(fit, f'{T} no number is cut off (a long top artist shrinks)')
     await pg.screenshot(path=f'{SHOTS}/profile-{theme}-top.png')
@@ -76,7 +94,7 @@ async def run(B, theme):
     await pg.tap('#hamburgerBtn'); await pg.wait_for_timeout(300)
     await pg.tap('#pfFavAll'); await pg.wait_for_timeout(500)
     r = await pg.evaluate("[document.getElementById('profileOverlay').classList.contains('open'), document.getElementById('stationsHeading').textContent]")
-    check(r == [False, 'Favorites'], f'{T} See all opens Favorites {r}')
+    check(r == [False, 'Favorites'], f'{T} the Favorites heading opens Favorites {r}')
     await pg.tap('#hamburgerBtn'); await pg.wait_for_timeout(300)
     await pg.tap('#profileCloseBtn'); await pg.wait_for_timeout(200)
     check(not await pg.evaluate("document.getElementById('profileOverlay').classList.contains('open')"), f'{T} the close button puts it away')

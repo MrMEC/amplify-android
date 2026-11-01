@@ -6528,11 +6528,17 @@
     border:1px solid var(--border); box-sizing:border-box; color:var(--text); font:inherit; font-size:14px; font-weight:600; line-height:1.2; text-align:left; cursor:pointer; }
   .pf-link:active{ background:var(--panel-2); }
   .pf-link .pf-ico{ flex-shrink:0; color:var(--accent); }
-  .pf-sub-head{ display:flex; align-items:baseline; justify-content:space-between; margin:24px 0 12px; }
-  .pf-h3{ margin:0; font-size:15px; font-weight:700; color:var(--text); }
-  .pf-see-all{ background:none; border:0; padding:4px 0; font:inherit; font-size:13px; font-weight:600; color:var(--accent); cursor:pointer; }
-  .pf-favs{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px 10px; }
-  .pf-fav{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .pf-h2-link{ display:inline-flex; align-items:center; gap:6px; margin:0; padding:2px 0; background:none; border:0; font:inherit; color:inherit; cursor:pointer; }
+  .pf-h2-link svg{ color:var(--text-dim); margin-top:2px; }
+  .pf-h2-link:active{ opacity:.7; }
+  /* Two rows that scroll sideways together, out to the screen's edges; four covers and a bit of
+     the fifth show, so it's clear there are more. With four or fewer favorites, one row. */
+  .pf-favs{ display:grid; grid-auto-flow:column; grid-template-rows:repeat(2, auto); grid-auto-columns:calc((100% - 30px) / 4.35);
+    gap:14px 10px; overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scroll-snap-type:x proximity; scrollbar-width:none;
+    margin:0 calc(-1 * var(--pf-pad)); padding:0 var(--pf-pad); scroll-padding:0 var(--pf-pad); width:calc(100% + 2 * var(--pf-pad)); box-sizing:border-box; }
+  .pf-favs::-webkit-scrollbar{ display:none; }
+  .pf-favs.pf-favs-one{ grid-template-rows:auto; }
+  .pf-fav{ display:flex; flex-direction:column; gap:6px; min-width:0; scroll-snap-align:start; }
   .pf-fav .shortcut{ border-radius:10px; overflow:hidden; }
   .pf-fav .shortcut-art{ border-radius:10px; }
   .pf-fav .shortcut-art img{ border-radius:0; }
@@ -8126,6 +8132,13 @@
     </div>
     <div class="pf-stats" id="pfStats"></div>
     <button type="button" class="pf-stats-link" id="pfStatsLink"><span>See your listening stats</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    <!-- Build 376 (Mark): Favorites first, its heading the way to the full list; a two-row strip
+         that scrolls sideways (both rows together) through every favorite. Then Shortcuts. -->
+    <section class="pf-sec" id="pfFavSec">
+      <h2 class="pf-h2 pf-h2-link-wrap"><button type="button" class="pf-h2-link" id="pfFavAll">Favorites<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></h2>
+      <div class="pf-favs" id="pfFavs"></div>
+      <p class="pf-empty" id="pfFavEmpty" hidden>Tap the star on a station, song, album or artist and it appears here.</p>
+    </section>
     <section class="pf-sec">
       <h2 class="pf-h2">Shortcuts</h2>
       <div class="pf-links">
@@ -8134,12 +8147,6 @@
         <button type="button" class="pf-link" data-pf-go="genres"><svg class="pf-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.1V4.5a1 1 0 0 1 1-1h7.6a1 1 0 0 1 .7.3l8.2 8.2a1 1 0 0 1 0 1.4l-7.6 7.6a1 1 0 0 1-1.4 0l-8.2-8.2a1 1 0 0 1-.3-.7z"/><circle cx="8" cy="8" r="1.5"/></svg><span>Genres</span></button>
         <button type="button" class="pf-link" data-pf-go="continue"><svg class="pf-ico" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M10 8.7v6.6a.7.7 0 0 0 1.06.6l5.3-3.3a.7.7 0 0 0 0-1.2l-5.3-3.3a.7.7 0 0 0-1.06.6z"/></svg><span>Continue Watching</span></button>
       </div>
-      <div class="pf-sub-head" id="pfFavHead">
-        <h3 class="pf-h3">Favorites</h3>
-        <button type="button" class="pf-see-all" id="pfFavAll">See all</button>
-      </div>
-      <div class="pf-favs" id="pfFavs"></div>
-      <p class="pf-empty" id="pfFavEmpty" hidden>Tap the star on a station, song, album or artist and it appears here.</p>
     </section>
     <section class="pf-sec">
       <button type="button" class="pf-settings" id="pfSettingsBtn"><svg class="pf-ico" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9 1.65 1.65 0 0 0 20.83 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="pf-settings-text"><span class="pf-settings-name">Settings</span></span><svg class="pf-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
@@ -11287,11 +11294,16 @@
       d.appendChild(v); d.appendChild(l);
       stats.appendChild(d);
     });
-    // Favorites: the first eight, cover and name.
+    // Favorites (build 376): all of them, minus your own channels, in two rows that scroll sideways.
     var box = document.getElementById('pfFavs');
     box.innerHTML = '';
-    var favs = favoritesInOrder();
-    favs.slice(0, 8).forEach(function(f){
+    var favs = favoritesInOrder().filter(function(f){
+      var u = f && (f.urlToResolve || f.url);
+      return !(typeof u === 'string' && u.indexOf('amplify-live:') === 0);
+    });
+    box.classList.toggle('pf-favs-one', favs.length <= 4);
+    box.scrollLeft = 0;
+    favs.forEach(function(f){
       var wrap = document.createElement('div');
       wrap.className = 'pf-fav';
       var sc = buildShortcut(f);
@@ -11305,7 +11317,6 @@
       box.appendChild(wrap);
     });
     document.getElementById('pfFavEmpty').hidden = favs.length > 0;
-    document.getElementById('pfFavAll').hidden = !favs.length;
     requestAnimationFrame(fitProfileName);
   }
   function openProfile(){
