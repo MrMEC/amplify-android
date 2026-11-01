@@ -108,11 +108,15 @@ async def run(B, theme):
     T = f'[{theme}]'
     MUS = [{'treeUri': 'content://tree/Music', 'name': 'Music'}]
     c, pg, errs = await page(B, theme, MUS, [{'treeUri': 'content://tree/Videos', 'name': 'Videos'}], no_write=True)
-    btns = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.archive-result-row .ia-dl'), function(b){ return [b.hidden, b.getAttribute('aria-label')]; })")
-    check(btns == [[False, 'Download to Library']] * 2, f'{T} each archive.org result has Download to Library {btns}')
+    await pg.evaluate("document.querySelector('.archive-result-row .ia-more-btn').click()"); await pg.wait_for_timeout(200)
+    btns = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.ia-row-menu .np-menu-item'), function(b){ return b.textContent; })")
+    badge = await pg.evaluate("getComputedStyle(document.querySelector('.archive-result-row .ia-dl-badge')).display")
+    check(btns == ['Play Next', 'Add to Queue', 'Download'] and badge == 'none', f'{T} each archive.org result has a More menu: Play Next, Add to Queue, Download (no arrow until it downloads) {btns} {badge}')
+    await pg.screenshot(path=f'{SHOTS}/iadl-{theme}-menu.png')
+    await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(150)
     await pg.screenshot(path=f'{SHOTS}/iadl-{theme}-rows.png', clip={'x': 0, 'y': 0, 'width': 390, 'height': 360})
     # no permission to add files yet: asked, then it goes ahead
-    await pg.evaluate("window.__slow = 250; document.querySelector('.archive-result-row .ia-dl').click()"); await pg.wait_for_timeout(500)
+    await pg.evaluate("window.__slow = 250; document.querySelector('.archive-result-row .ia-more-btn').click(); document.getElementById('iaMenuDl').click()"); await pg.wait_for_timeout(500)
     n = await notice(pg)
     check(n[1] == 'Allow Amplify to save here' and n[3] == ['Not Now', 'Allow'], f'{T} without permission it asks for it {n[1]!r} {n[3]}')
     await act(pg, 'Allow'); await pg.wait_for_timeout(350)
@@ -134,14 +138,14 @@ async def run(B, theme):
     await pg.evaluate("document.getElementById('noticeOverlay').classList.remove('open'); document.getElementById('importOverlay').classList.remove('open')")
     await pg.screenshot(path=f'{SHOTS}/iadl-{theme}-done.png', clip={'x': 0, 'y': 0, 'width': 390, 'height': 360})
     # a film goes into the video folder, named as a movie
-    await pg.evaluate("document.querySelectorAll('.archive-result-row .ia-dl')[1].click()"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("document.querySelectorAll('.archive-result-row .ia-more-btn')[1].click(); document.getElementById('iaMenuDl').click()"); await pg.wait_for_timeout(1200)
     call = await pg.evaluate("window.__calls[window.__calls.length - 1]")
     check(call['tree'] == 'content://tree/Videos' and call['path'] == ['Archive.org'] and [f['name'] for f in call['files']] == ['Night of the Living Dead (1968).mp4'], f'{T} a film -> Videos/Archive.org/Night of the Living Dead (1968).mp4 {call["path"]} {[f["name"] for f in call["files"]]}')
     await pg.wait_for_timeout(600)
     n = await notice(pg); vr = await pg.evaluate("window.__videoRescans || 0")
     check(n[1] == 'Downloaded' and 'Watch' in n[2] and vr >= 1, f'{T} and Watch looks again {n[1]!r} {n[2]!r} rescans={vr}')
     # cancel
-    await pg.evaluate("__t.ev('delete archiveDl.band1970'); window.__slow = 400; document.querySelector('.archive-result-row .ia-dl').click()"); await pg.wait_for_timeout(500)
+    await pg.evaluate("__t.ev('delete archiveDl.band1970'); window.__slow = 400; document.querySelector('.archive-result-row .ia-more-btn').click(); document.getElementById('iaMenuDl').click()"); await pg.wait_for_timeout(500)
     await act(pg, 'Cancel'); await pg.wait_for_timeout(1200)
     n = await notice(pg); lbl = await pg.evaluate("document.querySelector('.archive-result-row .ia-dl').getAttribute('aria-label')")
     check('cancelled' in n[2] and lbl == 'Download to Library', f'{T} Cancel stops it and the button resets {n[2]!r} {lbl!r}')
@@ -155,7 +159,7 @@ async def run(B, theme):
     await c.close()
     # two music folders: picked once, then kept
     c, pg, errs = await page(B, theme, MUS + [{'treeUri': 'content://tree/Phone%20Music', 'name': 'Phone Music'}])
-    await pg.evaluate("document.querySelector('.archive-result-row .ia-dl').click()"); await pg.wait_for_timeout(500)
+    await pg.evaluate("document.querySelector('.archive-result-row .ia-more-btn').click(); document.getElementById('iaMenuDl').click()"); await pg.wait_for_timeout(500)
     n = await notice(pg); opts = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#noticeMsg .bk-file-name'), function(e){ return e.textContent; })")
     check(n[1] == 'Download to' and opts == ['Music', 'Phone Music'], f'{T} two music folders: which one? {opts}')
     await pg.screenshot(path=f'{SHOTS}/iadl-{theme}-pick.png')
@@ -165,7 +169,7 @@ async def run(B, theme):
     await c.close()
     # no music folder: asked to add one
     c, pg, errs = await page(B, theme, [])
-    await pg.evaluate("document.querySelector('.archive-result-row .ia-dl').click()"); await pg.wait_for_timeout(500)
+    await pg.evaluate("document.querySelector('.archive-result-row .ia-more-btn').click(); document.getElementById('iaMenuDl').click()"); await pg.wait_for_timeout(500)
     n = await notice(pg)
     check(n[1] == 'Add a music folder first' and n[3] == ['Not Now', 'Add Music Folder'], f'{T} no music folder: add one first {n[1]!r} {n[3]}')
     await c.close()

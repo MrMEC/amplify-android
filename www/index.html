@@ -6664,6 +6664,19 @@
   .tp-auto{ display:block; margin:12px auto 0; padding:4px 8px; background:none; border:0; font:inherit; font-size:13px; font-weight:600; color:var(--accent); cursor:pointer; }
   .tp-auto[hidden]{ display:none; }
   .tp-panel .confirm-actions{ margin-top:18px; }
+  /* Build 386: search results' titles (Top Results, Songs, Music Videos, Movies & TV, Archive,
+     Channels, Playlists) take up to two lines. */
+  #stationsGrid.search-2line :is(.song-row-title, .tile-name, .ch-name, .vep-title){
+    white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; text-overflow:ellipsis; overflow-wrap:anywhere; line-height:1.25;
+  }
+  /* Build 386: All / Audio Only / Video Only over archive.org results; the row's More button,
+     with a small download badge beside it only while (or once) the item is downloading. */
+  .ia-kind-wrap{ grid-column:1/-1; display:flex; justify-content:flex-start; padding:2px 0 14px; }
+  .ia-kind{ max-width:100%; }
+  .ia-kind .mv-seg-btn{ white-space:nowrap; }
+  .ia-more-btn{ flex-shrink:0; align-self:center; }
+  .ia-dl-badge{ display:none; flex-shrink:0; align-self:center; background:none; border:0; padding:0 2px; pointer-events:none; color:var(--accent); }
+  .ia-dl-badge.working, .ia-dl-badge.done{ display:inline-flex; align-items:center; }
   /* Build 385: More Results under archive.org results. */
   .ia-more-wrap{ grid-column:1/-1; display:flex; justify-content:center; padding:18px 0 8px; }
   .ia-more.clear-search-btn{ display:inline-flex; align-items:center; justify-content:center; text-align:center; gap:0; min-width:180px; height:auto; padding:12px 28px; border-radius:999px; text-transform:none; letter-spacing:0; font-size:14.5px; font-weight:700;
@@ -9462,6 +9475,7 @@
     stationsGrid.classList.remove('guide-grid');
     stationsGrid.classList.remove('mv-grid');
     stationsGrid.classList.remove('grid-artists');
+    stationsGrid.classList.remove('search-2line');
     hideAzRail();
   }
   var stationsHeading = document.getElementById('stationsHeading');
@@ -23963,13 +23977,16 @@
     var q = (addChannelsState.archiveQ || '').trim();
     body.innerHTML = '';
     if(q){
-      body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-      var all = archiveSearchAll();
+      var kindSeg = archiveKindSeg(function(){ renderArchiveTab(body); });
+      body.appendChild(kindSeg);
+      body.insertAdjacentHTML('beforeend', '<div class="loading-state"><div class="spinner"></div></div>');
+      var all = archiveSearchAll(), kindAsked = archiveKind();
       archiveSearchItems(q, all).then(function(items){
-        if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q) return;
+        if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q || archiveKind() !== kindAsked) return;
         body.innerHTML = '';
+        body.appendChild(kindSeg);
         if(!items.length){
-          body.innerHTML = '<div class="empty-state">Nothing found' + (all ? '' : ' in the collections. Turn on Search everything to look through all of archive.org') + '.</div>';
+          body.insertAdjacentHTML('beforeend', '<div class="empty-state">Nothing found' + (all ? '' : ' in the collections. Turn on Search everything to look through all of archive.org') + '.</div>');
           setResultCount(0, 'item');
           return;
         }
@@ -41621,12 +41638,44 @@
   // Build 385 (Mark): results come 30 at a time; More Results asks for the next page. The list
   // carries how many archive.org found in all (total) and which page it is (page).
   var ARCHIVE_PAGE_SIZE = 30;
+  // Build 386 (Mark): All, Audio Only or Video Only, kept between sessions.
+  var ARCHIVE_KIND_KEY = 'radioPlayerArchiveKind';
+  function archiveKind(){ var k = ''; try{ k = localStorage.getItem(ARCHIVE_KIND_KEY) || ''; }catch(e){} return k === 'audio' || k === 'video' ? k : 'all'; }
+  function setArchiveKind(k){ try{ localStorage.setItem(ARCHIVE_KIND_KEY, k); }catch(e){} }
+  function archiveMediaClause(){ var k = archiveKind(); return k === 'audio' ? 'mediatype:(audio OR etree)' : k === 'video' ? 'mediatype:(movies)' : IA_MEDIA; }
+  // The All / Audio Only / Video Only switch over archive.org results.
+  function archiveKindSeg(onChange){
+    var wrap = document.createElement('div');
+    wrap.className = 'ia-kind-wrap';
+    var seg = document.createElement('div');
+    seg.className = 'mv-seg ia-kind';
+    seg.setAttribute('role', 'group');
+    seg.setAttribute('aria-label', 'Show');
+    var cur = archiveKind();
+    [['all', 'All'], ['audio', 'Audio Only'], ['video', 'Video Only']].forEach(function(o){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mv-seg-btn' + (cur === o[0] ? ' on' : '');
+      b.textContent = o[1];
+      b.dataset.kind = o[0];
+      b.setAttribute('aria-pressed', cur === o[0] ? 'true' : 'false');
+      b.addEventListener('click', function(){
+        if(archiveKind() === o[0]) return;
+        setArchiveKind(o[0]);
+        Array.prototype.forEach.call(seg.children, function(x){ x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        onChange(o[0]);
+      });
+      seg.appendChild(b);
+    });
+    wrap.appendChild(seg);
+    return wrap;
+  }
   function archiveSearchItems(term, all, page){
     if(all == null) all = archiveSearchAll();
     var words = String(term || '').replace(/[^A-Za-z0-9À-￿\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
     if(!words.length) return Promise.resolve([]);
     var w = words.join(' AND ');
-    var q = '(title:(' + w + ') OR creator:(' + w + ')) AND ' + IA_MEDIA + (all ? '' : ' AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')');
+    var q = '(title:(' + w + ') OR creator:(' + w + ')) AND ' + archiveMediaClause() + (all ? '' : ' AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')');
     page = page || 1;
     return extJson(archiveQueryUrl(q, ARCHIVE_PAGE_SIZE, page), { 'Accept': 'application/json' }).then(function(d){
       var items = archiveDocs(d);
@@ -42387,6 +42436,54 @@
     if(!id) return null;
     return { id: id, title: st.archiveVideo ? st.name : (st.collectionName || st.name), creator: st.artistName || '', video: !!st.archiveVideo };
   }
+  // Build 386: the archive.org result's menu. Play Next and Add to Queue put the item's files
+  // (all its songs, or its video) into Up Next; Download saves it to the library.
+  var iaMenu = null;
+  function closeArchiveRowMenu(){ if(iaMenu){ iaMenu.remove(); iaMenu = null; } }
+  document.addEventListener('click', function(e){ if(iaMenu && !iaMenu.contains(e.target) && !(e.target.closest && e.target.closest('.ia-more-btn'))) closeArchiveRowMenu(); });
+  window.addEventListener('scroll', closeArchiveRowMenu, { passive: true });
+  function archiveQueueItem(item, atFront){
+    setStatus('Getting \u201c' + item.title + '\u201d from archive.org\u2026', false, true);
+    extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
+      var list = archivePlayables(meta, item);
+      if(archiveSearchAll()) list.forEach(function(t){ t.iaNoHistory = true; });
+      if(!list.length){ setStatus('Nothing playable in this Internet Archive item.', true); return; }
+      var label = list.length > 1 ? item.title : null;
+      if(atFront) queuePlayNext(list, label); else queueAddToEnd(list, label);
+    })['catch'](function(){ setStatus('Could not reach the Internet Archive.', true); });
+  }
+  function openArchiveRowMenu(anchor, item){
+    if(iaMenu){ var same = iaMenu._item === item; closeArchiveRowMenu(); if(same) return; }
+    var m = document.createElement('div');
+    m.className = 'np-menu row-menu ia-row-menu open';
+    m.setAttribute('role', 'menu');
+    m._item = item;
+    function add(html, fn, id){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'np-menu-item'; b.setAttribute('role', 'menuitem');
+      if(id) b.id = id;
+      b.innerHTML = html;
+      b.addEventListener('click', function(e){ e.stopPropagation(); closeArchiveRowMenu(); fn(); });
+      m.appendChild(b);
+      return b;
+    }
+    add('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h10M4 11h10M4 16h6"/><path class="fill" d="M15 13.5v6l5-3z"/></svg><span>Play Next</span>', function(){ archiveQueueItem(item, true); }, 'iaMenuNext');
+    add('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h10"/><path d="M18 13v8M14 17h8"/></svg><span>Add to Queue</span>', function(){ archiveQueueItem(item, false); }, 'iaMenuQueue');
+    if(archiveDlPlugin()){
+      var st = archiveDl[item.id];
+      var lbl = st && st.state === 'working' ? 'Downloading\u2026 ' + (st.pct || 0) + '%' : st && st.state === 'done' ? 'Downloaded' : 'Download';
+      add('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg><span>' + lbl + '</span>', function(){ downloadArchiveItem(item); }, 'iaMenuDl');
+    }
+    document.body.appendChild(m);
+    iaMenu = m;
+    var r = anchor.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    var left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
+    var top = r.bottom + 6;
+    var bar = document.getElementById('playerBar'), floor = window.innerHeight - 8;
+    if(bar && bar.offsetParent){ var br = bar.getBoundingClientRect(); if(br.top > r.bottom) floor = Math.min(floor, br.top - 8); }
+    if(top + h > floor) top = Math.max(8, r.top - h - 6);
+    m.style.left = left + 'px'; m.style.top = top + 'px';
+  }
   function buildArchiveResultRow(item){
     var row = document.createElement('div');
     row.className = 'tile song-row video-result-row archive-result-row';
@@ -42407,7 +42504,21 @@
     sub.textContent = [item.video ? 'Video' : 'Audio', item.year, item.creator].filter(Boolean).join(' · ');
     body.appendChild(sub);
     row.appendChild(body);
-    row.appendChild(archiveDlButton(item, 'ch-add ia-dl-result'));
+    // Build 386 (Mark): a More button: Play Next, Add to Queue, Download. Its label shows how
+    // a download is going (the same .ia-dl painting as the arrow had).
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'row-more-btn ia-more-btn';
+    more.title = 'More';
+    more.setAttribute('aria-label', 'More');
+    more.setAttribute('aria-haspopup', 'true');
+    more.innerHTML = '<span class="icon-ellipsis-v" aria-hidden="true"></span>';
+    more.addEventListener('click', function(e){ e.stopPropagation(); openArchiveRowMenu(more, item); });
+    var badge = archiveDlButton(item, 'ia-dl-badge');
+    badge.tabIndex = -1;
+    badge.setAttribute('aria-hidden', 'true');
+    row.appendChild(badge);
+    row.appendChild(more);
     row.addEventListener('click', function(){ playArchiveItem(item, row, { noHistory: archiveSearchAll(), list: (lastSearch && lastSearch.archive) || (searchState && searchState.archive) || [item] }); });
     return row;
   }
@@ -42635,15 +42746,12 @@
   }
   // Send a search waiting on the typing pause right away (the Go / Enter key).
   function flushSearchRemote(){ if(searchRemoteRun){ clearTimeout(searchRemoteTimer); searchRemoteRun(); } }
-  function askDirectories(q, st){
-    // The two remote directories know nothing about quotes, so they get the words alone and
-    // the quoted phrases are enforced here, on what comes back.
-    var pq = parseSearchQuery(q);
-    var remoteQ = plainSearchText(q);
-    // The answers belong to this search (st), even after a newer one replaced it.
-    function stale(){ return lastSearch !== st; }
-
-    if(sourceOn('archive')) archiveSearchItems(remoteQ).then(function(items){
+  // Build 386: also asked again (page 1) when All / Audio Only / Video Only changes.
+  function searchArchiveFor(st, remoteQ, pq){
+    var ask = st.archiveAsk = (st.archiveAsk || 0) + 1;
+    function stale(){ return lastSearch !== st || st.archiveAsk !== ask; }
+    st.archivePending = true;
+    return archiveSearchItems(remoteQ).then(function(items){
       if(stale()) return;
       st.archive = rankByMatch(items.filter(function(it){
         return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases });
@@ -42656,6 +42764,16 @@
       st.archivePending = false;
       if(searchState === st) applySearchResults();
     });
+  }
+  function askDirectories(q, st){
+    // The two remote directories know nothing about quotes, so they get the words alone and
+    // the quoted phrases are enforced here, on what comes back.
+    var pq = parseSearchQuery(q);
+    var remoteQ = plainSearchText(q);
+    // The answers belong to this search (st), even after a newer one replaced it.
+    function stale(){ return lastSearch !== st; }
+
+    if(sourceOn('archive')) searchArchiveFor(st, remoteQ, pq);
 
     itunesSearchPodcasts(remoteQ, 15).then(function(results){
       if(stale()) return;
@@ -42756,6 +42874,8 @@
     if(!group) return;
     var items = searchGroupItems(group.id);
     resetStationsGrid();
+    // Build 386 (Mark): on these tabs a title may take two lines before it's cut short.
+    stationsGrid.classList.toggle('search-2line', ['top', 'songs', 'musicVideos', 'videos', 'archive', 'channels', 'playlists'].indexOf(group.id) !== -1);
 
     if(group.id === 'top'){
       if(!items.length){
@@ -42780,13 +42900,25 @@
       setResultCount(null);
       return;
     }
+    // Build 386: All / Audio Only / Video Only, over the archive.org results (and over
+    // "nothing found" too, so a filter that found nothing can be changed back).
+    if(group.id === 'archive'){
+      var stA = searchState;
+      stationsGrid.appendChild(archiveKindSeg(function(){
+        stA.archive = [];
+        stA.archiveTotal = 0;
+        searchArchiveFor(stA, stA.archiveRemoteQ || plainSearchText(stA.q || ''), parseSearchQuery(stA.q || ''));
+        applySearchResults();
+      }));
+    }
     if(group.id === 'archive' && !items.length && searchState.archivePending){
-      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      stationsGrid.insertAdjacentHTML('beforeend', '<div class="loading-state"><div class="spinner"></div></div>');
       setResultCount(null);
       return;
     }
     if(!items.length){
-      stationsGrid.innerHTML = '<div class="empty-state">No ' + group.label.toLowerCase() + ' matched that search.</div>';
+      var noun = group.id === 'archive' && archiveKind() !== 'all' ? (archiveKind() === 'audio' ? 'audio' : 'video') + ' items on archive.org' : group.label.toLowerCase();
+      stationsGrid.insertAdjacentHTML('beforeend', '<div class="empty-state">No ' + noun + ' matched that search.</div>');
       setResultCount(0, group.noun);
       return;
     }
