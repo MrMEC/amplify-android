@@ -1817,14 +1817,14 @@
 
   /* Music Videos on a favourite artist's page (builds 126-127): a sideways row of 16:9 thumbnails
      under the bio, above the albums. It runs to the screen's edges so the cut-off card shows it scrolls. */
-  .artist-videos{
+  .artist-videos, .artist-archive-row{
     grid-column:1/-1; display:flex; flex-wrap:nowrap; gap:14px;
     overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity;
     margin:0 calc(-1 * var(--main-pad)); padding:2px var(--main-pad) 6px;
     scroll-padding-left:var(--main-pad);
     scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain;
   }
-  .artist-videos::-webkit-scrollbar{ display:none; }
+  .artist-videos::-webkit-scrollbar, .artist-archive-row::-webkit-scrollbar{ display:none; }
   .yt-tile{
     flex:0 0 min(240px, 66vw); scroll-snap-align:start; display:flex; flex-direction:column;
     text-align:left; background:none; border:0; padding:0; margin:0; color:inherit; font:inherit; cursor:pointer;
@@ -1920,7 +1920,7 @@
     .yt-ov-frame{ width:min(100vw, calc(100vh * 16 / 9)); }
   }
   /* More room between the bio's More and the Music Videos heading under it. */
-  .tile-grid > .artist-videos-label:first-child{ padding-top:22px; margin-bottom:-10px; }
+  .tile-grid > .artist-videos-label:first-child, .tile-grid > .artist-archive-label:first-child{ padding-top:22px; margin-bottom:-10px; }
   @media (max-width: 900px){
     .artist-albums{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:28px 14px; }
   }
@@ -35651,6 +35651,8 @@
     }
     // A favourite artist's music videos, under the bio (syncArtistVideos puts them at the top).
     syncArtistVideos(entry);
+    // Build 389: and what archive.org has of theirs, under it.
+    syncArtistArchive(entry);
   }
 
   // ---------- the artist's albums, ten at a time ----------
@@ -36048,6 +36050,128 @@
       var ids = r && r.videos ? r.videos.map(function(v){ return v.id; }).join() : '';
       if(have && ids === shownIds && r && r.mv === rec.mv) return;   // nothing new
       paintArtistVideos(entry, r, false);
+    });
+  }
+
+  // ---------- Build 389 (Mark): archive.org videos on an artist's page ----------
+  // Under the YouTube row (or the bio when there isn't one): "On Archive.org", a sideways row of
+  // the artist's music videos and concert films from archive.org, most downloaded first. Only items
+  // that are the artist's own count: a title that starts "Artist - ..." (or "Artist Live ...", "... - Artist"),
+  // or a creator that is exactly the artist -- but for a one-word name (KEM, Delta) the creator
+  // alone matched unrelated uploads, so the title must say it's music too. Covers,
+  // karaoke, tutorials, reactions and the like are left out, and so is anything Amplify can't play
+  // (build 388's check). One search per artist (100 results, up to 24 kept), remembered a week
+  // (two days when nothing was found); a cache, so backups skip it. Off with archive.org in Sources.
+  var AA_KEY = 'amplifyArtistArchive';
+  var AA_TTL_MS = 7 * 24 * 60 * 60 * 1000, AA_MISS_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+  var AA_MAX_ARTISTS = 150, AA_MAX_ITEMS = 24, AA_FV = 1;
+  var aaStore = null, aaPending = {};
+  function aaMap(){ if(!aaStore) aaStore = lsGet(AA_KEY) || {}; return aaStore; }
+  function aaSave(){
+    var m = aaMap(), keys = Object.keys(m);
+    if(keys.length > AA_MAX_ARTISTS){
+      keys.sort(function(a, b){ return (m[a].ts || 0) - (m[b].ts || 0); });
+      keys.slice(0, keys.length - AA_MAX_ARTISTS).forEach(function(k){ delete m[k]; });
+    }
+    lsPut(AA_KEY, m);
+  }
+  function aaFresh(rec){ return !!rec && rec.fv === AA_FV && Date.now() - (rec.ts || 0) < (rec.items && rec.items.length ? AA_TTL_MS : AA_MISS_TTL_MS); }
+  function aaNorm(s){
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[\u2010-\u2015]/g, '-').replace(/&/g, ' and ').replace(/[^a-z0-9\- ]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  var AA_BAD_RE = /\b(covers?|karaoke|tutorial|lesson|reaction|parody|tribute|lyrics?|ytpmv|mash-?up|type beat|how to play)\b/i;
+  var AA_LIVE_RE = /\b(live|concert|tour|festival|unplugged|session|glastonbury)\b/i;
+  function aaMatches(name, doc){
+    var na = aaNorm(name), bare = na.replace(/^the /, '');
+    if(!na || AA_BAD_RE.test(String(doc.title || ''))) return false;
+    var t = aaNorm(doc.title), cr = aaNorm(doc.creator);
+    var byCreator = cr === na || cr === bare;
+    // A creator that is exactly the artist counts for a name of two or more words. A one-word name
+    // (Delta, KEM, Seal) is too easily someone else's, so it needs the title to say it's music too.
+    if(byCreator && (bare.indexOf(' ') >= 0 || /\b(official|music video|live|concert|unplugged|mtv)\b/i.test(String(doc.title || '')))) return true;
+    return [na, bare].some(function(n){
+      return t.indexOf(n + ' - ') === 0 || t.indexOf(n + ' live') === 0 || t.indexOf(n + ' official') === 0 || t.indexOf(n + ' in concert') === 0
+        || t.indexOf(n + ' music video') === 0 || t.indexOf('- ' + n + ' -') >= 0 || (t.length > n.length + 3 && t.slice(-(n.length + 3)) === ' - ' + n);
+    });
+  }
+  function loadArtistArchive(entry){
+    var k = entry.key, rec = aaMap()[k];
+    if(aaFresh(rec)) return Promise.resolve(rec);
+    if(aaPending[k]) return aaPending[k];
+    var name = sanitizeArtistName(entry.name).replace(/["\\]/g, ' ').replace(/\s+/g, ' ').trim();
+    if(!name || hasFeaturedCredit(entry.name)) return Promise.resolve(null);
+    var q = '(creator:"' + name + '" OR title:"' + name + '") AND mediatype:movies';
+    var p = extJson(archiveQueryUrl(q, 100, 1), { 'Accept': 'application/json' }).then(function(d){
+      var docs = archiveDocs(d).filter(function(x){ return aaMatches(name, x); }).slice(0, 40);
+      return archiveOnlyPlayable(docs).then(function(items){
+        items = items.slice(0, AA_MAX_ITEMS).map(function(x){ x.live = AA_LIVE_RE.test(x.title); return x; });
+        var r = { ts: Date.now(), fv: AA_FV, items: items };
+        aaMap()[k] = r; aaSave();
+        return r;
+      });
+    })['catch'](function(){ return rec || null; });   // couldn't reach archive.org: keep what we had
+    aaPending[k] = p;
+    p.then(function(){ delete aaPending[k]; }, function(){ delete aaPending[k]; });
+    return p;
+  }
+  function clearArtistArchive(){
+    stationsGrid.querySelectorAll('.artist-archive-label, .artist-archive-row').forEach(function(el){ el.remove(); });
+  }
+  function buildArchiveTile(it, list, artistName){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'yt-tile';
+    b.dataset.iaid = it.id;
+    var th = document.createElement('span');
+    th.className = 'yt-thumb';
+    var img = document.createElement('img');
+    img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+    img.src = archiveArtUrl(it.id);
+    img.onerror = function(){ img.remove(); };
+    th.appendChild(img);
+    var pl = document.createElement('span');
+    pl.className = 'yt-play';
+    pl.innerHTML = YT_PLAY_SVG;
+    th.appendChild(pl);
+    var t = document.createElement('span');
+    t.className = 'yt-title';
+    t.textContent = ytDisplayTitle(it.title, artistName);
+    var d = document.createElement('span');
+    d.className = 'yt-date';
+    d.textContent = (it.live ? 'Live' : 'Video') + (it.year ? ' \u00b7 ' + it.year : '');
+    b.appendChild(th); b.appendChild(t); b.appendChild(d);
+    b.setAttribute('aria-label', 'Play from archive.org: ' + it.title);
+    b.onclick = function(){ playArchiveItem(it, b, { noHistory: archiveSearchAll(), list: list }); };
+    return b;
+  }
+  function paintArtistArchive(entry, rec){
+    clearArtistArchive();
+    if(!rec || !rec.items || !rec.items.length) return;
+    var empty = stationsGrid.querySelector('.empty-state');
+    if(empty) empty.remove();
+    var label = appendGridSection('On Archive.org');
+    label.classList.add('artist-archive-label');
+    var row = document.createElement('div');
+    row.className = 'artist-archive-row';
+    rec.items.forEach(function(it){ row.appendChild(buildArchiveTile(it, rec.items, entry.name)); });
+    // Under the YouTube row when there is one, else at the top (the bio's own row).
+    var yt = stationsGrid.querySelector('.artist-videos');
+    stationsGrid.insertBefore(label, yt ? yt.nextSibling : stationsGrid.firstChild);
+    stationsGrid.insertBefore(row, label.nextSibling);
+  }
+  function syncArtistArchive(entry){
+    if(!entry || !sourceOn('archive')){ clearArtistArchive(); return; }
+    var rec = aaMap()[entry.key];
+    var have = rec && rec.items && rec.items.length;
+    if(have) paintArtistArchive(entry, rec);          // what's kept shows at once, even when stale
+    if(aaFresh(rec)) return;
+    var shown = have ? rec.items.map(function(x){ return x.id; }).join() : '';
+    loadArtistArchive(entry).then(function(r){
+      if(activeArtistKey !== entry.key || activeAlbumKey || !sourceOn('archive')) return;
+      var ids = r && r.items ? r.items.map(function(x){ return x.id; }).join() : '';
+      if(ids === shown) return;                         // nothing new
+      paintArtistArchive(entry, r);
     });
   }
 
