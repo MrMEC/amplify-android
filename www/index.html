@@ -8095,7 +8095,7 @@
       </div>
       <!-- Build 390 (Mark): YouTube, on by default; off, an artist's On YouTube row and Home's Top 100 go. -->
       <div class="settings-row" id="youtubeSourceRow">
-        <div class="set-text"><span class="settings-label" id="youtubeSourceLabel">YouTube</span><span class="set-desc">The On YouTube row on artist pages, and Top 100 on Home</span></div>
+        <div class="set-text"><span class="settings-label" id="youtubeSourceLabel">YouTube</span><span class="set-desc">Everything from YouTube: the On YouTube row on artist pages, music videos in Search and Home, Top 100 on Home and the YouTube button in Now Playing</span></div>
         <select class="settings-select" id="youtubeSourceSelect" aria-labelledby="youtubeSourceLabel">
           <option value="on">On</option>
           <option value="off">Off</option>
@@ -14321,7 +14321,7 @@
     renderNpCollection(st);
     renderNpRelated(st);
     syncNpVideoToggle(st);
-    npYouTubeBtn.hidden = !isChartSong(st);
+    npYouTubeBtn.hidden = !isChartSong(st) || !sourceOn('youtube');
     vctlSync();
     updateNowPlayingFavState();
     updateNpPlayBtn();
@@ -17261,7 +17261,7 @@
   }
   function knownChannels(item){
     var out = [];
-    chartArtistEntries(item).forEach(function(e){ var r = ytStore[e.key]; ((r && r.channels) || []).forEach(function(c){ out.push(c); }); });
+    chartArtistEntries(item).forEach(function(e){ var r = ytRec(e.key); ((r && r.channels) || []).forEach(function(c){ out.push(c); }); });
     return out;
   }
   var chartVideoStats = { found: 0, none: 0, by: {} };
@@ -17401,7 +17401,7 @@
     if(!item) return;
     var job = ++chartTapJob;
     document.querySelectorAll('.chart-art-loading').forEach(function(n){ n.remove(); });
-    if(libraryTrackForSong(item)){ playChartAudio(items, index, label); return; }
+    if(libraryTrackForSong(item) || !sourceOn('youtube')){ playChartAudio(items, index, label); return; }
     var spin = showChartSpinner(artEl);
     findSongPreview(item)['catch'](function(){});      // ready in case there's no video
     chartVideoSoon(item).then(function(v){
@@ -21184,6 +21184,8 @@
       if(sourceOn('youtube') && !hot100Latest) loadHot100Latest().then(function(){ renderTop100HomeSection(); })['catch'](function(){});
       renderTop100HomeSection();
     }catch(e){}
+    try{ if(typeof renderDailyHome === 'function') renderDailyHome(); }catch(e){}
+    try{ npYouTubeBtn.hidden = npYouTubeBtn.hidden || !sourceOn('youtube'); }catch(e){}
   }
   // My Channels runs A to Z by name unless Manual is chosen (in edit mode), in which case
   // it's the order the channels were last dragged into (new ones go on the end). The stored
@@ -26635,7 +26637,7 @@
       } else if(isInProgress(v)) out.push({ kind: 'video', v: v, at: at });
     });
     channelHistory.forEach(function(h){ if(channelSourceOn(h)) out.push({ kind: 'channel', ch: h, at: h.at || 0 }); });
-    chartVideoHistory.forEach(function(h){ if(h && h.item) out.push({ kind: 'chart', item: h.item, vid: h.vid, at: h.at || 0 }); });
+    chartVideoHistory.forEach(function(h){ if(sourceOn('youtube') && h && h.item) out.push({ kind: 'chart', item: h.item, vid: h.vid, at: h.at || 0 }); });
     out = out.filter(function(e){ var hid = cwHidden[cwKey(e)]; return !(hid && hid >= e.at); });
     out.sort(function(a, b){ return b.at - a.at; });
     return out.slice(0, 20);
@@ -27582,7 +27584,7 @@
     var key = dailyState && dailyState.videoKey;
     var entry = key ? findArtistEntry(key) : null;
     if(!entry) return;
-    var rec = ytStore && ytStore[key];
+    var rec = ytRec(key);
     var yt = (rec && rec.videos) || [];
     var locals = musicVideosFor(key);
     if(!yt.length && !locals.length) return;
@@ -35771,6 +35773,8 @@
   var YT_MISS_TTL_MS = 2 * 24 * 60 * 60 * 1000; // no channel found: asked again in two days
   var YT_MAX_CHANNELS = 3, YT_MAX_VIDEOS = 24, YT_MAX_ARTISTS = 150;
   var ytStore = lsGet(YT_STORE_KEY) || {};
+  // Build 390: every YouTube feature follows Settings > Sources > YouTube; off reads as nothing known.
+  function ytRec(key){ return sourceOn('youtube') ? (ytStore && ytStore[key]) : null; }
   var ytPending = {};
   function ytSave(){
     var keys = Object.keys(ytStore);
@@ -35912,6 +35916,7 @@
     return /\s(?:feat\.?|ft\.?|featuring)\s/i.test(String(name || '')) || /[\(\[]\s*(?:feat|ft|featuring)\b/i.test(String(name || ''));
   }
   function loadArtistVideos(entry){
+    if(!sourceOn('youtube')) return Promise.resolve(null);
     var k = entry.key, rec = ytStore[k];
     if(hasFeaturedCredit(entry.name)){
       if(!rec || (rec.videos && rec.videos.length) || (rec.channels && rec.channels.length)){
@@ -36411,7 +36416,7 @@
     try{ localStorage.setItem(VIDEO_HIST_KEY, JSON.stringify(h.slice(-5000))); }catch(e){}
   }
   function artistHasVideos(key){
-    var rec = ytStore && ytStore[key];
+    var rec = ytRec(key);
     return !!((rec && rec.videos && rec.videos.length) || musicVideosFor(key).length);
   }
   function videoArtistEligible(e){
@@ -36425,7 +36430,7 @@
     var all = buildArtistIndex().filter(videoArtistEligible);
     // One known to have no videos doesn't count as waiting for a turn (else the history would
     // never start over).
-    function knownEmpty(e){ var r = ytStore && ytStore[e.key]; return !!r && ytFresh(r) && !artistHasVideos(e.key); }
+    function knownEmpty(e){ var r = ytRec(e.key); return !!r && ytFresh(r) && !artistHasVideos(e.key); }
     var left = all.filter(function(e){ return !shown[e.key] && !knownEmpty(e); });
     if(!left.length && all.length){
       var recent = videoHistory().slice(-30);
@@ -36458,6 +36463,7 @@
   // had no artist yet and one turns up, it's today's.
   var videoDiscoveryDone = false;
   function scheduleVideoDiscovery(order){
+    if(!sourceOn('youtube')) return;
     if(videoDiscoveryDone || dailyVideoSearching) return;
     dailyVideoSearching = true;
     setTimeout(function(){
@@ -36627,7 +36633,7 @@
     var key = dailyState && dailyState.videoKey;
     var entry = key ? findArtistEntry(key) : null;
     if(!entry) return null;
-    var rec = ytStore && ytStore[key];
+    var rec = ytRec(key);
     var yt = (rec && rec.videos) || [];
     var locals = musicVideosFor(key);
     if(!yt.length && !locals.length) return null;
@@ -43411,7 +43417,7 @@
         if(matchesQuery([v.name, v.artist], pq)) out.push({ src: 'local', name: v.name, artist: v.artist, v: v, list: list });
       });
     });
-    Object.keys(ytStore || {}).forEach(function(k){
+    Object.keys(sourceOn('youtube') ? (ytStore || {}) : {}).forEach(function(k){
       var rec = ytStore[k];
       if(!rec || !rec.videos || !rec.videos.length) return;
       var entry = findArtistEntry(k);
@@ -43429,7 +43435,7 @@
   // loadArtistVideos as for the artist page), then fill the tab in.
   function fetchSearchArtistVideos(q, st){
     var pq = parseSearchQuery(q);
-    if(pq.empty) return;
+    if(pq.empty || !sourceOn('youtube')) return;
     var hits = searchArtists(q).filter(function(e){ return nameMatchRank(e.name, pq) <= 1; }).slice(0, 2);
     hits.forEach(function(entry){
       if(ytFresh(ytStore[entry.key])) return;
