@@ -6664,6 +6664,12 @@
   .tp-auto{ display:block; margin:12px auto 0; padding:4px 8px; background:none; border:0; font:inherit; font-size:13px; font-weight:600; color:var(--accent); cursor:pointer; }
   .tp-auto[hidden]{ display:none; }
   .tp-panel .confirm-actions{ margin-top:18px; }
+  /* Build 385: More Results under archive.org results. */
+  .ia-more-wrap{ grid-column:1/-1; display:flex; justify-content:center; padding:18px 0 8px; }
+  .ia-more.clear-search-btn{ display:inline-flex; align-items:center; justify-content:center; text-align:center; gap:0; min-width:180px; height:auto; padding:12px 28px; border-radius:999px; text-transform:none; letter-spacing:0; font-size:14.5px; font-weight:700;
+    background:var(--panel); border:1px solid var(--border); color:var(--text); }
+  .ia-more.clear-search-btn:active{ background:var(--panel-2); }
+  .ia-more.loading{ opacity:.7; }
   /* Build 379: Download to Library on archive.org items. */
   .ia-dl.working{ font-size:11px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
   .ia-dl.done{ color:var(--accent); }
@@ -23967,8 +23973,28 @@
           setResultCount(0, 'item');
           return;
         }
-        items.forEach(function(it){ body.appendChild(archiveItemRow(it, null, items)); });
-        setResultCount(items.length, 'item');
+        var shown = items.slice(), page = 1, total = items.total;
+        items.forEach(function(it){ body.appendChild(archiveItemRow(it, null, shown)); });
+        setResultCount(shown.length, 'item');
+        // Build 385: More Results, for as long as archive.org has more.
+        function more(){
+          if(!archiveHasMore(total, page)) return;
+          var btn = archiveMoreButton(function(){
+            return archiveSearchItems(q, all, page + 1).then(function(next){
+              if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q) return;
+              page++;
+              total = next.total || total;
+              var have = {};
+              shown.forEach(function(it){ have[it.id] = true; });
+              btn.remove();
+              next.forEach(function(it){ if(have[it.id]) return; shown.push(it); body.appendChild(archiveItemRow(it, null, shown)); });
+              setResultCount(shown.length, 'item');
+              more();
+            });
+          });
+          body.appendChild(btn);
+        }
+        more();
       }, function(){
         if(!onAddChannelsView || addChannelsTab !== 'archive') return;
         body.innerHTML = '<div class="empty-state">Couldn’t reach archive.org. Check your connection and try again.</div>';
@@ -41587,18 +41613,50 @@
         year: x.year ? String(x.year).slice(0, 4) : '', video: x.mediatype === 'movies', downloads: Number(x.downloads) || 0 };
     });
   }
-  function archiveQueryUrl(q, rows){
+  function archiveQueryUrl(q, rows, page){
     return 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q)
       + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype&fl%5B%5D=creator&fl%5B%5D=year&fl%5B%5D=downloads'
-      + '&sort%5B%5D=' + encodeURIComponent('downloads desc') + '&rows=' + rows + '&page=1&output=json';
+      + '&sort%5B%5D=' + encodeURIComponent('downloads desc') + '&rows=' + rows + '&page=' + (page || 1) + '&output=json';
   }
-  function archiveSearchItems(term, all){
+  // Build 385 (Mark): results come 30 at a time; More Results asks for the next page. The list
+  // carries how many archive.org found in all (total) and which page it is (page).
+  var ARCHIVE_PAGE_SIZE = 30;
+  function archiveSearchItems(term, all, page){
     if(all == null) all = archiveSearchAll();
     var words = String(term || '').replace(/[^A-Za-z0-9À-￿\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
     if(!words.length) return Promise.resolve([]);
     var w = words.join(' AND ');
     var q = '(title:(' + w + ') OR creator:(' + w + ')) AND ' + IA_MEDIA + (all ? '' : ' AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')');
-    return extJson(archiveQueryUrl(q, 30), { 'Accept': 'application/json' }).then(archiveDocs);
+    page = page || 1;
+    return extJson(archiveQueryUrl(q, ARCHIVE_PAGE_SIZE, page), { 'Accept': 'application/json' }).then(function(d){
+      var items = archiveDocs(d);
+      items.total = Number(d && d.response && d.response.numFound) || items.length;
+      items.page = page;
+      return items;
+    });
+  }
+  function archiveHasMore(total, page){ return total > page * ARCHIVE_PAGE_SIZE; }
+  // The More Results button under a list of archive.org results.
+  function archiveMoreButton(onMore){
+    var wrap = document.createElement('div');
+    wrap.className = 'ia-more-wrap';
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'clear-search-btn ia-more';
+    b.textContent = 'More Results';
+    b.addEventListener('click', function(){
+      if(b.disabled) return;
+      b.disabled = true;
+      b.classList.add('loading');
+      b.textContent = 'Loading\u2026';
+      onMore().then(null, function(){
+        b.disabled = false;
+        b.classList.remove('loading');
+        b.textContent = 'Couldn\u2019t load more. Try again';
+      });
+    });
+    wrap.appendChild(b);
+    return wrap;
   }
   // ---------- Build 339 (Mark): Add Channels > Archive.org ----------
   // Each category is an archive.org collection; its channel plays the 20 most downloaded items
@@ -42590,6 +42648,7 @@
       st.archive = rankByMatch(items.filter(function(it){
         return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases });
       }), function(it){ return it.title; }, pq);
+      st.archiveTotal = items.total; st.archivePage = 1; st.archiveRemoteQ = remoteQ;
       st.archivePending = false;
       if(searchState === st) applySearchResults();
     })['catch'](function(){
@@ -42804,6 +42863,28 @@
 
     if(group.id === 'musicVideos') searchMusicVideoStills(items);
     if(group.id === 'channels' && !iptvIndex) stationsGrid.appendChild(buildSearchAllChannelsRow());
+    // Build 385: the next 30 from archive.org, as many times as there are more.
+    if(group.id === 'archive' && archiveHasMore(searchState.archiveTotal || 0, searchState.archivePage || 1)){
+      var st = searchState;
+      stationsGrid.appendChild(archiveMoreButton(function(){
+        var next = (st.archivePage || 1) + 1;
+        var pq = parseSearchQuery(st.q || '');
+        return archiveSearchItems(st.archiveRemoteQ || plainSearchText(st.q || ''), null, next).then(function(more){
+          var have = {};
+          (st.archive || []).forEach(function(it){ have[it.id] = true; });
+          var add = more.filter(function(it){
+            return !have[it.id] && (!pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases }));
+          });
+          st.archive = (st.archive || []).concat(add);
+          st.archivePage = next;
+          st.archiveTotal = more.total || st.archiveTotal;
+          if(searchState !== st) return;
+          var y = window.scrollY;
+          applySearchResults();
+          window.scrollTo(0, y);
+        });
+      }));
+    }
     // Still counting up while the directory answers, so no total is claimed yet.
     if(group.id === 'stations' && searchState.pending) setResultCount(null);
     else if(group.id === 'podcasts' && searchState.podcastsPending) setResultCount(null);
