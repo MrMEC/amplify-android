@@ -10,7 +10,9 @@ permissions:
 
 concurrency:
   group: build
-  cancel-in-progress: true
+  # Queue rather than cancel: a build cancelled while it was replacing the release left the
+  # release as an unpublished draft, and the APK link gave a 404 (build 370).
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -78,3 +80,14 @@ jobs:
             --target "${{ github.sha }}" \
             --title "Amplify build $BUILD" \
             --notes "Open this page on the phone and tap Amplify.apk to install or update."
+          # Make sure it is published, not left as a draft (whose download link is a 404).
+          gh release edit latest --draft=false
+          # And that the APK link answers.
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://github.com/${{ github.repository }}/releases/download/latest/Amplify.apk")
+            echo "APK link: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "The APK link isn't answering" >&2
+          exit 1
