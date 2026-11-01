@@ -293,9 +293,9 @@
     }
     .drawer-head.scrolled{ box-shadow:0 1px 0 var(--border), 0 6px 12px -8px rgba(0,0,0,.35); }
     .drawer-head .drawer-close-btn{ margin:0; align-self:center; }
-    .drawer-tabs{ display:flex; gap:2px; padding:3px; border-radius:999px; background:var(--panel-2); border:1px solid var(--border); }
+    .drawer-tabs{ display:flex; gap:2px; padding:3px; border-radius:var(--r-pill, 999px); background:var(--panel-2); border:1px solid var(--border); }
     .drawer-tab{
-      font:inherit; font-size:13px; font-weight:600; padding:6px 13px; border-radius:999px; border:0;
+      font:inherit; font-size:13px; font-weight:600; padding:6px 13px; border-radius:var(--r-pill, 999px); border:0;
       background:none; color:var(--text-dim); cursor:pointer;
     }
     .drawer-tab:hover{ color:var(--text); }
@@ -457,7 +457,7 @@
   @media (max-width: 900px){
     .sidebar-scroll .custom-search-item,
     .sidebar-scroll .genre-item{
-      border-radius:999px; border:1px solid var(--accent-dim); color:var(--accent);
+      border-radius:var(--r-pill, 999px); border:1px solid var(--accent-dim); color:var(--accent);
       background:var(--panel-2);
       background:color-mix(in srgb, var(--accent) 12%, transparent);
       font-weight:600; max-width:100%;
@@ -565,7 +565,7 @@
      sidebar to click away from, so this is the way back out of it. */
   .clear-search-btn{
     display:inline-flex; align-items:center; gap:7px; flex-shrink:0;
-    padding:7px 14px; border-radius:999px; font-size:12px; font-weight:700;
+    padding:7px 14px; border-radius:var(--r-pill, 999px); font-size:12px; font-weight:700;
     letter-spacing:.04em; text-transform:uppercase; cursor:pointer;
     background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim);
     transition: color .15s ease, border-color .15s ease;
@@ -979,7 +979,7 @@
   }
   .home-tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:2px 0 18px; }
   .home-tab{
-    padding:7px 16px; border-radius:999px; font-size:12.5px; font-weight:700;
+    padding:7px 16px; border-radius:var(--r-pill, 999px); font-size:12.5px; font-weight:700;
     /* Build 255 (Mark): tab labels are written as they are, never in capitals, on every page.
        The tracking came down with the capitals, as on the podcast date headings (build 210). */
     letter-spacing:.01em; text-transform:none;
@@ -1887,7 +1887,7 @@
     background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); }
   /* The main menu button (build 182), the glass pill the artist page uses. */
   .yt-ov-menu{ flex:0 0 auto; display:flex; align-items:center; gap:8px; height:38px; padding:0 15px 0 13px; cursor:pointer;
-    border-radius:999px; background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); color:#fff; font:inherit;
+    border-radius:var(--r-pill, 999px); background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); color:#fff; font:inherit;
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
   .yt-ov-menu .hb-lines{ display:flex; flex-direction:column; justify-content:center; gap:4px; font-style:normal; }
   .yt-ov-menu .hb-lines span{ display:block; width:17px; height:2px; background:#fff; border-radius:1px; }
@@ -1921,7 +1921,7 @@
   .chart-vrow.on .chart-vrow-title, .chart-vrow.on .chart-rank{ color:#fff; }
   .chart-v-note{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:16px; text-align:center; color:rgba(255,255,255,.82); font-size:14px; }
   .chart-v-actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .chart-v-actions button{ border:0; border-radius:999px; padding:9px 16px; background:rgba(255,255,255,.16); color:#fff; font:inherit; font-weight:700; font-size:13.5px; cursor:pointer; }
+  .chart-v-actions button{ border:0; border-radius:var(--r-pill, 999px); padding:9px 16px; background:rgba(255,255,255,.16); color:#fff; font:inherit; font-weight:700; font-size:13.5px; cursor:pointer; }
   .yt-ov-list-head{ font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); margin:8px 0 12px; }
   .yt-row{ display:flex; align-items:flex-start; gap:12px; width:100%; padding:0; margin:0 0 14px;
     background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
@@ -2020,7 +2020,7 @@
      index pages keep the small text buttons in the heading row. */
   .album-play-pill{
     display:inline-flex; align-items:center; justify-content:center; gap:10px;
-    min-width:min(208px, 46vw); height:54px; padding:0 30px; border-radius:999px;
+    min-width:min(208px, 46vw); height:54px; padding:0 30px; border-radius:var(--r-pill, 999px);
     background:#fff; color:#15171b; border:0; cursor:pointer;
     font-family:inherit; font-size:19px; font-weight:700; letter-spacing:.01em;
     box-shadow:0 6px 18px rgba(0,0,0,.22);
@@ -2446,7 +2446,7 @@
   /* Back link above a detail page's heading. */
   .detail-back-btn{
     display:inline-flex; align-items:center; gap:7px; margin-bottom:10px; padding:5px 12px 5px 9px;
-    border-radius:999px; cursor:pointer; font-size:12px; font-weight:600;
+    border-radius:var(--r-pill, 999px); cursor:pointer; font-size:12px; font-weight:600;
     background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim);
   }
   .detail-back-btn:hover{ color:var(--text); border-color:var(--accent-dim); }
@@ -2871,7 +2871,7 @@
 
   /* Retry offered inside a library section's empty state when storage could not be read. */
   .library-retry-btn{
-    display:inline-block; margin-top:4px; padding:2px 10px; border-radius:999px; cursor:pointer;
+    display:inline-block; margin-top:4px; padding:2px 10px; border-radius:var(--r-pill, 999px); cursor:pointer;
     font-size:11.5px; font-weight:600; font-family:inherit;
     background:transparent; border:1px solid var(--accent-dim); color:var(--accent);
   }
@@ -3060,7 +3060,7 @@
   .import-panel.stopped .import-panel-detail{ white-space:normal; }
   .import-panel-actions{ display:flex; justify-content:flex-end; margin-top:10px; }
   .import-panel-stop{
-    padding:4px 14px; border-radius:999px; cursor:pointer; font-family:inherit;
+    padding:4px 14px; border-radius:var(--r-pill, 999px); cursor:pointer; font-family:inherit;
     font-size:11.5px; font-weight:600; background:transparent;
     border:1px solid var(--accent-dim); color:var(--accent);
   }
@@ -3111,7 +3111,7 @@
 
   /* Cancel control inside the status line, shown only during an import. */
   .import-cancel-btn{
-    flex-shrink:0; margin-left:10px; padding:3px 12px; border-radius:999px; cursor:pointer;
+    flex-shrink:0; margin-left:10px; padding:3px 12px; border-radius:var(--r-pill, 999px); cursor:pointer;
     font-size:11.5px; font-weight:600; letter-spacing:.02em;
     background:transparent; border:1px solid var(--accent-dim); color:var(--accent);
   }
@@ -3123,7 +3123,7 @@
   .more-like-tags{ display:flex; flex-wrap:wrap; gap:8px; padding:10px 0 4px; }
   .more-like-tags .np-genre-pill{ font-size:12.5px; padding:7px 14px; color:var(--text); }
   .np-genre-pill{
-    padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:600; letter-spacing:.01em;
+    padding:5px 12px; border-radius:var(--r-pill, 999px); font-size:11.5px; font-weight:600; letter-spacing:.01em;
     background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim); cursor:pointer;
     transition: color .15s ease, border-color .15s ease, background .15s ease;
   }
@@ -3461,7 +3461,7 @@
   /* The toggle: a pill directly above the play controls, only for an episode with video. */
   .np-video-toggle{
     display:inline-flex; align-items:center; gap:8px; margin:2px auto 14px; padding:8px 16px;
-    border-radius:999px; border:1px solid rgba(255,255,255,.16); background:rgba(20,20,22,.42);
+    border-radius:var(--r-pill, 999px); border:1px solid rgba(255,255,255,.16); background:rgba(20,20,22,.42);
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
     color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer;
   }
@@ -3516,7 +3516,7 @@
   /* Build 246 (Mark): Stop, top right of the controls: ends the video and goes back to where it came
      from (the Live TV guide, or the movie's / show's page). */
   .vctl-stop{
-    position:absolute; top:10px; right:10px; z-index:1; height:30px; padding:0 13px; border-radius:999px; border:none; cursor:pointer;
+    position:absolute; top:10px; right:10px; z-index:1; height:30px; padding:0 13px; border-radius:var(--r-pill, 999px); border:none; cursor:pointer;
     background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:13px; font-weight:700; letter-spacing:.02em; line-height:30px;
   }
   body.np-video-full .vctl-stop{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
@@ -3620,7 +3620,7 @@
   #favoritesGrid.fav-reordering > .tile:not(.fav-dragging){ transition:transform .16s ease; }
   .tile-grid > .fav-order-bar{ grid-column:1/-1; display:flex; align-items:center; gap:10px; margin:0 0 2px; }
   .fav-order-label{ font-size:12.5px; font-weight:700; color:var(--text-dim); }
-  .fav-order-btn{ display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px;
+  .fav-order-btn{ display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:var(--r-pill, 999px);
     border:1px solid var(--border); background:var(--panel); color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
   .fav-order-chev{ width:14px; height:14px; fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; flex:none; }
   /* Build 189: Favorites / My Channels headings on Live TV, sized like the list heading under a
@@ -3900,11 +3900,11 @@
   .vd-meta{ margin-top:4px; font-size:13px; color:var(--text-dim); }
   .vd-actions{ display:flex; align-items:center; gap:10px; margin:18px 0 0; flex-wrap:wrap; }
   .vd-play{
-    display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:999px; border:none; cursor:pointer;
+    display:inline-flex; align-items:center; gap:9px; padding:11px 22px; border-radius:var(--r-pill, 999px); border:none; cursor:pointer;
     background:var(--accent); color:#fff; font:inherit; font-size:14px; font-weight:800;
   }
   .vd-secondary{
-    display:inline-flex; align-items:center; padding:10px 18px; border-radius:999px; cursor:pointer;
+    display:inline-flex; align-items:center; padding:10px 18px; border-radius:var(--r-pill, 999px); cursor:pointer;
     background:var(--panel-2); border:1px solid var(--border); color:var(--text); font:inherit; font-size:13px; font-weight:700;
   }
   .vd-actions .vd-more{ margin-left:auto; }
@@ -3948,8 +3948,8 @@
   .mv-daily .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mv-recent .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tile-grid > .mv-artists-head{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; }
-  .mv-seg{ display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:999px; padding:3px; flex-shrink:0; }
-  .mv-seg-btn{ border:none; background:none; font-family:inherit; font-size:12px; font-weight:700; color:var(--text-dim); padding:5px 12px; border-radius:999px; cursor:pointer; }
+  .mv-seg{ display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--r-pill, 999px); padding:3px; flex-shrink:0; }
+  .mv-seg-btn{ border:none; background:none; font-family:inherit; font-size:12px; font-weight:700; color:var(--text-dim); padding:5px 12px; border-radius:var(--r-pill, 999px); cursor:pointer; }
   .mv-seg-btn.on{ background:var(--accent); color:var(--accent-text); }
   .tile.mv-other .tile-art, .mv-hero-art.mv-other-art{ border-radius:50%; }
   .mv-other-art{ display:flex; align-items:center; justify-content:center; background:var(--panel-2); color:var(--text-dim); }
@@ -5220,7 +5220,7 @@
     background:var(--thumb, #fff); border:3px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.45); }
   .accent-range::-moz-range-thumb{ width:20px; height:20px; border-radius:50%; background:var(--thumb, #fff); border:3px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.45); }
   .accent-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
-  .accent-action{ min-width:92px; padding:10px 18px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+  .accent-action{ min-width:92px; padding:10px 18px; border-radius:var(--r-pill, 999px); border:1px solid var(--border); background:var(--panel-2);
     color:var(--text); font:inherit; font-size:14.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
   .accent-action-set{ background:var(--pick, var(--accent)); border-color:var(--pick, var(--accent)); color:var(--pick-text, var(--accent-text)); }
   #settingsPanel .accent-color-input::-webkit-color-swatch{ border:none; border-radius:50%; }
@@ -6003,7 +6003,7 @@
   #queueCloseBtn + .queue-title{ margin-left:-12px; }
   @media (min-width: 901px){ .queue-head{ cursor:pointer; } .queue-head .queue-clear{ cursor:pointer; } }
   .queue-clear{
-    border:1px solid rgba(255,255,255,.22); background:none; color:#fff; border-radius:999px;
+    border:1px solid rgba(255,255,255,.22); background:none; color:#fff; border-radius:var(--r-pill, 999px);
     padding:7px 14px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer;
   }
   .queue-clear:hover{ background:rgba(255,255,255,.12); }
@@ -6264,7 +6264,7 @@
   .hamburger-btn .hb-label{ font-size:15px; font-weight:600; color:var(--text); line-height:1; letter-spacing:-.005em; }
   @media (max-width: 900px){
     .sidebar-top .hamburger-btn{
-      flex-direction:row; width:auto; height:38px; padding:0 15px 0 13px; gap:8px; border-radius:999px;
+      flex-direction:row; width:auto; height:38px; padding:0 15px 0 13px; gap:8px; border-radius:var(--r-pill, 999px);
       border:none; background:var(--panel-2);
     }
     .sidebar-top .hamburger-btn span{ width:17px; height:2px; background:var(--text); border-radius:1px; }
@@ -6274,7 +6274,7 @@
     body.np-open .sidebar-top .hamburger-btn, body.np-open.album-open .sidebar-top .hamburger-btn, body.np-open.artist-open .sidebar-top .hamburger-btn,
     html[data-theme="light"] body.album-open .sidebar-top .hamburger-btn, html[data-theme="light"] body.artist-open .sidebar-top .hamburger-btn,
     html[data-theme="light"] body.np-open .sidebar-top .hamburger-btn{
-      width:auto; height:38px; border-radius:999px; gap:8px; padding:0 15px 0 13px; filter:none;
+      width:auto; height:38px; border-radius:var(--r-pill, 999px); gap:8px; padding:0 15px 0 13px; filter:none;
       background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16);
       backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
     }
@@ -6699,7 +6699,7 @@
   .ia-dl-badge.working, .ia-dl-badge.done{ display:inline-flex; align-items:center; }
   /* Build 385: More Results under archive.org results. */
   .ia-more-wrap{ grid-column:1/-1; display:flex; justify-content:center; padding:18px 0 8px; }
-  .ia-more.clear-search-btn{ display:inline-flex; align-items:center; justify-content:center; text-align:center; gap:0; min-width:180px; height:auto; padding:12px 28px; border-radius:999px; text-transform:none; letter-spacing:0; font-size:14.5px; font-weight:700;
+  .ia-more.clear-search-btn{ display:inline-flex; align-items:center; justify-content:center; text-align:center; gap:0; min-width:180px; height:auto; padding:12px 28px; border-radius:var(--r-pill, 999px); text-transform:none; letter-spacing:0; font-size:14.5px; font-weight:700;
     background:var(--panel); border:1px solid var(--border); color:var(--text); }
   .ia-more.clear-search-btn:active{ background:var(--panel-2); }
   .ia-more.loading{ opacity:.7; }
@@ -6990,6 +6990,14 @@
     background:var(--text); color:var(--bg); font-size:16px; border-radius:var(--r-play); }
   .shape-preview .sp-play i{ margin-left:2px; }
   .shape-preview .sp-play + .sp-btn{ margin-left:0; align-self:center; }
+  /* Build 402 (Mark): with big text on a narrow phone the preview stays inside its box (no sideways scroll). */
+  .shape-preview{ flex-wrap:wrap; overflow:hidden; gap:14px; box-sizing:border-box; max-width:100%; }
+  .shape-preview .sp-tile{ width:min(72px, 18vw); flex:0 1 auto; min-width:0; }
+  .shape-preview .sp-art{ width:min(72px, 18vw); height:min(72px, 18vw); }
+  .shape-preview .sp-play{ width:min(48px, 12vw); height:min(48px, 12vw); flex-basis:auto; }
+  .shape-preview .sp-btn{ flex:0 1 auto; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-sizing:border-box; }
+  /* Build 402: a choice never cuts off its own text (big text sizes): the box grows to fit it. */
+  #settingsPanel .set-page .settings-row > .settings-select{ flex:0 0 auto; width:auto; min-width:150px; max-width:100%; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -18808,7 +18816,37 @@
       localStorage.setItem(ALBUM_PLAYED_KEY, JSON.stringify(m));
     }catch(e){}
   }
-  function mfyDay(){ var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  // Build 402 (Mark): a library refresh also picks again (Made for You, the Daily Mixes, Discover and the
+  // day's music-video artist). Everything is seeded by the day, so a refresh just adds a count to it;
+  // tomorrow starts afresh.
+  var MIX_REFRESH_KEY = 'radioPlayerMixRefresh';
+  function mfyBaseDay(){ var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function mfyDay(){
+    var day = mfyBaseDay(), r = null;
+    try{ r = JSON.parse(localStorage.getItem(MIX_REFRESH_KEY) || 'null'); }catch(e){}
+    return r && r.day === day && r.n ? day + '#' + r.n : day;
+  }
+  function refreshDailyPicks(){
+    var day = mfyBaseDay(), r = null;
+    try{ r = JSON.parse(localStorage.getItem(MIX_REFRESH_KEY) || 'null'); }catch(e){}
+    var n = r && r.day === day ? (r.n || 0) + 1 : 1;
+    try{ localStorage.setItem(MIX_REFRESH_KEY, JSON.stringify({ day: day, n: n })); }catch(e){}
+    mfyMemo = null;
+    var oldVideo = null;
+    try{ oldVideo = (dailyState || dailyLoad() || {}).videoKey || null; }catch(e){}
+    dailyState = null;
+    // A different music-video artist when there is another to show.
+    try{
+      if(ensureDailyLists() && oldVideo && dailyState.videoKey === oldVideo){
+        var others = dailyVideoArtistKeys().filter(function(k){ return k !== oldVideo; });
+        if(others.length){ dailyState.videoKey = others[0]; dailySave(); }
+      }
+    }catch(e){}
+    try{ if(typeof renderDailyHome === 'function') renderDailyHome(); }catch(e){}
+    try{ if(typeof renderMadeForYouSection === 'function') renderMadeForYouSection(); }catch(e){}
+    try{ if(onVideoView && typeof rerenderVideoKeepingScroll === 'function') rerenderVideoKeepingScroll(); }catch(e){}
+    try{ if(activeHomeSection && typeof renderHomeSectionPage === 'function') renderHomeSectionPage(); }catch(e){}
+  }
   // A small seeded shuffle, so "a different handful each day" stays the same all day.
   function mfySeeded(list, seed){
     var h = 2166136261;
@@ -28222,14 +28260,28 @@
       b.className = 'mv-seg-btn' + (sort === o[0] ? ' on' : '');
       b.textContent = o[1];
       b.dataset.sort = o[0];
-      b.addEventListener('click', function(){ if(mvSort() === o[0]) return; vsave(MV_SORT_KEY, o[0]); rerenderVideoKeepingScroll(); });
+      // Build 402 (Mark: the page jumped up): the order changes in place, the page isn't rebuilt.
+      b.addEventListener('click', function(){
+        if(mvSort() === o[0]) return;
+        vsave(MV_SORT_KEY, o[0]);
+        Array.prototype.forEach.call(seg.children, function(x){ x.classList.toggle('on', x === b); });
+        mvOrderArtists(o[0]);
+      });
       seg.appendChild(b);
     });
     head.appendChild(seg);
     stationsGrid.appendChild(head);
-    var artists = cat.artists.slice();
-    if(sort === 'most') artists.sort(function(a, b){ return b.videos.length - a.videos.length || alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
-    else if(sort === 'recent') artists.sort(function(a, b){ return b.newest - a.newest || alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+    function mvSorted(how){
+      var list = cat.artists.slice();
+      if(how === 'most') list.sort(function(a, b){ return b.videos.length - a.videos.length || alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+      else if(how === 'recent') list.sort(function(a, b){ return b.newest - a.newest || alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+      return list;
+    }
+    var artists = mvSorted(sort), mvTiles = {}, mvEnd = document.createComment('mv-artists-end');
+    function mvOrderArtists(how){
+      if(!mvEnd.parentNode) return;
+      mvSorted(how).forEach(function(a){ var t = mvTiles[a.key]; if(t) mvEnd.parentNode.insertBefore(t, mvEnd); });
+    }
     artists.forEach(function(a){
       var entry = a.entry || { key: a.key, name: a.name, tracks: [], stations: [] };
       var tile = buildEntityTile({
@@ -28245,8 +28297,10 @@
       // Build 327: the Music Videos filter also finds an artist by the titles of their videos.
       tile.dataset.sfExtra = a.videos.map(function(v){ return v.name; }).join(' ');
       if(a.videoOnly) tile.classList.add('mv-video-only');
+      mvTiles[a.key] = tile;
       stationsGrid.appendChild(tile);
     });
+    stationsGrid.appendChild(mvEnd);
     if(cat.other.length){
       var ot = buildEntityTile({
         key: 'mv:other', entity: 'mvother', name: 'Other Videos', sub: mvCountText(cat.other.length),
@@ -37106,7 +37160,8 @@
   // have been shown, the history starts over (the last month's still kept out).
   function dailyVideoOrder(day){
     var shown = {};
-    videoHistory().forEach(function(x){ if(x && x.k && x.day !== day) shown[x.k] = 1; });
+    var baseDay = String(day).split('#')[0];   // build 402: a refresh (day#n) is still today
+    videoHistory().forEach(function(x){ if(x && x.k && String(x.day).split('#')[0] !== baseDay) shown[x.k] = 1; });
     var all = buildArtistIndex().filter(videoArtistEligible);
     // One known to have no videos doesn't count as waiting for a turn (else the history would
     // never start over).
@@ -41925,6 +41980,7 @@
       pruneStaleLibraryRefs();
       renderLibraryList();
       refreshLibraryView();
+      refreshDailyPicks();
       // With new songs the import reports its own result; otherwise say what changed.
       if(!importedCount){
         setStatus(failed ? 'A music folder could not be opened. Add it again with the + button.' : changeSummary(0, removed, 'song', updated, merged), !!failed);

@@ -34,6 +34,17 @@ async def main():
             await pg.screenshot(path=f'{shots}/shape-page-{scheme}.png')
             await pg.click('#settingsCloseBtn'); await pg.wait_for_timeout(300)
             check(await pg.evaluate("document.getElementById('settingsTitle').textContent") == 'Appearance', 'back goes to the Appearance list')
+            # build 402: with the biggest text on a narrow phone the preview stays inside its box and nothing scrolls sideways
+            await pg.set_viewport_size({'width': 360, 'height': 780}); await pg.wait_for_timeout(200)
+            await pg.evaluate("(()=>{ var r=document.getElementById('fontSizeRange'); r.value='150'; r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(500)
+            await pg.evaluate("__t.ev('openSettings(\"appearance-shape\")')"); await pg.wait_for_timeout(400)
+            ov = await pg.evaluate("""(()=>{ var p=document.getElementById('settingsPanel'), b=document.getElementById('shapePreview').getBoundingClientRect();
+              var kids=Array.from(document.querySelectorAll('#shapePreview > *')).map(e=>e.getBoundingClientRect());
+              return { sw: p.scrollWidth, cw: p.clientWidth, doc: document.documentElement.scrollWidth, vw: innerWidth, boxR: Math.round(b.right), kidsR: Math.round(Math.max.apply(null, kids.map(k=>k.right))), kidsB: Math.round(Math.max.apply(null, kids.map(k=>k.bottom))), boxB: Math.round(b.bottom) }; })()""")
+            check(ov['sw'] <= ov['cw'] and ov['doc'] <= ov['vw'] and ov['kidsR'] <= ov['boxR'] and ov['kidsB'] <= ov['boxB'], f'[{scheme}] text 150% at 360px: the preview fits, no sideways scroll {ov}')
+            await pg.screenshot(path=f'{shots}/shape-preview-big-{scheme}.png')
+            await pg.evaluate("(()=>{ var r=document.getElementById('fontSizeRange'); r.value='100'; r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(300)
+            await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(200)
             # build 400: the previews are first on their pages and stay at the top while scrolling (a short screen, so the pages scroll)
             await pg.set_viewport_size({'width': 390, 'height': 480}); await pg.wait_for_timeout(300)
             for cat, pid in (('appearance-type', 'fontPreview'), ('appearance-shape', 'shapePreview')):

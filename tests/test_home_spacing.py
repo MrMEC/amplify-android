@@ -7,7 +7,7 @@ Run: python3 tests/test_home_spacing.py (screenshots in /tmp/claude-0/t/shots)""
 import asyncio, json, sys, os
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 __file__ = os.path.join(HERE, 'test_daily_mixes.py')
-_src = open(__file__).read().split("async def run(theme):")[0].replace("PORT = 8803", "PORT = 8886").replace("srv_daily", "srv_spacing").replace('" stopPlay: function', '" imp: function(d){ importBackupData(d, \'merge\'); }, stopPlay: function')
+_src = open(__file__).read().split("async def run(theme):")[0].replace("PORT = 8803", "PORT = 8886").replace("srv_daily", "srv_spacing").replace('" stopPlay: function', '" imp: function(d){ importBackupData(d, \'merge\'); }, rfr: function(){ refreshDailyPicks(); }, dst: function(){ ensureDailyLists(); return JSON.parse(JSON.stringify({ day: dailyState.day, video: dailyState.videoKey, mixes: dailyState.mixes.map(function(m){ return m.id + \':\' + (m.songs || []).slice(0, 8).join(\',\'); }), mfy: madeForYou().rediscover ? madeForYou().rediscover.map(function(x){ return x.key || x.name || JSON.stringify(x).slice(0, 40); }) : [] })); }, stopPlay: function')
 exec(_src)
 BACKUP = json.load(open(os.path.join(HERE, 'fixtures', 'layout_backup.json')))
 MEASURE = r"""(()=>{
@@ -73,6 +73,16 @@ async def run(theme, w, h):
           var r1=t.filter(x=>Math.round(x.getBoundingClientRect().top)===tops[0]); var b1=Math.max(...r1.map(x=>Math.max(...Array.from(x.querySelectorAll('.tile-name,.tile-sub')).map(y=>y.getBoundingClientRect().bottom))));
           return Math.round(tops[1]-b1); })()""")
         if pl is not None: check(pl <= 24, f'{T} the two Playlists rows sit close together ({pl}px)')
+        # Build 402: a library refresh picks the Daily Mixes, Discover, Made for You and the video artist again
+        before = await pg.evaluate("__d.dst()")
+        await pg.evaluate("__d.rfr()"); await pg.wait_for_timeout(1200)
+        after = await pg.evaluate("__d.dst()")
+        changed = [i for i, (a, c) in enumerate(zip(before['mixes'], after['mixes'])) if a != c]
+        check(after['day'].endswith('#1') and len(changed) >= 1, f'{T} refresh makes new mixes (day {after["day"]}, {len(changed)} of {len(after["mixes"])} lists changed)')
+        await pg.evaluate("__d.rfr()"); await pg.wait_for_timeout(600)
+        check((await pg.evaluate("__d.dst()"))['day'].endswith('#2'), f'{T} and again on the next refresh')
+        names2 = [x['name'] for x in await pg.evaluate(MEASURE)]
+        check(any('Daily Mix' in n for n in names2) and any(n == 'Kay' for n in names2), f'{T} Home still shows the rows after a refresh {names2}')
         H = await pg.evaluate("document.documentElement.scrollHeight")
         await pg.set_viewport_size({'width': w, 'height': min(H, 7000)}); await pg.wait_for_timeout(800)
         await pg.screenshot(path=f'{shots}/home-spacing-{theme}-{w}.png')

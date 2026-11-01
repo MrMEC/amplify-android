@@ -220,6 +220,22 @@ async def run(vw, vh, mobile, scheme, tag, full):
         i = await info(pg)
         check(i and i['inGrid'] and i['ph'] == 'Filter music videos', f'[{tag}] Music Videos: box {i}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-mv.png')
+        # Build 402: the Artists order changes in place (the page doesn't jump), and every button here follows the shape setting
+        vp = pg.viewport_size
+        await pg.set_viewport_size({'width': vp['width'], 'height': 420}); await pg.wait_for_timeout(300)
+        await pg.evaluate("(()=>{ var h=document.querySelector('.mv-artists-head'); window.scrollTo(0, h.getBoundingClientRect().top + scrollY - 120); })()"); await pg.wait_for_timeout(300)
+        y0 = await pg.evaluate("Math.round(scrollY)")
+        for srt in ('most', 'recent', 'az'):
+            await pg.evaluate("(s)=>document.querySelector('.mv-seg-btn[data-sort='+s+']').click()", srt); await pg.wait_for_timeout(400)
+            st = await pg.evaluate("(s)=>({ y: Math.round(scrollY), on: document.querySelector('.mv-seg-btn.on').dataset.sort, n: document.querySelectorAll('#stationsGrid .tile.mv-artist').length })", srt)
+            check(y0 > 0 and abs(st['y'] - y0) <= 2 and st['on'] == srt and st['n'] == 2, f'[{tag}] Music Videos: "{srt}" keeps the page where it was ({y0} -> {st})')
+        await pg.evaluate("localStorage.setItem('radioPlayerShape', JSON.stringify({radius:'square'})); __t.ev ? 0 : 0") if False else None
+        await pg.evaluate("(()=>{ document.documentElement.style.setProperty('--r-pill','0px'); document.documentElement.style.setProperty('--r-btn','0px'); })()"); await pg.wait_for_timeout(200)
+        rr = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .mv-seg, #stationsGrid .mv-seg-btn.on, #stationsGrid .mv-btn, .watch-tabs .home-tab.active')).filter(e=>e.offsetParent).map(e=>[e.className.slice(0,22), getComputedStyle(e).borderTopLeftRadius])")
+        check(len(rr) >= 4 and all(r[1] == '0px' for r in rr), f'[{tag}] Music Videos: tabs, sort switch and Play All / Shuffle all follow the shape setting {rr}')
+        await pg.screenshot(path=f'{shots}/sf-{tag}-mv-square.png')
+        await pg.evaluate("(()=>{ document.documentElement.style.removeProperty('--r-pill'); document.documentElement.style.removeProperty('--r-btn'); })()")
+        await pg.set_viewport_size(vp); await pg.wait_for_timeout(300)
         await typ(pg, 'great song')
         rows = await vis(pg, '#stationsGrid .sf-mv-res .vep-title')
         check(rows == ['Great Song'], f'[{tag}] Music Videos: the video itself is the result {rows}')
