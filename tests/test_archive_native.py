@@ -259,7 +259,7 @@ async def main():
         check(bar['kb'] and bar['bar'] == 'none', f'no mini Now Playing while typing in Add Channels {bar}')
         await pg.screenshot(path=f'{SHOTS}/addch-typing.png')
         # four lines at most for the name and for the description
-        cl = await pg.evaluate("""(function(){ var rows = document.querySelectorAll('.ia-item'); var one = function(sel){ return rows[1].querySelector(sel).getBoundingClientRect().height; };
+        cl = await pg.evaluate("""(function(){ var rows = document.querySelectorAll('.ia-item'); var one = function(sel){ var el = rows[0].querySelector(sel), e = el.cloneNode(false); e.textContent = 'X'; el.parentNode.appendChild(e); var h = e.getBoundingClientRect().height; e.remove(); return h; };
           return Array.prototype.map.call(rows, function(r){ var n=r.querySelector('.ch-name'), s=r.querySelector('.ch-sub');
             return { n: Math.round(n.getBoundingClientRect().height / one('.ch-name')), s: Math.round(s.getBoundingClientRect().height / one('.ch-sub')), cn: getComputedStyle(n).webkitLineClamp, cs: getComputedStyle(s).webkitLineClamp }; }); })()""")
         check(cl and all(c['n'] <= 4 and c['s'] <= 4 and c['cn'] == '4' and c['cs'] == '4' for c in cl) and cl[0]['n'] == 4 and cl[0]['s'] == 4, f'names and descriptions: up to four lines each {cl}')

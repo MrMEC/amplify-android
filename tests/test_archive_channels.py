@@ -96,7 +96,7 @@ async def main():
         check('collection:' not in q2 and 'mediatype:(movies OR audio OR etree)' in q2, f'switch on: all of archive.org {q2}')
         check(await pg.evaluate("localStorage.getItem('radioPlayerArchiveAll')") == '1', 'switch kept')
         await pg.screenshot(path=f'{SHOTS}/archch-search.png')
-        await pg.evaluate("document.querySelector('.ia-item .ch-add:not(.ia-combine)').click()"); await pg.wait_for_timeout(300)
+        await pg.evaluate("document.querySelector('.ia-item .ch-add:not(.ia-combine):not(.ia-dl)').click()"); await pg.wait_for_timeout(300)
         urls = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerVideoChannels')).map(function(c){return c.url;})")
         check('amplify-archive:i:zz_found' in urls, f'a search result is added as a channel {urls}')
         # --- custom channel: name it, put several items in it, play it

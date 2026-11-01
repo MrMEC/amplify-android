@@ -1582,7 +1582,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     new Thread(() -> call.resolve(VideoLibrary.info(ctx, u, thumb))).start();
   }
 
-  private static JSObject walkTree(ContentResolver cr, Uri tree) {
+  /** The name a folder's files are listed under (the start of each relPath). */
+  private static String treeRootName(ContentResolver cr, Uri tree) {
     String rootId = DocumentsContract.getTreeDocumentId(tree);
     String rootName = displayName(cr, DocumentsContract.buildDocumentUriUsingTree(tree, rootId));
     if (rootName == null || rootName.isEmpty()) {
@@ -1592,6 +1593,12 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       if (s >= 0) rootName = rootName.substring(s + 1);
       if (rootName.isEmpty()) rootName = "Music";
     }
+    return rootName;
+  }
+
+  private static JSObject walkTree(ContentResolver cr, Uri tree) {
+    String rootId = DocumentsContract.getTreeDocumentId(tree);
+    String rootName = treeRootName(cr, tree);
     JSArray files = new JSArray();
     int count = 0;
     boolean truncated = false;
@@ -1653,6 +1660,104 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     o.put("files", files);
     o.put("truncated", truncated);
     return o;
+  }
+
+  // ---- Downloads into a music or video folder (build 379: archive.org items) ----
+  // One at a time, in the background. The page hears "folderDownload" as each file goes
+  // ({id, index, count, name, done, total}) and gets back the files as a folder listing
+  // would list them, so they can go straight into the library.
+  private final java.util.concurrent.ExecutorService downloads =
+      java.util.concurrent.Executors.newSingleThreadExecutor();
+  private final java.util.Set<String> downloadsCancelled =
+      java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
+  @PluginMethod
+  public void downloadToFolder(PluginCall call) {
+    final String id = call.getString("id", "");
+    final String t = call.getString("tree");
+    final JSArray pathArr = call.getArray("path");
+    final JSArray files = call.getArray("files");
+    if (t == null || files == null) {
+      call.reject("Missing details");
+      return;
+    }
+    final Uri tree = Uri.parse(t);
+    if (!canWrite(tree)) {
+      call.reject("Amplify can't add files to this folder yet", "NO_WRITE");
+      return;
+    }
+    final ContentResolver cr = getContext().getContentResolver();
+    downloads.execute(
+        () -> {
+          try {
+            java.util.List<String> path = new java.util.ArrayList<>();
+            if (pathArr != null) for (int i = 0; i < pathArr.length(); i++) path.add(pathArr.getString(i));
+            String folderId = FolderDownloads.folder(cr, tree, path.toArray(new String[0]));
+            StringBuilder rel = new StringBuilder(treeRootName(cr, tree));
+            for (String seg : path) rel.append('/').append(FolderDownloads.safeName(seg));
+            JSArray out = new JSArray();
+            JSArray failed = new JSArray();
+            final int count = files.length();
+            for (int i = 0; i < count; i++) {
+              if (downloadsCancelled.contains(id)) throw new FolderDownloads.CancelledException();
+              org.json.JSONObject f = files.getJSONObject(i);
+              final String name = FolderDownloads.safeName(f.optString("name"));
+              final int index = i;
+              try {
+                String[] got =
+                    FolderDownloads.download(
+                        cr, tree, folderId, name, f.optString("url"), f.optLong("size", 0),
+                        (done, total) -> {
+                          JSObject ev = new JSObject();
+                          ev.put("id", id);
+                          ev.put("index", index);
+                          ev.put("count", count);
+                          ev.put("name", name);
+                          ev.put("done", done);
+                          ev.put("total", total);
+                          notifyListeners("folderDownload", ev);
+                        },
+                        () -> downloadsCancelled.contains(id));
+                JSObject o = new JSObject();
+                o.put("uri", DocumentsContract.buildDocumentUriUsingTree(tree, got[0]).toString());
+                o.put("name", name);
+                o.put("relPath", rel + "/" + name);
+                o.put("type", FolderDownloads.mimeOf(name));
+                o.put("size", Long.parseLong(got[1]));
+                o.put("lastModified", Long.parseLong(got[2]));
+                o.put("skipped", "1".equals(got[3]));
+                out.put(o);
+              } catch (FolderDownloads.CancelledException e) {
+                throw e;
+              } catch (Exception e) {
+                JSObject o = new JSObject();
+                o.put("name", name);
+                o.put("why", e.getMessage() == null ? "It couldn't be downloaded" : e.getMessage());
+                failed.put(o);
+              }
+            }
+            JSObject res = new JSObject();
+            res.put("files", out);
+            res.put("failed", failed);
+            res.put("folder", rel.toString());
+            call.resolve(res);
+          } catch (FolderDownloads.CancelledException e) {
+            call.reject("Cancelled", "CANCELLED");
+          } catch (SecurityException e) {
+            call.reject("Amplify can't add files to this folder yet", "NO_WRITE");
+          } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "The download failed" : e.getMessage());
+          } finally {
+            downloadsCancelled.remove(id);
+          }
+        });
+  }
+
+  @PluginMethod
+  public void cancelDownload(PluginCall call) {
+    String id = call.getString("id");
+    if (id != null) downloadsCancelled.add(id);
+    call.resolve();
   }
 
   /** Lists a music folder picked earlier again, to pick up songs added or removed since. */

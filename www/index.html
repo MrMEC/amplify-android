@@ -6646,6 +6646,15 @@
   .bk-file:active{ background:var(--panel-2); }
   .bk-file-name{ font-size:14.5px; font-weight:600; }
   .bk-file-sub{ font-size:12.5px; color:var(--text-dim); }
+  /* Build 379: Download to Library on archive.org items. */
+  .ia-dl.working{ font-size:11px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .ia-dl.done{ color:var(--accent); }
+  .ia-dl-result{ flex-shrink:0; align-self:center; margin-left:6px; }
+  .ia-dl-box{ display:flex; flex-direction:column; gap:8px; }
+  .ia-dl-name{ margin:0; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ia-dl-bar{ height:6px; border-radius:3px; background:var(--border); overflow:hidden; }
+  .ia-dl-bar i{ display:block; height:100%; width:0; background:var(--accent); border-radius:3px; transition:width .25s; }
+  .ia-dl-line{ margin:0; font-size:12.5px; color:var(--text-dim); font-variant-numeric:tabular-nums; }
   /* ---------- Build 349 (Mark): Settings, full screen and in categories ----------
      A page of its own over everything (the floating video still above it), on the page's own
      background. The back arrow sits where every other page's does, on the menu button's line;
@@ -7551,6 +7560,10 @@
                   </button>
                   <button type="button" class="np-menu-item" id="npMoreLikeBtn" role="menuitem" style="display:none;">
                     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.4 1.4 0 0 1 0 2l-6.2 6.2a1.4 1.4 0 0 1-2 0z"/><circle class="fill" cx="8" cy="8" r="1.5"/></svg><span>More Like This</span>
+                  </button>
+                  <!-- Build 379: an archive.org item playing: save it into the library. -->
+                  <button type="button" class="np-menu-item" id="npArchiveDlBtn" role="menuitem" style="display:none;">
+                    <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg><span>Download to Library</span>
                   </button>
                   <button type="button" class="np-menu-item" id="npPlaylistBtn" role="menuitem">
                     <i class="fa-solid fa-plus"></i><span>Add to Playlist</span>
@@ -23858,7 +23871,7 @@
     tools.appendChild(row);
     var hint = document.createElement('div');
     hint.className = 'ch-sub ia-hint';
-    hint.textContent = 'Off: searches the collections below. On: searches all of archive.org. Tap + to make an item its own channel, or the list button next to it to put it in a custom channel.';
+    hint.textContent = 'Off: searches the collections below. On: searches all of archive.org. Tap + to make an item its own channel, the list button to put it in a custom channel, or the arrow to download it to your library.';
     tools.appendChild(hint);
   }
   function archiveCount(n){ return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0); }
@@ -23888,6 +23901,7 @@
       openArchivePicker(it, function(){ if(!(addChannelsState.archiveQ || '').trim() && onAddChannelsView && addChannelsTab === 'archive') renderAddChannels(true); });
     });
     row.appendChild(combine);
+    row.appendChild(archiveDlButton(it));
     var add = document.createElement('button');
     add.type = 'button';
     function paint(){
@@ -26421,7 +26435,7 @@
         return P.rescanVideoFolder({ treeUri: fo.treeUri }).then(mergeScan, function(){ failed.push(fo.name); });
       });
     });
-    chain.then(function(){
+    return chain.then(function(){
       videoScanBusy = false;
       videoRefreshHeaderBtnEl.classList.remove('refreshing');
       var after = videoSet(), added = 0, removed = 0;
@@ -26430,6 +26444,7 @@
       setStatus(failed.length ? ('Could not open ' + failed.join(', ') + '. Remove it and add it again.') : changeSummary(added, removed, 'video'), !!failed.length);
       if(onVideoView) renderVideoHome();
       fetchVideoInfoQueue();
+      return { added: added, failed: failed.length };
     });
   }
   function removeVideoFolder(tree, confirmed){
@@ -38597,12 +38612,18 @@
     // Build 243: a channel has no queue (sideways swipes are for the guide grid).
     try{ npQueueMenuBtn.style.display = isNpChannel(npTarget()) ? 'none' : ''; }catch(e){}
     try{ document.getElementById('npLyricsMenuBtn').style.display = lyricsApplies() ? '' : 'none'; }catch(e){}
+    try{ document.getElementById('npArchiveDlBtn').style.display = archiveDlPlugin() && npArchiveItem(npTarget() || currentStation) ? '' : 'none'; }catch(e){}
     var open = npMenu.classList.toggle('open');
     npMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
   npMenuBtn.addEventListener('click', function(e){
     e.stopPropagation();
     toggleNpMenu();
+  });
+  document.getElementById('npArchiveDlBtn').addEventListener('click', function(){
+    closeNpMenu();
+    var it = npArchiveItem(npTarget() || currentStation);
+    if(it) downloadArchiveItem(it);
   });
   document.addEventListener('click', function(e){
     if(!npMenu.classList.contains('open')) return;
@@ -41783,6 +41804,282 @@
       setStatus('Could not reach the Internet Archive.', true);
     });
   }
+  // ---------- Download to Library (build 379, Mark) ----------
+  // An archive.org item is saved onto the phone and joins the library: audio into a music
+  // folder (Archive.org/<Creator - Title>/, its songs and its cover), a film or show into a
+  // video folder (Archive.org/<Title (Year)>.mp4, so Watch knows it as a movie). The phone
+  // downloads it (FolderDownloads), one item at a time, in the background; a progress window
+  // can be hidden (the item's button keeps counting) or cancel it. Songs then go straight into
+  // the library, and any song tag the file lacks (title, artist, album, track, year) is filled
+  // from archive.org. With more than one music (or video) folder, the person picks one once.
+  var ARCHIVE_DL_KEY = 'radioPlayerArchiveDownloads';
+  var archiveDl = {};          // id -> { pct, state: 'working' | 'done' }
+  var archiveDlQueue = Promise.resolve();
+  function archiveDlPlugin(){
+    var C = window.Capacitor, P = C && C.Plugins && C.Plugins.AmplifyPlayer;
+    return P && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && typeof P.downloadToFolder === 'function' ? P : null;
+  }
+  function archiveDlPrefs(){ var o = null; try{ o = JSON.parse(localStorage.getItem(ARCHIVE_DL_KEY) || 'null'); }catch(e){} return o && typeof o === 'object' ? o : {}; }
+  function archiveDlSavePrefs(o){ try{ localStorage.setItem(ARCHIVE_DL_KEY, JSON.stringify(o)); }catch(e){} }
+  var ARCHIVE_DL_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>';
+  var ARCHIVE_DL_DONE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  // The item's download buttons, wherever they are on screen, show how it's going.
+  function paintArchiveDlButtons(id){
+    var st = archiveDl[id];
+    Array.prototype.forEach.call(document.querySelectorAll('.ia-dl[data-ia-id]'), function(b){
+      if(b.dataset.iaId !== id) return;
+      b.classList.toggle('working', !!st && st.state === 'working');
+      b.classList.toggle('done', !!st && st.state === 'done');
+      if(st && st.state === 'working'){ b.textContent = (st.pct || 0) + '%'; b.title = 'Downloading (' + (st.pct || 0) + '%)'; }
+      else if(st && st.state === 'done'){ b.innerHTML = ARCHIVE_DL_DONE; b.title = 'Downloaded to your library'; }
+      else { b.innerHTML = ARCHIVE_DL_ICON; b.title = 'Download to Library'; }
+      b.setAttribute('aria-label', b.title);
+    });
+  }
+  function archiveDlButton(item, cls){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = (cls || 'ch-add') + ' ia-dl';
+    b.dataset.iaId = item.id;
+    b.hidden = !archiveDlPlugin();
+    b.addEventListener('click', function(ev){ ev.stopPropagation(); downloadArchiveItem(item); });
+    setTimeout(function(){ paintArchiveDlButtons(item.id); }, 0);
+    b.innerHTML = ARCHIVE_DL_ICON;
+    b.title = 'Download to Library';
+    b.setAttribute('aria-label', b.title);
+    return b;
+  }
+  // What to download and where it goes in the folder.
+  function archiveDlPlan(meta, item){
+    var files = (meta && meta.files) || [];
+    var byName = {};
+    files.forEach(function(f){ if(f && f.name) byName[f.name] = f; });
+    var md = (meta && meta.metadata) || {};
+    function first(v){ return Array.isArray(v) ? v[0] : v; }
+    var title = String(first(md.title) || item.title || item.id).trim();
+    var creator = String(first(md.creator) || item.creator || '').trim();
+    var year = String(item.year || first(md.year) || first(md.date) || '').slice(0, 4);
+    if(!/^\d{4}$/.test(year)) year = '';
+    var list = archivePlayables(meta, item);
+    if(!list.length) return null;
+    var video = !!list[0].isVideo;
+    function fileOf(ep){ return byName[String(ep.guid || '').slice(('ia:' + item.id + '/').length)] || {}; }
+    function ext(n){ var m = /\.[A-Za-z0-9]{2,5}$/.exec(n || ''); return m ? m[0].toLowerCase() : ''; }
+    if(video){
+      var vf = fileOf(list[0]);
+      return { kind: 'video', title: title, path: ['Archive.org'],
+        files: [{ url: list[0].episodeUrl, name: title + (year ? ' (' + year + ')' : '') + (ext(vf.name) || '.mp4'), size: Number(vf.size) || 0 }] };
+    }
+    var out = list.map(function(ep, i){
+      var f = fileOf(ep);
+      var base = String(f.name || ep.name).split('/').pop();
+      return { url: ep.episodeUrl, name: base, size: Number(f.size) || 0,
+        tags: { title: String(f.title || ep.name || '').trim(), artist: String(f.artist || f.creator || creator || '').trim(),
+          album: String(f.album || title).trim(), track: String(parseInt(f.track, 10) || (i + 1)), year: year } };
+    });
+    // The item's own picture, as the album's cover: a JPEG or PNG it has (the largest), or
+    // archive.org's picture of the item.
+    var imgs = files.filter(function(f){ return f && f.name && !f.private && /\.(jpe?g|png)$/i.test(f.name) && !/thumb|_itemimage|__ia_thumb/i.test(f.name) && (Number(f.size) || 0) < 8e6; })
+      .sort(function(a, b){ return (/cover|front|folder/i.test(b.name) ? 1 : 0) - (/cover|front|folder/i.test(a.name) ? 1 : 0) || (Number(b.size) || 0) - (Number(a.size) || 0); });
+    if(imgs.length){
+      var im = imgs[0];
+      out.push({ url: 'https://archive.org/download/' + encodeURIComponent(item.id) + '/' + String(im.name).split('/').map(encodeURIComponent).join('/'),
+        name: 'cover' + (ext(im.name) === '.png' ? '.png' : '.jpg'), size: Number(im.size) || 0 });
+    } else {
+      out.push({ url: archiveArtUrl(item.id), name: 'cover.jpg', size: 0 });
+    }
+    return { kind: 'music', title: title, path: ['Archive.org', creator && creator.toLowerCase() !== title.toLowerCase() ? creator + ' - ' + title : title], files: out };
+  }
+  // Which folder: the one picked before, the only one there is, or the person picks.
+  function archiveDlFolder(kind){
+    var list = kind === 'video'
+      ? videoFolders.map(function(f){ return { tree: f.treeUri, name: f.name }; })
+      : musicFolderTrees().map(function(t){ var m = musicFolders.filter(function(f){ return f.treeUri === t; })[0]; return { tree: t, name: (m && m.name) || folderNameOfTree(t) }; });
+    var prefs = archiveDlPrefs();
+    var kept = list.filter(function(f){ return f.tree === prefs[kind]; })[0];
+    if(kept) return Promise.resolve(kept);
+    if(list.length === 1) return Promise.resolve(list[0]);
+    if(!list.length){
+      showNotice({ kind: 'info', title: kind === 'video' ? 'Add a video folder first' : 'Add a music folder first',
+        message: kind === 'video' ? 'Videos are saved into one of your video folders, so they show up in Watch. Add the folder you keep videos in, then download again.'
+          : 'Songs are saved into one of your music folders, so they stay in your library. Add the folder you keep music in, then download again.',
+        autoClose: false, actions: [{ label: 'Not Now' }, { label: kind === 'video' ? 'Add Video Folder' : 'Add Music Folder', primary: true,
+          run: function(){ if(kind === 'video') addVideoFolder(); else openAddMusicDialog(); } }] });
+      return Promise.resolve(null);
+    }
+    return new Promise(function(resolve){
+      var box = document.createElement('div');
+      var p = document.createElement('p'); p.className = 'bk-what';
+      p.textContent = 'Which ' + (kind === 'video' ? 'video' : 'music') + ' folder should downloads go into? It’s used from now on.';
+      box.appendChild(p);
+      var seq = 0, picked = false;
+      var wrap = document.createElement('div'); wrap.className = 'bk-list';
+      list.forEach(function(f){
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'bk-file';
+        var n = document.createElement('span'); n.className = 'bk-file-name'; n.textContent = f.name; b.appendChild(n);
+        b.addEventListener('click', function(){
+          picked = true; closeNotice(seq);
+          var o = archiveDlPrefs(); o[kind] = f.tree; archiveDlSavePrefs(o);
+          resolve(f);
+        });
+        wrap.appendChild(b);
+      });
+      box.appendChild(wrap);
+      seq = showNotice({ kind: 'info', title: 'Download to', message: box, autoClose: false,
+        onClose: function(){ if(!picked) resolve(null); }, actions: [{ label: 'Cancel', run: function(){ resolve(null); } }] });
+    });
+  }
+  function downloadArchiveItem(item){
+    var P = archiveDlPlugin();
+    if(!P){ setStatus('Downloading works in the Android app.', true); return; }
+    var st = archiveDl[item.id];
+    if(st && st.state === 'working'){ showArchiveDlProgress(item); return; }
+    if(st && st.state === 'preparing') return;
+    archiveDl[item.id] = { state: 'preparing', pct: 0, title: item.title };
+    function reset(){ delete archiveDl[item.id]; paintArchiveDlButtons(item.id); }
+    extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
+      var plan = archiveDlPlan(meta, item);
+      if(!plan){ reset(); showNotice({ kind: 'error', message: 'There’s nothing in this item Amplify can play, so there’s nothing to download.' }); return; }
+      return archiveDlFolder(plan.kind).then(function(folder){
+        if(!folder){ reset(); return; }
+        archiveDl[item.id].plan = plan; archiveDl[item.id].folder = folder;
+        archiveDl[item.id].state = 'working';
+        showArchiveDlProgress(item);
+        archiveDlQueue = archiveDlQueue.then(function(){ return runArchiveDownload(P, item, plan, folder); }, function(){ return runArchiveDownload(P, item, plan, folder); });
+      });
+    })['catch'](function(){
+      reset();
+      showNotice({ kind: 'error', message: 'Couldn’t reach archive.org. Check your connection and try again.' });
+    });
+  }
+  // The progress window: the item, a bar, which file; Hide keeps it going, Cancel stops it.
+  var archiveDlNotice = { seq: 0, id: '' };
+  function showArchiveDlProgress(item){
+    var st = archiveDl[item.id];
+    if(!st) return;
+    var box = document.createElement('div'); box.className = 'ia-dl-box';
+    var name = document.createElement('p'); name.className = 'ia-dl-name'; name.textContent = item.title; box.appendChild(name);
+    var bar = document.createElement('div'); bar.className = 'ia-dl-bar'; var fill = document.createElement('i'); bar.appendChild(fill); box.appendChild(bar);
+    var line = document.createElement('p'); line.className = 'ia-dl-line'; box.appendChild(line);
+    st.ui = { fill: fill, line: line };
+    archiveDlPaint(item.id);
+    archiveDlNotice.id = item.id;
+    archiveDlNotice.seq = showNotice({ kind: 'working', title: 'Downloading to your library', message: box, autoClose: false,
+      onClose: function(){ if(archiveDl[item.id]) archiveDl[item.id].ui = null; },
+      actions: [{ label: 'Cancel', run: function(){ var P = archiveDlPlugin(); if(P) P.cancelDownload({ id: item.id }); if(archiveDl[item.id]) archiveDl[item.id].cancelled = true; } }, { label: 'Hide', primary: true }] });
+  }
+  function archiveDlPaint(id){
+    var st = archiveDl[id];
+    if(!st) return;
+    paintArchiveDlButtons(id);
+    if(!st.ui) return;
+    st.ui.fill.style.width = (st.pct || 0) + '%';
+    st.ui.line.textContent = st.count ? (st.count > 1 ? 'File ' + (st.index + 1) + ' of ' + st.count + ' · ' : '') + (st.pct || 0) + '%' : 'Starting…';
+  }
+  var archiveDlListening = false;
+  function listenArchiveDl(P){
+    if(archiveDlListening || typeof P.addListener !== 'function') return;
+    archiveDlListening = true;
+    P.addListener('folderDownload', function(ev){
+      var st = ev && archiveDl[ev.id];
+      if(!st || st.state !== 'working') return;
+      var plan = st.plan, sizes = plan ? plan.files.map(function(f){ return f.size || 0; }) : [];
+      var all = sizes.reduce(function(a, b){ return a + b; }, 0);
+      var before = sizes.slice(0, ev.index).reduce(function(a, b){ return a + b; }, 0);
+      var frac = all > 0 ? (before + Math.min(ev.done, sizes[ev.index] || ev.total || ev.done)) / all
+        : (ev.index + (ev.total > 0 ? ev.done / ev.total : 0)) / Math.max(1, ev.count);
+      st.pct = Math.max(st.pct || 0, Math.min(99, Math.floor(frac * 100)));
+      st.index = ev.index; st.count = ev.count;
+      archiveDlPaint(ev.id);
+    });
+  }
+  function runArchiveDownload(P, item, plan, folder){
+    listenArchiveDl(P);
+    var st = archiveDl[item.id];
+    if(!st || st.cancelled){ delete archiveDl[item.id]; paintArchiveDlButtons(item.id); return Promise.resolve(); }
+    function go(){
+      return P.downloadToFolder({ id: item.id, tree: folder.tree, path: plan.path, files: plan.files.map(function(f){ return { url: f.url, name: f.name, size: f.size }; }) });
+    }
+    function finish(res){
+      if(archiveDlNotice.id === item.id) closeNotice(archiveDlNotice.seq);
+      var got = (res && res.files) || [], failed = (res && res.failed) || [];
+      var media = got.filter(function(f){ return !/^image\//.test(f.type || ''); });
+      if(!media.length){
+        delete archiveDl[item.id]; paintArchiveDlButtons(item.id);
+        showNotice({ kind: 'error', title: 'Nothing was downloaded', message: failed.length ? failed[0].name + ': ' + failed[0].why : 'archive.org didn’t send the files.', autoClose: false });
+        return;
+      }
+      archiveDl[item.id] = { state: 'done', pct: 100 };
+      paintArchiveDlButtons(item.id);
+      var note = failed.length ? ' ' + failed.length + (failed.length === 1 ? ' file' : ' files') + ' couldn’t be downloaded.' : '';
+      if(plan.kind === 'video'){
+        if(!videoFolders.some(function(f){ return f.treeUri === folder.tree; })) return;
+        // Watch looks at its folders again, then says where the film is.
+        var said = function(){ showNotice({ kind: 'done', title: 'Downloaded', message: '“' + plan.title + '” is in ' + folder.name + '/Archive.org and in Watch.' + note, autoClose: !note }); };
+        return Promise.resolve(rescanVideoFolders()).then(said, said);
+      }
+      return addArchiveSongs(got, plan, folder, note);
+    }
+    function fail(err){
+      if(err && err.code === 'NO_WRITE'){
+        showNotice({ kind: 'info', title: 'Allow Amplify to save here',
+          message: 'Amplify needs your permission to add files to “' + folder.name + '”. Tap Allow, then choose that folder and tap Use this folder.',
+          autoClose: false, actions: [{ label: 'Not Now', run: function(){ delete archiveDl[item.id]; paintArchiveDlButtons(item.id); } }, { label: 'Allow', primary: true, run: function(){
+            askFolderWrite(folder.tree).then(function(r){
+              if(r !== 'ok'){
+                delete archiveDl[item.id]; paintArchiveDlButtons(item.id);
+                showNotice({ kind: 'error', message: r === 'other' ? 'That was a different folder. Choose “' + folder.name + '”.' : 'Permission wasn’t given, so nothing was downloaded.' });
+                return;
+              }
+              showArchiveDlProgress(item);
+              archiveDlQueue = archiveDlQueue.then(function(){ return go().then(finish, fail); });
+            }, function(){ delete archiveDl[item.id]; paintArchiveDlButtons(item.id); });
+          } }] });
+        return;
+      }
+      delete archiveDl[item.id]; paintArchiveDlButtons(item.id);
+      if(archiveDlNotice.id === item.id) closeNotice(archiveDlNotice.seq);
+      if(err && err.code === 'CANCELLED'){ showNotice({ kind: 'info', message: 'Download cancelled. Nothing was kept.' }); return; }
+      showNotice({ kind: 'error', title: 'The download stopped', message: (err && err.message) || 'Something went wrong.', autoClose: false });
+    }
+    return go().then(finish, fail);
+  }
+  // The songs go into the library now (no folder refresh needed), then tags they lack are filled.
+  function addArchiveSongs(got, plan, folder, note){
+    var stubs = nativeMusicStubs({ files: got });
+    var audio = stubs.filter(isAudioFile);
+    var art = buildFolderArtIndex(stubs), artStubs = Object.keys(art).map(function(d){ return art[d]; });
+    var tagsByName = {};
+    plan.files.forEach(function(f){ if(f.tags) tagsByName[f.name] = f.tags; });
+    var uris = {};
+    got.forEach(function(f){ uris[f.uri] = f.name; });
+    function wait(){ return importInProgress ? new Promise(function(r){ setTimeout(r, 1500); }).then(wait) : Promise.resolve(); }
+    return wait().then(function(){
+      return Promise.all(artStubs.map(function(s){ return nativeFileFromEntry(s.amplifyEntry)['catch'](function(){ return null; }); }));
+    }).then(function(artFiles){
+      return importLocalFiles(audio.concat(artFiles.filter(Boolean)), { fromFolder: true });
+    }).then(function(){
+      var tracks = libraryTracks.filter(function(t){ return t.srcUri && uris[t.srcUri]; });
+      if(!tracks.length) return;
+      return saveTagsToTracks(tracks, function(doc, t){
+        var want = tagsByName[uris[t.srcUri]] || {}, c = {};
+        ['title', 'artist', 'album', 'track', 'year'].forEach(function(k){
+          if(want[k] && !String(doc.values[k] || '').trim()) c[k] = want[k];
+        });
+        return c;
+      })['catch'](function(){});
+    }).then(function(){
+      if(note) showNotice({ kind: 'info', title: 'Downloaded', message: '“' + plan.title + '” is in your library.' + note, autoClose: false });
+    });
+  }
+  // Now Playing's menu: download what's playing, when it's from archive.org.
+  function npArchiveItem(st){
+    var g = String((st && st.guid) || '');
+    if(g.indexOf('ia:') !== 0) return null;
+    var id = g.slice(3).split('/')[0];
+    if(!id) return null;
+    return { id: id, title: st.archiveVideo ? st.name : (st.collectionName || st.name), creator: st.artistName || '', video: !!st.archiveVideo };
+  }
   function buildArchiveResultRow(item){
     var row = document.createElement('div');
     row.className = 'tile song-row video-result-row archive-result-row';
@@ -41803,6 +42100,7 @@
     sub.textContent = [item.video ? 'Video' : 'Audio', item.year, item.creator].filter(Boolean).join(' · ');
     body.appendChild(sub);
     row.appendChild(body);
+    row.appendChild(archiveDlButton(item, 'ch-add ia-dl-result'));
     row.addEventListener('click', function(){ playArchiveItem(item, row, { noHistory: archiveSearchAll(), list: (lastSearch && lastSearch.archive) || (searchState && searchState.archive) || [item] }); });
     return row;
   }
