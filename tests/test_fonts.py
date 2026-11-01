@@ -12,6 +12,7 @@ src = open(os.path.join(HERE, '..', 'www', 'index.html')).read()
 mark = '  var coverFlow = null;\n'
 assert src.count(mark) == 1
 open(ROOT + '/index.html', 'w').write(src.replace(mark, mark + HOOK))
+shutil.copytree(os.path.join(HERE, '..', 'www', 'fonts'), ROOT + '/fonts')
 H = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT); H.log_message = lambda *a: None
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
 TTF = '/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf'
@@ -27,7 +28,7 @@ PROBE = "(()=>{ if(document.querySelector('.grid-section-label')) return; ['grid
 async def pick(pg, sel, val):
     await pg.select_option(sel, val); await pg.wait_for_timeout(250)
 async def run(B, theme, w, h, mobile):
-    T = f'[{theme} {w}]'
+    T = f'[{theme} {w}]'; PW = w
     c = await B.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2 if mobile else 1, is_mobile=mobile, has_touch=mobile, color_scheme=theme)
     pg = await c.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.add_init_script(AUTO_NOTICE)
@@ -40,7 +41,7 @@ async def run(B, theme, w, h, mobile):
     sub = await pg.evaluate("document.querySelector('.set-cat[data-set-cat=appearance] .set-cat-sub').textContent")
     check('font' in sub.lower(), f'{T} category line mentions fonts {sub!r}')
     opts = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#fontBodySelect option'), o => o.textContent)")
-    check(opts == ['Poppins (default)', 'System', 'Serif', 'Condensed', 'Monospace'], f'{T} app font choices {opts}')
+    check(opts == ['Poppins (default)', 'Inter', 'Open Sans', 'Lato', 'Nunito', 'Nunito Sans', 'System', 'Serif', 'Condensed', 'Monospace'], f'{T} app font choices {opts}')
     hopts = await pg.evaluate("document.querySelector('#fontHeadSelect option').textContent")
     check(hopts == 'Same as app', f'{T} headings default to the app font')
     await pg.screenshot(path=f'{SHOTS}/fonts_default_{theme}_{w}.png')
@@ -52,6 +53,13 @@ async def run(B, theme, w, h, mobile):
     check('Noto Serif' in await cs(pg, '.grid-section-label', 'fontFamily') and 'mono' in (await cs(pg, 'body', 'fontFamily')).lower(), f'{T} headings can differ from the app font')
     check('Noto Serif' in await cs(pg, '.page-title', 'fontFamily'), f'{T} page titles use the heading font')
     await pg.screenshot(path=f'{SHOTS}/fonts_mono_serif_{theme}_{w}.png')
+    # bundled fonts load from the app's files
+    for fid, fam, wt in (('inter', 'Inter', 400), ('opensans', 'Open Sans', 700), ('lato', 'Lato', 400), ('nunito', 'Nunito', 800), ('nunitosans', 'Nunito Sans', 600)):
+        await pick(pg, '#fontBodySelect', fid)
+        got = await cs(pg, 'body', 'fontFamily')
+        n = await pg.evaluate("([f, wt]) => document.fonts.load(wt + ' 16px \"' + f + '\"').then(l => l.filter(x => x.status === 'loaded').length)", [fam, wt])
+        check(fam in got and n >= 1, f'{T} {fam}: app font set and its file loads ({n})')
+    await pg.screenshot(path=f'{SHOTS}/fonts_nunitosans_{theme}_{PW}.png')
     # text size
     await pick(pg, '#fontBodySelect', 'poppins'); await pick(pg, '#fontHeadSelect', 'same')
     await pg.evaluate("(()=>{ var r = document.getElementById('fontSizeRange'); r.value = '150'; r.dispatchEvent(new Event('input')); })()")
