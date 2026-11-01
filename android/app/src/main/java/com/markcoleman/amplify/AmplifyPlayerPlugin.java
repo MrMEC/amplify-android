@@ -1662,23 +1662,36 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     frames.execute(
         () -> {
           try {
+            // Build 384: the phone's software decoder first (see SoftFrame): it doesn't take one of
+            // the few hardware decoders, and everything is let go after each frame.
+            String softWhy = null;
+            try {
+              java.util.concurrent.Future<byte[]> f =
+                  frameWork.submit(() -> SoftFrame.jpeg(ctx, Uri.parse(u), ms, exact || save, save ? 1280 : 480, 7000));
+              byte[] jpg = f.get(9, java.util.concurrent.TimeUnit.SECONDS);
+              JSObject o = VideoLibrary.frameResult(ctx, u, jpg, save);
+              o.put("via", "software");
+              call.resolve(o);
+              return;
+            } catch (java.util.concurrent.ExecutionException e) {
+              Throwable c = e.getCause();
+              softWhy = c == null || c.getMessage() == null ? "failed" : c.getMessage();
+            } catch (java.util.concurrent.TimeoutException e) {
+              softWhy = "took too long";
+            }
+            // A file the software decoder can't read (an .avi, say): the system's reader, and only
+            // ever the nearest key frame (the exact one stalled it).
             android.media.MediaMetadataRetriever r = frameReaderFor(ctx, u);
             JSObject o;
             try {
-              o = frameWithin(ctx, r, u, ms, exact, save, 6);
+              o = frameWithin(ctx, r, u, ms, false, save, 6);
             } catch (java.util.concurrent.TimeoutException te) {
-              // That reader is stuck: leave it, and ask a new one for the nearest key frame.
               frameReader = null;
               frameUri = null;
-              android.media.MediaMetadataRetriever r2 = frameReaderFor(ctx, u);
-              try {
-                o = frameWithin(ctx, r2, u, ms, false, save, 8);
-              } catch (java.util.concurrent.TimeoutException te2) {
-                frameReader = null;
-                frameUri = null;
-                throw new Exception("The phone is taking too long to read this video");
-              }
+              throw new Exception("The phone is taking too long to read this video (" + softWhy + ")");
             }
+            o.put("via", "reader");
+            o.put("softWhy", softWhy);
             call.resolve(o);
           } catch (Throwable e) {
             call.reject(e.getMessage() == null ? "The video can't be read" : e.getMessage());

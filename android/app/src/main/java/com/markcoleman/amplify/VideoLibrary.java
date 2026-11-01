@@ -282,27 +282,35 @@ final class VideoLibrary {
     long dur = parseLong(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
     Bitmap frame = grabAny(r, Math.max(0, ms) * 1000L, exact, save ? 1280 : 480, w, h);
     if (frame == null) throw new Exception("No picture at that point");
-    JSObject o = new JSObject();
-    o.put("duration", dur);
+    byte[] jpg;
     try {
-      if (save) {
-        File dir = new File(context.getFilesDir(), "vthumbs");
-        if (!dir.exists()) dir.mkdirs();
-        String base = hash(uriString) + "-c";
-        File[] old = dir.listFiles((d, n) -> n.startsWith(base));
-        File out = new File(dir, base + System.currentTimeMillis() + ".jpg");
-        try (FileOutputStream os = new FileOutputStream(out)) {
-          frame.compress(Bitmap.CompressFormat.JPEG, 88, os);
-        }
-        if (old != null) for (File f : old) f.delete();
-        o.put("thumb", Uri.fromFile(out).toString());
-      } else {
-        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
-        frame.compress(Bitmap.CompressFormat.JPEG, 72, bos);
-        o.put("data", "data:image/jpeg;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP));
-      }
+      java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+      frame.compress(Bitmap.CompressFormat.JPEG, save ? 88 : 72, bos);
+      jpg = bos.toByteArray();
     } finally {
       frame.recycle();
+    }
+    JSObject o = frameResult(context, uriString, jpg, save);
+    o.put("duration", dur);
+    return o;
+  }
+
+  /** A frame (JPEG) as the page wants it: a preview data URL, or saved as the video's still. */
+  static JSObject frameResult(Context context, String uriString, byte[] jpg, boolean save) throws Exception {
+    JSObject o = new JSObject();
+    if (save) {
+      File dir = new File(context.getFilesDir(), "vthumbs");
+      if (!dir.exists()) dir.mkdirs();
+      String base = hash(uriString) + "-c";
+      File[] old = dir.listFiles((d, n) -> n.startsWith(base));
+      File out = new File(dir, base + System.currentTimeMillis() + ".jpg");
+      try (FileOutputStream os = new FileOutputStream(out)) {
+        os.write(jpg);
+      }
+      if (old != null) for (File f : old) f.delete();
+      o.put("thumb", Uri.fromFile(out).toString());
+    } else {
+      o.put("data", "data:image/jpeg;base64," + android.util.Base64.encodeToString(jpg, android.util.Base64.NO_WRAP));
     }
     return o;
   }

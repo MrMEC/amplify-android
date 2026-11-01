@@ -25071,8 +25071,8 @@
         + '<button type="button" class="confirm-ok confirm-ok-safe" id="tpSave">Use Frame</button></div></div>';
       document.body.appendChild(ov);
       var sl = ov.querySelector('#tpSlider');
-      sl.addEventListener('input', function(){ if(tp){ tp.ms = Number(sl.value); tpShow(); } });
-      sl.addEventListener('change', function(){ if(tp){ tp.ms = Number(sl.value); tpShow(); } });
+      sl.addEventListener('input', function(){ if(tp){ tp.ms = Number(sl.value); tpShow(false); } });
+      sl.addEventListener('change', function(){ if(tp){ tp.ms = Number(sl.value); tpShow(true); } });
       ov.querySelector('#tpBack').addEventListener('click', function(){ tpNudge(-1000); });
       ov.querySelector('#tpFwd').addEventListener('click', function(){ tpNudge(1000); });
       ov.querySelector('#tpCancel').addEventListener('click', closeThumbPicker);
@@ -25089,7 +25089,9 @@
     if(v.still) img.src = capUrl(v.still);
     tpSync();
     ov.classList.add('open');
-    tpShow();
+    // A quick frame first, then the exact one.
+    tpShow(false);
+    tp.pending = { exact: true };
   }
   function tpSync(){
     if(!tp) return;
@@ -25101,30 +25103,30 @@
   function tpNudge(d){
     if(!tp) return;
     tp.ms = Math.max(0, Math.min(tp.dur || Infinity, tp.ms + d));
-    tpShow();
+    tpShow(true);
   }
   // Frames are asked for one at a time; while one is coming, only the latest wish is kept.
-  // Build 383 (Mark's phone): only the quick way of reading a frame (the nearest key frame) is
-  // used, for the preview and for saving alike, so what's saved is what was shown. Asking for
-  // the exact frame stalled his phone's video decoder for good (16 seconds, then nothing).
-  function tpShow(){
-    var exact = false;
+  // Build 384: frames come from the phone's software decoder (SoftFrame), which doesn't stall
+  // the way the system's frame reader did on Mark's phone: a quick key frame while dragging, the
+  // exact frame on letting go, on a nudge and when saving.
+  function tpShow(exact){
     if(!tp) return;
     tpSync();
-    if(tp.shownMs === tp.ms && !tp.busy) return;
-    if(tp.busy){ tp.pending = { exact: false }; return; }
+    if(tp.shownMs === tp.ms && (tp.shownExact || !exact) && !tp.busy) return;
+    if(tp.busy){ tp.pending = { exact: !!exact || !!(tp.pending && tp.pending.exact && tp.pending.ms === tp.ms), ms: tp.ms }; return; }
     var P = thumbPlugin(), want = tp.ms, cur = tp;
     cur.busy = true;
     cur.el.querySelector('#tpFrame').classList.add('loading');
     var msg = cur.el.querySelector('#tpMsg');
     // Build 381: never left waiting -- an answer that doesn't come in time counts as a failure.
-    var started = Date.now(), what = 'frame at ' + tpTime(want);
+    var started = Date.now(), what = (exact ? 'exact' : 'quick') + ' frame at ' + tpTime(want);
     var ask = P.videoFrame({ uri: cur.v.uri, ms: want, exact: !!exact });
     var late = new Promise(function(res, rej){ setTimeout(function(){ rej(new Error('The phone didn\u2019t answer in time')); }, 25000); });
     Promise.race([ask, late]).then(function(r){
       if(tp !== cur) return;
       if(r && r.duration && !cur.dur){ cur.dur = r.duration; tpSync(); }
-      if(r && r.data){ cur.el.querySelector('#tpImg').src = r.data; msg.hidden = true; tpNote(what, true, started, Math.round(r.data.length / 1024) + ' K'); }
+      if(r && r.data){ cur.el.querySelector('#tpImg').src = r.data; msg.hidden = true; cur.shownExact = !!exact;
+        tpNote(what, true, started, Math.round(r.data.length / 1024) + ' K' + (r.via ? ', ' + r.via : '') + (r.softWhy ? ' (' + r.softWhy + ')' : '')); }
       else { msg.textContent = 'No picture came back for this point. Try another.'; msg.hidden = false; tpNote(what, false, started, 'no picture'); }
       cur.shownMs = want;
     }, function(err){
@@ -25136,7 +25138,7 @@
       cur.busy = false;
       if(tp !== cur) return;
       var p = cur.pending; cur.pending = null;
-      if(p) tpShow();
+      if(p) tpShow(p.exact);
       else cur.el.querySelector('#tpFrame').classList.remove('loading');
     });
   }
@@ -25167,11 +25169,11 @@
     var P = thumbPlugin(), cur = tp, btn = cur.el.querySelector('#tpSave');
     var started = Date.now();
     btn.disabled = true;
-    P.videoFrame({ uri: cur.v.uri, ms: cur.ms, save: true, exact: false }).then(function(r){
+    P.videoFrame({ uri: cur.v.uri, ms: cur.ms, save: true, exact: true }).then(function(r){
       btn.disabled = false;
       if(!r || !r.thumb) throw new Error('No picture');
       var kept = applyVideoStill(cur.v.uri, r.thumb, true);
-      tpNote('save at ' + tpTime(cur.ms), kept, started, kept ? '' : 'settings storage full');
+      tpNote('save at ' + tpTime(cur.ms), kept, started, (kept ? '' : 'settings storage full') + (r.via ? (kept ? '' : ', ') + r.via : ''));
       closeThumbPicker();
       if(kept) showNotice({ kind: 'done', message: 'Thumbnail changed.' });
       // Build 382: shown, but not kept -- Amplify's settings storage is full.
