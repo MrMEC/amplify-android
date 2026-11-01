@@ -6872,6 +6872,67 @@
   #settingsPanel .set-switch[aria-checked="true"]{ background:var(--accent); }
   #settingsPanel .set-switch[aria-checked="true"]::after{ transform:translateX(20px); }
   #settingsPanel .set-switch:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  /* ---------- Build 393 (Mark): one set of cover sizes, text sizes and line limits ----------
+     Settings > Appearance > Sizes & text sets the --sz-* factors and --lines-* below (layoutApply).
+     Every row of the same kind uses the same size on every page; the base values are the ones Home
+     already had. Text sizes carry --amp-ts so Typography's text size still scales them. */
+  :root{
+    --sz-cover:1; --sz-artist:1; --sz-video:1; --sz-poster:1; --sz-album:1; --fs-album:1;
+    --lines-title:3; --lines-sub:2;
+    --album-cols:2; --poster-cols:2;
+    --cover-base:150px; --artist-base:100px; --list-art:64px;
+    --fs-tile-name:calc(13px * var(--amp-ts, 1)); --fs-tile-sub:calc(11.5px * var(--amp-ts, 1));
+    --fs-row-name:calc(14.5px * var(--amp-ts, 1)); --fs-row-sub:calc(12.5px * var(--amp-ts, 1));
+    --w-cover:calc(var(--cover-base) * var(--sz-cover));
+    --w-artist:calc(var(--artist-base) * var(--sz-artist));
+    --w-video:min(calc(var(--cover-base) * 16 / 9 * var(--sz-video)), calc(100vw - 52px));
+    --w-list-art:calc(var(--list-art) * var(--sz-artist));
+  }
+  @media (max-width: 900px){
+    :root{ --cover-base:min(132px, calc(-33.1915px + 42.5532vw)); --artist-base:min(86px, calc(-28.5714px + 25.974vw)); --list-art:56px; }
+  }
+  @media (max-width: 380px){ :root{ --artist-base:min(86px, calc(-30.3226px + 32.2581vw)); } }
+  /* Covers in rows */
+  body.home-stacked .home-row > .tile-grid > .tile, body.home-stacked .home-row > #favoritesGrid > .tile, .tile-grid > .cl-row > .tile{ flex:0 0 var(--w-cover); }
+  .pf-favs{ grid-auto-columns:var(--w-cover); }
+  body.home-stacked .home-row > #stationsGrid:has(> .tile), body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile), body.home-stacked .home-row > #top100HomeGrid:has(> .tile),
+  body.home-stacked .home-row > #favoritesGrid:has(> .tile){ grid-auto-columns:var(--w-cover); }
+  .vw-tile.vw-channel, .vw-home-grid .vw-tile.vw-channel{ width:var(--w-cover); }
+  /* Artist circles */
+  body.home-stacked .home-row > #topArtistsGrid > .tile, .fav-artists-row > .tile{ flex:0 0 var(--w-artist); }
+  .fav-artists-list .row-thumb.fav-artist-thumb, .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-art{ width:var(--w-list-art); height:var(--w-list-art); flex:0 0 var(--w-list-art); }
+  /* Music video thumbnails */
+  body.home-stacked .home-row > .daily-videos-grid > .yt-tile, .yt-tile, .vw-tile:not(.vw-channel), .vw-home-grid .vw-tile:not(.vw-channel){ flex:0 0 var(--w-video); }
+  .vw-tile:not(.vw-channel), .vw-home-grid .vw-tile:not(.vw-channel){ width:var(--w-video); }
+  /* Movie and TV posters, albums and stations in grids: desktop sizes exactly, phone by covers per row */
+  .tile-grid:has(> .tile.vposter){ grid-template-columns:repeat(auto-fill, minmax(calc(110px * var(--sz-poster)), calc(150px * var(--sz-poster)))); }
+  .tile-grid:has(> .tile[data-entity="album"]), .tile-grid:has(> .tile.station-tile){ grid-template-columns:repeat(auto-fill, minmax(calc(110px * var(--sz-album)), calc(150px * var(--sz-album)))); }
+  @media (max-width: 900px){
+    .tile-grid:has(> .tile.vposter){ grid-template-columns:repeat(var(--poster-cols), minmax(0, 1fr)); }
+    .tile-grid:has(> .tile[data-entity="album"]), .tile-grid:has(> .tile.station-tile), .artist-albums{ grid-template-columns:repeat(var(--album-cols), minmax(0, 1fr)); }
+  }
+  /* Under-cover text: one size for names, one for the line beneath */
+  .tile:not(.tile-row):not(.song-row) .tile-name, .fav-card .tile-name, body.home-stacked #favoritesGrid .fav-card .tile-name,
+  .yt-title, .vw-tile .tile-name, .tile.vposter .tile-name, .tile-grid.mv-grid .tile.mv-artist .tile-name, .pf-fav-name{ font-size:var(--fs-tile-name) !important; }
+  .tile:not(.tile-row):not(.song-row) .tile-sub, .fav-card .tile-sub, body.home-stacked #favoritesGrid .fav-card .tile-sub, .vw-tile .tile-sub{ font-size:var(--fs-tile-sub) !important; }
+  .tile[data-entity="album"]:not(.tile-row):not(.song-row):not(.fav-card) .tile-name, .tile.station-tile:not(.tile-row):not(.fav-card) .tile-name{ font-size:calc(var(--fs-tile-name) * var(--fs-album)) !important; }
+  .tile[data-entity="album"]:not(.tile-row):not(.song-row):not(.fav-card) .tile-sub, .tile.station-tile:not(.tile-row):not(.fav-card) .tile-sub{ font-size:calc(var(--fs-tile-sub) * var(--fs-album)) !important; }
+  /* Names and details in lists */
+  .song-row .song-row-title, .mfy-row .song-row-title, .tile.tile-row .tile-name, .tile-grid.grid-artists > .tile[data-entity="artist"] .tile-name, .row-name, .ch-name,
+  .chart-vrow-title, .queue-row-title, .cf-track-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name{ font-size:var(--fs-row-name) !important; }
+  .song-row-sub, .mfy-row .song-row-sub, .tile.tile-row .tile-sub, .row-item .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .cf-track-artist, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub{ font-size:var(--fs-row-sub) !important; }
+  /* Longest a name or a detail line may run before it is cut (Settings > Appearance > Sizes & text) */
+  :is(.tile-name, .song-row-title, .row-name, .yt-title, .ch-name, .chart-vrow-title, .queue-row-title, .cf-track-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name),
+  :is(.tile-sub, .song-row-sub, .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .cf-track-artist, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub){
+    display:-webkit-box !important; -webkit-box-orient:vertical !important; white-space:normal !important; overflow:hidden !important; text-overflow:ellipsis !important; overflow-wrap:anywhere;
+  }
+  :is(.tile-name, .song-row-title, .row-name, .yt-title, .ch-name, .chart-vrow-title, .queue-row-title, .cf-track-title, .artist-info-name, .cl-name, .st-row-n, .v-folder-name, .vep-title, .np-upnext-title, .np-next-up-title, .tp-name){ -webkit-line-clamp:var(--lines-title) !important; }
+  :is(.tile-sub, .song-row-sub, .row-sub, .ch-sub, .chart-vrow-artist, .queue-row-sub, .cf-track-artist, .artist-info-desc, .cl-sub, .st-row-s, .vep-sub, .np-upnext-sub){ -webkit-line-clamp:var(--lines-sub) !important; }
+  /* Settings > Appearance > Sizes & text */
+  .sz-row{ display:flex; flex-direction:column; gap:2px; width:100%; }
+  .sz-row-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .sz-val{ color:var(--text-dim); font-weight:600; font-size:13px; }
+
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -8018,6 +8079,9 @@
           <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
         </div>
       </div>
+      <!-- Build 393: sizes and line limits. -->
+      <h3 class="set-sub">Sizes &amp; text</h3>
+      <div class="sz-rows" id="szRows"></div>
       <!-- Build 391: fonts. -->
       <h3 class="set-sub">Typography</h3>
       <div class="settings-row">
@@ -9431,7 +9495,7 @@
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
-    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont', 'radioPlayerAmoled',
+    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont', 'radioPlayerAmoled', 'radioPlayerLayout',
     'radioPlayerLibArtistRadio', 'radioPlayerTourDone'];
   var MIRROR = {};
   if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
@@ -10154,6 +10218,92 @@
     });
     presetGridEl.appendChild(b);
   });
+
+  // ---------- Build 393 (Mark): cover sizes, text size for albums/stations, and line limits ----------
+  // Each group of covers has its own size (a percentage of the standard one); rows size exactly, and
+  // grids on a phone (posters, albums, stations) change how many covers sit across a row. The
+  // numbers become CSS variables the stylesheet's "Build 393" block uses on every page.
+  var LAYOUT_KEY = 'radioPlayerLayout';
+  var LAYOUT_ITEMS = [
+    { k: 'cover', label: 'Cover rows', desc: 'Favorites on Home and Profile, and every other row of covers', min: 60, max: 150 },
+    { k: 'artist', label: 'Artist circles', desc: 'Top Artists, Favorite Artists and artist lists', min: 60, max: 150 },
+    { k: 'video', label: 'Music video thumbnails', desc: 'Home, the Watch page and artist pages', min: 60, max: 150 },
+    { k: 'poster', label: 'Movies & TV shows', desc: 'Posters in Watch; on a phone this changes how many fit across', min: 60, max: 150 },
+    { k: 'album', label: 'Albums & stations', desc: 'Cover size in grids; on a phone this changes how many fit across', min: 60, max: 150 },
+    { k: 'albumfs', label: 'Albums & stations text', desc: 'Size of their names and details', min: 70, max: 150 }
+  ];
+  var LAYOUT_LINES = [5, 4, 3, 2, 1, 0];
+  function layoutDefaults(){ return { cover: 100, artist: 100, video: 100, poster: 100, album: 100, albumfs: 100, titleLines: 3, subLines: 2 }; }
+  function layoutLoad(){
+    var d = layoutDefaults();
+    try{
+      var o = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null');
+      if(o && typeof o === 'object'){
+        LAYOUT_ITEMS.forEach(function(it){ if(typeof o[it.k] === 'number' && isFinite(o[it.k])) d[it.k] = Math.max(it.min, Math.min(it.max, Math.round(o[it.k]))); });
+        ['titleLines', 'subLines'].forEach(function(k){ if(typeof o[k] === 'number' && LAYOUT_LINES.indexOf(o[k]) >= 0) d[k] = o[k]; });
+      }
+    }catch(e){}
+    return d;
+  }
+  var layoutPrefs = layoutLoad();
+  function layoutCols(f){
+    if(window.innerWidth > 900) return 2;
+    var W = document.documentElement.clientWidth - 42, gap = 14;
+    return Math.max(1, Math.round((W + gap) / (((W - gap) / 2) * f + gap)));
+  }
+  function layoutApply(){
+    var st = document.documentElement.style, p = layoutPrefs;
+    st.setProperty('--sz-cover', String(p.cover / 100));
+    st.setProperty('--sz-artist', String(p.artist / 100));
+    st.setProperty('--sz-video', String(p.video / 100));
+    st.setProperty('--sz-poster', String(p.poster / 100));
+    st.setProperty('--sz-album', String(p.album / 100));
+    st.setProperty('--fs-album', String(p.albumfs / 100));
+    st.setProperty('--lines-title', p.titleLines ? String(p.titleLines) : 'none');
+    st.setProperty('--lines-sub', p.subLines ? String(p.subLines) : 'none');
+    st.setProperty('--album-cols', String(layoutCols(p.album / 100)));
+    st.setProperty('--poster-cols', String(layoutCols(p.poster / 100)));
+  }
+  function layoutSave(){ try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutPrefs)); }catch(e){} }
+  (function(){
+    var box = document.getElementById('szRows'), vals = {}, ranges = {};
+    function paintVals(){ LAYOUT_ITEMS.forEach(function(it){ vals[it.k].textContent = layoutPrefs[it.k] + '%'; ranges[it.k].value = String(layoutPrefs[it.k]); }); }
+    LAYOUT_ITEMS.forEach(function(it){
+      var row = document.createElement('div'); row.className = 'settings-row settings-row--stack';
+      var wrap = document.createElement('div'); wrap.className = 'sz-row';
+      var top = document.createElement('div'); top.className = 'sz-row-top';
+      var lab = document.createElement('span'); lab.className = 'settings-label'; lab.id = 'sz-label-' + it.k; lab.textContent = it.label;
+      var v = document.createElement('span'); v.className = 'sz-val'; vals[it.k] = v;
+      top.appendChild(lab); top.appendChild(v);
+      var d = document.createElement('span'); d.className = 'set-desc'; d.textContent = it.desc;
+      var r = document.createElement('input'); r.type = 'range'; r.className = 'font-range'; r.id = 'sz-' + it.k;
+      r.min = String(it.min); r.max = String(it.max); r.step = '5'; r.setAttribute('aria-labelledby', lab.id); ranges[it.k] = r;
+      r.addEventListener('input', function(){ vals[it.k].textContent = r.value + '%'; layoutPrefs[it.k] = parseInt(r.value, 10); layoutApply(); });
+      r.addEventListener('change', function(){ layoutPrefs[it.k] = parseInt(r.value, 10); layoutSave(); layoutApply(); });
+      wrap.appendChild(top); wrap.appendChild(d); wrap.appendChild(r); row.appendChild(wrap); box.appendChild(row);
+    });
+    var selects = {};
+    [['titleLines', 'Title lines', 'Most a title may run to before it is cut off'], ['subLines', 'Detail lines', 'Most the line under a title (artist, album, date) may run to']].forEach(function(c){
+      var row = document.createElement('div'); row.className = 'settings-row';
+      var tx = document.createElement('div'); tx.className = 'set-text';
+      var lab = document.createElement('span'); lab.className = 'settings-label'; lab.id = 'sz-label-' + c[0]; lab.textContent = c[1];
+      var d = document.createElement('span'); d.className = 'set-desc'; d.textContent = c[2];
+      tx.appendChild(lab); tx.appendChild(d);
+      var sel = document.createElement('select'); sel.className = 'settings-select'; sel.id = 'sz-' + c[0]; sel.setAttribute('aria-labelledby', lab.id);
+      LAYOUT_LINES.slice().reverse().forEach(function(n){ var o = document.createElement('option'); o.value = String(n); o.textContent = n === 0 ? 'No limit' : (n === 1 ? '1 line' : n + ' lines'); sel.appendChild(o); });
+      sel.addEventListener('change', function(){ layoutPrefs[c[0]] = parseInt(sel.value, 10); layoutSave(); layoutApply(); });
+      selects[c[0]] = sel; row.appendChild(tx); row.appendChild(sel); box.appendChild(row);
+    });
+    var rrow = document.createElement('div'); rrow.className = 'settings-row';
+    var rl = document.createElement('span'); rl.className = 'settings-label'; rl.textContent = 'Reset sizes and lines';
+    var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'accent-reset-btn'; rb.id = 'szResetBtn'; rb.textContent = 'Reset';
+    rb.addEventListener('click', function(){ layoutPrefs = layoutDefaults(); layoutSave(); layoutApply(); paintAll(); });
+    rrow.appendChild(rl); rrow.appendChild(rb); box.appendChild(rrow);
+    function paintAll(){ paintVals(); selects.titleLines.value = String(layoutPrefs.titleLines); selects.subLines.value = String(layoutPrefs.subLines); }
+    paintAll();
+  })();
+  layoutApply();
+  window.addEventListener('resize', function(){ layoutApply(); });
   var AMOLED_KEY = 'radioPlayerAmoled';
   var amoledSel = document.getElementById('amoledSelect');
   function amoledApply(){
