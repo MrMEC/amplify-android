@@ -44,7 +44,7 @@ async def run(B, theme):
     check(info[1] == 'Listening since August 2026', f'{T} listening since the first counted play {info[1]!r}')
     check(info[2] == ['—Artists', '—This month', 'The SupremesTop artist'], f'{T} numbers from the app (no time listened yet) {info[2]}')
     check(len(info[3]) == 8 and info[3][0] == "80's 80's", f'{T} first eight favorites, named {info[3]}')
-    fit = await pg.evaluate("Array.prototype.every.call(document.querySelectorAll('.pf-stat-v'), function(v){ return v.scrollWidth <= v.clientWidth + 1; })")
+    fit = await pg.evaluate("Array.prototype.every.call(document.querySelectorAll('.pf-stat-v, .pf-stat-l'), function(v){ return v.scrollWidth <= v.clientWidth + 1; })")
     check(fit, f'{T} no number is cut off (a long top artist shrinks)')
     await pg.screenshot(path=f'{SHOTS}/profile-{theme}-top.png')
     await pg.evaluate("document.getElementById('pfSettingsBtn').scrollIntoView({block:'end'})"); await pg.wait_for_timeout(200)
@@ -87,6 +87,18 @@ async def run(B, theme):
     check(await pg.evaluate("document.getElementById('pfName').textContent") == 'Mark' and await pg.evaluate("!!document.querySelector('#pfAvatar img')"), f'{T} name and photo kept after a restart')
     check(not errs, f'{T} no page errors {errs}')
     await c.close()
+async def bigtext(B):
+    # Android's larger text: the labels stay on one line
+    c = await B.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
+    await c.add_init_script(AUTO_NOTICE); await c.add_init_script(SEED)
+    pg = await c.new_page()
+    await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(1800)
+    await pg.add_style_tag(content='html{ font-size:130% } .pf-stat-v{ font-size:26px } .pf-stat-l{ font-size:15px }')
+    await pg.tap('#hamburgerBtn'); await pg.wait_for_timeout(500)
+    r = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.pf-stat-l'), function(l){ return [l.textContent, Math.round(l.getBoundingClientRect().height), l.scrollWidth <= l.clientWidth + 1]; })")
+    check(all(x[1] < 24 and x[2] for x in r), f'[big text] every label on one line {r}')
+    await pg.screenshot(path=f'{SHOTS}/profile-bigtext.png', clip={'x': 0, 'y': 300, 'width': 390, 'height': 200})
+    await c.close()
 async def wide(B):
     c = await B.new_context(viewport={'width': 1400, 'height': 900})
     await c.add_init_script(AUTO_NOTICE)
@@ -99,6 +111,7 @@ async def main():
     async with async_playwright() as p:
         B = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         for th in ('dark', 'light'): await run(B, th)
+        await bigtext(B)
         await wide(B)
         await B.close()
     print('ALL PASSED' if not fails else f'FAILS {len(fails)}')
