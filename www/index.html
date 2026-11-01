@@ -6752,6 +6752,21 @@
   #settingsPanel .settings-row--stack > .set-text{ flex:none; }
   /* Every drop-down the same width, so they line up down the page. */
   #settingsPanel .set-page .settings-row > .settings-select{ flex:0 0 150px; width:150px; min-width:0; }
+  #settingsPanel .set-page .settings-row > #fontBodySelect, #settingsPanel .set-page .settings-row > #fontHeadSelect{ flex-basis:172px; width:172px; }
+  .font-range{ width:100%; accent-color:var(--accent); margin:6px 0 2px; }
+  .font-size-val{ color:var(--text-dim); font-weight:600; margin-left:6px; }
+  .font-custom-list{ display:flex; flex-direction:column; gap:6px; width:100%; }
+  .font-custom-list:empty{ display:none; }
+  .font-custom-item{ display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); font-size:13px; }
+  .font-custom-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .font-custom-state{ color:var(--text-dim); font-size:11.5px; }
+  .font-custom-del{ flex:0 0 auto; background:none; border:0; color:var(--text-dim); cursor:pointer; padding:4px 6px; font-size:14px; }
+  .font-add-btn{ width:100%; }
+  .font-note{ margin-top:2px; }
+  .font-preview{ margin:10px 0 4px; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:var(--panel-2); }
+  .font-preview-head{ font-size:22px; font-weight:800; letter-spacing:-.01em; line-height:1.2; }
+  .font-preview-sub{ font-size:13px; font-weight:600; color:var(--text-dim); margin-top:2px; }
+  .font-preview-body{ font-size:14px; line-height:1.45; margin-top:10px; }
   #settingsPanel .set-desc{ font-size:12.5px; line-height:1.4; color:var(--text-dim); font-weight:400; }
   #settingsPanel .set-sub{ margin:18px 0 0; font-size:13px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); }
   #settingsPanel .set-page > .set-sub:first-child{ margin-top:2px; }
@@ -7909,7 +7924,7 @@
     <nav class="set-home" id="setHome" aria-label="Settings categories">
       <button type="button" class="set-cat" data-set-cat="appearance">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11.2" r="1.1"/><circle cx="10.4" cy="7.4" r="1.1"/><circle cx="15" cy="7.7" r="1.1"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, accent color</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, accent color, fonts</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="playback">
@@ -7960,6 +7975,44 @@
           <button type="button" class="accent-color-input accent-swatch-btn" id="accentColorInput" aria-label="Accent color" aria-haspopup="dialog"></button>
           <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
         </div>
+      </div>
+      <!-- Build 391: fonts. -->
+      <h3 class="set-sub">Typography</h3>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="fontBodyLabel">App font</span><span class="set-desc">Poppins is built in; the others use your phone's fonts, or add your own</span></div>
+        <select class="settings-select" id="fontBodySelect" aria-labelledby="fontBodyLabel"></select>
+      </div>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="fontHeadLabel">Headings</span><span class="set-desc">Page titles, artist and album names, section headings</span></div>
+        <select class="settings-select" id="fontHeadSelect" aria-labelledby="fontHeadLabel"></select>
+      </div>
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="fontSizeLabel">Text size <span class="font-size-val" id="fontSizeVal">100%</span></span>
+        <input type="range" class="font-range" id="fontSizeRange" min="80" max="150" step="5" value="100" aria-labelledby="fontSizeLabel">
+      </div>
+      <div class="settings-row">
+        <span class="settings-label" id="fontWeightLabel">Text weight</span>
+        <select class="settings-select" id="fontWeightSelect" aria-labelledby="fontWeightLabel">
+          <option value="-1">Lighter</option>
+          <option value="0">Normal</option>
+          <option value="1">Bolder</option>
+        </select>
+      </div>
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label">Your fonts</span>
+        <div class="font-custom-list" id="fontCustomList"></div>
+        <button type="button" class="settings-data-btn font-add-btn" id="fontAddBtn">Add a font file (TTF, OTF, WOFF)</button>
+        <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden>
+        <div class="set-desc font-note" id="fontNote" role="status" hidden></div>
+      </div>
+      <div class="font-preview" id="fontPreview" aria-label="Font preview">
+        <div class="font-preview-head" id="fontPreviewHead">Midnight Drive</div>
+        <div class="font-preview-sub" id="fontPreviewSub">The Night Owls &middot; 12 songs &middot; 2024</div>
+        <div class="font-preview-body" id="fontPreviewBody">The quick brown fox jumps over the lazy dog. 0123456789</div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Reset typography</span>
+        <button class="accent-reset-btn" id="fontResetBtn">Reset</button>
       </div>
     </section>
 
@@ -9336,7 +9389,7 @@
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
-    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent',
+    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont',
     'radioPlayerLibArtistRadio', 'radioPlayerTourDone'];
   var MIRROR = {};
   if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
@@ -10015,6 +10068,196 @@
     return { open: open, close: close, isOpen: function(){ return ov.classList.contains('open'); } };
   })();
   accentColorInput.addEventListener('click', function(){ accentPick.open(); });
+
+  // ---------- Build 391 (Mark): fonts ----------
+  // App font and heading font (Poppins, the phone's own fonts, or a font file the person adds),
+  // text size and weight, with a preview. Poppins stays at the end of every stack, so a font that
+  // is missing or fails to load quietly falls back to it. Added fonts' bytes live in IndexedDB
+  // (the library database's meta store); the choices live in localStorage and travel in backups.
+  var FONT_KEY = 'radioPlayerFont';
+  var FONT_MAX_CUSTOM = 5, FONT_MAX_BYTES = 8 * 1024 * 1024;
+  var FONT_STACKS = {
+    poppins: "'Poppins', -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+    system: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    serif: "\"Noto Serif\", Georgia, \"Times New Roman\", serif",
+    condensed: "\"Roboto Condensed\", sans-serif-condensed, \"Arial Narrow\", 'Poppins', sans-serif",
+    mono: "ui-monospace, \"Roboto Mono\", \"Cascadia Mono\", Menlo, Consolas, monospace"
+  };
+  var FONT_NAMES = { poppins: 'Poppins (default)', system: 'System', serif: 'Serif', condensed: 'Condensed', mono: 'Monospace' };
+  var FONT_HEAD_SEL = '.page-title, .grid-section-label, .artist-hero-name, .album-hero-name, .mv-hero-name, .settings-header h2, .font-preview-head, h1, h2, h3';
+  var fontFaces = {};      // custom id -> FontFace
+  var fontState = {};      // custom id -> 'ok' | 'missing' | 'bad'
+  function fontDefaults(){ return { body: 'poppins', head: 'same', size: 100, weight: 0, custom: [] }; }
+  function fontLoadPrefs(){
+    var d = fontDefaults();
+    try{
+      var o = JSON.parse(localStorage.getItem(FONT_KEY) || 'null');
+      if(o && typeof o === 'object'){
+        if(typeof o.body === 'string') d.body = o.body;
+        if(typeof o.head === 'string') d.head = o.head;
+        if(typeof o.size === 'number' && isFinite(o.size)) d.size = Math.max(80, Math.min(150, Math.round(o.size)));
+        if(o.weight === -1 || o.weight === 1) d.weight = o.weight;
+        if(Array.isArray(o.custom)) d.custom = o.custom.filter(function(c){ return c && typeof c.id === 'string' && typeof c.name === 'string'; }).slice(0, FONT_MAX_CUSTOM);
+      }
+    }catch(e){}
+    return d;
+  }
+  var fontPrefs = fontLoadPrefs();
+  function fontSavePrefs(){ try{ localStorage.setItem(FONT_KEY, JSON.stringify(fontPrefs)); }catch(e){} }
+  function fontCustomItem(id){ for(var i = 0; i < fontPrefs.custom.length; i++) if(fontPrefs.custom[i].id === id) return fontPrefs.custom[i]; return null; }
+  function fontStack(id){
+    if(FONT_STACKS[id]) return FONT_STACKS[id];
+    if(fontCustomItem(id) && fontState[id] !== 'missing' && fontState[id] !== 'bad') return "'AmpFont_" + id + "', " + FONT_STACKS.poppins;
+    return FONT_STACKS.poppins;
+  }
+  // The px font sizes and numeric weights of the page's own style rules, read once, so size and
+  // weight changes can be written as one override sheet that sits after them.
+  var fontRulesBase = null;
+  function fontWeightNum(v){
+    v = String(v || '').trim();
+    if(v === 'normal') return 400;
+    if(v === 'bold') return 700;
+    return /^[1-9]00$/.test(v) ? parseInt(v, 10) : 0;
+  }
+  function fontReadRules(){
+    if(fontRulesBase) return fontRulesBase;
+    var out = [];
+    function walk(rules, wrap){
+      for(var i = 0; i < rules.length; i++){
+        var r = rules[i];
+        if(r.type === 1){
+          var px = /^([\d.]+)px$/.exec(r.style.getPropertyValue('font-size'));
+          var w = fontWeightNum(r.style.getPropertyValue('font-weight'));
+          if(px || w) out.push({ wrap: wrap, sel: r.selectorText, px: px ? parseFloat(px[1]) : 0, w: w,
+            pi: r.style.getPropertyPriority('font-size') === 'important', wi: r.style.getPropertyPriority('font-weight') === 'important' });
+        } else if(r.type === 4 || r.type === 12){
+          walk(r.cssRules, wrap.concat([r.cssText.slice(0, r.cssText.indexOf('{')).trim()]));
+        }
+      }
+    }
+    Array.prototype.forEach.call(document.styleSheets, function(sh){
+      if(sh.ownerNode && /^ampFont/.test(sh.ownerNode.id || '')) return;
+      try{ walk(sh.cssRules, []); }catch(e){}
+    });
+    fontRulesBase = out;
+    return out;
+  }
+  function fontScaleCss(){
+    var size = fontPrefs.size !== 100, wt = fontPrefs.weight !== 0, css = '';
+    fontReadRules().forEach(function(r){
+      var d = '';
+      if(size && r.px) d += 'font-size:calc(' + r.px + 'px * var(--amp-ts))' + (r.pi ? ' !important' : '') + ';';
+      if(wt && r.w) d += 'font-weight:' + Math.max(100, Math.min(900, r.w + fontPrefs.weight * 100)) + (r.wi ? ' !important' : '') + ';';
+      if(!d) return;
+      var t = r.sel + '{' + d + '}';
+      for(var i = r.wrap.length - 1; i >= 0; i--) t = r.wrap[i] + '{' + t + '}';
+      css += t;
+    });
+    return css;
+  }
+  var fontStyleEl = null;
+  function fontApply(){
+    var p = fontPrefs, css = '';
+    var isDefault = p.body === 'poppins' && p.head === 'same' && p.size === 100 && p.weight === 0;
+    document.documentElement.style.setProperty('--amp-ts', String(p.size / 100));
+    if(!isDefault){
+      if(p.body !== 'poppins') css += 'html,body{font-family:' + fontStack(p.body) + ';}';
+      if(p.head !== 'same' && p.head !== p.body) css += FONT_HEAD_SEL + '{font-family:' + fontStack(p.head) + ';}';
+      else if(p.head !== 'same' && p.head === p.body && p.body !== 'poppins') css += FONT_HEAD_SEL + '{font-family:' + fontStack(p.head) + ';}';
+      if(p.size !== 100 || p.weight !== 0) css += fontScaleCss();
+    }
+    if(!fontStyleEl){
+      fontStyleEl = document.createElement('style'); fontStyleEl.id = 'ampFontStyle';
+      document.head.appendChild(fontStyleEl);
+    }
+    fontStyleEl.textContent = css;
+    // Added after anything else that was appended since, so it keeps the last word.
+    if(fontStyleEl.nextSibling) document.head.appendChild(fontStyleEl);
+  }
+  var fontBodySel = document.getElementById('fontBodySelect'), fontHeadSel = document.getElementById('fontHeadSelect');
+  var fontSizeRange = document.getElementById('fontSizeRange'), fontSizeVal = document.getElementById('fontSizeVal');
+  var fontWeightSel = document.getElementById('fontWeightSelect'), fontListEl = document.getElementById('fontCustomList');
+  var fontNoteEl = document.getElementById('fontNote'), fontFileInput = document.getElementById('fontFileInput');
+  function fontNote(msg){ fontNoteEl.hidden = !msg; fontNoteEl.textContent = msg || ''; }
+  function fontOptions(sel, withSame){
+    sel.textContent = '';
+    function add(v, label){ var o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); }
+    if(withSame) add('same', 'Same as app');
+    Object.keys(FONT_NAMES).forEach(function(k){ add(k, FONT_NAMES[k]); });
+    fontPrefs.custom.forEach(function(c){ add(c.id, c.name + (fontState[c.id] === 'missing' || fontState[c.id] === 'bad' ? ' (unavailable)' : '')); });
+  }
+  function fontUiSync(){
+    fontOptions(fontBodySel, false); fontOptions(fontHeadSel, true);
+    fontBodySel.value = fontPrefs.body; fontHeadSel.value = fontPrefs.head;
+    if(fontBodySel.value !== fontPrefs.body) fontBodySel.value = 'poppins';
+    if(fontHeadSel.value !== fontPrefs.head) fontHeadSel.value = 'same';
+    fontSizeRange.value = String(fontPrefs.size); fontSizeVal.textContent = fontPrefs.size + '%';
+    fontWeightSel.value = String(fontPrefs.weight);
+    fontListEl.textContent = '';
+    fontPrefs.custom.forEach(function(c){
+      var row = document.createElement('div'); row.className = 'font-custom-item';
+      var nm = document.createElement('span'); nm.className = 'font-custom-name'; nm.textContent = c.name;
+      row.appendChild(nm);
+      var bad = fontState[c.id] === 'missing' || fontState[c.id] === 'bad';
+      if(bad){ var st = document.createElement('span'); st.className = 'font-custom-state'; st.textContent = fontState[c.id] === 'bad' ? "Can't be read" : 'File missing'; row.appendChild(st); }
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'font-custom-del';
+      del.setAttribute('aria-label', 'Remove ' + c.name); del.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      del.addEventListener('click', function(){ fontRemove(c.id); });
+      row.appendChild(del); fontListEl.appendChild(row);
+    });
+    document.getElementById('fontPreviewHead').style.fontFamily = fontStack(fontPrefs.head === 'same' ? fontPrefs.body : fontPrefs.head);
+    var unavailable = fontPrefs.custom.filter(function(c){ return (c.id === fontPrefs.body || c.id === fontPrefs.head) && (fontState[c.id] === 'missing' || fontState[c.id] === 'bad'); })[0];
+    if(unavailable) fontNote(unavailable.name + " isn't available, so Poppins is used. Add the file again to bring it back.");
+  }
+  function fontChanged(){ fontSavePrefs(); fontApply(); fontUiSync(); }
+  function fontRegister(item, buf){
+    var face = new FontFace('AmpFont_' + item.id, buf.slice(0));
+    return face.load().then(function(f){ document.fonts.add(f); fontFaces[item.id] = f; fontState[item.id] = 'ok'; });
+  }
+  function fontLoadCustom(){
+    fontPrefs.custom.forEach(function(item){
+      readMeta('userFont:' + item.id).then(function(buf){
+        if(!buf || !buf.byteLength){ fontState[item.id] = 'missing'; return; }
+        return fontRegister(item, buf)['catch'](function(){ fontState[item.id] = 'bad'; });
+      }).then(function(){ fontApply(); fontUiSync(); });
+    });
+  }
+  function fontRemove(id){
+    var f = fontFaces[id]; if(f){ try{ document.fonts['delete'](f); }catch(e){} delete fontFaces[id]; }
+    idbDo([LIB_STORE_META], 'readwrite', function(tx){ return tx.objectStore(LIB_STORE_META)['delete']('userFont:' + id); })['catch'](function(){});
+    fontPrefs.custom = fontPrefs.custom.filter(function(c){ return c.id !== id; });
+    if(fontPrefs.body === id) fontPrefs.body = 'poppins';
+    if(fontPrefs.head === id) fontPrefs.head = 'same';
+    delete fontState[id]; fontNote('');
+    fontChanged();
+  }
+  function fontImport(file){
+    fontNote('');
+    if(!file) return;
+    if(!/\.(ttf|otf|woff2?)$/i.test(file.name || '')){ fontNote('Choose a TTF, OTF, WOFF or WOFF2 font file.'); return; }
+    if(file.size > FONT_MAX_BYTES){ fontNote('That font file is over 8 MB.'); return; }
+    if(fontPrefs.custom.length >= FONT_MAX_CUSTOM){ fontNote('You can add up to ' + FONT_MAX_CUSTOM + ' fonts. Remove one first.'); return; }
+    file.arrayBuffer().then(function(buf){
+      var item = { id: 'u' + Date.now().toString(36), name: String(file.name).replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim().slice(0, 40) || 'My font' };
+      return fontRegister(item, buf).then(function(){
+        return writeMeta('userFont:' + item.id, buf).then(function(){
+          fontPrefs.custom.push(item); fontPrefs.body = item.id; fontChanged();
+        });
+      });
+    })['catch'](function(){ fontNote("That file couldn't be used as a font."); });
+  }
+  fontBodySel.addEventListener('change', function(){ fontPrefs.body = fontBodySel.value; fontNote(''); fontChanged(); });
+  fontHeadSel.addEventListener('change', function(){ fontPrefs.head = fontHeadSel.value; fontNote(''); fontChanged(); });
+  fontWeightSel.addEventListener('change', function(){ fontPrefs.weight = parseInt(fontWeightSel.value, 10) || 0; fontChanged(); });
+  fontSizeRange.addEventListener('input', function(){ fontSizeVal.textContent = fontSizeRange.value + '%'; });
+  fontSizeRange.addEventListener('change', function(){ fontPrefs.size = parseInt(fontSizeRange.value, 10) || 100; fontChanged(); });
+  document.getElementById('fontAddBtn').addEventListener('click', function(){ fontFileInput.value = ''; fontFileInput.click(); });
+  fontFileInput.addEventListener('change', function(){ fontImport(fontFileInput.files && fontFileInput.files[0]); });
+  document.getElementById('fontResetBtn').addEventListener('click', function(){
+    var keep = fontPrefs.custom; fontPrefs = fontDefaults(); fontPrefs.custom = keep; fontNote(''); fontChanged();
+  });
+  fontApply(); fontUiSync();
+  setTimeout(fontLoadCustom, 0);   // after the rest of the script has run (the database helpers need their timeouts set)
   accentResetBtn.addEventListener('click', function(){
     clearCustomAccent(currentTheme);
     restoreAccentForTheme(currentTheme);
