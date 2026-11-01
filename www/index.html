@@ -6521,6 +6521,8 @@
   .pf-stat-l{ font-size:11.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; }   /* build 372: one line, shrunk to fit */
   .pf-stat-v.pf-wrap{ white-space:normal; overflow-wrap:anywhere; line-height:1.15; }
   .pf-stat{ justify-content:flex-end; }
+  button.pf-stat{ font:inherit; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  button.pf-stat:active{ background:var(--panel-2); }
   .pf-sec{ margin-top:30px; }
   .pf-h2{ margin:0 0 14px; font-size:20px; font-weight:800; color:var(--text); }
   .pf-links{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
@@ -6611,6 +6613,15 @@
   .st-leg-n{ flex:1; min-width:0; color:var(--text); font-weight:600; }
   .st-leg-v{ color:var(--text-dim); font-variant-numeric:tabular-nums; }
   .st-list{ display:flex; flex-direction:column; }
+  /* Build 377: rows that go somewhere (a chevron) or play (a play mark). */
+  button.st-go{ width:100%; background:none; border:0; border-bottom:1px solid var(--border); font:inherit; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  button.st-go:last-child{ border-bottom:none; }
+  button.st-go:active{ background:var(--panel); }
+  .st-go-ico{ flex-shrink:0; display:flex; align-items:center; justify-content:center; width:16px; color:var(--text-dim); }
+  .st-row.st-go .st-go-ico svg[fill="currentColor"]{ color:var(--accent); }
+  .st-row.st-now .st-row-n{ color:var(--accent); }
+  .st-h2-link{ display:inline-flex; align-items:center; gap:4px; background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer; }
+  .st-h2-link .st-go-ico{ margin-top:1px; }
   .st-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); min-width:0; }
   .st-row:last-child{ border-bottom:none; }
   .st-rank{ flex:0 0 18px; font-size:14px; font-weight:800; color:var(--accent); text-align:center; }
@@ -11271,9 +11282,9 @@
     // Build 367: time listened this month in place of the play count (that's in Listening Stats).
     var d = new Date(), month = listenBetween(dayKey(new Date(d.getFullYear(), d.getMonth(), 1)), dayKey(d));
     return [
-      { v: artists ? fmt(artists) : '—', l: artists === 1 ? 'Artist' : 'Artists' },
-      { v: month >= 30 ? fmtListenShort(month) : '—', l: 'This month' },
-      { v: top ? top.name : '—', l: 'Top artist' }
+      { v: artists ? fmt(artists) : '—', l: artists === 1 ? 'Artist' : 'Artists', go: 'artists' },
+      { v: month >= 30 ? fmtListenShort(month) : '—', l: 'This month', go: 'stats' },
+      { v: top ? top.name : '—', l: 'Top artist', go: 'topArtists' }
     ];
   }
   function renderProfile(){
@@ -11287,8 +11298,11 @@
     var stats = document.getElementById('pfStats');
     stats.innerHTML = '';
     profileStats().forEach(function(s){
-      var d = document.createElement('div');
+      // Build 377: each box goes somewhere: Artists, Listening Stats, Top Artists.
+      var d = document.createElement('button');
+      d.type = 'button';
       d.className = 'pf-stat';
+      d.dataset.pfGo = s.go;
       var v = document.createElement('span'); v.className = 'pf-stat-v'; v.textContent = s.v;
       var l = document.createElement('span'); l.className = 'pf-stat-l'; l.textContent = s.l;
       d.appendChild(v); d.appendChild(l);
@@ -11334,6 +11348,15 @@
   document.getElementById('profileCloseBtn').addEventListener('click', closeProfile);
   document.getElementById('pfSettingsBtn').addEventListener('click', function(){ openSettings(); });
   document.getElementById('pfFavAll').addEventListener('click', function(){ closeProfile(); openHomeSectionPage('favorites'); });
+  document.getElementById('pfStats').addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('.pf-stat');
+    if(!b) return;
+    var go = b.dataset.pfGo;
+    if(go === 'stats'){ openStats(); return; }
+    closeProfile();
+    if(go === 'topArtists'){ openHomeSectionPage('topArtists'); return; }
+    if(go === 'artists'){ pushView(); searchInput.value = ''; runLibrarySection('artists'); }
+  });
   Array.prototype.forEach.call(document.querySelectorAll('#profileOverlay .pf-link'), function(b){
     b.addEventListener('click', function(){
       var go = b.dataset.pfGo;
@@ -11551,25 +11574,65 @@
   var statsOverlay = document.getElementById('statsOverlay');
   var ST_KINDS = [{ k: 'm', n: 'Music' }, { k: 'r', n: 'Radio' }, { k: 'p', n: 'Podcasts' }, { k: 'v', n: 'Video & TV' }];
   function stEl(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined) e.textContent = text; return e; }
-  function stSection(title){
+  function stSection(title, go){
     var sec = stEl('section', 'st-sec');
-    sec.appendChild(stEl('h2', 'st-h2', title));
+    var h = stEl('h2', 'st-h2');
+    if(go){
+      var b = stEl('button', 'st-h2-link', title);
+      b.type = 'button';
+      b.appendChild(stIcon(false));
+      b.addEventListener('click', function(){ stGo(go); });
+      h.appendChild(b);
+    } else h.textContent = title;
+    sec.appendChild(h);
     return sec;
   }
   function stList(rows, empty){
     var box = stEl('div', 'st-list');
     if(!rows.length){ box.appendChild(stEl('p', 'st-empty', empty)); return box; }
     rows.forEach(function(r, i){
-      var row = stEl('div', 'st-row');
+      var row = stEl(r.go ? 'button' : 'div', 'st-row' + (r.go ? ' st-go' : ''));
+      if(r.go){ row.type = 'button'; row.addEventListener('click', function(){
+        if(r.play){ Array.prototype.forEach.call(document.querySelectorAll('#statsBody .st-now'), function(x){ x.classList.remove('st-now'); }); row.classList.add('st-now'); }
+        stGo(r.go);
+      }); }
       row.appendChild(stEl('span', 'st-rank', String(i + 1)));
       var t = stEl('span', 'st-row-text');
       t.appendChild(stEl('span', 'st-row-n', r.n));
       if(r.s) t.appendChild(stEl('span', 'st-row-s', r.s));
       row.appendChild(t);
       row.appendChild(stEl('span', 'st-row-v', r.v));
+      if(r.go) row.appendChild(stIcon(r.play));
       box.appendChild(row);
     });
     return box;
+  }
+  // Build 377 (Mark): what's listed goes there. Stats and the profile are put away first; the
+  // page opened is recorded so Back returns to where it was. Songs and stations just play.
+  function stGo(fn){
+    var play = fn.play;
+    if(!play){ closeStats(); closeProfile(); }
+    fn();
+  }
+  function stIcon(play){
+    var i = document.createElement('span');
+    i.className = 'st-go-ico';
+    i.setAttribute('aria-hidden', 'true');
+    i.innerHTML = play ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+    return i;
+  }
+  function stPlayFn(f){ f.play = true; return f; }
+  var ST_KIND_GO = {
+    m: function(){ pushView(); openMyLibraryHome(); },
+    r: function(){ pushView(); openStationsHome(); },
+    p: function(){ pushView(); openPodcastsHome(false); },
+    v: function(){ pushView(); openVideoHome(); }
+  };
+  function stStationFor(key, x){
+    var all = favorites.concat(recentStations || []);
+    for(var i = 0; i < all.length; i++) if(favKey(all[i]) === key) return all[i];
+    return x && x.st && (x.st.urlToResolve || x.st.url || x.st.stationuuid) ? x.st : null;
   }
   // Four kinds told apart by lightness as well as colour.
   function stKindColor(k){
@@ -11638,23 +11701,28 @@
     ST_KINDS.forEach(function(k){
       var v = listenBetween(monthStart, today, k.k);
       if(tot && v){ var seg = stEl('i'); seg.style.width = (v / tot * 100) + '%'; seg.style.background = stKindColor(k.k); mix.appendChild(seg); }
-      var row = stEl('div', 'st-leg');
+      var row = stEl('button', 'st-leg st-go');
+      row.type = 'button';
+      row.addEventListener('click', function(){ stGo(ST_KIND_GO[k.k]); });
       var dot = stEl('span', 'st-dot'); dot.style.background = stKindColor(k.k);
       row.appendChild(dot);
       row.appendChild(stEl('span', 'st-leg-n', k.n));
       row.appendChild(stEl('span', 'st-leg-v', fmtListen(v) + (tot ? ' · ' + Math.round(v / tot * 100) + '%' : '')));
+      row.appendChild(stIcon(false));
       legend.appendChild(row);
     });
     sec.appendChild(mix); sec.appendChild(legend);
     body.appendChild(sec);
 
     var ap = loadArtistPlays();
-    var arts = Object.keys(ap).map(function(k){ return ap[k]; }).filter(function(a){ return a && a.count && a.name; })
+    var arts = Object.keys(ap).map(function(k){ return ap[k] && Object.assign({ key: k }, ap[k]); }).filter(function(a){ return a && a.count && a.name; })
       .sort(function(a, b){ return (b.count - a.count) || ((b.last || 0) - (a.last || 0)); }).slice(0, 5);
     sec = stSection('Top artists');
     sec.appendChild(stList(arts.map(function(a){
       var t = L.artists[artistMatchKey(a.name)];
-      return { n: a.name, s: t && t.s >= 60 ? fmtListen(t.s) + ' listened' : '', v: a.count + (a.count === 1 ? ' play' : ' plays') };
+      var has = false; try{ has = !!findArtistEntry(a.key); }catch(e){}
+      return { n: a.name, s: t && t.s >= 60 ? fmtListen(t.s) + ' listened' : '', v: a.count + (a.count === 1 ? ' play' : ' plays'),
+        go: has ? function(){ openArtistPage(a.key); } : null };
     }), 'Artists you play show up here.'));
     body.appendChild(sec);
 
@@ -11665,20 +11733,24 @@
     sec = stSection('Top songs');
     sec.appendChild(stList(songs.map(function(x){
       var t = libraryById[x.id];
-      return { n: t.name || t.fileName || '', s: t.artist || '', v: x.c + (x.c === 1 ? ' play' : ' plays') };
+      return { n: t.name || t.fileName || '', s: t.artist || '', v: x.c + (x.c === 1 ? ' play' : ' plays'), play: true,
+        go: stPlayFn(function(){ playTrackInLibrary(t); }) };
     }), 'Songs from your library you play show up here.'));
     body.appendChild(sec);
 
     function topItems(kind){
-      return Object.keys(L.items).map(function(k){ return L.items[k]; }).filter(function(x){ return x.k === kind && x.s >= 60 && x.n; })
+      return Object.keys(L.items).map(function(k){ return Object.assign({ key: k }, L.items[k]); }).filter(function(x){ return x.k === kind && x.s >= 60 && x.n; })
         .sort(function(a, b){ return b.s - a.s; }).slice(0, 5);
     }
     sec = stSection('Top stations');
-    sec.appendChild(stList(topItems('r').map(function(x){ return { n: x.n, v: fmtListen(x.s) }; }), 'Stations you listen to show up here.'));
+    sec.appendChild(stList(topItems('r').map(function(x){
+      var st = stStationFor(x.key, x);
+      return { n: x.n, v: fmtListen(x.s), play: true, go: st ? stPlayFn(function(){ playEntity(st); }) : null };
+    }), 'Stations you listen to show up here.'));
     body.appendChild(sec);
     // Build 369: Podcasts. Time listened (from the listening count), episodes started and
     // finished (from each episode's saved place), shows followed, and the top shows by time.
-    sec = stSection('Podcasts');
+    sec = stSection('Podcasts', ST_KIND_GO.p);
     var podGrid = stEl('div', 'st-grid');
     function podCard(v, l, id){
       var card = stEl('div', 'st-card');
@@ -11699,13 +11771,17 @@
       if(!nm) return;
       var sh = shows[nm] || (shows[nm] = { n: nm, s: 0, eps: 0 });
       sh.s += x.s; if(x.s >= 60) sh.eps++;
+      if(x.c && !sh.c) sh.c = x.c;
     });
     var topShows = Object.keys(shows).map(function(k){ return shows[k]; }).filter(function(x){ return x.s >= 60; })
       .sort(function(a, b){ return b.s - a.s; }).slice(0, 5);
     var podSub = stEl('h3', 'st-h3', 'Top shows');
     sec.appendChild(podSub);
     sec.appendChild(stList(topShows.map(function(x){
-      return { n: x.n, s: x.eps ? x.eps + (x.eps === 1 ? ' episode' : ' episodes') : '', v: fmtListen(x.s) };
+      var sub = null;
+      for(var i = 0; i < podcastSubs.length; i++){ var ps = podcastSubs[i]; if((x.c && String(ps.collectionId) === String(x.c)) || ps.collectionName === x.n){ sub = ps; break; } }
+      return { n: x.n, s: x.eps ? x.eps + (x.eps === 1 ? ' episode' : ' episodes') : '', v: fmtListen(x.s),
+        go: sub ? function(){ pushView(); openShowPage(sub.collectionId); } : null };
     }), 'Shows you listen to show up here.'));
     body.appendChild(sec);
     getAllPodcastProgress().then(function(recs){
@@ -16192,6 +16268,13 @@
       it.n = (k === 'm' ? st.name : (typeof stripExclusively === 'function' ? stripExclusively(st.name || '') : st.name)) || it.n || '';
       if(k === 'm' && st.artist) it.a = st.artist;
       if(k === 'p' && (st.collectionName || st.podcastName)) it.a = st.collectionName || st.podcastName;
+      if(k === 'p' && st.collectionId) it.c = st.collectionId;
+      // Build 377: enough of a station to play it again from Listening Stats.
+      if(k === 'r'){
+        var keep = {};
+        Object.keys(st).forEach(function(f){ var v = st[f]; if((typeof v === 'string' && v.length < 600) || typeof v === 'number' || typeof v === 'boolean') keep[f] = v; });
+        it.st = keep;
+      }
     }
     var artist = '';
     try{ artist = k === 'm' ? String(st.artist || '').trim() : (k === 'r' ? artistNameForPlay(st) : ''); }catch(e){}
