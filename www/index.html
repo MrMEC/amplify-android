@@ -47416,9 +47416,16 @@
 
     // Top Stations and every For You search, from the station directory.
     function refreshNetLists(){
-      if(Date.now() - carNet.at < CAR_NET_MS && carNet.top) return Promise.resolve();
+      if(carNet.top && Date.now() - carNet.at < (carNet.failed ? 2 * 60 * 1000 : CAR_NET_MS)) return Promise.resolve();
+      carNet.failed = false;
+      // Build 398: with the directories out of reach, the car takes the last Top Stations that loaded
+      // and tries again in two minutes, instead of going back to the network on every change.
       var jobs = [apiFetch('/json/stations/search?limit=48&countrycode=US&hidebroken=true&order=clickcount&reverse=true')
-        .then(function(data){ carNet.top = stationCards(data); })['catch'](function(){})];
+        .then(function(data){ carNet.top = stationCards(data); })['catch'](function(){
+          carNet.failed = true;
+          var kept = null; try{ kept = JSON.parse(localStorage.getItem(TOP_CACHE_KEY) || 'null'); }catch(e){}
+          if(!carNet.top) carNet.top = kept && kept.length ? stationCards(kept) : [];
+        })];
       customSearches.forEach(function(item){
         jobs.push(apiFetch('/json/stations/search?name=' + encodeURIComponent(item.query) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
           .then(function(data){ carNet.forYou[item.id] = sortAlphaWithFavoritesFirst(stationCards(data)); })['catch'](function(){}));
