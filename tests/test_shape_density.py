@@ -34,6 +34,19 @@ async def main():
             await pg.screenshot(path=f'{shots}/shape-page-{scheme}.png')
             await pg.click('#settingsCloseBtn'); await pg.wait_for_timeout(300)
             check(await pg.evaluate("document.getElementById('settingsTitle').textContent") == 'Appearance', 'back goes to the Appearance list')
+            # build 400: the previews are first on their pages and stay at the top while scrolling (a short screen, so the pages scroll)
+            await pg.set_viewport_size({'width': 390, 'height': 480}); await pg.wait_for_timeout(300)
+            for cat, pid in (('appearance-type', 'fontPreview'), ('appearance-shape', 'shapePreview')):
+                await pg.evaluate("(c)=>__t.ev('openSettings(\"' + c + '\")')", cat); await pg.wait_for_timeout(300)
+                first = await pg.evaluate(f"(()=>{{ var pg=document.querySelector('.set-page[data-set-page={cat}]'); return pg.firstElementChild.contains(document.getElementById('{pid}')); }})()")
+                await pg.evaluate("document.getElementById('settingsPanel').scrollTop = 99999"); await pg.wait_for_timeout(300)
+                st = await pg.evaluate(f"""(()=>{{ var r=document.getElementById('{pid}').getBoundingClientRect(), p=document.getElementById('settingsPanel');
+                  var hit=document.elementFromPoint(r.left+r.width/2, r.top+r.height/2); return {{ top: Math.round(r.top), h: Math.round(r.height), scrolled: p.scrollTop, hit: !!hit && document.getElementById('{pid}').contains(hit) || (hit && hit.closest && !!hit.closest('#{pid}')) }}; }})()""")
+                check(first and st['scrolled'] > 0 and st['top'] >= 56 and st['top'] <= 64 and st['hit'], f'[{scheme}] {pid} is first and stays at the top while scrolling {st}')
+                await pg.screenshot(path=f'{shots}/sticky-{cat}-{scheme}.png')
+                await pg.evaluate("document.getElementById('settingsPanel').scrollTop = 0")
+            await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(300)
+            await pg.evaluate("__t.ev('openSettings(\"appearance\")')"); await pg.wait_for_timeout(300)
             for cat, ttl in (('appearance-theme', 'Theme & color'), ('appearance-sizes', 'Sizes & text'), ('appearance-type', 'Typography')):
                 await pg.click(f'.set-subcats .set-cat[data-set-cat={cat}]'); await pg.wait_for_timeout(300)
                 check(await pg.evaluate("document.getElementById('settingsTitle').textContent") == ttl, f'opens {ttl}')

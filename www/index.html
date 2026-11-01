@@ -804,7 +804,7 @@
     body.home-stacked #favoritesGrid .fav-card .tile-name{ font-size:12.5px; }
     body.home-stacked #favoritesGrid .fav-card .tile-sub{ font-size:11px; }
     body.home-stacked .home-row > .tile-grid > .song-row{ flex:0 0 min(78vw, 290px); }
-    body.home-stacked .home-section, body.home-stacked .recent-section{ margin-bottom:26px; }
+    body.home-stacked .home-section, body.home-stacked .recent-section{ margin-bottom:34px; }   /* build 400: 40px between sections */
   }
 
   /* Build 257 (Mark): Top Stations on Home is two rows of covers stacked in one scroller, so a
@@ -6975,8 +6975,13 @@
   body.home-stacked :is(.home-section, .recent-col) .home-row > .tile-grid > :is(.tile:not(.tile-row):not(.song-row):not(.fav-card), .vw-tile) .tile-sub,
   body.home-stacked :is(.home-section, .recent-col) .home-row > .tile-grid > .yt-tile .yt-date{
     display:-webkit-box !important; -webkit-box-orient:vertical !important; overflow:hidden !important; white-space:normal !important; -webkit-line-clamp:var(--hl-sub) !important; }
-  body.home-stacked .recent-split{ gap:26px; }
+  body.home-stacked .recent-split{ gap:34px; }
   body.home-stacked #madeForYouSection{ padding-bottom:6px; }
+  /* Build 400 (Mark): the Typography and Shape & density previews stay at the top while the page scrolls. */
+  #settingsOverlay .set-sticky-preview{ position:sticky; top:56px; z-index:2; background:var(--main-bg, var(--bg));
+    margin:0 calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))); padding:4px max(var(--set-pad), calc((100vw - 640px) / 2)) 10px;
+    border-bottom:1px solid var(--border); }
+  #settingsOverlay .set-sticky-preview > .font-preview, #settingsOverlay .set-sticky-preview > .shape-preview{ margin:0; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -8156,6 +8161,13 @@
     </section>
 
     <section class="set-page" data-set-page="appearance-type" data-set-title="Typography" data-set-parent="appearance" hidden>
+      <div class="set-sticky-preview">
+        <div class="font-preview" id="fontPreview" aria-label="Font preview">
+          <div class="font-preview-head" id="fontPreviewHead">Midnight Drive</div>
+          <div class="font-preview-sub" id="fontPreviewSub">The Night Owls &middot; 12 songs &middot; 2024</div>
+          <div class="font-preview-body" id="fontPreviewBody">The quick brown fox jumps over the lazy dog. 0123456789</div>
+        </div>
+      </div>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="fontBodyLabel">App font</span><span class="set-desc">Built in, from your phone, or a font file of your own</span></div>
         <select class="settings-select" id="fontBodySelect" aria-labelledby="fontBodyLabel"></select>
@@ -8183,11 +8195,6 @@
         <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden>
         <div class="set-desc font-note" id="fontNote" role="status" hidden></div>
       </div>
-      <div class="font-preview" id="fontPreview" aria-label="Font preview">
-        <div class="font-preview-head" id="fontPreviewHead">Midnight Drive</div>
-        <div class="font-preview-sub" id="fontPreviewSub">The Night Owls &middot; 12 songs &middot; 2024</div>
-        <div class="font-preview-body" id="fontPreviewBody">The quick brown fox jumps over the lazy dog. 0123456789</div>
-      </div>
       <div class="settings-row">
         <span class="settings-label">Reset typography</span>
         <button class="accent-reset-btn" id="fontResetBtn">Reset</button>
@@ -8196,6 +8203,9 @@
 
     <!-- Build 395: corner radius, density, and the shape of artist portraits. -->
     <section class="set-page" data-set-page="appearance-shape" data-set-title="Shape &amp; density" data-set-parent="appearance" hidden>
+      <div class="set-sticky-preview">
+        <div class="shape-preview" id="shapePreview" aria-hidden="true"><div class="sp-tile"><span class="sp-art"></span><span class="sp-line"></span></div><div class="sp-tile"><span class="sp-art sp-artist"></span><span class="sp-line"></span></div><span class="sp-btn">Button</span></div>
+      </div>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="shapeRadiusLabel">Corner radius</span><span class="set-desc">Covers, tiles, cards and buttons</span></div>
         <select class="settings-select" id="shapeRadiusSelect" aria-labelledby="shapeRadiusLabel"><option value="square">Square</option><option value="soft">Soft</option><option value="round">Round</option></select>
@@ -8208,7 +8218,6 @@
         <div class="set-text"><span class="settings-label" id="shapeArtistLabel">Artist portraits</span><span class="set-desc">Top Artists, Favorite Artists and artist lists</span></div>
         <select class="settings-select" id="shapeArtistSelect" aria-labelledby="shapeArtistLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
       </div>
-      <div class="shape-preview" id="shapePreview" aria-hidden="true"><div class="sp-tile"><span class="sp-art"></span><span class="sp-line"></span></div><div class="sp-tile"><span class="sp-art sp-artist"></span><span class="sp-line"></span></div><span class="sp-btn">Button</span></div>
       <div class="settings-row">
         <span class="settings-label">Reset shape &amp; density</span>
         <button class="accent-reset-btn" id="shapeResetBtn">Reset</button>
@@ -10371,11 +10380,10 @@
     { k: 'artist', label: 'Artist circles', desc: 'Top Artists, Favorite Artists and artist lists', min: 60, max: 150 },
     { k: 'video', label: 'Music video thumbnails', desc: 'Home, the Watch page and artist pages', min: 60, max: 150 },
     { k: 'poster', label: 'Movies & TV shows', desc: 'Posters in Watch; on a phone this changes how many fit across', min: 60, max: 150 },
-    { k: 'album', label: 'Albums & stations', desc: 'Cover size in grids; on a phone this changes how many fit across', min: 60, max: 150 },
-    { k: 'albumfs', label: 'Albums & stations text', desc: 'Size of their names and details', min: 70, max: 150 }
+    { k: 'album', label: 'Albums & stations', desc: 'Cover size in grids; on a phone this changes how many fit across', min: 60, max: 150 }
   ];
   var LAYOUT_LINES = [5, 4, 3, 2, 1, 0];
-  function layoutDefaults(){ return { cover: 100, artist: 100, video: 100, poster: 100, album: 100, albumfs: 100, titleLines: 3, subLines: 2 }; }
+  function layoutDefaults(){ return { cover: 100, artist: 100, video: 100, poster: 100, album: 100, titleLines: 3, subLines: 2 }; }
   function layoutLoad(){
     var d = layoutDefaults();
     try{
@@ -10401,7 +10409,7 @@
     st.setProperty('--sz-video', String(p.video / 100 * dz));
     st.setProperty('--sz-poster', String(p.poster / 100 * dz));
     st.setProperty('--sz-album', String(p.album / 100 * dz));
-    st.setProperty('--fs-album', String(p.albumfs / 100));
+    st.setProperty('--fs-album', '1');   // build 400: one text size everywhere (the separate album/station size is gone)
     st.setProperty('--lines-title', p.titleLines ? String(p.titleLines) : 'none');
     st.setProperty('--lines-sub', p.subLines ? String(p.subLines) : 'none');
     st.setProperty('--hl-title', String(p.titleLines ? Math.min(p.titleLines, 2) : 2));   // build 397: Home rows

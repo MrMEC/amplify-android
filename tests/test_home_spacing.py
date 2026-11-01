@@ -1,7 +1,7 @@
 """Build 397 (Mark): every section on Home ends the same distance above the next heading, whatever the row
 holds (covers with a detail line, artist circles with none, 16:9 videos, two-row Playlists, the favourite
 cards, Continue Listening and Recent Songs, the daily rows, Top Stations). Uses the library and plays of
-test_daily_mixes.py plus the trimmed backup in fixtures. Measures, for each section, the distance from the
+test_daily_mixes.py plus the trimmed backup in fixtures. Build 400: the space is 40px. Measures, for each section, the distance from the
 bottom of its last row to the next heading; all must match. Also that a long title stops at two lines on Home.
 Run: python3 tests/test_home_spacing.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, sys, os
@@ -64,7 +64,7 @@ async def run(theme, w, h):
         names = [x['name'] for x in r]
         check(any('Top Artists' in n for n in names) and any('Hear It Again' in n for n in names) and any('Playlists' in n for n in names) and any(n == 'Kay' for n in names), f'{T} the busy Home has every kind of row {names}')
         vals = sorted(set(g[2] for g in gaps))
-        check(len(gaps) >= 8 and vals[-1] - vals[0] <= 1, f'{T} every section ends the same distance above the next heading {vals}')
+        check(len(gaps) >= 8 and vals[-1] - vals[0] <= 1 and vals[0] == 40, f'{T} every section ends 40px above the next heading {vals}')
         ink = [g[3] - g[2] for g in gaps]
         check(all(0 <= x <= 20 for x in ink), f'{T} no row leaves more than one line of blank under what is on screen {ink}')
         check(all(x['maxLines'] <= 2 for x in r), f'{T} titles on Home rows stop at two lines {[(x["name"], x["maxLines"]) for x in r]}')
