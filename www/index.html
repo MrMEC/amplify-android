@@ -42090,19 +42090,26 @@
         description: item.year ? 'Internet Archive · ' + item.year : 'Internet Archive', isVideo: isVideo, archiveVideo: isVideo };
     }
     var usable = files.filter(function(f){ return f && f.name && !f.private && f.source !== 'metadata'; });
-    var video = usable.filter(function(f){ return /^(h\.264|mpeg4|512kb mpeg4)$/i.test(f.format || '') || /\.(mp4|m4v)$/i.test(f.name); });
-    var pref = ['h.264', 'mpeg4', '512kb mpeg4'];
+    // Build 387 (Mark: a 2008 Funny or Die video "had nothing playable"): older uploads often have
+    // no MP4 at all, only Flash Video, WebM, Matroska or QuickTime -- which the phone's player
+    // plays too. MP4 is still preferred; then the others, in the order they play best.
+    var VRANK = [/^h\.264( hd)?$/i, /^mpeg4$/i, /^512kb mpeg4$/i, /\.(mp4|m4v)$/i, /webm/i, /\.webm$/i, /matroska/i, /\.mkv$/i, /quicktime/i, /\.mov$/i, /flash video|^flv$/i, /\.flv$/i, /\.(avi)$/i];
+    function vrank(f){
+      for(var i = 0; i < VRANK.length; i++){
+        var re = VRANK[i];
+        if(re.source.charAt(0) === '\\' ? re.test(f.name) : re.test(f.format || '')) return i;
+      }
+      return -1;
+    }
+    var video = usable.filter(function(f){ return vrank(f) >= 0 && !/thumb|sample/i.test(f.format || ''); });
     if(item.video && video.length){
-      video.sort(function(a, b){
-        var ia = pref.indexOf(String(a.format || '').toLowerCase()), ib = pref.indexOf(String(b.format || '').toLowerCase());
-        if(ia < 0) ia = 9; if(ib < 0) ib = 9;
-        return ia - ib || (Number(b.size) || 0) - (Number(a.size) || 0);
-      });
+      video.sort(function(a, b){ return vrank(a) - vrank(b) || (Number(b.size) || 0) - (Number(a.size) || 0); });
       return [ep(video[0], true)];
     }
     var audio = usable.filter(function(f){ return /^vbr mp3$/i.test(f.format || ''); });
     if(!audio.length) audio = usable.filter(function(f){ return /mp3$/i.test(f.format || '') || /\.mp3$/i.test(f.name); });
     if(!audio.length) audio = usable.filter(function(f){ return /ogg vorbis/i.test(f.format || ''); });
+    if(!audio.length) audio = usable.filter(function(f){ return /flac|aac|m4a|wave|opus/i.test(f.format || '') || /\.(flac|m4a|aac|wav|opus|oga)$/i.test(f.name); });
     audio.sort(function(a, b){
       var ta = parseInt(a.track, 10), tb = parseInt(b.track, 10);
       if(isFinite(ta) && isFinite(tb) && ta !== tb) return ta - tb;
@@ -42141,6 +42148,25 @@
       npCollectionGrid.appendChild(row);
     });
   }
+  // Build 387: why an item has nothing to play: its media files are restricted (archive.org only
+  // streams them on its own site, or lends them), or they're in formats a phone can't play.
+  function archiveWhyNothing(meta, item){
+    var files = (meta && meta.files) || [];
+    var media = files.filter(function(f){ return f && f.name && f.source !== 'metadata' && /video|audio|mpeg|mp3|mp4|m4v|m4a|h\.264|ogg|ogv|flac|wav|aac|windows media|wmv|wma|real|flash|flv|quicktime|mov|matroska|mkv|webm|avi|dv/i.test((f.format || '') + ' ' + f.name.split('.').pop()) && !/thumb|image|jpeg|png|gif|text|xml|json|torrent|sqlite/i.test(f.format || ''); });
+    if(meta && meta.is_dark) return 'archive.org has taken this item down.';
+    if(!files.length) return 'archive.org didn\u2019t list any files for it.';
+    if(media.length && media.every(function(f){ return f.private; })) return 'Its files are restricted: archive.org only plays them on its own site.';
+    var kinds = {};
+    media.forEach(function(f){ if(!f.private) kinds[f.format || f.name.split('.').pop().toUpperCase()] = true; });
+    var k = Object.keys(kinds);
+    if(!k.length) return 'It has no audio or video files, only ' + (files.length === 1 ? 'one file' : files.length + ' other files') + ' (pictures, text or the like).';
+    return 'Its files are in ' + (k.length > 1 ? 'formats' : 'a format') + ' phones can\u2019t play (' + k.slice(0, 4).join(', ') + ').';
+  }
+  function archiveNothingNotice(meta, item){
+    showNotice({ kind: 'error', title: 'Nothing to play', autoClose: false,
+      message: '\u201c' + item.title + '\u201d can\u2019t be played in Amplify. ' + archiveWhyNothing(meta, item),
+      actions: [{ label: 'OK' }, { label: 'Open on archive.org', primary: true, run: function(){ try{ window.open('https://archive.org/details/' + encodeURIComponent(item.id), '_blank'); }catch(e){} } }] });
+  }
   function playArchiveItem(item, row, opts){
     if(opts && opts.list) archiveNpResults = { items: opts.list.slice(), noHistory: !!opts.noHistory };
     else archiveNpResults = null;
@@ -42151,7 +42177,7 @@
       // Build 345 (Mark): a result found with Search everything on leaves no trace (Continue
       // Listening, Continue Watching, its place in it).
       if(opts && opts.noHistory) list.forEach(function(t){ t.iaNoHistory = true; });
-      if(!list.length){ setStatus('Nothing playable in this Internet Archive item.', true); return; }
+      if(!list.length){ archiveNothingNotice(meta, item); return; }
       if(list.length > 1) setQueue(list, list[0], item.title); else clearQueue();
       playStation(list[0]);
       openNowPlaying(list[0], true);
@@ -42447,7 +42473,7 @@
     extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
       var list = archivePlayables(meta, item);
       if(archiveSearchAll()) list.forEach(function(t){ t.iaNoHistory = true; });
-      if(!list.length){ setStatus('Nothing playable in this Internet Archive item.', true); return; }
+      if(!list.length){ archiveNothingNotice(meta, item); return; }
       var label = list.length > 1 ? item.title : null;
       if(atFront) queuePlayNext(list, label); else queueAddToEnd(list, label);
     })['catch'](function(){ setStatus('Could not reach the Internet Archive.', true); });
