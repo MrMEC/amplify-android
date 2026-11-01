@@ -6642,6 +6642,7 @@
   body.yt-open #settingsOverlay.settings-full{ z-index:3020; }
   /* Dialogs Settings opens (accent colour, export/import notes...) come up over it. */
   body.settings-open .settings-overlay:not(#settingsOverlay){ z-index:1600; }
+  body.yt-open.settings-open .settings-overlay:not(#settingsOverlay){ z-index:3030; }
   #settingsOverlay #settingsPanel{
     --set-pad:var(--main-pad);
     width:100%; max-width:none; height:100%; max-height:none; margin:0; border:0; border-radius:0; box-shadow:none;
@@ -29928,9 +29929,8 @@
   // one-off confirmations the user should actually notice, not a line of text that can be
   // missed below the search bar.
   function openDataDialog(title, msg, isErr){
-    // Settings is what launched the import/export, and leaving it stacked underneath means
-    // the reader has two modals to dismiss to get back to the app.
-    closeSettings();
+    // Build 375: Settings stays open underneath (it is a full page now, so closing it dropped
+    // the person on the homepage); the message comes up over it and OK returns to Settings.
     dataDialogTitle.textContent = title;
     dataDialogMessage.textContent = msg;
     dataDialogMessage.classList.toggle('err', !!isErr);
@@ -43551,7 +43551,7 @@
   function exportPayload(payload){
     var text = JSON.stringify(payload, null, 2);
     // Dated, so a second export beside an older one is easy to tell apart.
-    var fileName = 'amplify-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    var fileName = 'amplify-backup-' + dayKey(new Date()) + '.json';   // the local date, not UTC's
     var nativePlugin = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
       && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer;
     if(nativePlugin && typeof nativePlugin.saveToDownloads === 'function'){

@@ -26,6 +26,7 @@ MOCK = """
   function KV(){ try{ return JSON.parse(sessionStorage.getItem('__kv') || '{}'); }catch(e){ return {}; } }
   window.__picks = 0;
   var impl = {
+    saveToDownloads: function(o){ window.__saved = o.name; return Promise.resolve({ folder: 'Downloads', name: o.name }); },
     pickBackupFolder: function(){ window.__picks++; return Promise.resolve({ treeUri: 'content://tree/Backups', name: 'Amplify Backups' }); },
     backupWrite: function(o){
       var f = F(); f[o.name] = { text: o.text, at: Date.now() };
@@ -124,6 +125,15 @@ async def run(B, theme):
     await act(pg, 'Merge'); await pg.wait_for_timeout(500)
     favs = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerFavorites')).length")
     check(favs == 3, f'{T} Merge adds what is missing ({favs})')
+    # Export: the message comes up over Settings, and OK goes back to Settings, not the homepage
+    await pg.evaluate("document.getElementById('dataDialogOkBtn').click()")
+    await pg.click('#exportFavBtn'); await pg.wait_for_timeout(600)
+    ex = await pg.evaluate("[window.__saved, document.getElementById('dataDialogTitle').textContent, document.getElementById('settingsOverlay').classList.contains('open'), (function(){ var b = document.getElementById('dataDialogOkBtn').getBoundingClientRect(); var e = document.elementFromPoint(b.x + b.width/2, b.y + b.height/2); return e && e.id; })()]")
+    check(ex[0] and ex[1] == 'Export Complete' and ex[2] and ex[3] == 'dataDialogOkBtn', f'{T} Export says where it saved, over Settings {ex}')
+    await pg.screenshot(path=f'{SHOTS}/backup-{theme}-export.png')
+    await pg.click('#dataDialogOkBtn'); await pg.wait_for_timeout(300)
+    back = await pg.evaluate("[document.getElementById('settingsOverlay').classList.contains('open'), getComputedStyle(document.getElementById('bkFolderRow')).display !== 'none']")
+    check(back == [True, True], f'{T} OK goes back to Privacy & Backup {back}')
     # due: a week old
     await pg.evaluate("var b = JSON.parse(localStorage.getItem('radioPlayerBackupSettings')); b.last = Date.now() - 8*86400000; localStorage.setItem('radioPlayerBackupSettings', JSON.stringify(b)); window.__writes = [];")
     await pg.evaluate("__t.ev('runDueBackup()')"); await pg.wait_for_timeout(600)
