@@ -9290,7 +9290,7 @@
   var origSet = Storage.prototype.setItem, origRemove = Storage.prototype.removeItem;
   // Caches that can be fetched again. Never the listener's own data.
   var CACHE_PREFIXES = ['amplifyFallback:'];
-  var CACHE_KEYS = ['radioPlayerArtCache', 'radioPlayerPluto2', 'radioPlayerPluto', 'radioPlayerPlexLib', 'radioPlayerPodcastPopular',
+  var CACHE_KEYS = ['amplifyArchivePlayable', 'radioPlayerArtCache', 'radioPlayerPluto2', 'radioPlayerPluto', 'radioPlayerPlexLib', 'radioPlayerPodcastPopular',
     'amplifyTagVocab', 'amplifySlowMoments', 'radioPlayerLastSearch', 'radioPlayerVideoStations', 'radioPlayerMadeForYou'];
   window.__amplifyIsCache = function(k){ return isCache(k); };   // build 373: left out of backups
   function isCache(k){
@@ -23990,7 +23990,7 @@
           setResultCount(0, 'item');
           return;
         }
-        var shown = items.slice(), page = 1, total = items.total;
+        var shown = items.slice(), page = items.page || 1, total = items.total;
         items.forEach(function(it){ body.appendChild(archiveItemRow(it, null, shown)); });
         setResultCount(shown.length, 'item');
         // Build 385: More Results, for as long as archive.org has more.
@@ -23999,7 +23999,7 @@
           var btn = archiveMoreButton(function(){
             return archiveSearchItems(q, all, page + 1).then(function(next){
               if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q) return;
-              page++;
+              page = next.page || page + 1;
               total = next.total || total;
               var have = {};
               shown.forEach(function(it){ have[it.id] = true; });
@@ -41677,11 +41677,61 @@
     var w = words.join(' AND ');
     var q = '(title:(' + w + ') OR creator:(' + w + ')) AND ' + archiveMediaClause() + (all ? '' : ' AND collection:(' + IA_COLLECTIONS.join(' OR ') + ')');
     page = page || 1;
-    return extJson(archiveQueryUrl(q, ARCHIVE_PAGE_SIZE, page), { 'Accept': 'application/json' }).then(function(d){
-      var items = archiveDocs(d);
-      items.total = Number(d && d.response && d.response.numFound) || items.length;
-      items.page = page;
-      return items;
+    // Build 388 (Mark): only what can be played is shown. A page whose items all turn out
+    // unplayable is skipped for the next one (up to three pages in one go).
+    var tries = 0;
+    function one(pg){
+      tries++;
+      return extJson(archiveQueryUrl(q, ARCHIVE_PAGE_SIZE, pg), { 'Accept': 'application/json' }).then(function(d){
+        var found = archiveDocs(d);
+        var total = Number(d && d.response && d.response.numFound) || found.length;
+        return archiveOnlyPlayable(found).then(function(items){
+          items.total = total;
+          items.page = pg;
+          items.hidden = found.length - items.length;
+          if(!items.length && tries < 3 && archiveHasMore(total, pg)) return one(pg + 1);
+          return items;
+        });
+      });
+    }
+    return one(page);
+  }
+  // Build 388: whether an archive.org item has anything Amplify can play. Search can't tell
+  // (an item whose files archive.org keeps private looks like any other), so each item's file
+  // list is looked at, six at a time, and the answer kept on the phone (amplifyArchivePlayable,
+  // a cache: newest 3000). An item that can't be checked (no connection) is kept.
+  var ARCHIVE_OK_KEY = 'amplifyArchivePlayable';
+  var archiveOk = null;
+  function archiveOkMap(){
+    if(archiveOk) return archiveOk;
+    try{ archiveOk = JSON.parse(localStorage.getItem(ARCHIVE_OK_KEY) || '{}') || {}; }catch(e){ archiveOk = {}; }
+    return archiveOk;
+  }
+  var archiveOkSaveTimer = 0;
+  function archiveOkSave(){
+    clearTimeout(archiveOkSaveTimer);
+    archiveOkSaveTimer = setTimeout(function(){
+      var m = archiveOkMap(), keys = Object.keys(m);
+      if(keys.length > 3000){ keys.sort(function(a, b){ return (m[a].t || 0) - (m[b].t || 0); }).slice(0, keys.length - 3000).forEach(function(k){ delete m[k]; }); }
+      try{ localStorage.setItem(ARCHIVE_OK_KEY, JSON.stringify(m)); }catch(e){}
+    }, 400);
+  }
+  function archiveOnlyPlayable(items){
+    var m = archiveOkMap(), todo = items.filter(function(it){ return !m[it.id]; });
+    var i = 0;
+    function worker(){
+      if(i >= todo.length) return Promise.resolve();
+      var it = todo[i++];
+      return extJson('https://archive.org/metadata/' + encodeURIComponent(it.id), { 'Accept': 'application/json' }).then(function(meta){
+        var ok = !!(meta && meta.files) && archivePlayables(meta, it).length > 0;
+        m[it.id] = { ok: ok ? 1 : 0, t: Date.now() };
+      }, function(){ /* unknown: kept, and asked again next time */ }).then(worker);
+    }
+    var workers = [];
+    for(var w = 0; w < 6; w++) workers.push(worker());
+    return Promise.all(workers).then(function(){
+      if(todo.length) archiveOkSave();
+      return items.filter(function(it){ var r = m[it.id]; return !r || r.ok; });
     });
   }
   function archiveHasMore(total, page){ return total > page * ARCHIVE_PAGE_SIZE; }
@@ -42782,7 +42832,7 @@
       st.archive = rankByMatch(items.filter(function(it){
         return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases });
       }), function(it){ return it.title; }, pq);
-      st.archiveTotal = items.total; st.archivePage = 1; st.archiveRemoteQ = remoteQ;
+      st.archiveTotal = items.total; st.archivePage = items.page || 1; st.archiveRemoteQ = remoteQ;
       st.archivePending = false;
       if(searchState === st) applySearchResults();
     })['catch'](function(){
@@ -43034,7 +43084,7 @@
             return !have[it.id] && (!pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases }));
           });
           st.archive = (st.archive || []).concat(add);
-          st.archivePage = next;
+          st.archivePage = more.page || next;
           st.archiveTotal = more.total || st.archiveTotal;
           if(searchState !== st) return;
           var y = window.scrollY;
