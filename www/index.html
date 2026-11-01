@@ -10271,6 +10271,16 @@
             (log.freed.length ? line('Caches cleared to make room', log.freed.length) : '') +
             (log.failed ? line('A save was refused (storage full)', escapeHtml(log.failed.key) + ' at ' + escapeHtml(new Date(log.failed.at).toLocaleTimeString()), true) : '');
         })() +
+        (function(){
+          // Build 382: Choose Thumbnail's last tries this session.
+          var tl = window.__amplifyThumbLog || [];
+          if(!tl.length) return '';
+          var bad = tl.filter(function(x){ return !x.ok; }).length;
+          return line('Thumbnail tries this session', tl.length + (bad ? ', ' + bad + ' failed' : ''), !!bad) + '<div>' + tl.map(function(x){
+            return escapeHtml(new Date(x.at).toLocaleTimeString()) + ' ' + escapeHtml(x.what) + ': ' + (x.ok ? 'ok' : '<b class="diag-bad">failed</b>')
+              + ' (' + (x.took / 1000).toFixed(1) + ' s' + (x.detail ? ', ' + escapeHtml(x.detail) : '') + ')';
+          }).join('<br>') + '</div>';
+        })() +
         (nativeCaught ? line('Cast and error log', nativeCaught.split('\n').filter(function(l){ return /^\[/.test(l); }).length, /\[(cast media|plugin|cast [a-z]+\])/.test(nativeCaught))
           + '<div style="white-space:pre-wrap;font-size:11px">' + escapeHtml(nativeCaught.split('\n').filter(function(l){ return /^\[/.test(l) || /Exception:/.test(l); }).slice(-16).join('\n')) + '</div>' : '') +
         line('Saved cover-art URLs', customCount) +
@@ -25029,6 +25039,12 @@
     return P && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && typeof P.videoFrame === 'function' ? P : null;
   }
   var tp = null;   // { v, dur, ms, busy, pending, el }
+  // Build 382: the last few frame requests and saves, for Settings > About > Check storage.
+  var tpLog = window.__amplifyThumbLog = [];
+  function tpNote(what, ok, started, detail){
+    tpLog.push({ at: Date.now(), what: what, ok: ok, took: Date.now() - started, detail: detail || '' });
+    if(tpLog.length > 12) tpLog.shift();
+  }
   function tpTime(ms){ var s = Math.max(0, ms) / 1000; return formatTime(Math.floor(s)) + '.' + Math.floor((s % 1) * 10); }
   function openThumbPicker(v){
     var P = thumbPlugin();
@@ -25099,15 +25115,17 @@
     cur.el.querySelector('#tpFrame').classList.add('loading');
     var msg = cur.el.querySelector('#tpMsg');
     // Build 381: never left waiting -- an answer that doesn't come in time counts as a failure.
+    var started = Date.now(), what = (exact ? 'exact' : 'quick') + ' frame at ' + tpTime(want);
     var ask = P.videoFrame({ uri: cur.v.uri, ms: want, exact: !!exact });
     var late = new Promise(function(res, rej){ setTimeout(function(){ rej(new Error('The phone didn\u2019t answer in time')); }, 25000); });
     Promise.race([ask, late]).then(function(r){
       if(tp !== cur) return;
       if(r && r.duration && !cur.dur){ cur.dur = r.duration; tpSync(); }
-      if(r && r.data){ cur.el.querySelector('#tpImg').src = r.data; msg.hidden = true; }
-      else { msg.textContent = 'No picture came back for this point. Try another.'; msg.hidden = false; }
+      if(r && r.data){ cur.el.querySelector('#tpImg').src = r.data; msg.hidden = true; tpNote(what, true, started, Math.round(r.data.length / 1024) + ' K'); }
+      else { msg.textContent = 'No picture came back for this point. Try another.'; msg.hidden = false; tpNote(what, false, started, 'no picture'); }
       cur.shownMs = want;
     }, function(err){
+      tpNote(what, false, started, (err && err.message) || 'failed');
       if(tp !== cur) return;
       msg.textContent = 'Couldn\u2019t show this point' + (err && err.message ? ': ' + err.message : '') + '. Try another.';
       msg.hidden = false;
@@ -25131,7 +25149,7 @@
     var info = videoInfo[uri] = videoInfo[uri] || { d: 0, w: 0, h: 0, t: '' };
     info.t = still || '';
     if(custom) info.c = 1; else delete info.c;
-    vsave(VIDEO_INFO_KEY, videoInfo);
+    var kept = vsave(VIDEO_INFO_KEY, videoInfo);
     mvIndexCache = null;
     Array.prototype.forEach.call(document.querySelectorAll('.mv-tile, .mv-row'), function(b){
       if(!b._v || b._v.uri !== uri) return;
@@ -25139,18 +25157,25 @@
       if(b._paintStill) b._paintStill(); else if(b._paint) b._paint();
     });
     if(currentStation && currentStation.uri === uri){ currentStation.still = info.t; currentStation.favicon = info.t ? capUrl(info.t) : ''; }
+    return kept;
   }
   function saveThumbPick(){
     if(!tp) return;
     var P = thumbPlugin(), cur = tp, btn = cur.el.querySelector('#tpSave');
+    var started = Date.now();
     btn.disabled = true;
     P.videoFrame({ uri: cur.v.uri, ms: cur.ms, save: true }).then(function(r){
       btn.disabled = false;
       if(!r || !r.thumb) throw new Error('No picture');
-      applyVideoStill(cur.v.uri, r.thumb, true);
+      var kept = applyVideoStill(cur.v.uri, r.thumb, true);
+      tpNote('save at ' + tpTime(cur.ms), kept, started, kept ? '' : 'settings storage full');
       closeThumbPicker();
-      showNotice({ kind: 'done', message: 'Thumbnail changed.' });
+      if(kept) showNotice({ kind: 'done', message: 'Thumbnail changed.' });
+      // Build 382: shown, but not kept -- Amplify's settings storage is full.
+      else showNotice({ kind: 'error', title: 'Thumbnail not kept', autoClose: false,
+        message: 'The new thumbnail shows now, but Amplify\u2019s storage on this phone is full, so it won\u2019t be there next time. Settings \u203a About \u203a Check storage shows what\u2019s using the space.' });
     })['catch'](function(err){
+      tpNote('save at ' + tpTime(cur.ms), false, started, (err && err.message) || 'failed');
       btn.disabled = false;
       showNotice({ kind: 'error', message: 'That frame couldn’t be saved' + (err && err.message ? ': ' + err.message : '.') });
     });

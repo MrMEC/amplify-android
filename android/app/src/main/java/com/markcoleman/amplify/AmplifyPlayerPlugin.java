@@ -1591,8 +1591,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       java.util.concurrent.Executors.newSingleThreadExecutor();
   private final java.util.concurrent.ExecutorService frameWork =
       java.util.concurrent.Executors.newCachedThreadPool();
-  private android.media.MediaMetadataRetriever frameReader;
-  private String frameUri;
+  private volatile android.media.MediaMetadataRetriever frameReader;
+  private volatile String frameUri;
 
   private void releaseFrameReader() {
     if (frameReader != null) {
@@ -1622,7 +1622,22 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   private JSObject frameWithin(Context ctx, android.media.MediaMetadataRetriever r, String u, long ms, boolean exact, boolean save, long secs)
       throws Exception {
-    java.util.concurrent.Future<JSObject> f = frameWork.submit(() -> VideoLibrary.frame(ctx, r, u, ms, exact, save));
+    // A reader given up on (it took too long) is let go as soon as it finishes, so it doesn't
+    // keep hold of the phone's video decoder.
+    java.util.concurrent.Future<JSObject> f =
+        frameWork.submit(
+            () -> {
+              try {
+                return VideoLibrary.frame(ctx, r, u, ms, exact, save);
+              } finally {
+                if (r != frameReader) {
+                  try {
+                    r.release();
+                  } catch (Throwable ignored) {
+                  }
+                }
+              }
+            });
     try {
       return f.get(secs, java.util.concurrent.TimeUnit.SECONDS);
     } catch (java.util.concurrent.ExecutionException e) {

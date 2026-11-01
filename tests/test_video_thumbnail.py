@@ -9,6 +9,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 _setup = open(os.path.join(HERE, 'test_music_videos.py')).read().split('fails = []')[0]
 _setup = _setup.replace('PORT = 8814', 'PORT = 8883').replace("root = '/tmp/claude-0/t/srv_mv'", "root = '/tmp/claude-0/t/srv_tp'")
 _setup = _setup.replace("os.path.dirname(__file__)", repr(HERE))
+_setup = _setup.replace('window.__t = { mvPage:', 'window.__t = { ev: function(js){ return eval(js); }, mvPage:')
 _setup = _setup.replace("   addListener: function(n, f)", """   videoFrame: function(o){ (window.__frames = window.__frames || []).push(o);
      if(window.__frameFail) return Promise.reject(new Error('setDataSource failed'));
      if(o.save) return Promise.resolve({ thumb: 'http://127.0.0.1:8883/still2.jpg', duration: 125000 });
@@ -108,6 +109,23 @@ async def run(b, theme):
     op = await pg.evaluate("[document.getElementById('thumbPickOverlay').classList.contains('open'), document.getElementById('tpName').textContent, window.__loaded ? 1 : 0]")
     check(op[0] and op[1].startswith('Live at Wembley') and op[2] == 0, f'{T} a long press on a row opens it too, without playing {op}')
     await pg.click('#tpCancel'); await pg.wait_for_timeout(200)
+    # storage full: the save says it wasn't kept
+    await pg.evaluate("""(function(){ var o = Storage.prototype.setItem; Storage.prototype.setItem = function(k, v){ if(k === 'radioPlayerVideoInfo'){ var e = new Error('full'); e.name = 'QuotaExceededError'; throw e; } return o.call(this, k, v); }; window.__restoreSet = function(){ Storage.prototype.setItem = o; }; })()""")
+    await pg.evaluate("document.querySelector('.mv-row .row-more-btn').click()"); await pg.wait_for_timeout(200)
+    await pg.evaluate("document.getElementById('rowMenuThumb').click()"); await pg.wait_for_timeout(400)
+    await pg.click('#tpSave'); await pg.wait_for_timeout(500)
+    n = await pg.evaluate("[document.getElementById('noticeTitle').textContent, document.getElementById('noticeMsg').textContent]")
+    check(n[0] == 'Thumbnail not kept' and 'Check storage' in n[1], f'{T} storage full: it says the thumbnail wasn\u2019t kept and where to look {n}')
+    await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-full.png')
+    await pg.evaluate("window.__restoreSet(); document.getElementById('noticeOverlay').classList.remove('open')")
+    # Check storage lists the tries
+    await pg.evaluate("__t.ev(\"openSettings('about')\")"); await pg.wait_for_timeout(300)
+    await pg.evaluate("document.getElementById('diagnosticsBtn').click()"); await pg.wait_for_timeout(1500)
+    dg = await pg.evaluate("document.getElementById('diagnostics').textContent")
+    check('Thumbnail tries this session' in dg and 'failed' in dg and 'setDataSource failed' in dg and 'settings storage full' in dg, f'{T} Check storage lists the thumbnail tries, failures with their reason')
+    await pg.evaluate("document.querySelector('#diagnostics').scrollIntoView({block:'start'})"); await pg.wait_for_timeout(200)
+    await pg.screenshot(path=f'{SHOTS_DIR}/tp-{theme}-diag.png')
+    await pg.evaluate("__t.ev('closeSettings()')")
     # a plain tap still plays
     await pg.tap('.mv-row'); await pg.wait_for_timeout(1000)
     check(await pg.evaluate("!!window.__loaded"), f'{T} a tap still plays the video')
