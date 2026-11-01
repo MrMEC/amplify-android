@@ -1817,14 +1817,14 @@
 
   /* Music Videos on a favourite artist's page (builds 126-127): a sideways row of 16:9 thumbnails
      under the bio, above the albums. It runs to the screen's edges so the cut-off card shows it scrolls. */
-  .artist-videos, .artist-archive-row{
+  .artist-videos, .artist-yt-row, .artist-archive-row{
     grid-column:1/-1; display:flex; flex-wrap:nowrap; gap:14px;
     overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity;
     margin:0 calc(-1 * var(--main-pad)); padding:2px var(--main-pad) 6px;
     scroll-padding-left:var(--main-pad);
     scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain;
   }
-  .artist-videos::-webkit-scrollbar, .artist-archive-row::-webkit-scrollbar{ display:none; }
+  .artist-videos::-webkit-scrollbar, .artist-yt-row::-webkit-scrollbar, .artist-archive-row::-webkit-scrollbar{ display:none; }
   .yt-tile{
     flex:0 0 min(240px, 66vw); scroll-snap-align:start; display:flex; flex-direction:column;
     text-align:left; background:none; border:0; padding:0; margin:0; color:inherit; font:inherit; cursor:pointer;
@@ -1920,7 +1920,7 @@
     .yt-ov-frame{ width:min(100vw, calc(100vh * 16 / 9)); }
   }
   /* More room between the bio's More and the Music Videos heading under it. */
-  .tile-grid > .artist-videos-label:first-child, .tile-grid > .artist-archive-label:first-child{ padding-top:22px; margin-bottom:-10px; }
+  .tile-grid > .artist-videos-label:first-child, .tile-grid > .artist-yt-label:first-child, .tile-grid > .artist-archive-label:first-child{ padding-top:22px; margin-bottom:-10px; }
   @media (max-width: 900px){
     .artist-albums{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:28px 14px; }
   }
@@ -8089,6 +8089,14 @@
       <div class="settings-row" id="archiveSourceRow">
         <div class="set-text"><span class="settings-label" id="archiveSourceLabel">Archive.org</span><span class="set-desc">The Archive tab in Search, archive.org channels and Add Channels</span></div>
         <select class="settings-select" id="archiveSourceSelect" aria-labelledby="archiveSourceLabel">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <!-- Build 390 (Mark): YouTube, on by default; off, an artist's On YouTube row and Home's Top 100 go. -->
+      <div class="settings-row" id="youtubeSourceRow">
+        <div class="set-text"><span class="settings-label" id="youtubeSourceLabel">YouTube</span><span class="set-desc">The On YouTube row on artist pages, and Top 100 on Home</span></div>
+        <select class="settings-select" id="youtubeSourceSelect" aria-labelledby="youtubeSourceLabel">
           <option value="on">On</option>
           <option value="off">Off</option>
         </select>
@@ -16630,7 +16638,7 @@
   // ---------- Home row ----------
   function renderTop100HomeSection(){
     if(!top100HomeGrid) return;
-    var items = hot100Latest ? hot100Items(hot100Latest) : [];
+    var items = hot100Latest && sourceOn('youtube') ? hot100Items(hot100Latest) : [];   // build 390: off with YouTube in Sources
     hot100Shown = items.length > 0;
     top100HomeGrid.innerHTML = '';
     items.slice(0, HOT100_HOME_MAX).forEach(function(item, i){
@@ -17512,12 +17520,13 @@
   });
 
   setTimeout(function(){
+    if(!sourceOn('youtube')){ renderTop100HomeSection(); return; }   // build 390: YouTube is off in Sources
     loadHot100Latest().then(function(){
       renderTop100HomeSection();
     })['catch'](function(){ renderTop100HomeSection(); });
   }, 0);
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState !== 'visible') return;
+    if(document.visibilityState !== 'visible' || !sourceOn('youtube')) return;
     var saved = lsGet(HOT100_KEY);
     if(!saved || Date.now() - (saved.at || 0) >= HOT100_TTL_MS){
       loadHot100Latest(true).then(function(){ renderTop100HomeSection(); })['catch'](function(){});
@@ -21143,9 +21152,9 @@
   }
   function channelSourceOn(c){ var id = channelSourceId(c); return !id || sourceOn(id); }
   function channelVisible(e){ return !isAdultChannel(e) && channelSourceOn(e); }
-  // The two switches in Settings > Sources; whatever is showing behind Settings is redrawn.
+  // The switches in Settings > Sources; whatever is showing behind Settings is redrawn.
   (function(){
-    [['pluto', 'plutoSourceSelect'], ['archive', 'archiveSourceSelect']].forEach(function(pair){
+    [['pluto', 'plutoSourceSelect'], ['archive', 'archiveSourceSelect'], ['youtube', 'youtubeSourceSelect']].forEach(function(pair){
       var sel = document.getElementById(pair[1]);
       if(!sel) return;
       sel.value = sourceOn(pair[0]) ? 'on' : 'off';
@@ -21162,6 +21171,18 @@
       else if(typeof onVideoView !== 'undefined' && onVideoView) renderVideoHome();
       if(typeof refreshContinueWatching === 'function') refreshContinueWatching();
       if(searchState && searchState.q) runSearch(searchState.q);
+    }catch(e){}
+    // Build 390: an artist page open behind Settings gets (or loses) its On YouTube and On Archive.org
+    // rows, and Home's Top 100 comes back (or goes).
+    try{
+      if(typeof activeArtistKey !== 'undefined' && activeArtistKey && !activeAlbumKey){
+        var ae = findArtistEntry(activeArtistKey);
+        if(ae){ syncArtistVideos(ae); syncArtistArchive(ae); }
+      }
+    }catch(e){}
+    try{
+      if(sourceOn('youtube') && !hot100Latest) loadHot100Latest().then(function(){ renderTop100HomeSection(); })['catch'](function(){});
+      renderTop100HomeSection();
     }catch(e){}
   }
   // My Channels runs A to Z by name unless Manual is chosen (in edit mode), in which case
@@ -35649,7 +35670,8 @@
     if(!total){
       stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
     }
-    // A favourite artist's music videos, under the bio (syncArtistVideos puts them at the top).
+    // Their own videos and their YouTube videos, under the bio (build 390: any artist, not only
+    // favourites; syncArtistVideos puts them at the top).
     syncArtistVideos(entry);
     // Build 389: and what archive.org has of theirs, under it.
     syncArtistArchive(entry);
@@ -35970,37 +35992,74 @@
     b.onclick = function(){ openYtPlayer(v, b._ytList, artistName); };
     return b;
   }
+  // Build 390 (Mark): an artist page's video sections, top to bottom: Music Videos (their own video
+  // files on the phone), On YouTube (any artist in the library, favourite or not; off with YouTube
+  // in Sources), then On Archive.org. Each is a heading and a sideways row, and they arrive on
+  // their own schedules, so each is put in its place by its rank among the three.
+  var ARTIST_VIDEO_SECTIONS = [['artist-videos-label', 'artist-videos'], ['artist-yt-label', 'artist-yt-row'], ['artist-archive-label', 'artist-archive-row']];
+  function placeArtistSection(rank, label, row){
+    var anchor = null, i, prev = null;
+    for(i = rank + 1; i < ARTIST_VIDEO_SECTIONS.length && !anchor; i++) anchor = stationsGrid.querySelector('.' + ARTIST_VIDEO_SECTIONS[i][0]);
+    if(!anchor){
+      for(i = rank - 1; i >= 0 && !prev; i--) prev = stationsGrid.querySelector('.' + ARTIST_VIDEO_SECTIONS[i][1]);
+      anchor = prev ? prev.nextSibling : stationsGrid.firstChild;
+    }
+    stationsGrid.insertBefore(label, anchor);
+    stationsGrid.insertBefore(row, label.nextSibling);
+  }
   function clearArtistVideos(){
     stationsGrid.querySelectorAll('.artist-videos-label, .artist-videos, .artist-mvs-label').forEach(function(el){ el.remove(); });
   }
-  function paintArtistVideos(entry, rec, loading){
+  function clearArtistYouTube(){
+    stationsGrid.querySelectorAll('.artist-yt-label, .artist-yt-row').forEach(function(el){ el.remove(); });
+  }
+  function dropArtistEmptyState(){
+    var empty = stationsGrid.querySelector('.empty-state');
+    if(empty) empty.remove();
+  }
+  // Music Videos: the artist's own video files (build 152), when they have any.
+  function paintArtistLocalVideos(entry){
     clearArtistVideos();
-    // The artist's own video files (build 152) go at the end of the same row (build 155).
     var locals = musicVideosFor(entry.key);
-    if(!loading && !(rec && rec.videos && rec.videos.length) && locals.length){
-      rec = { videos: [], mv: true };
-    }
-    if(!loading && !(rec && rec.videos && rec.videos.length) && !locals.length){
+    if(!locals.length) return;
+    dropArtistEmptyState();
+    var label = appendGridSection('Music Videos');
+    label.classList.add('artist-videos-label');
+    // Build 302: the heading opens their Music Videos page.
+    label.classList.add('home-heading-link', 'mv-heading-link');
+    label.setAttribute('role', 'link'); label.tabIndex = 0;
+    label.insertAdjacentHTML('beforeend', MV_CHEVRON);
+    var openMv = function(){ pushView(); openMusicVideoArtist(entry.key); };
+    label.addEventListener('click', openMv);
+    label.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMv(); } });
+    var row = document.createElement('div');
+    row.className = 'artist-videos';
+    var tiles = {};
+    locals.forEach(function(v){ var tile = buildMusicVideoTile(v, locals); tiles[v.uri] = tile; row.appendChild(tile); });
+    ensureMusicVideoStills(locals, function(v){
+      var tile = tiles[v.uri];
+      if(tile && tile.isConnected){ tile._paintStill(); tile._paintDur(); }
+    });
+    var c = document.createElement('span');
+    c.className = 'grid-section-count';
+    c.textContent = String(locals.length);
+    var chev = label.querySelector('.mv-chev');
+    if(chev) label.insertBefore(c, chev); else label.appendChild(c);
+    placeArtistSection(0, label, row);
+  }
+  // On YouTube: their YouTube videos (loading: three placeholders).
+  function paintArtistYouTube(entry, rec, loading){
+    clearArtistYouTube();
+    var vids = (rec && rec.videos) || [];
+    if(!loading && !vids.length){
       if(!stationsGrid.children.length) stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
       return;
     }
-    var empty = stationsGrid.querySelector('.empty-state');
-    if(empty) empty.remove();
-    // Directly under the bio: the first thing in the page's grid, above Stations and Albums.
-    var label = appendGridSection(loading ? 'Music Videos' : ((rec.mv || locals.length) ? 'Music Videos' : 'Videos'));
-    label.classList.add('artist-videos-label');
-    stationsGrid.insertBefore(label, stationsGrid.firstChild);
-    // Build 302: with videos of theirs on the phone, the heading opens their Music Videos page.
-    if(locals.length){
-      label.classList.add('home-heading-link', 'mv-heading-link');
-      label.setAttribute('role', 'link'); label.tabIndex = 0;
-      label.insertAdjacentHTML('beforeend', MV_CHEVRON);
-      var openMv = function(){ pushView(); openMusicVideoArtist(entry.key); };
-      label.addEventListener('click', openMv);
-      label.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openMv(); } });
-    }
+    dropArtistEmptyState();
+    var label = appendGridSection('On YouTube');
+    label.classList.add('artist-yt-label');
     var row = document.createElement('div');
-    row.className = 'artist-videos';
+    row.className = 'artist-yt-row';
     if(loading){
       for(var i = 0; i < 3; i++){
         var sk = document.createElement('div');
@@ -36009,52 +36068,38 @@
         row.appendChild(sk);
       }
     } else {
-      rec.videos.forEach(function(v){ var t = buildYtTile(v, entry.name); t._ytList = rec.videos; row.appendChild(t); });
+      vids.forEach(function(v){ var t = buildYtTile(v, entry.name); t._ytList = vids; row.appendChild(t); });
     }
-    if(locals.length){
-      var tiles = {};
-      locals.forEach(function(v){ var tile = buildMusicVideoTile(v, locals); tiles[v.uri] = tile; row.appendChild(tile); });
-      ensureMusicVideoStills(locals, function(v){
-        var tile = tiles[v.uri];
-        if(tile && tile.isConnected){ tile._paintStill(); tile._paintDur(); }
-      });
-      if(!loading){
-        var c = document.createElement('span');
-        c.className = 'grid-section-count';
-        c.textContent = String((rec.videos || []).length + locals.length);
-        var chev = label.querySelector('.mv-chev');
-        if(chev) label.insertBefore(c, chev); else label.appendChild(c);
-      }
-    }
-    stationsGrid.insertBefore(row, label.nextSibling);
+    placeArtistSection(1, label, row);
   }
-  // Called whenever the artist page is drawn and when the artist is favourited or not.
+  // Called whenever the artist page is drawn (and when YouTube is switched in Sources): their own
+  // videos, then the YouTube row.
   function syncArtistVideos(entry){
-    if(entry && !isFavorite(artistFavRecord(entry)) && musicVideosFor(entry.key).length){
-      // Not a favourite (no YouTube videos looked up), but videos of theirs on the phone.
-      paintArtistVideos(entry, null, false);
-      return;
-    }
-    if(!entry || !isFavorite(artistFavRecord(entry))){
-      clearArtistVideos();
-      if(entry && !stationsGrid.children.length) stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
+    if(!entry){ clearArtistVideos(); clearArtistYouTube(); return; }
+    paintArtistLocalVideos(entry);
+    syncArtistYouTube(entry);
+  }
+  function syncArtistYouTube(entry){
+    if(!sourceOn('youtube')){
+      clearArtistYouTube();
+      if(!stationsGrid.children.length) stationsGrid.innerHTML = '<div class="empty-state">Nothing to show for this artist yet.</div>';
       return;
     }
     var rec = ytStore[entry.key];
     var have = rec && rec.videos && rec.videos.length;
-    if(ytFresh(rec)){ paintArtistVideos(entry, rec, false); return; }
-    paintArtistVideos(entry, rec, !have);
+    if(ytFresh(rec)){ paintArtistYouTube(entry, rec, false); return; }
+    paintArtistYouTube(entry, rec, !have);
     var shownIds = have ? rec.videos.map(function(v){ return v.id; }).join() : '';
     loadArtistVideos(entry).then(function(r){
-      if(activeArtistKey !== entry.key || activeAlbumKey || !isFavorite(artistFavRecord(entry))) return;
+      if(activeArtistKey !== entry.key || activeAlbumKey || !sourceOn('youtube')) return;
       var ids = r && r.videos ? r.videos.map(function(v){ return v.id; }).join() : '';
-      if(have && ids === shownIds && r && r.mv === rec.mv) return;   // nothing new
-      paintArtistVideos(entry, r, false);
+      if(have && ids === shownIds) return;   // nothing new
+      paintArtistYouTube(entry, r, false);
     });
   }
 
   // ---------- Build 389 (Mark): archive.org videos on an artist's page ----------
-  // Under the YouTube row (or the bio when there isn't one): "On Archive.org", a sideways row of
+  // Under On YouTube (or whichever rows are there, else the bio): "On Archive.org", a sideways row of
   // the artist's music videos and concert films from archive.org, most downloaded first. Only items
   // that are the artist's own count: a title that starts "Artist - ..." (or "Artist Live ...", "... - Artist"),
   // or a creator that is exactly the artist -- but for a one-word name (KEM, Delta) the creator
@@ -36155,10 +36200,7 @@
     var row = document.createElement('div');
     row.className = 'artist-archive-row';
     rec.items.forEach(function(it){ row.appendChild(buildArchiveTile(it, rec.items, entry.name)); });
-    // Under the YouTube row when there is one, else at the top (the bio's own row).
-    var yt = stationsGrid.querySelector('.artist-videos');
-    stationsGrid.insertBefore(label, yt ? yt.nextSibling : stationsGrid.firstChild);
-    stationsGrid.insertBefore(row, label.nextSibling);
+    placeArtistSection(2, label, row);   // under Music Videos and On YouTube, whichever are there
   }
   function syncArtistArchive(entry){
     if(!entry || !sourceOn('archive')){ clearArtistArchive(); return; }

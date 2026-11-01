@@ -1,4 +1,4 @@
-"""Builds 126-127: a favourite artist's page shows a sideways row of YouTube music videos under the
+"""Builds 126-127 (build 390: any artist in the library, headed "On YouTube", under Music Videos and above On Archive.org; off with YouTube in Sources, which also hides Home's Top 100): an artist's page shows a sideways row of YouTube music videos under the
 bio (above Albums; build 127) (channel from Wikidata P2397, videos from YouTube's public feed fetched natively), and tapping one plays it in a full-screen overlay. Artist bio previews are
 left-aligned. Run: python3 tests/test_artist_videos.py (screenshots in /tmp/claude-0/t/shots)"""
 import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
@@ -12,7 +12,7 @@ shots = '/tmp/claude-0/t/shots'
 os.makedirs(shots, exist_ok=True)
 shutil.rmtree(root, ignore_errors=True)
 os.makedirs(root)
-HOOK = ("window.__v = { fav: function(n){ var e = findArtistEntry(artistMatchKey(n)); toggleFavorite(artistFavRecord(e)); },"
+HOOK = ("window.__t = { ev: function(js){ return eval(js); } }; window.__v = { fav: function(n){ var e = findArtistEntry(artistMatchKey(n)); toggleFavorite(artistFavRecord(e)); },"
         " open: function(n){ openArtistPage(findArtistEntry(artistMatchKey(n)).key); },"
         " tracks: function(){ return libraryTracks.length; }, hide: function(){ try{ hideImportPanel(); setStatus('', false); }catch(e){} },"
         " play: function(){ currentStation = libraryTracks[0]; audio.play = function(){ return Promise.resolve(); }; audio.pause = function(){}; setPlayingUI(true); },"
@@ -186,7 +186,7 @@ async def route(r):
     return await r.abort()
 
 ROW = """(()=>{ var g = document.getElementById('stationsGrid'); var kids = Array.from(g.children);
-  var lab = g.querySelector('.artist-videos-label'), row = g.querySelector('.artist-videos'), al = g.querySelector('.artist-albums');
+  var lab = g.querySelector('.artist-yt-label'), row = g.querySelector('.artist-yt-row'), al = g.querySelector('.artist-albums');
   return { label: lab ? lab.textContent : null, labelIdx: kids.indexOf(lab), albumsIdx: kids.indexOf(al), rowIdx: kids.indexOf(row),
     ids: row ? Array.from(row.querySelectorAll('.yt-tile:not(.yt-skel)')).map(function(t){ return t.dataset.vid; }) : null,
     titles: row ? Array.from(row.querySelectorAll('.yt-title')).map(function(t){ return t.textContent; }) : null,
@@ -211,10 +211,10 @@ async def main():
         await pg.wait_for_timeout(300); await pg.evaluate('__v.hide()')
 
         # ---- not a favourite: no videos, no requests ----
-        await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(1500)
+        await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(2500)
         r = await pg.evaluate(ROW)
-        check(r['label'] is None and r['rowIdx'] == -1, 'not a favourite: no video row')
-        check(not await pg.evaluate('__http.length'), 'not a favourite: YouTube not asked')
+        check(r['label'] == 'On YouTube' and r['ids'] and len(r['ids']) == 7, f'not a favourite: the On YouTube row shows all the same {r["label"]} {r["ids"]}')
+        check(await pg.evaluate('__http.length') > 0, 'not a favourite: YouTube is asked')
         bio = await pg.evaluate("""(()=>{ var b = document.getElementById('artistHeroBio'), t = b.querySelector('.artist-hero-bio-text');
           var g = document.getElementById('stationsGrid').getBoundingClientRect();
           if(!t) return null; var range = document.createRange(); range.selectNodeContents(t); var rs = range.getClientRects();
@@ -240,15 +240,15 @@ async def main():
         # ---- favourite it from the artist menu: the row appears ----
         await pg.evaluate("document.getElementById('artistFavBtn').click()"); await pg.wait_for_timeout(60)
         r = await pg.evaluate(ROW)
-        check(r['skel'] == 3 and r['label'] == 'Music Videos', f'favourited: placeholders while loading {r["skel"]}')
+        check(r['skel'] == 0 and r['label'] == 'On YouTube' and len(r['ids']) == 7, f'favourited: the row is just as it was {r["skel"]}')
         await pg.wait_for_timeout(1500)
         r = await pg.evaluate(ROW)
         print(r)
-        check(r['label'] == 'Music Videos', 'headed Music Videos')
+        check(r['label'] == 'On YouTube', 'headed On YouTube')
         check(r['labelIdx'] == 0 and r['rowIdx'] == 1 and r['albumsIdx'] > r['rowIdx'], f'the row sits right under the bio, above Albums {r}')
-        gap = await pg.evaluate("""(()=>{ var b = document.getElementById('artistHeroBio').getBoundingClientRect(), l = document.querySelector('.artist-videos-label').getBoundingClientRect(),
-          row = document.querySelector('.artist-videos').getBoundingClientRect(), al = Array.from(document.querySelectorAll('#stationsGrid .grid-section-label')).filter(function(x){ return /Albums/.test(x.textContent); })[0].getBoundingClientRect();
-          var lt = document.createRange(); lt.selectNodeContents(document.querySelector('.artist-videos-label')); var tr = lt.getClientRects()[0];
+        gap = await pg.evaluate("""(()=>{ var b = document.getElementById('artistHeroBio').getBoundingClientRect(), l = document.querySelector('.artist-yt-label').getBoundingClientRect(),
+          row = document.querySelector('.artist-yt-row').getBoundingClientRect(), al = Array.from(document.querySelectorAll('#stationsGrid .grid-section-label')).filter(function(x){ return /Albums/.test(x.textContent); })[0].getBoundingClientRect();
+          var lt = document.createRange(); lt.selectNodeContents(document.querySelector('.artist-yt-label')); var tr = lt.getClientRects()[0];
           return { bioToLabel: Math.round(tr.top - b.bottom), labelToRow: Math.round(row.top - tr.bottom), rowToAlbums: Math.round(al.top - row.bottom) }; })()""")
         print('gaps', gap)
         check(28 <= gap['bioToLabel'] <= 60 and 10 <= gap['labelToRow'] <= 24 and 8 <= gap['rowToAlbums'] <= 70, f'room between More and Music Videos (build 128), sensible gap below the row {gap}')
@@ -259,9 +259,9 @@ async def main():
         check(not any(CH_AX in u for u in urls), 'a deprecated channel is never asked')
         check(any('channel_id=' + CH_A1 in u for u in urls), 'a channel without a videos-only list falls back to its plain feed')
         check(r['sw'] > r['cw'] + 100, f'the row runs off the screen (scrolls sideways) {r["sw"]} > {r["cw"]}')
-        geo = await pg.evaluate("""(()=>{ var row = document.querySelector('.artist-videos'), t = row.querySelectorAll('.yt-tile');
+        geo = await pg.evaluate("""(()=>{ var row = document.querySelector('.artist-yt-row'), t = row.querySelectorAll('.yt-tile');
           var a = t[0].getBoundingClientRect(), b = t[1].getBoundingClientRect(), th = t[0].querySelector('.yt-thumb').getBoundingClientRect();
-          var lab = document.querySelector('.artist-videos-label').getBoundingClientRect();
+          var lab = document.querySelector('.artist-yt-label').getBoundingClientRect();
           return { top0: Math.round(a.top), top1: Math.round(b.top), left0: Math.round(a.left), labLeft: Math.round(lab.left),
             ratio: th.width / th.height, imgOk: t[0].querySelector('img').naturalWidth > 0, vw: innerWidth,
             rowL: Math.round(row.getBoundingClientRect().left), rowR: Math.round(row.getBoundingClientRect().right),
@@ -271,16 +271,16 @@ async def main():
         check(abs(geo['left0'] - geo['labLeft']) <= 2, 'first tile lines up with the heading')
         check(abs(geo['ratio'] - 16 / 9) < 0.02 and geo['imgOk'], 'thumbnails 16:9 and loaded')
         check(geo['rowL'] == 0 and geo['rowR'] == geo['vw'] and geo['pageX'] <= geo['vw'], 'the row runs to both screen edges without sideways page scroll')
-        await pg.evaluate("document.querySelector('.artist-videos').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(400)
+        await pg.evaluate("document.querySelector('.artist-yt-row').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'{shots}/artvid-row.png')
-        await pg.evaluate("document.querySelector('.artist-videos').scrollBy({left: 300, behavior: 'instant'})"); await pg.wait_for_timeout(400)
-        check(await pg.evaluate("document.querySelector('.artist-videos').scrollLeft") > 100, 'the row scrolls sideways')
+        await pg.evaluate("document.querySelector('.artist-yt-row').scrollBy({left: 300, behavior: 'instant'})"); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("document.querySelector('.artist-yt-row').scrollLeft") > 100, 'the row scrolls sideways')
         await pg.screenshot(path=f'{shots}/artvid-row-scrolled.png')
 
         # ---- play one ----
         await pg.evaluate('__v.play()'); await pg.wait_for_timeout(300)
         check(await pg.evaluate('__v.playing()'), '(setup) something is playing')
-        await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[4].click()"); await pg.wait_for_timeout(1200)
+        await pg.evaluate("document.querySelectorAll('.artist-yt-row .yt-tile')[4].click()"); await pg.wait_for_timeout(1200)
         OV = """(()=>{ var o = document.getElementById('ytOverlay'), f = o.querySelector('iframe'), r = o.getBoundingClientRect(), fr = f.getBoundingClientRect();
           var bar = o.querySelector('.yt-ov-bar').getBoundingClientRect(), back = document.getElementById('ytBackBtn'), list = document.getElementById('ytOvList');
           var rows = Array.from(list.querySelectorAll('.yt-row'));
@@ -339,7 +339,7 @@ async def main():
         check(await pg.evaluate('__v.playing()'), 'and the radio resumes')
 
         # ---- landscape: player stays on top of the landscape Now Playing ----
-        await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[0].click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelectorAll('.artist-yt-row .yt-tile')[0].click()"); await pg.wait_for_timeout(500)
         await pg.set_viewport_size({'width': 844, 'height': 390}); await pg.wait_for_timeout(1200)
         land = await pg.evaluate("""(()=>{ var o = document.getElementById('ytOverlay'), fr = o.querySelector('iframe').getBoundingClientRect();
           var top = document.elementFromPoint(422, 200); return { onTop: o.contains(top), fw: Math.round(fr.width), fh: Math.round(fr.height), ft: Math.round(fr.top), fb: Math.round(fr.bottom) }; })()""")
@@ -352,7 +352,7 @@ async def main():
         check(await pg.evaluate("document.getElementById('ytBackBtn').getClientRects().length > 0 && document.getElementById('ytMenuBtn').getClientRects().length > 0"), 'upright again: Back and Menu are back')
         await pg.evaluate("document.getElementById('ytBackBtn').click()"); await pg.wait_for_timeout(500)
         # picking something in the menu over a video leaves the video page
-        await pg.evaluate("document.querySelectorAll('.artist-videos .yt-tile')[0].click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelectorAll('.artist-yt-row .yt-tile')[0].click()"); await pg.wait_for_timeout(500)
         await pg.evaluate("document.getElementById('ytMenuBtn').click()"); await pg.wait_for_timeout(400)
         await pg.evaluate("document.getElementById('drawerSettingsBtn').click()"); await pg.wait_for_timeout(600)
         # Build 226: Settings opens inside the menu panel, so nothing is left: the panel stays open
@@ -369,18 +369,18 @@ async def main():
         # ---- unfavourite: the row goes ----
         await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(500)
         await pg.evaluate("document.getElementById('artistFavBtn').click()"); await pg.wait_for_timeout(200)
-        check((await pg.evaluate(ROW))['rowIdx'] == -1, 'unfavourited: the row goes')
+        check((await pg.evaluate(ROW))['ids'] == r['ids'], 'unfavourited: the row stays (build 390)')
         await pg.evaluate("document.getElementById('artistFavBtn').click()"); await pg.wait_for_timeout(200)
-        check((await pg.evaluate(ROW))['ids'] == r['ids'], 'favourited again: back at once from the saved list')
+        check((await pg.evaluate(ROW))['ids'] == r['ids'], 'favourited again: still there')
 
         # ---- Bravo (no article: Wikidata search), Delta (non-music hit skipped; no official videos), Charlie (no channel) ----
         for n in ('Bravo', 'Charlie', 'Delta'): await pg.evaluate(f"__v.fav('{n}')")
         await pg.evaluate("__v.open('Bravo')"); await pg.wait_for_timeout(2000)
         rb = await pg.evaluate(ROW)
-        check(rb['ids'] == ['bravoVid001'] and rb['label'] == 'Music Videos', f'Bravo: channel found by name search {rb["ids"]}')
+        check(rb['ids'] == ['bravoVid001'] and rb['label'] == 'On YouTube', f'Bravo: channel found by name search {rb["ids"]}')
         await pg.evaluate("__v.open('Delta')"); await pg.wait_for_timeout(2000)
         rd = await pg.evaluate(ROW)
-        check(rd['ids'] == ['deltaTalk01', 'deltaTalk02'] and rd['label'] == 'Videos', f'Delta: skips the airline, no official videos so all shown as "Videos" {rd}')
+        check(rd['ids'] == ['deltaTalk01', 'deltaTalk02'] and rd['label'] == 'On YouTube', f'Delta: skips the airline, no official videos so all shown {rd}')
         await pg.evaluate("__v.open('Charlie')"); await pg.wait_for_timeout(2000)
         rc = await pg.evaluate(ROW)
         check(rc['rowIdx'] == -1 and rc['skel'] == 0, 'Charlie: no channel, no row')
@@ -406,11 +406,35 @@ async def main():
             await pg.set_viewport_size({'width': w, 'height': 900}); await pg.wait_for_timeout(500)
             await pg.add_style_tag(content='html{ font-size:135% } .yt-title{ font-size:18.2px !important } .yt-date{ font-size:16.2px !important } .artist-hero-bio-text{ font-size:18.2px !important } .grid-section-label{ font-size:16.9px !important }')
             await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(800)
-            await pg.evaluate("document.querySelector('.artist-videos').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(300)
-            clip = await pg.evaluate("""(()=>{ var t = document.querySelectorAll('.artist-videos .yt-tile')[0], ti = t.querySelector('.yt-title'), d = t.querySelector('.yt-date');
+            await pg.evaluate("document.querySelector('.artist-yt-row').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(300)
+            clip = await pg.evaluate("""(()=>{ var t = document.querySelectorAll('.artist-yt-row .yt-tile')[0], ti = t.querySelector('.yt-title'), d = t.querySelector('.yt-date');
               return { titleH: ti.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(ti).lineHeight), dateVis: d.getBoundingClientRect().height > 10 }; })()""")
             check(clip['titleH'] <= clip['lh'] * 2 + 1 and clip['dateVis'], f'{w}px, big text: title at most two lines, year shown {clip}')
             await pg.screenshot(path=f'{shots}/artvid-big-{w}.png')
+        # ---- Settings > Sources > YouTube (build 390): the row and Home's Top 100 follow it ----
+        await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(300)
+        await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(600)
+        check(await pg.evaluate("document.getElementById('youtubeSourceSelect').value") == 'on', 'Sources: YouTube is on to begin with')
+        await pg.evaluate("""__t.ev("hot100Latest = { date: '2026-10-31', data: [{ this_week: 1, last_week: 2, peak_position: 1, weeks_on_chart: 3, song: 'Alpha Song', artist: 'Alpha' }] }; renderTop100HomeSection();")""")
+        t_on = await pg.evaluate("[__t.ev('hot100Shown'), document.getElementById('top100HomeGrid').children.length]")
+        check(t_on == [True, 1], f'Top 100 shows on Home while YouTube is on {t_on}')
+        await pg.evaluate("(()=>{ var s = document.getElementById('youtubeSourceSelect'); s.value = 'off'; s.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(500)
+        ro = await pg.evaluate(ROW)
+        check(ro['label'] is None and ro['rowIdx'] == -1, 'YouTube off: the artist page loses its On YouTube row at once')
+        t_off = await pg.evaluate("[__t.ev('hot100Shown'), document.getElementById('top100HomeGrid').children.length]")
+        check(t_off == [False, 0], f'YouTube off: Top 100 leaves Home {t_off}')
+        n_http = await pg.evaluate('__http.length')
+        await pg.evaluate("__v.open('Bravo')"); await pg.wait_for_timeout(1500)
+        check((await pg.evaluate(ROW))['rowIdx'] == -1 and await pg.evaluate('__http.length') == n_http, 'YouTube off: another artist has no row and YouTube isn\'t asked')
+        await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(500)
+        await pg.evaluate("(()=>{ var s = document.getElementById('youtubeSourceSelect'); s.value = 'on'; s.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(600)
+        ron = await pg.evaluate(ROW)
+        check(ron['ids'] == r['ids'], 'YouTube on again: the row is back')
+        t_back = await pg.evaluate("[__t.ev('hot100Shown'), document.getElementById('top100HomeGrid').children.length]")
+        check(t_back == [True, 1], f'YouTube on again: Top 100 is back {t_back}')
+        await pg.evaluate("__t.ev(\"openSettings('sources')\")"); await pg.wait_for_timeout(600)
+        await pg.screenshot(path=f'{shots}/artvid-sources.png')
+        await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(300)
         check(not errs, f'no page errors {errs[:3]}')
 
         # ---- desktop ----

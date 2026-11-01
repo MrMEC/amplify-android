@@ -107,14 +107,22 @@ async def run(b, theme, w=390, h=844, tag=''):
     await pg.screenshot(path=f'{shots}/artarch-{theme}{tag}-row.png')
     n1 = len(asked['search'])
 
-    # ---- under the YouTube row when there is one ----
-    await pg.evaluate("""(()=>{ var g = document.getElementById('stationsGrid');
-      var l = document.createElement('div'); l.className = 'grid-section-label artist-videos-label'; l.textContent = 'Music Videos';
-      var w = document.createElement('div'); w.className = 'artist-videos'; w.innerHTML = '<div class="yt-tile"></div>';
-      g.insertBefore(w, g.firstChild); g.insertBefore(l, g.firstChild);
-      __t.ev("var e = findArtistEntry(artistMatchKey('Alpha')); paintArtistArchive(e, aaMap()[e.key]);"); })()""")
-    o = await pg.evaluate("Array.from(document.getElementById('stationsGrid').children).slice(0, 4).map(function(e){ return e.className.split(' ').filter(function(c){ return /artist-/.test(c); })[0]; })")
-    check(o == ['artist-videos-label', 'artist-videos', 'artist-archive-label', 'artist-archive-row'], f'{T} under the YouTube row when there is one {o}')
+    # ---- the order: Music Videos (phone), On YouTube, On Archive.org -- whichever arrives first ----
+    ORDER = """__t.ev(`(()=>{ var e = findArtistEntry(artistMatchKey('Alpha')), g = document.getElementById('stationsGrid');
+      clearArtistVideos(); clearArtistYouTube(); clearArtistArchive();
+      var order = arguments[0] || [];
+      var fakeLocal = function(){ var l = document.createElement('div'); l.className = 'grid-section-label artist-videos-label'; l.textContent = 'Music Videos';
+        var w = document.createElement('div'); w.className = 'artist-videos'; w.innerHTML = '<div class="yt-tile"></div>'; placeArtistSection(0, l, w); };
+      var yt = function(){ paintArtistYouTube(e, { videos: [{ id: 'yt000000001', title: 'Alpha - X (Official Video)', published: '2024-01-01' }] }, false); };
+      var ia = function(){ paintArtistArchive(e, aaMap()[e.key]); };
+      return { fakeLocal: fakeLocal, yt: yt, ia: ia }; })()`)"""
+    for seq in (['ia', 'yt', 'local'], ['local', 'ia', 'yt'], ['yt', 'local', 'ia']):
+        o = await pg.evaluate("""(seq)=>{ var h = %s; seq.forEach(function(k){ (k === 'local' ? h.fakeLocal : h[k])(); });
+          return Array.from(document.getElementById('stationsGrid').children).slice(0, 6).map(function(e){ return e.className.split(' ').filter(function(c){ return /artist-/.test(c); })[0]; }); }""" % ORDER, seq)
+        check(o == ['artist-videos-label', 'artist-videos', 'artist-yt-label', 'artist-yt-row', 'artist-archive-label', 'artist-archive-row'], f'{T} order Music Videos, On YouTube, On Archive.org when they arrive as {seq} {o}')
+    await pg.evaluate("document.querySelector('.artist-yt-label').scrollIntoView({ block: 'start' })"); await pg.wait_for_timeout(500)
+    await pg.screenshot(path=f'{shots}/artarch-{theme}{tag}-three.png')
+    await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(800)
 
     # ---- kept: opening again doesn't ask archive.org again ----
     await pg.evaluate("__v.open('Bravo')"); await pg.wait_for_timeout(1800)
@@ -141,12 +149,19 @@ async def run(b, theme, w=390, h=844, tag=''):
     await pg.evaluate("document.querySelector('.artist-archive-row .yt-tile').click()"); await pg.wait_for_timeout(1500)
     check('a1' in asked['meta'], f'{T} tapping a tile opens that item (its file list asked for) {asked["meta"]}')
 
-    # ---- off with archive.org in Sources ----
-    await pg.evaluate("__t.ev(\"setSourceOn('archive', false)\")")
-    await pg.evaluate("__v.open('Bravo')"); await pg.wait_for_timeout(1200)
+    # ---- off with archive.org in Settings > Sources: the real switch, the artist page open behind it ----
+    await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(800)
+    check(await pg.evaluate("document.getElementById('archiveSourceSelect').value") == 'on' and (await pg.evaluate(ROW2))['label'] == 'On Archive.org', f'{T} archive.org on in Sources, and the row is showing')
+    await pg.evaluate("(()=>{ var s = document.getElementById('archiveSourceSelect'); s.value = 'off'; s.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(400)
     ro = await pg.evaluate(ROW2)
-    check(ro['label'] is None, f'{T} archive.org turned off in Sources: no row')
-    await pg.evaluate("__t.ev(\"setSourceOn('archive', true)\")")
+    check(ro['label'] is None and ro['rowIdx'] == -1, f'{T} archive.org turned off in Settings: the On Archive.org row goes from the page behind it')
+    n_s = len(asked['search'])
+    await pg.evaluate("__v.open('Bravo')"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("__v.open('Alpha')"); await pg.wait_for_timeout(800)
+    ro2 = await pg.evaluate(ROW2)
+    check(ro2['label'] is None and len(asked['search']) == n_s, f'{T} and stays off on other artists\' pages, archive.org not asked ({len(asked["search"]) - n_s} searches)')
+    await pg.evaluate("(()=>{ var s = document.getElementById('archiveSourceSelect'); s.value = 'on'; s.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(800)
+    check((await pg.evaluate(ROW2))['ids'] == ['a1', 'a2', 'a6'], f'{T} turned on again: the row is back')
     check(not errs, f'{T} no page errors {errs}')
     await ctx.close()
 
