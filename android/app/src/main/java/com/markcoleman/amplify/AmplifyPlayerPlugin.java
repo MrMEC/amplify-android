@@ -1382,6 +1382,121 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         .start();
   }
 
+  // ---- Automatic backups (build 373, see BackupFiles) ----
+  // The folder is picked once (read and write kept); the page decides when to back up and
+  // hands over the text. A folder whose access has gone rejects with code NO_ACCESS.
+  @PluginMethod
+  public void pickBackupFolder(PluginCall call) {
+    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+    i.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION
+            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+    startActivityForResult(call, i, "onBackupFolderPicked");
+  }
+
+  @ActivityCallback
+  private void onBackupFolderPicked(PluginCall call, ActivityResult result) {
+    if (call == null) return;
+    Intent data = result.getData();
+    if (result.getResultCode() != Activity.RESULT_OK || data == null || data.getData() == null) {
+      JSObject o = new JSObject();
+      o.put("cancelled", true);
+      call.resolve(o);
+      return;
+    }
+    Uri tree = data.getData();
+    ContentResolver cr = getContext().getContentResolver();
+    try {
+      cr.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+    } catch (Exception e) {
+      call.reject("Amplify wasn't allowed to save in that folder", "NO_ACCESS");
+      return;
+    }
+    JSObject o = new JSObject();
+    o.put("treeUri", tree.toString());
+    o.put("name", displayName(cr, BackupFiles.rootDoc(tree)));
+    call.resolve(o);
+  }
+
+  private boolean backupAccess(Uri tree) {
+    for (android.content.UriPermission p : getContext().getContentResolver().getPersistedUriPermissions()) {
+      if (p.getUri().equals(tree) && p.isWritePermission() && p.isReadPermission()) return true;
+    }
+    return false;
+  }
+
+  private JSObject backupEntry(BackupFiles.Entry e) {
+    JSObject f = new JSObject();
+    f.put("name", e.name);
+    f.put("uri", e.uri.toString());
+    f.put("size", e.size);
+    f.put("lastModified", e.modified);
+    return f;
+  }
+
+  @PluginMethod
+  public void backupWrite(PluginCall call) {
+    String treeS = call.getString("tree"), name = call.getString("name"), text = call.getString("text");
+    int keep = call.getInt("keep", 8);
+    if (treeS == null || name == null || text == null) { call.reject("tree, name and text"); return; }
+    new Thread(() -> {
+      try {
+        Uri tree = Uri.parse(treeS);
+        if (!backupAccess(tree)) { call.reject("No access to the backup folder", "NO_ACCESS"); return; }
+        java.util.List<String> removed = new java.util.ArrayList<>();
+        BackupFiles.Entry e = BackupFiles.write(getContext().getContentResolver(), tree, name, text, keep, removed);
+        JSObject o = backupEntry(e);
+        JSArray r = new JSArray();
+        for (String n : removed) r.put(n);
+        o.put("removed", r);
+        call.resolve(o);
+      } catch (SecurityException se) {
+        call.reject("No access to the backup folder", "NO_ACCESS");
+      } catch (Exception ex) {
+        call.reject(String.valueOf(ex.getMessage()));
+      }
+    }).start();
+  }
+
+  @PluginMethod
+  public void backupList(PluginCall call) {
+    String treeS = call.getString("tree");
+    if (treeS == null) { call.reject("tree"); return; }
+    new Thread(() -> {
+      try {
+        Uri tree = Uri.parse(treeS);
+        if (!backupAccess(tree)) { call.reject("No access to the backup folder", "NO_ACCESS"); return; }
+        JSArray files = new JSArray();
+        for (BackupFiles.Entry e : BackupFiles.list(getContext().getContentResolver(), tree)) files.put(backupEntry(e));
+        JSObject o = new JSObject();
+        o.put("files", files);
+        call.resolve(o);
+      } catch (SecurityException se) {
+        call.reject("No access to the backup folder", "NO_ACCESS");
+      } catch (Exception ex) {
+        call.reject(String.valueOf(ex.getMessage()));
+      }
+    }).start();
+  }
+
+  @PluginMethod
+  public void backupRead(PluginCall call) {
+    String uriS = call.getString("uri");
+    if (uriS == null) { call.reject("uri"); return; }
+    new Thread(() -> {
+      try {
+        JSObject o = new JSObject();
+        o.put("text", BackupFiles.read(getContext().getContentResolver(), Uri.parse(uriS)));
+        call.resolve(o);
+      } catch (SecurityException se) {
+        call.reject("No access to the backup folder", "NO_ACCESS");
+      } catch (Exception ex) {
+        call.reject(String.valueOf(ex.getMessage()));
+      }
+    }).start();
+  }
+
   // ---- Movies and TV shows on the phone (see VideoLibrary) ----
   @PluginMethod
   public void pickVideoFolder(PluginCall call) {

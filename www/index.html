@@ -6618,6 +6618,17 @@
   .st-fact:last-child{ border-bottom:none; }
   .st-fact span:first-child{ color:var(--text-dim); }
   .st-fact span:last-child{ color:var(--text); font-weight:700; text-align:right; }
+  /* ---------- Build 373 (Mark): backups ---------- */
+  .bk-when{ margin:0 0 4px; font-size:14px; font-weight:700; color:var(--text); }
+  .bk-what{ margin:0 0 10px; font-size:13.5px; line-height:1.45; color:var(--text); }
+  .bk-how{ margin:0; font-size:13px; line-height:1.45; color:var(--text-dim); }
+  .bk-list{ display:flex; flex-direction:column; max-height:min(52vh, 420px); overflow-y:auto; margin:0 -4px; }
+  .bk-file{ display:flex; flex-direction:column; gap:2px; width:100%; padding:11px 4px; margin:0; background:none; border:0; border-bottom:1px solid var(--border);
+    font:inherit; color:var(--text); text-align:left; cursor:pointer; }
+  .bk-file:last-child{ border-bottom:none; }
+  .bk-file:active{ background:var(--panel-2); }
+  .bk-file-name{ font-size:14.5px; font-weight:600; }
+  .bk-file-sub{ font-size:12.5px; color:var(--text-dim); }
   /* ---------- Build 349 (Mark): Settings, full screen and in categories ----------
      A page of its own over everything (the floating video still above it), on the page's own
      background. The back arrow sits where every other page's does, on the menu button's line;
@@ -7855,7 +7866,7 @@
       </button>
       <button type="button" class="set-cat" data-set-cat="privacy">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.2 4.8 6v5.6c0 4.4 3 8 7.2 9.2 4.2-1.2 7.2-4.8 7.2-9.2V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Privacy &amp; Backup</span><span class="set-cat-sub">Privacy, export and import</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Privacy &amp; Backup</span><span class="set-cat-sub">Privacy, automatic backup, restore</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="about">
@@ -8034,8 +8045,41 @@
           <option value="on">On</option>
         </select>
       </div>
+      <!-- Build 373 (Mark): automatic backups to a folder you choose (the Android app). -->
+      <h3 class="set-sub" id="bkSub">Automatic backup</h3>
+      <div class="settings-row" id="bkAutoRow" style="display:none;">
+        <div class="set-text"><span class="settings-label" id="bkAutoLabel">Automatic backup</span><span class="set-desc">Everything, saved to a folder you choose</span></div>
+        <select class="settings-select" id="bkAutoSelect" aria-labelledby="bkAutoLabel">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <div class="settings-row" id="bkEveryRow" style="display:none;">
+        <span class="settings-label" id="bkEveryLabel">How often</span>
+        <select class="settings-select" id="bkEverySelect" aria-labelledby="bkEveryLabel">
+          <option value="daily">Every day</option>
+          <option value="weekly">Every week</option>
+        </select>
+      </div>
+      <div class="settings-row" id="bkKeepRow" style="display:none;">
+        <div class="set-text"><span class="settings-label" id="bkKeepLabel">Backups to keep</span><span class="set-desc">Older ones are removed</span></div>
+        <select class="settings-select" id="bkKeepSelect" aria-labelledby="bkKeepLabel">
+          <option value="4">4</option>
+          <option value="8">8</option>
+          <option value="12">12</option>
+        </select>
+      </div>
+      <div class="settings-row settings-row--stack" id="bkFolderRow" style="display:none;">
+        <div class="set-text"><span class="settings-label">Backup folder</span><span class="set-desc" id="bkFolderDesc"></span></div>
+        <div class="settings-data-actions settings-actions-pair">
+          <button type="button" class="settings-data-btn" id="bkNowBtn">Back Up Now</button>
+          <button type="button" class="settings-data-btn" id="bkRestoreBtn">Restore</button>
+        </div>
+        <button type="button" class="settings-data-btn settings-wide-btn" id="bkFolderBtn">Choose Folder</button>
+      </div>
+      <h3 class="set-sub">Export &amp; import</h3>
       <div class="settings-row settings-row--stack">
-        <div class="set-text"><span class="settings-label">Backup &amp; restore</span><span class="set-desc">Favorites, playlists, custom art, searches and more</span></div>
+        <div class="set-text"><span class="settings-label">Export &amp; import</span><span class="set-desc">One file to keep or send somewhere else. Import adds what this phone doesn’t have.</span></div>
         <div class="settings-data-actions settings-actions-pair">
           <button type="button" class="settings-data-btn" id="exportFavBtn" title="Export favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-export"></i>Export</button>
           <button type="button" class="settings-data-btn" id="importFavBtn" title="Import favorites, recent stations, custom cover art, custom searches, playlists, blocked stations &amp; genre order"><i class="fa-solid fa-file-import"></i>Import</button>
@@ -9175,6 +9219,7 @@
   var CACHE_PREFIXES = ['amplifyFallback:'];
   var CACHE_KEYS = ['radioPlayerArtCache', 'radioPlayerPluto2', 'radioPlayerPluto', 'radioPlayerPlexLib', 'radioPlayerPodcastPopular',
     'amplifyTagVocab', 'amplifySlowMoments', 'radioPlayerLastSearch', 'radioPlayerVideoStations', 'radioPlayerMadeForYou'];
+  window.__amplifyIsCache = function(k){ return isCache(k); };   // build 373: left out of backups
   function isCache(k){
     if(CACHE_KEYS.indexOf(k) !== -1) return true;
     for(var i = 0; i < CACHE_PREFIXES.length; i++) if(k.indexOf(CACHE_PREFIXES[i]) === 0) return true;
@@ -9214,6 +9259,7 @@
     'radioPlayerLibArtistRadio', 'radioPlayerTourDone'];
   var MIRROR = {};
   if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
+  window.__amplifyKvKeys = KEYS.slice();   // build 373: a restore updates Android's copy before reloading
   var atLoad = {};
   KEYS.forEach(function(k){ try{ atLoad[k] = ls.getItem(k); }catch(e){ atLoad[k] = null; } });
   var ready = false, pending = {}, latest = {};
@@ -43481,9 +43527,9 @@
 
   // ---------- export / import (favorites, recent stations, custom cover art, custom searches) ----------
   // What a backup holds, for the Export dialog.
-  var EXPORT_CONTENTS_NOTE = 'Your favorites, recent stations, custom cover art (including playlist and custom station covers), custom searches, playlists, blocked stations, genre order, podcast subscriptions, podcast categories, video channels & your own channels are all in it.';
-  exportFavBtn.addEventListener('click', function(){
-    var payload = {
+  var EXPORT_CONTENTS_NOTE = 'Everything is in it: favorites, playlists, stations, channels, podcasts and their progress, covers, settings, your profile and your listening stats.';
+  function buildExportPayload(){
+    return {
       favorites: favorites,
       recent: recentStations,
       customArt: loadCustomArtMap(),
@@ -43498,6 +43544,11 @@
       videoLibrary: exportVideoLibrary(),
       exportedAt: new Date().toISOString()
     };
+  }
+  exportFavBtn.addEventListener('click', function(){
+    buildBackupPayload('export').then(function(payload){ exportPayload(payload); });
+  });
+  function exportPayload(payload){
     var text = JSON.stringify(payload, null, 2);
     // Dated, so a second export beside an older one is easy to tell apart.
     var fileName = 'amplify-backup-' + new Date().toISOString().slice(0, 10) + '.json';
@@ -43526,15 +43577,335 @@
     a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     openDataDialog('Export Complete', 'Saved as \u201c' + fileName + '\u201d. ' + EXPORT_CONTENTS_NOTE, false);
-  });
+  }
   importFavBtn.addEventListener('click', function(){ importFavInput.click(); });
   importFavInput.addEventListener('change', function(){
     var file = importFavInput.files && importFavInput.files[0];
     if(!file) return;
     var reader = new FileReader();
     reader.onload = function(){
-      try{
-        var data = JSON.parse(reader.result);
+      var data = null;
+      try{ data = JSON.parse(reader.result); }catch(e){}
+      importFavInput.value = '';
+      if(!data || typeof data !== 'object'){ openDataDialog('Import Failed', 'That file did not look like an Amplify backup.', true); return; }
+      // Build 373: a backup with everything in it can be restored exactly, or merged as before.
+      if(data.amplifyBackup && typeof openRestoreChoice === 'function'){ openRestoreChoice(data, file.name); return; }
+      try{ importBackupData(data); }catch(e){ openDataDialog('Import Failed', 'That file did not look like an Amplify backup.', true); }
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- Automatic backups (build 373, Mark) ----------
+  // A backup is the Export payload (so Import can still merge it) plus amplifyBackup: a copy of
+  // every saved setting and list as it is stored (left out: caches, the Plex sign-in, the backup
+  // settings themselves), and podcast episode progress. Restore can then put everything back
+  // exactly (Replace), or add what's missing (Merge). In the app, backups are written to a folder
+  // the person chose, once a day or once a week, whenever Amplify is open or playing (Amplify's
+  // data only changes while it runs), named amplify-backup-<date>.json; the newest few are kept.
+  var BACKUP_SETTINGS_KEY = 'radioPlayerBackupSettings';
+  var BACKUP_DAY_MS = 24 * 3600 * 1000;
+  function backupPlugin(){
+    var C = window.Capacitor, P = C && C.Plugins && C.Plugins.AmplifyPlayer;
+    return P && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && typeof P.backupWrite === 'function' ? P : null;
+  }
+  function loadBackupSettings(){
+    var b = null;
+    try{ b = JSON.parse(localStorage.getItem(BACKUP_SETTINGS_KEY) || 'null'); }catch(e){}
+    if(!b || typeof b !== 'object') b = {};
+    if(b.every !== 'daily') b.every = 'weekly';
+    if([4, 8, 12].indexOf(b.keep) === -1) b.keep = 8;
+    return b;
+  }
+  function saveBackupSettings(b){ try{ localStorage.setItem(BACKUP_SETTINGS_KEY, JSON.stringify(b)); }catch(e){} }
+  function backupKeyKept(k){
+    if(!/^(radioPlayer|amplify)/.test(k)) return false;
+    if(k === BACKUP_SETTINGS_KEY || /^radioPlayerPlex/.test(k)) return false;
+    try{ if(window.__amplifyIsCache && window.__amplifyIsCache(k)) return false; }catch(e){}
+    return true;
+  }
+  function buildBackupPayload(kind){
+    var payload = buildExportPayload();
+    var store = {};
+    try{
+      for(var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && backupKeyKept(k)) store[k] = localStorage.getItem(k);
+      }
+    }catch(e){}
+    return getAllPodcastProgress().then(null, function(){ return []; }).then(function(pods){
+      payload.amplifyBackup = {
+        v: 1, kind: kind || 'auto', at: new Date().toISOString(),
+        build: (document.getElementById('buildStamp') || {}).textContent || '',
+        store: store, podcastProgress: pods || [],
+        counts: {
+          favorites: favorites.length, playlists: stationPlaylists.length, channels: videoChannels.length,
+          podcasts: podcastSubs.length, searches: customSearches.length
+        }
+      };
+      return payload;
+    });
+  }
+  function backupDateName(d, suffix){
+    d = d || new Date();
+    return 'amplify-backup-' + dayKey(d) + (suffix ? '-' + suffix : '') + '.json';
+  }
+  function whenText(ts){
+    if(!ts) return '';
+    var d = new Date(ts), now = new Date();
+    var t = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    if(dayKey(d) === dayKey(now)) return 'today, ' + t;
+    var y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if(dayKey(d) === dayKey(y)) return 'yesterday, ' + t;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' }) + ', ' + t;
+  }
+  // Writes one backup; resolves the file, rejects with err.code 'NO_FOLDER' or 'NO_ACCESS'.
+  var backupBusy = null;
+  function writeBackup(kind, name){
+    var P = backupPlugin(), b = loadBackupSettings();
+    if(!P) return Promise.reject(new Error('Backups to a folder need the Android app'));
+    if(!b.tree){ var e0 = new Error('No backup folder chosen'); e0.code = 'NO_FOLDER'; return Promise.reject(e0); }
+    if(backupBusy) return backupBusy;
+    backupBusy = buildBackupPayload(kind).then(function(payload){
+      return P.backupWrite({ tree: b.tree, name: name || backupDateName(), text: JSON.stringify(payload), keep: b.keep });
+    }).then(function(file){
+      var nb = loadBackupSettings();
+      if(kind !== 'safety'){ nb.last = Date.now(); nb.lastName = file && file.name; }
+      delete nb.lastError;
+      saveBackupSettings(nb);
+      renderBackupSettings();
+      return file;
+    }, function(err){
+      var nb = loadBackupSettings();
+      nb.lastError = (err && err.code) || 'FAILED';
+      saveBackupSettings(nb);
+      renderBackupSettings();
+      throw err;
+    });
+    var done = function(){ backupBusy = null; };
+    backupBusy.then(done, done);
+    return backupBusy;
+  }
+  function backupIsDue(){
+    var b = loadBackupSettings();
+    if(!b.on || !b.tree || !backupPlugin()) return false;
+    var period = b.every === 'daily' ? BACKUP_DAY_MS : 7 * BACKUP_DAY_MS;
+    // An hour's leeway, so a backup made at 9:05 is due again at 9:00 the next day or week.
+    return !b.last || Date.now() - b.last >= period - 3600 * 1000;
+  }
+  var backupWarned = false;
+  function runDueBackup(){
+    if(!backupIsDue() || backupBusy) return;
+    writeBackup('auto')['catch'](function(err){
+      if(backupWarned) return;
+      backupWarned = true;
+      var b = loadBackupSettings();
+      showNotice({ kind: 'error', title: 'Automatic backup didn’t run',
+        message: err && err.code === 'NO_ACCESS'
+          ? 'Amplify can no longer save in “' + (b.folderName || 'your backup folder') + '”. Choose the folder again to keep backing up.'
+          : 'The backup couldn’t be saved' + (err && err.message ? ': ' + err.message : '.') + ' Amplify will try again later.',
+        autoClose: false,
+        actions: err && err.code === 'NO_ACCESS' ? [{ label: 'Not Now' }, { label: 'Choose Folder', primary: true, run: function(){ chooseBackupFolder(); } }] : undefined });
+    });
+  }
+  setTimeout(runDueBackup, 20000);
+  setInterval(runDueBackup, 3600 * 1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) setTimeout(runDueBackup, 5000); });
+
+  function chooseBackupFolder(){
+    var P = backupPlugin();
+    if(!P || typeof P.pickBackupFolder !== 'function') return Promise.resolve(false);
+    return P.pickBackupFolder().then(function(r){
+      if(!r || r.cancelled || !r.treeUri) return false;
+      var b = loadBackupSettings();
+      b.tree = r.treeUri; b.folderName = r.name || 'Backups';
+      delete b.lastError;
+      saveBackupSettings(b);
+      renderBackupSettings();
+      return true;
+    }, function(err){
+      showNotice({ kind: 'error', message: (err && err.message) || 'That folder couldn’t be used.' });
+      return false;
+    });
+  }
+  function renderBackupSettings(){
+    var P = backupPlugin(), b = loadBackupSettings();
+    ['bkAutoRow', 'bkFolderRow'].forEach(function(id){ var r = document.getElementById(id); if(r) r.style.display = P ? '' : 'none'; });
+    ['bkEveryRow', 'bkKeepRow'].forEach(function(id){ var r = document.getElementById(id); if(r) r.style.display = P && b.on ? '' : 'none'; });
+    var sub = document.getElementById('bkSub'); if(sub) sub.hidden = !P;
+    var auto = document.getElementById('bkAutoSelect'); if(auto) auto.value = b.on ? 'on' : 'off';
+    var every = document.getElementById('bkEverySelect'); if(every) every.value = b.every;
+    var keep = document.getElementById('bkKeepSelect'); if(keep) keep.value = String(b.keep);
+    var desc = document.getElementById('bkFolderDesc');
+    if(desc){
+      var bits = [];
+      bits.push(b.tree ? b.folderName || 'Chosen' : 'No folder chosen yet');
+      if(b.lastError === 'NO_ACCESS') bits.push('Amplify can’t save there any more: choose it again');
+      else if(b.last) bits.push('Last backup ' + whenText(b.last));
+      desc.textContent = bits.join(' · ');
+    }
+    var fb = document.getElementById('bkFolderBtn'); if(fb) fb.textContent = b.tree ? 'Change Folder' : 'Choose Folder';
+  }
+  document.getElementById('bkAutoSelect').addEventListener('change', function(e){
+    var b = loadBackupSettings();
+    b.on = e.target.value === 'on';
+    saveBackupSettings(b);
+    renderBackupSettings();
+    if(b.on && !b.tree){
+      chooseBackupFolder().then(function(ok){
+        if(!ok){ var nb = loadBackupSettings(); nb.on = false; saveBackupSettings(nb); renderBackupSettings(); return; }
+        runDueBackup();
+      });
+    } else if(b.on) runDueBackup();
+  });
+  document.getElementById('bkEverySelect').addEventListener('change', function(e){ var b = loadBackupSettings(); b.every = e.target.value === 'daily' ? 'daily' : 'weekly'; saveBackupSettings(b); runDueBackup(); });
+  document.getElementById('bkKeepSelect').addEventListener('change', function(e){ var b = loadBackupSettings(); b.keep = parseInt(e.target.value, 10) || 8; saveBackupSettings(b); });
+  document.getElementById('bkFolderBtn').addEventListener('click', function(){ chooseBackupFolder(); });
+  document.getElementById('bkNowBtn').addEventListener('click', function(){
+    function go(){
+      var seq = showNotice({ kind: 'working', title: 'Backing up', message: '', autoClose: false, actions: [] });
+      writeBackup('manual').then(function(file){
+        closeNotice(seq);
+        var b = loadBackupSettings();
+        showNotice({ kind: 'done', title: 'Backed up', message: 'Saved in “' + (b.folderName || 'your backup folder') + '” as “' + (file && file.name) + '”.' });
+      }, function(err){
+        closeNotice(seq);
+        showNotice({ kind: 'error', title: 'Backup failed', message: err && err.code === 'NO_ACCESS'
+          ? 'Amplify can no longer save in that folder. Choose it again.' : 'The backup couldn’t be saved' + (err && err.message ? ': ' + err.message : '.') });
+      });
+    }
+    if(!loadBackupSettings().tree) chooseBackupFolder().then(function(ok){ if(ok) go(); });
+    else go();
+  });
+  // ---- Restore ----
+  function backupSummary(data){
+    var c = (data.amplifyBackup && data.amplifyBackup.counts) || {};
+    function n(v, one, many){ v = v || 0; return v + ' ' + (v === 1 ? one : many); }
+    var fav = c.favorites != null ? c.favorites : (data.favorites || []).length;
+    var pl = c.playlists != null ? c.playlists : (data.stationPlaylists || []).length;
+    var ch = c.channels != null ? c.channels : (data.videoChannels || []).length;
+    var pod = c.podcasts != null ? c.podcasts : (data.podcastSubscriptions || []).length;
+    return [n(fav, 'favorite', 'favorites'), n(pl, 'playlist', 'playlists'), n(ch, 'channel', 'channels'), n(pod, 'podcast followed', 'podcasts followed')].join(', ');
+  }
+  function backupWhen(data, fallbackName){
+    var at = (data.amplifyBackup && data.amplifyBackup.at) || data.exportedAt;
+    var d = at ? new Date(at) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) + ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : (fallbackName || '');
+  }
+  function openRestoreChoice(data, name){
+    var full = !!(data.amplifyBackup && data.amplifyBackup.store);
+    var box = document.createElement('div');
+    var p1 = document.createElement('p'); p1.className = 'bk-when'; p1.textContent = backupWhen(data, name);
+    var p2 = document.createElement('p'); p2.className = 'bk-what'; p2.textContent = backupSummary(data) + '.';
+    var p3 = document.createElement('p'); p3.className = 'bk-how';
+    p3.textContent = full ? 'Replace puts everything back exactly as it was then. Merge only adds what this phone doesn’t have.'
+      : 'This file can only be merged: it adds what this phone doesn’t have.';
+    box.appendChild(p1); box.appendChild(p2); box.appendChild(p3);
+    var acts = [];
+    if(full) acts.push({ label: 'Replace Everything', primary: true, run: function(){ confirmReplace(data); } });
+    acts.push({ label: 'Merge', primary: !full, run: function(){ try{ importBackupData(data); }catch(e){ openDataDialog('Import Failed', 'That backup couldn’t be read.', true); } } });
+    acts.push({ label: 'Cancel' });
+    showNotice({ kind: 'info', title: 'Restore this backup?', message: box, autoClose: false, stack: true, actions: acts });
+  }
+  function confirmReplace(data){
+    confirmDelete({ title: 'Replace everything?', ok: 'Replace',
+      message: 'Your favorites, playlists, channels, podcasts, settings, profile and stats go back to how they were in this backup. ' +
+        (backupPlugin() && loadBackupSettings().tree ? 'A backup of how things are now is saved first.' : 'Export first if you might want today’s back.') })
+      .then(function(ok){ if(ok) replaceFromBackup(data); });
+  }
+  function replaceFromBackup(data){
+    var bk = data.amplifyBackup || {}, store = bk.store || {};
+    var seq = showNotice({ kind: 'working', title: 'Restoring', message: '', autoClose: false, actions: [] });
+    var safety = backupPlugin() && loadBackupSettings().tree
+      ? writeBackup('safety', backupDateName(new Date(), ('0' + new Date().getHours()).slice(-2) + ('0' + new Date().getMinutes()).slice(-2) + '-before-restore'))['catch'](function(){})
+      : Promise.resolve();
+    safety.then(function(){
+      // Every kept key goes back to the backup's value (or away, when the backup didn't have it).
+      var now = [];
+      for(var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i); if(k && backupKeyKept(k)) now.push(k); }
+      now.forEach(function(k){ if(!Object.prototype.hasOwnProperty.call(store, k)){ try{ localStorage.removeItem(k); }catch(e){} } });
+      Object.keys(store).forEach(function(k){ if(backupKeyKept(k) && typeof store[k] === 'string'){ try{ localStorage.setItem(k, store[k]); }catch(e){} } });
+      // Podcast progress: replaced as a whole.
+      var pods = Array.isArray(bk.podcastProgress) ? bk.podcastProgress : [];
+      var podsDone = idbDo([LIB_STORE_PODCAST_EPISODES], 'readwrite', function(tx){
+        var st = tx.objectStore(LIB_STORE_PODCAST_EPISODES);
+        st.clear();
+        pods.forEach(function(r){ if(r && r.guid) st.put(r); });
+        return null;
+      })['catch'](function(){});
+      // Android's own copy of the main lists has to match before the reload, or it puts the old ones back.
+      var C = window.Capacitor, P = C && C.Plugins && C.Plugins.AmplifyPlayer;
+      var kv = (P && typeof P.kvSet === 'function' && C.isNativePlatform && C.isNativePlatform())
+        ? Promise.all((window.__amplifyKvKeys || []).map(function(k){
+            var v = null; try{ v = localStorage.getItem(k); }catch(e){}
+            return P.kvSet({ key: k, value: v })['catch'](function(){});
+          }))
+        : Promise.resolve();
+      return Promise.all([podsDone, kv]);
+    }).then(function(){
+      closeNotice(seq);
+      try{ sessionStorage.setItem('amplifyRestored', '1'); }catch(e){}
+      location.reload();
+    }, function(err){
+      closeNotice(seq);
+      showNotice({ kind: 'error', message: 'The backup couldn’t be restored' + (err && err.message ? ': ' + err.message : '.') });
+    });
+  }
+  try{
+    if(sessionStorage.getItem('amplifyRestored') === '1'){
+      sessionStorage.removeItem('amplifyRestored');
+      setTimeout(function(){ showNotice({ kind: 'done', title: 'Restored', message: 'Everything is back as it was in that backup.' }); }, 1200);
+    }
+  }catch(e){}
+  document.getElementById('bkRestoreBtn').addEventListener('click', function(){
+    var P = backupPlugin(), b = loadBackupSettings();
+    function fromFile(){ importFavInput.click(); }
+    if(!P || !b.tree){ fromFile(); return; }
+    P.backupList({ tree: b.tree }).then(function(r){
+      var files = (r && r.files) || [];
+      var box = document.createElement('div');
+      box.className = 'bk-list';
+      if(!files.length){
+        var e = document.createElement('p'); e.className = 'bk-how';
+        e.textContent = 'There are no backups in “' + (b.folderName || 'your backup folder') + '” yet.';
+        box.appendChild(e);
+      }
+      var seq = 0;
+      files.forEach(function(f){
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bk-file';
+        var m = /amplify-backup-(\d{4})-(\d{2})-(\d{2})(?:-(\d{2})(\d{2}))?(-before-restore)?/.exec(f.name);
+        var d = m ? new Date(+m[1], +m[2] - 1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0) : new Date(f.lastModified || 0);
+        var t1 = document.createElement('span'); t1.className = 'bk-file-name';
+        t1.textContent = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (m && m[6] ? ' · before a restore' : '');
+        var t2 = document.createElement('span'); t2.className = 'bk-file-sub';
+        t2.textContent = (f.lastModified ? 'Saved ' + whenText(f.lastModified) + ' · ' : '') + Math.max(1, Math.round((f.size || 0) / 1024)).toLocaleString() + ' KB';
+        btn.appendChild(t1); btn.appendChild(t2);
+        btn.addEventListener('click', function(){
+          closeNotice(seq);
+          P.backupRead({ uri: f.uri }).then(function(res){
+            var data = null;
+            try{ data = JSON.parse(res && res.text); }catch(e){}
+            if(!data || typeof data !== 'object'){ showNotice({ kind: 'error', message: 'That backup couldn’t be read.' }); return; }
+            openRestoreChoice(data, f.name);
+          }, function(){ showNotice({ kind: 'error', message: 'That backup couldn’t be opened.' }); });
+        });
+        box.appendChild(btn);
+      });
+      seq = showNotice({ kind: 'info', title: 'Restore', message: box, autoClose: false, stack: true,
+        actions: [{ label: 'Choose a File…', run: fromFile }, { label: 'Cancel' }] });
+    }, function(err){
+      if(err && err.code === 'NO_ACCESS'){
+        showNotice({ kind: 'error', message: 'Amplify can no longer open your backup folder. Choose it again.', autoClose: false,
+          actions: [{ label: 'Not Now' }, { label: 'Choose Folder', primary: true, run: function(){ chooseBackupFolder(); } }] });
+      } else fromFile();
+    });
+  });
+  renderBackupSettings();
+
+  // The merge (build 373: pulled out so a backup from the backup folder can be merged too).
+  // Adds what this phone doesn't have; never removes anything.
+  function importBackupData(data){
 
         // Merge in any blacklisted (deleted dead-stream) keys first, so a station removed
         // on one device can't be resurrected by importing an older export from another.
@@ -43771,13 +44142,7 @@
         if(categoriesAdded) parts.push(categoriesAdded + ' podcast categor' + (categoriesAdded === 1 ? 'y' : 'ies'));
         if(categoryShowsAdded) parts.push(categoryShowsAdded + ' show(s) added to existing podcast categories');
         openDataDialog('Import Complete', parts.length ? 'Imported ' + parts.join(', ') + '.' : 'Nothing new to import — already up to date.', false);
-      }catch(e){
-        openDataDialog('Import Failed', 'That file did not look like a Radio Player export.', true);
-      }
-      importFavInput.value = '';
-    };
-    reader.readAsText(file);
-  });
+  }
 
   // ---------- playlist resolution ----------
   function looksLikePlaylist(url){
