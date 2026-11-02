@@ -6999,34 +6999,27 @@
   /* Build 402: a choice never cuts off its own text (big text sizes): the box grows to fit it. */
   #settingsPanel .set-page .settings-row > .settings-select{ flex:0 0 auto; width:auto; min-width:150px; max-width:100%; }
   /* ---------- Build 403 (Mark): Genres browse grid and the genre page ---------- */
-  .gb-search{ grid-column:1/-1; display:flex; align-items:center; gap:10px; height:46px; padding:0 14px; margin:0 0 22px;
-    border-radius:var(--r-btn, 10px); background:#f2f3f5; color:#2a2c31; box-sizing:border-box; cursor:text; }
-  html[data-theme="light"] .gb-search{ background:var(--panel-2); color:var(--text-dim); border:1px solid var(--border); }
-  .gb-search svg{ width:20px; height:20px; flex:0 0 20px; }
-  .gb-search input{ flex:1; min-width:0; border:0; outline:none; background:none; font:inherit; font-size:15px; font-weight:500; color:#111214; }
-  html[data-theme="light"] .gb-search input{ color:var(--text); }
-  .gb-search input::placeholder{ color:#5c6068; }
   .gb-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   .gb-head{ grid-column:1/-1; margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); line-height:1.25; }
   .gb-head[hidden], .gb-top[hidden], .gb-card[hidden], .gb-none[hidden]{ display:none !important; }
-  .gb-top{ grid-column:1/-1; display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; margin:0 calc(-1 * var(--main-pad)) 26px; padding:0 var(--main-pad);
+  .gb-top{ grid-column:1/-1; display:flex; align-items:stretch; gap:12px; overflow-x:auto; overflow-y:hidden; margin:0 calc(-1 * var(--main-pad)) 26px; padding:0 var(--main-pad);
     scroll-snap-type:x proximity; scroll-padding-left:var(--main-pad); scrollbar-width:none; overscroll-behavior-x:contain; }
   .gb-top::-webkit-scrollbar{ display:none; }
-  .gb-topcard{ position:relative; flex:0 0 min(236px, 64vw); height:132px; border-radius:var(--r-tile, 8.5px); background:var(--gc); color:#fff;
+  .gb-topcard{ position:relative; flex:0 0 min(236px, 64vw); min-height:132px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:space-between; gap:10px; padding:14px 16px 12px; border-radius:var(--r-tile, 8.5px); background:var(--gc); color:#fff;
     overflow:hidden; cursor:pointer; scroll-snap-align:start; -webkit-tap-highlight-color:transparent; }
   .gb-topcard:active, .gb-card:active{ transform:scale(.98); }
-  .gb-topcard-text{ position:absolute; left:16px; top:14px; right:84px; display:flex; flex-direction:column; gap:6px; }
-  .gb-topcard-name{ font-size:22px; font-weight:800; line-height:1.1; overflow-wrap:anywhere; }
-  .gb-topcard-blurb{ font-size:12.5px; font-weight:500; line-height:1.35; color:rgba(255,255,255,.88); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+  .gb-topcard-text{ position:relative; z-index:1; margin-right:64px; display:flex; flex-direction:column; gap:6px; }
+  .gb-topcard-name{ font-size:22px; font-weight:800; line-height:1.1; }
+  .gb-topcard-blurb{ font-size:12.5px; font-weight:500; line-height:1.35; color:rgba(255,255,255,.88); }
   .gb-topcard-icon{ position:absolute; right:-12px; bottom:-14px; width:96px; height:96px; transform:rotate(22deg); color:rgba(255,255,255,.9); pointer-events:none; }
-  .gb-topcard-play{ position:absolute; left:14px; bottom:12px; width:44px; height:44px; border:0; padding:0; border-radius:var(--r-play, 999px);
+  .gb-topcard-play{ position:relative; z-index:1; flex:0 0 auto; margin-left:-2px; width:44px; height:44px; border:0; padding:0; border-radius:var(--r-play, 999px);
     background:rgba(0,0,0,.28); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .gb-topcard-play svg{ width:17px; height:17px; margin-left:2px; }
   .gb-grid{ grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:12px; }
   @media (max-width: 900px){ .gb-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
   .gb-card{ position:relative; height:96px; border:0; padding:0; margin:0; border-radius:var(--r-tile, 8.5px); background:var(--gc); color:#fff; overflow:hidden;
     text-align:left; font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
-  .gb-card-name{ position:absolute; left:14px; top:12px; right:46px; font-size:17px; font-weight:700; line-height:1.15; overflow-wrap:anywhere; }
+  .gb-card-name{ position:absolute; left:14px; top:12px; right:46px; font-size:17px; font-weight:700; line-height:1.15; }
   .gb-card-icon{ position:absolute; right:-8px; bottom:-8px; width:64px; height:64px; transform:rotate(22deg); color:rgba(255,255,255,.92); pointer-events:none; }
   .gb-none{ grid-column:1/-1; margin:4px 0 0; font-size:14px; color:var(--text-dim); }
   body.genre-open #stationsGrid, body.genres-open #stationsGrid{ row-gap:0; }
@@ -7049,7 +7042,7 @@
   .gp-hero-icon{ position:absolute; right:-50px; top:-6px; width:250px; height:250px; transform:rotate(18deg); color:rgba(255,255,255,.16); pointer-events:none; }
   .gp-hero-text{ position:relative; }
   .gp-eyebrow{ font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.86); }
-  .gp-title{ margin:4px 0 0; font-size:44px; font-weight:800; line-height:1.02; letter-spacing:-.02em; overflow-wrap:anywhere; }
+  .gp-title{ margin:4px 0 0; font-size:44px; font-weight:800; line-height:1.02; letter-spacing:-.02em; }
   .gp-blurb{ margin-top:8px; font-size:14px; font-weight:500; line-height:1.4; color:rgba(255,255,255,.9); }
   .gp-acts{ grid-column:1/-1; position:relative; display:flex; align-items:center; gap:14px; margin:0 calc(-1 * var(--main-pad)) 18px;
     padding:18px var(--main-pad) 0; background:linear-gradient(to bottom, color-mix(in srgb, var(--gc) 55%, transparent), transparent 84px); }
@@ -7073,6 +7066,12 @@
   .gp-songs{ grid-column:1/-1; display:flex; flex-direction:column; margin:0 0 8px; }
   .gp-more{ grid-column:1/-1; justify-self:start; margin:0 0 28px; height:38px; padding:0 16px; border-radius:var(--r-pill, 999px); border:1px solid var(--border);
     background:none; color:var(--text); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; }
+  /* Build 404 (Mark): a word never breaks across lines anywhere; titles and names wrap only between
+     words, and one whose longest word doesn't fit is shrunk until it does (the word-fit script). */
+  :is(.tile-name, .tile-sub, .song-row-title, .song-row-sub, .row-name, .row-sub, .yt-title, .ch-name, .ch-sub, .section-heading, .page-title, .gb-card-name, .gb-topcard-name, .gp-title, .gp-chip, .vd-title, .vep-title, .epg-info-show, .epg-info-ep, .guide-title, .guide-sub, .guide-name, .mv-hero-name, .pf-fav-name, .artist-hero-name, .album-hero-name, .nph-title, .home-section-head h2, .recent-col-heading, .grid-section-label, .cl-name, .set-cat-name, .settings-label, .chart-vrow-title, .queue-row-title, .artist-info-name, .np-onair-title, .fav-group-title, .st-title, .confirm-title, .notice-title, .settings-title, .cf-cap-title, .epg-logo-name, .v-folder-name){ overflow-wrap:normal !important; word-break:normal !important; hyphens:manual !important; }
+  /* Build 404 (Mark): with the keyboard up, the mini Now Playing never shows (any input, any page). */
+  body.kb-open .player-bar{ display:none !important; }
+  .gb-find{ grid-column:1/-1; margin:0 0 22px !important; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -10560,6 +10559,51 @@
   })();
   shapeApply();
   window.addEventListener('resize', function(){ layoutApply(); });
+  // ---------- Build 404 (Mark): words never break ----------
+  // A title or name wraps only between words; when its longest word is wider than its box (a big
+  // text size, a narrow card), it is shrunk in small steps until the word fits, down to 60 percent.
+  // Each is checked as it comes into view (so a list of thousands costs nothing up front), and
+  // again after the window, the text size or the font changes.
+  (function(){
+    var SEL = '.tile-name, .tile-sub, .song-row-title, .song-row-sub, .row-name, .row-sub, .yt-title, .ch-name, .ch-sub, .section-heading, .page-title, .gb-card-name, .gb-topcard-name, .gp-title, .gp-chip, .vd-title, .vep-title, .epg-info-show, .epg-info-ep, .guide-title, .guide-sub, .guide-name, .mv-hero-name, .pf-fav-name, .artist-hero-name, .album-hero-name, .nph-title, .home-section-head h2, .recent-col-heading, .grid-section-label, .cl-name, .set-cat-name, .settings-label, .chart-vrow-title, .queue-row-title, .artist-info-name, .np-onair-title, .fav-group-title, .st-title, .confirm-title, .notice-title, .settings-title, .cf-cap-title, .epg-logo-name, .v-folder-name';
+    if(!window.IntersectionObserver || !window.MutationObserver) return;
+    function fit(el){
+      if(!el.isConnected || !el.offsetParent) return;
+      if(el.dataset.wfit){ el.style.removeProperty('font-size'); delete el.dataset.wfit; }
+      var cs = getComputedStyle(el);
+      if(/nowrap|pre$/.test(cs.whiteSpace)) return;   // one-line text ends in an ellipsis instead
+      if(!el.clientWidth || el.scrollWidth <= el.clientWidth + 1) return;
+      var fs = parseFloat(cs.fontSize) || 14, min = fs * 0.6;
+      while(el.scrollWidth > el.clientWidth + 1 && fs > min){ fs = fs * 0.93; el.style.setProperty('font-size', fs.toFixed(2) + 'px', 'important'); }
+      el.dataset.wfit = '1';
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ io.unobserve(e.target); fit(e.target); } });
+    }, { rootMargin: '200px 0px' });
+    var pending = [], timer = 0;
+    function watch(root){
+      if(!root || root.nodeType !== 1) return;
+      if(root.matches(SEL)) io.observe(root);
+      if(root.firstElementChild) Array.prototype.forEach.call(root.querySelectorAll(SEL), function(el){ io.observe(el); });
+    }
+    new MutationObserver(function(muts){
+      for(var j = 0; j < muts.length; j++){
+        var m = muts[j];
+        for(var i = 0; i < m.addedNodes.length; i++) pending.push(m.addedNodes[i]);
+        var t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+        if(t && t.matches && t.matches(SEL)) pending.push(t);
+      }
+      if(!timer) timer = setTimeout(function(){ timer = 0; var list = pending; pending = []; list.forEach(function(n){ if(n.nodeType === 3) n = n.parentElement; watch(n); }); }, 60);
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    function refitAll(){ watch(document.body); }
+    window.__wordFitAll = refitAll;
+    var rt = 0;
+    window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(refitAll, 200); });
+    document.addEventListener('change', function(e){ if(e.target && /^(font|sz-|shape)/.test(e.target.id || '')) setTimeout(refitAll, 150); }, true);
+    document.addEventListener('input', function(e){ if(e.target && /^(fontSizeRange|sz-)/.test(e.target.id || '')){ clearTimeout(rt); rt = setTimeout(refitAll, 250); } }, true);
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(refitAll);
+    setTimeout(refitAll, 0);
+  })();
   var AMOLED_KEY = 'radioPlayerAmoled';
   var amoledSel = document.getElementById('amoledSelect');
   function amoledApply(){
@@ -29648,10 +29692,12 @@
     resetStationsGrid();
     document.body.classList.add('genres-open');
     // A field to narrow the cards; Enter on a style that isn't a card looks it up.
-    var search = document.createElement('label');
-    search.className = 'gb-search';
-    search.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'
-      + '<span class="gb-sr">Find a genre</span><input type="search" id="genreFindInput" placeholder="What do you want to hear?" autocomplete="off" enterkeyhint="search">';
+    var search = document.createElement('div');
+    search.className = 'sec-filter gb-find';
+    search.setAttribute('role', 'search');
+    search.innerHTML = '<i class="fa-solid fa-magnifying-glass sf-ico" aria-hidden="true"></i>'
+      + '<input type="search" id="genreFindInput" placeholder="Filter genres" aria-label="Filter genres" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">'
+      + '<button type="button" class="sf-clear" aria-label="Clear filter" title="Clear" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>';
     stationsGrid.appendChild(search);
     var input = search.querySelector('input');
     var top = topGenres(), topHead = null, topRow = null;
@@ -29695,7 +29741,9 @@
       none.hidden = !(q && !shown);
       if(q && !shown) none.textContent = 'No genre called \u201c' + input.value.trim() + '\u201d. Press Enter to find stations for it.';
     }
-    input.addEventListener('input', apply);
+    var clearBtn = search.querySelector('.sf-clear');
+    input.addEventListener('input', function(){ clearBtn.hidden = !input.value; apply(); });
+    clearBtn.addEventListener('click', function(){ input.value = ''; clearBtn.hidden = true; apply(); input.focus(); });
     input.addEventListener('keydown', function(e){
       if(e.key !== 'Enter') return;
       var q = input.value.trim();

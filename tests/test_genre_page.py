@@ -59,7 +59,7 @@ async def route(r):
 
 GB = """(()=>{ var g = document.getElementById('stationsGrid');
   var cards = Array.from(g.querySelectorAll('.gb-card')).filter(function(c){ return !c.hidden; });
-  return { search: !!g.querySelector('.gb-search input'), heads: Array.from(g.querySelectorAll('.gb-head')).filter(function(h){ return !h.hidden; }).map(function(h){ return h.textContent; }),
+  return { search: !!g.querySelector('.sec-filter.gb-find input'), heads: Array.from(g.querySelectorAll('.gb-head')).filter(function(h){ return !h.hidden; }).map(function(h){ return h.textContent; }),
     top: Array.from(g.querySelectorAll('.gb-top:not([hidden]) .gb-topcard-name')).map(function(e){ return e.textContent; }),
     cards: cards.map(function(c){ return c.dataset.genre; }), lefts: Array.from(new Set(cards.map(function(c){ return Math.round(c.getBoundingClientRect().left); }))).length,
     colors: Array.from(new Set(cards.map(function(c){ return getComputedStyle(c).backgroundColor; }))).length,
@@ -106,6 +106,37 @@ async def run(b, scheme, w, h, full):
     check(r['lefts'] == (2 if w < 900 else r['lefts']) and r['lefts'] >= 2, f'{T} cards in columns ({r["lefts"]})')
     check(r['sw'] <= r['vw'], f'{T} nothing scrolls sideways ({r["sw"]} > {r["vw"]})')
     await pg.screenshot(path=f'{shots}/genres-{scheme}-{w}.png', full_page=full)
+    # Build 404: the find box is the app's filter box, its placeholder fits, and no word breaks (at the biggest text too)
+    st = await pg.evaluate("""(()=>{ var i=document.getElementById('genreFindInput'), cs=getComputedStyle(i);
+      var c=document.createElement('canvas').getContext('2d'); c.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily;
+      var room=i.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+      return { cls: i.parentElement.className, h: Math.round(i.getBoundingClientRect().height), ph: i.placeholder, fits: c.measureText(i.placeholder).width <= room, room: Math.round(room), radius: cs.borderTopLeftRadius, bg: cs.backgroundColor, panel: getComputedStyle(document.body).getPropertyValue('--panel-2') }; })()""")
+    check(st['cls'] == 'sec-filter gb-find' and st['h'] == 46 and st['ph'] == 'Filter genres' and st['fits'], f'{T} the find box is the app\'s filter box and its placeholder fits {st}')
+    if w < 900:
+        await pg.evaluate("(()=>{ var r=document.getElementById('fontSizeRange'); r.value='150'; r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(900)
+        await pg.evaluate("window.scrollTo(0, 99999)"); await pg.wait_for_timeout(500); await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(500)
+        wb = await pg.evaluate("""(()=>{ var bad=[]; document.querySelectorAll('.gb-card-name, .gb-topcard-name, #genreFindInput').forEach(function(e){
+            if(e.tagName==='INPUT'){ return; } if(e.scrollWidth > e.clientWidth + 1) bad.push(e.textContent + ' ' + e.scrollWidth + '>' + e.clientWidth); }); return bad; })()""")
+        st2 = await pg.evaluate("""(()=>{ var i=document.getElementById('genreFindInput'), cs=getComputedStyle(i); var c=document.createElement('canvas').getContext('2d'); c.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily;
+            return c.measureText(i.placeholder).width <= i.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight); })()""")
+        check(not wb and st2, f'{T} text at 150%: every genre name fits whole, no word broken, placeholder still fits {wb}')
+        await pg.screenshot(path=f'{shots}/genres-big-{scheme}-{w}.png')
+        await pg.evaluate("__t.genre('Electronic')"); await pg.wait_for_timeout(1200)
+        gt = await pg.evaluate("(()=>{ var e=document.querySelector('.gp-title'); return [e.scrollWidth, e.clientWidth, getComputedStyle(e).fontSize]; })()")
+        check(gt[0] <= gt[1] + 1, f'{T} text at 150%: the genre title "Electronic" fits on one line, shrunk ({gt})')
+        await pg.screenshot(path=f'{shots}/genre-big-{scheme}-{w}.png')
+        await pg.evaluate("(()=>{ var r=document.getElementById('fontSizeRange'); r.value='100'; r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); })()"); await pg.wait_for_timeout(600)
+        await pg.evaluate("__t.home()"); await pg.wait_for_timeout(800)
+        # with the keyboard up the mini Now Playing never shows
+        await pg.evaluate("document.querySelector('.gb-topcard-play').click()"); await pg.wait_for_timeout(1500)
+        await pg.evaluate("__t.ev('closeNowPlaying()')"); await pg.wait_for_timeout(500)
+        before = await pg.evaluate("getComputedStyle(document.querySelector('.player-bar')).display")
+        await pg.tap('#genreFindInput'); await pg.wait_for_timeout(500)
+        kb = await pg.evaluate("({ kb: document.body.classList.contains('kb-open'), bar: getComputedStyle(document.querySelector('.player-bar')).display })")
+        check(before != 'none' and kb['kb'] and kb['bar'] == 'none', f'{T} typing in the find box hides the mini Now Playing (before {before}, now {kb})')
+        await pg.evaluate("document.activeElement.blur()"); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("getComputedStyle(document.querySelector('.player-bar')).display") != 'none', f'{T} and it is back when the keyboard closes')
+        await pg.evaluate("__t.home()"); await pg.wait_for_timeout(600)
     if not full: return await ctx.close()
     await pg.fill('#genreFindInput', 'ja'); await pg.wait_for_timeout(200)
     r = await pg.evaluate(GB)
