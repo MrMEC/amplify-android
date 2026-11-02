@@ -17123,6 +17123,12 @@
     // Build 421: the song on air wins over a cover set by hand for the station (Exclusively
     // stations carry one), on the player bar and Now Playing; the station's own cover returns
     // when no song is named.
+    if(container.closest && container.closest('.nph-slide')){
+      var lastCover = lastSongCoverFor(station);
+      if(lastCover){ songPaint = true; paint(lastCover); songPaint = false; return; }
+      var heroSlide = container.closest('.nph-slide');
+      if(heroSlide && lastSongItem(station)) requestLastSongCover(station, heroSlide);
+    }
     if(container === playerIcon || container === npArt){
       var songFirst = onAirArtFor(station);
       if(songFirst){ songPaint = true; paint(songFirst); songPaint = false; if(isArtistRadio(station)) container.classList.add('art-radio'); return; }
@@ -47793,6 +47799,25 @@
     }, null);
   }
   function songCoverNow(st){ return onAirArtFor(st) || radioSongCoverFor(st); }
+  // Build 424: Home's station slides wear the cover of the last song each station named.
+  function lastSongItem(st){
+    if(!st || !isLiveStream(st) || isChannelEntry(st) || isArtistRadio(st)) return null;
+    var r = stationSongMap()[favKey(st)];
+    if(!r || !r.t || !r.a) return null;
+    return { artist: r.a, name: r.t, songKey: songKeyOf(r.a, r.t) };
+  }
+  function lastSongCoverFor(st){
+    var it = lastSongItem(st);
+    return it ? (songArt[it.songKey] || null) : null;
+  }
+  function requestLastSongCover(st, slide){
+    var it = lastSongItem(st);
+    if(!it || songArt[it.songKey] || songArtIsNone(it.songKey)) return;
+    requestSongArt(it, function(url){
+      if(!url || !slide || slide._item !== st) return;
+      repaintHeroSlideArt(slide);
+    }, null);
+  }
   function dropOnAirArt(quiet){
     if(!onAirArt) return;
     onAirArt = null;
@@ -48191,6 +48216,15 @@
       })['catch'](function(){});
     }
   }
+  function repaintHeroSlideArt(slide){
+    if(!slide || !slide._item) return;
+    ['.nph-art', '.nph-bg', '.nph-mid'].forEach(function(sel){
+      var box = slide.querySelector(sel), cur = box && box.querySelector('img');
+      var want = lastSongCoverFor(slide._item);
+      if(cur && want && cur.getAttribute('data-song-src') === want) return;
+      if(box) renderStationArt(box, slide._item);
+    });
+  }
   function heroIndex(){
     if(!npHeroTrack || !npHeroTrack.clientWidth) return 0;
     return Math.max(0, Math.min(heroSlides.length - 1, Math.round(npHeroTrack.scrollLeft / npHeroTrack.clientWidth)));
@@ -48310,7 +48344,11 @@
       if(!heroIsStation(slide._item)) return;
       var el = slide.querySelector('.nph-line');
       var t = stationLastSongText(slide._item);
-      if(el.textContent !== t) el.textContent = t;
+      if(el.textContent !== t){
+        el.textContent = t;
+        // a new last song: its cover, once the slide has been painted at all
+        if(slide._artDone) repaintHeroSlideArt(slide);
+      }
     });
   }
   function heroPlay(slide){

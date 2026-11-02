@@ -9,7 +9,7 @@ shutil.rmtree(ROOT, ignore_errors=True); os.makedirs(ROOT); os.makedirs(SHOTS, e
 html = open(os.path.join(HERE, '..', 'www', 'index.html')).read()
 mark = '  function renderStationArt(container, station){'
 assert html.count(mark) == 1
-html = html.replace(mark, "  window.__fc = { open: openFindBetterCover, rowMenu: function(a, t){ openRowMenu(a, t, {}); }, findable: isFindableStation, setCur: function(s){ currentStation = s; }, onAir: setOnAir, radio: function(tr, label){ radioCtx = { key: 'x', label: label }; queueLabel = label; currentStation = tr; renderStationArt(playerIcon, tr); }, rerender: function(){ refreshStationArt(currentStation); try{ renderNowPlayingScreen(); }catch(e){} },  art: function(){ return onAirArt; }, np: function(){ toggleNpMenu(); return [document.getElementById('npFindCoverBtn').style.display, JSON.stringify(npTarget() && npTarget().name)]; } };\n" + mark, 1)
+html = html.replace(mark, "  window.__fc = { open: openFindBetterCover, rowMenu: function(a, t){ openRowMenu(a, t, {}); }, findable: isFindableStation, setCur: function(s){ currentStation = s; }, onAir: setOnAir, noteSong: noteStationSong, hero: function(){ renderNpHero(); heroPaintAround(); }, radio: function(tr, label){ radioCtx = { key: 'x', label: label }; queueLabel = label; currentStation = tr; renderStationArt(playerIcon, tr); }, rerender: function(){ refreshStationArt(currentStation); try{ renderNowPlayingScreen(); }catch(e){} },  art: function(){ return onAirArt; }, np: function(){ toggleNpMenu(); return [document.getElementById('npFindCoverBtn').style.display, JSON.stringify(npTarget() && npTarget().name)]; } };\n" + mark, 1)
 open(ROOT + '/index.html', 'w').write(html)
 H = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT); H.log_message = lambda *a: None
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 8841), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -116,6 +116,14 @@ async def main():
         await pg.evaluate("window.__fc.onAir({title:'', artist:''})")
         await pg.wait_for_timeout(600)
         check(not await pg.evaluate("window.__fc.art()"), 'and falls back to the station cover when nothing is named')
+        # build 424: Home's station slides wear the cover of the station's last song
+        await pg.evaluate("(a)=>{ window.__fc.setCur(a); window.__fc.noteSong(a, 'Blue Skies', 'Ella Vale'); }", STN)
+        await pg.evaluate("window.__fc.hero()")
+        await pg.wait_for_timeout(2500)
+        await pg.evaluate("window.scrollTo(0,0); document.querySelectorAll('.nph-slide').length")
+        hero = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.nph-slide'), function(s){ var i = s.querySelector('.nph-art img'); return [s.querySelector('.nph-title').textContent, i ? i.src : '', s.querySelector('.nph-line').textContent]; })")
+        await pg.screenshot(path=f'{SHOTS}/findcover-hero.png')
+        check(any(h[0] == 'Alpha FM' and h[1].endswith('cover.png') for h in hero), f"the Home slide wears the last song's cover {hero}")
         # build 420: an artist's Radio plays songs from the library; the cover is found by song name
         LT = {**LOCAL, 'artist': 'Ella Vale', 'name': 'Blue Skies', 'album': '', 'uri': 'content://x/9'}
         await pg.evaluate("(a)=>window.__fc.radio(a[0], a[1])", [LT, 'Ella Vale Radio'])
