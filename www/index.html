@@ -41235,14 +41235,17 @@
   // Build 426: the Disney genre also gathers everything Disney in the library by what it is
   // called (artist, album, song, folder) and, for soundtracks, films and shows, by title.
   var DISNEY_STRONG_RE = /\b(disney|pixar|walt disney)\b/i;
-  var DISNEY_TITLE_RE = /\b(lion king|moana|encanto|mulan|aladdin|tangled|little mermaid|beauty and the beast|toy story|finding nemo|finding dory|incredibles|zootopia|zootropolis|cinderella|lilo (?:and|&) stitch|bambi|dumbo|pinocchio|snow white|winnie the pooh|hercules|tarzan|ratatouille|wall-?e|frozen|mickey mouse|minnie mouse|mary poppins|jungle book|101 dalmatians|sleeping beauty|peter pan|lady and the tramp|aristocats|hunchback of notre dame|princess and the frog|big hero 6|wreck-it ralph|monsters,? inc|inside out|pocahontas|bluey|doc mcstuffins|phineas and ferb|gravity falls|ducktales|darkwing duck|goof troop|chip ?n ?dale|descendants|high school musical|hannah montana|that.s so raven|lizzie mcguire|kim possible|raven.s home|andi mack|good luck charlie|wizards of waverly place|sofia the first|moana 2)\b/i;
+  var DISNEY_TITLE_RE = /\b(lion king|moana|encanto|mulan|aladdin|tangled|little mermaid|beauty and the beast|toy story|finding nemo|finding dory|incredibles|zootopia|zootropolis|cinderella|lilo (?:and|&) stitch|bambi|dumbo|pinocchio|snow white|winnie the pooh|hercules|tarzan|ratatouille|wall-?e|frozen|mickey mouse|minnie mouse|mary poppins|jungle book|101 dalmatians|sleeping beauty|peter pan|lady and the tramp|aristocats|hunchback of notre dame|princess and the frog|big hero 6|wreck-it ralph|monsters,? inc|pocahontas|bluey|doc mcstuffins|phineas and ferb|gravity falls|ducktales|darkwing duck|goof troop|chip ?n ?dale|descendants|high school musical|hannah montana|that.s so raven|lizzie mcguire|kim possible|raven.s home|andi mack|good luck charlie|wizards of waverly place|sofia the first|moana 2)\b/i;
   function isDisneyText(txt, titleToo){
     txt = String(txt || '');
     return DISNEY_STRONG_RE.test(txt) || (titleToo && DISNEY_TITLE_RE.test(txt));
   }
   function isDisneyTrack(t){
     var fields = [t.artist, t.album, t.name, t.relPath, t.folder, t.dir, t.path].filter(Boolean).join(' / ');
-    return DISNEY_STRONG_RE.test(fields) || DISNEY_TITLE_RE.test(String(t.album || ''));
+    if(DISNEY_STRONG_RE.test(fields)) return true;
+    // a film's name on an album only counts for a soundtrack, not a concert or a hotel ("Live at the Aladdin, Las Vegas")
+    var album = String(t.album || '');
+    return DISNEY_TITLE_RE.test(album) && !/\b(live|las vegas|concert|tour|unplugged)\b/i.test(album);
   }
   function disneyMovies(){
     try{ return (vlib().movies || []).filter(function(m){ return isDisneyText([m.title, m.relPath, m.fileName].join(' / '), true); }); }catch(e){ return []; }
@@ -45732,6 +45735,13 @@
   // has both; otherwise just the one list. Each tab names its own count.
   var genrePage = null;
   var GENRE_TABS = [['songs', 'Songs', 'song', 'songs'], ['stations', 'Stations', 'station', 'stations']];
+  function genreMoreLink(g, flag){
+    var more = document.createElement('button');
+    more.type = 'button'; more.className = 'gp-more';
+    more.textContent = g[flag] ? 'Show fewer' : 'Show more';
+    more.addEventListener('click', function(){ g[flag] = !g[flag]; var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); });
+    return more;
+  }
   function renderGenrePage(){
     var g = genrePage;
     if(!g) return;
@@ -45817,7 +45827,7 @@
       if(songs.length > 5){
         var more = document.createElement('button');
         more.type = 'button'; more.className = 'gp-more';
-        more.textContent = g.allSongs ? 'Show fewer' : 'See all ' + songs.length + ' songs';
+        more.textContent = g.allSongs ? 'Show fewer' : 'Show more';
         more.addEventListener('click', function(){ g.allSongs = !g.allSongs; var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); });
         stationsGrid.appendChild(more);
       }
@@ -45833,15 +45843,17 @@
       head('Movies');
       var mrow = document.createElement('div');
       mrow.className = 'gp-row';
-      g.movies.slice(0, 30).forEach(function(m){ mrow.appendChild(buildMovieTile(m)); });
+      (g.allMovies ? g.movies : g.movies.slice(0, 10)).forEach(function(m){ mrow.appendChild(buildMovieTile(m)); });
       stationsGrid.appendChild(mrow);
+      if(g.movies.length > 10) stationsGrid.appendChild(genreMoreLink(g, 'allMovies'));
     }
     if(g.shows && g.shows.length){
       head('TV shows');
       var srow = document.createElement('div');
       srow.className = 'gp-row';
-      g.shows.slice(0, 30).forEach(function(sh){ srow.appendChild(buildShowTile(sh)); });
+      (g.allShows ? g.shows : g.shows.slice(0, 10)).forEach(function(sh){ srow.appendChild(buildShowTile(sh)); });
       stationsGrid.appendChild(srow);
+      if(g.shows.length > 10) stationsGrid.appendChild(genreMoreLink(g, 'allShows'));
     }
     if(g.stations.length > TOP){
       head('More ' + g.tag + ' stations');

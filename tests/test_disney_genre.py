@@ -17,6 +17,7 @@ hook = """  window.__dz = {
         shows: [{ key: 'ducktales', title: 'DuckTales', episodes: [{ relPath: 'TV/DuckTales/s01e01.mp4', season: 1, episode: 1, uri: 'e1', id: 'e1' }], seasons: [1], poster: '', backdrop: '', seasonPosters: {} }, { key: 'seinfeld', title: 'Seinfeld', episodes: [{ relPath: 'TV/Seinfeld/s01e01.mp4', season: 1, episode: 1, uri: 'e2', id: 'e2' }], seasons: [1], poster: '', backdrop: '', seasonPosters: {} }], byId: {}, showsByKey: {} };
       vlib = function(){ return lib; };
     },
+    songs: function(){ return localTracksWithTag('Disney').map(function(t){ return t.name; }); },
     home: function(){ openGenresHome(); },
     genres: function(){ return genreOrder.slice(); }
   };
@@ -32,6 +33,11 @@ def check(ok, msg):
 TRACKS = [{'name': 'Let It Go', 'artist': 'Idina Menzel', 'album': 'Frozen (Soundtrack)', 'uri': 'content://t/1', 'type': 'local', 'localTrack': True, 'tags': ''},
           {'name': 'Circle of Life', 'artist': 'Carmen Twillie', 'album': 'The Lion King', 'uri': 'content://t/2', 'type': 'local', 'localTrack': True, 'tags': ''},
           {'name': 'Zip-a-Dee-Doo-Dah', 'artist': 'Various', 'album': 'Greatest Hits', 'relPath': 'Music/Disney Classics/Zip.mp3', 'uri': 'content://t/3', 'type': 'local', 'localTrack': True, 'tags': ''},
+          {'name': 'Purple Rain', 'artist': 'Prince', 'album': 'Live at the Aladdin, Las Vegas', 'uri': 'content://t/5', 'type': 'local', 'localTrack': True, 'tags': ''},
+          {'name': 'Slow Me Down', 'artist': 'Emmy Rossum', 'album': 'Inside Out', 'uri': 'content://t/6', 'type': 'local', 'localTrack': True, 'tags': ''},
+          {'name': 'S1', 'artist': 'Disney Kids', 'album': 'A', 'uri': 'content://t/7', 'type': 'local', 'localTrack': True, 'tags': ''},
+          {'name': 'S2', 'artist': 'Disney Kids', 'album': 'A', 'uri': 'content://t/8', 'type': 'local', 'localTrack': True, 'tags': ''},
+          {'name': 'S3', 'artist': 'Disney Kids', 'album': 'A', 'uri': 'content://t/9', 'type': 'local', 'localTrack': True, 'tags': ''},
           {'name': 'Bohemian Rhapsody', 'artist': 'Queen', 'album': 'A Night at the Opera', 'uri': 'content://t/4', 'type': 'local', 'localTrack': True, 'tags': 'rock'}]
 async def main():
     async with async_playwright() as p:
@@ -52,7 +58,15 @@ async def main():
           tiles: Array.prototype.map.call(document.querySelectorAll('.gp-row .tile-name'), x => x.textContent) })""")
         await pg.screenshot(path=f'{SHOTS}/disney-top.png')
         check(info['title'] == 'Disney', f"the genre page is called Disney {info['title']}")
-        check(sorted([x for x in info['songs'] if x != 'Shuffle All']) == ['Circle of Life', 'Let It Go', 'Zip-a-Dee-Doo-Dah'], f"library: Disney songs only {info['songs']}")
+        allsongs = await pg.evaluate("(function(){ return window.__dz.songs(); })()")
+        check(sorted(allsongs) == ['Circle of Life', 'Let It Go', 'S1', 'S2', 'S3', 'Zip-a-Dee-Doo-Dah'], f'Prince at the Aladdin and Emmy Rossum are not Disney {allsongs}')
+        shown = [x for x in info['songs'] if x != 'Shuffle All']
+        check(len(shown) == 5, f'the library shows 5 by default {shown}')
+        txt = await pg.evaluate("(document.querySelector('.gp-more')||{}).textContent")
+        check(txt == 'Show more', f'with a Show more link ({txt})')
+        await pg.evaluate("document.querySelector('.gp-more').click()"); await pg.wait_for_timeout(300)
+        n2 = await pg.evaluate("document.querySelectorAll('.gp-songs .song-row').length")
+        check(n2 == 7, f'Show more reveals the rest ({n2} rows incl. Shuffle All)')
         check(all(h in info['heads'] for h in ['Top stations', 'In your library', 'Podcasts', 'Movies', 'TV shows']), f"all the sections {info['heads']}")
         check('Disney Hits Radio' in info['tiles'] and 'Magic Mix' in info['tiles'], f"stations from the tag and the name {info['tiles']}")
         check('Disney Dreamlight Podcast' in info['tiles'] and 'Unrelated Show' not in info['tiles'], 'only Disney podcasts')
