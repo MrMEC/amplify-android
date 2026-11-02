@@ -2470,6 +2470,10 @@
      button above -- a discovery list is the one place this action matters most, so it stays
      visible rather than waiting for a hover a touch visitor will never make. */
   .tile-fav.tile-follow{ opacity:1; }
+  /* Build 421 (Mark): no star on top of a cover, anywhere -- they were touched by accident.
+     Favorite lives in the More menu / long-press, on the page's own control, and beside song
+     rows' text (a song row's star is not on its cover). More, dismiss and follow buttons stay. */
+  .tile:not(.song-row) .tile-fav:not(.tile-more):not(.tile-dismiss):not(.tile-follow){ display:none !important; }
 
   /* podcastRefreshHeaderBtn's icon is a plain Unicode arrow, not a Font Awesome glyph -- see
      the HTML comment by its markup -- so it needs its own size/line-height rather than the
@@ -17116,6 +17120,13 @@
       container.appendChild(img);
     }
 
+    // Build 421: the song on air wins over a cover set by hand for the station (Exclusively
+    // stations carry one), on the player bar and Now Playing; the station's own cover returns
+    // when no song is named.
+    if(container === playerIcon || container === npArt){
+      var songFirst = onAirArtFor(station);
+      if(songFirst){ songPaint = true; paint(songFirst); songPaint = false; if(isArtistRadio(station)) container.classList.add('art-radio'); return; }
+    }
     var customUrl = customArtFor(station);
     if(customUrl){
       // Build 290: kept on the phone, fetched by the app when the web view can't load it.
@@ -35003,6 +35014,8 @@
   var HAS_MEDIA_SESSION = !!(navigator.mediaSession && typeof window.MediaMetadata === 'function');
   function mediaArtworkUrl(track){
     var key = favKey(track);
+    var songFirst = (typeof onAirArtFor === 'function') ? onAirArtFor(track) : null;
+    if(songFirst) return Promise.resolve(songFirst);
     var custom = customArtFor(track);
     if(custom) return Promise.resolve(custom);
     var radioCover = (typeof radioSongCoverFor === 'function') ? radioSongCoverFor(track) : null;
