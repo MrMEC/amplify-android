@@ -17058,11 +17058,11 @@
     // Build 416: a re-render while the same song cover is already showing must not blank the
     // box (that was the flashing between song and station cover).
     if(container === playerIcon || container === npArt){
-      var keepUrl = onAirArtFor(station), shown = container.querySelector('img');
+      var keepUrl = songCoverNow(station), shown = container.querySelector('img');
       if(shown && shown.parentNode === container && shown.hasAttribute('data-song-src') && ((keepUrl && shown.getAttribute('data-song-src') === keepUrl) || (!keepUrl && songArtPending && isLiveStream(station)))) return;
     }
     var outgoing = null;
-    if((container === playerIcon || container === npArt) && onAirArtFor(station)){
+    if((container === playerIcon || container === npArt) && songCoverNow(station)){
       var oi = container.querySelector('img:not(.song-out)');
       if(oi && oi.complete && oi.naturalWidth) outgoing = oi.cloneNode(false);
     }
@@ -17164,6 +17164,11 @@
     // A local track's art comes from the file's own embedded picture. There is no homepage,
     // favicon or Wikipedia page to chase, so the station lookup chain is skipped entirely
     // and an untagged file simply keeps the generated placeholder.
+    if((container === playerIcon || container === npArt) && inArtistRadio(station)){
+      var rcv = radioSongCoverFor(station);
+      if(rcv){ songPaint = true; paint(rcv); songPaint = false; return; }
+      requestRadioSongArt(station);
+    }
     if(isLocalTrack(station)){
       localArtUrl(station).then(function(url){
         // A file picked one at a time on a phone has no folder beside it to take a cover
@@ -18196,6 +18201,7 @@
       ['itunes', itunesSongArt],
       ['musicbrainz', musicbrainzSongArt]
     ];
+    if(item && item.skipLibrary) steps.shift();      // build 420: a song from your own library asking for its online cover
     return (function next(i){
       if(i >= steps.length) return Promise.resolve(hadError ? { error: true } : null);
       return Promise.resolve().then(function(){ return steps[i][1](item); }).then(function(url){
@@ -34999,6 +35005,8 @@
     var key = favKey(track);
     var custom = customArtFor(track);
     if(custom) return Promise.resolve(custom);
+    var radioCover = (typeof radioSongCoverFor === 'function') ? radioSongCoverFor(track) : null;
+    if(radioCover) return Promise.resolve(radioCover);
     if(isLocalTrack(track)) return localArtUrl(track);
     if(isChartSong(track)) return Promise.resolve(songArt[track.songKey] || null);
     var songCover = (typeof onAirArtFor === 'function') ? onAirArtFor(track) : null;
@@ -47747,6 +47755,31 @@
     var song = onAirFor(st);
     return (song && onAirArt && onAirArt.key === song.key && onAirArt.song === song.title + '\n' + song.artist && stationWeakLogo(st)) ? onAirArt.url : null;
   }
+  // Build 420: an artist's Radio plays songs from your library, which name the song but rarely
+  // the album, so the cover comes from an online lookup by artist and song name (never from
+  // the library itself, which would only hand back the file's own picture).
+  function inArtistRadio(t){
+    return !!(t && radioCtx && radioCtx.kind !== 'playlist' && isLocalTrack(t) && currentStation && favKey(t) === favKey(currentStation) && queueLabel === radioCtx.label);
+  }
+  function radioSongItem(t){
+    var artist = t.artist || String(radioCtx && radioCtx.label || '').replace(/ Radio$/, '');
+    var name = plainTitle(t.name || '');
+    return { artist: artist, name: name, songKey: 'radio|' + songKeyOf(artist, name), skipLibrary: true };
+  }
+  function radioSongCoverFor(t){
+    if(!inArtistRadio(t)) return null;
+    return songArt[radioSongItem(t).songKey] || null;
+  }
+  function requestRadioSongArt(t){
+    var item = radioSongItem(t);
+    if(!item.artist || !item.name || songArt[item.songKey] || songArtIsNone(item.songKey)) return;
+    requestSongArt(item, function(url){
+      if(!url || !currentStation || favKey(currentStation) !== favKey(t)) return;
+      try{ refreshStationArt(currentStation); }catch(e){}
+      try{ updateMediaSession(currentStation); }catch(e){}
+    }, null);
+  }
+  function songCoverNow(st){ return onAirArtFor(st) || radioSongCoverFor(st); }
   function dropOnAirArt(quiet){
     if(!onAirArt) return;
     onAirArt = null;
