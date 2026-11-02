@@ -17183,6 +17183,11 @@
     var day = L.days[dayKey(d)] || (L.days[dayKey(d)] = { t: 0 });
     day.t += secs;
     day[k] = (day[k] || 0) + secs;
+    // Build 412: the day's time per genre too, for Search's "Your top picks".
+    if(k === 'm' || k === 'r'){
+      var gs = genresForListen(st);
+      if(gs.length){ var dg = day.g || (day.g = {}); gs.forEach(function(g){ dg[g] = (dg[g] || 0) + secs; }); }
+    }
     L.hours[d.getHours()] += secs;
     var key = favKey(st);
     if(key){
@@ -29735,7 +29740,59 @@
   }
   // How much of each genre this listener plays: library songs with it, and recent and favourite
   // stations tagged with it (a station counts more: it is a choice made again and again).
+  // Build 412 (Mark): "Your top picks" follow what has actually been played lately -- time spent
+  // on songs and stations of each genre over the last 28 days (Listening Stats' daily record).
+  // Genres not played lately fill any spare places from the library, as before.
+  var TOP_PICK_DAYS = 28;
+  var listenGenreCache = {};
+  function genresForTags(tags){
+    if(typeof genreOrder === 'undefined' || !tags || !tags.length) return [];
+    return genreOrder.filter(function(g){ var w = g.toLowerCase(); return tags.some(function(x){ return x === w || x.indexOf(w) !== -1; }); });
+  }
+  function genresForListen(st){
+    var key = favKey(st) || '';
+    if(key && listenGenreCache[key]) return listenGenreCache[key];
+    var gs = [];
+    try{ gs = genresForTags(stationTags(st)); }catch(e){}
+    if(key) listenGenreCache[key] = gs;
+    return gs;
+  }
+  function recentGenreScores(){
+    var L = loadListen(), now = Date.now(), cutoff = dayKey(new Date(now - (TOP_PICK_DAYS - 1) * 86400000)), sc = {};
+    // Listening from before genres were recorded per day: the songs and stations played in the
+    // window, credited once with their time, so the picks are right from the first day.
+    if(!L.gSeedDone){
+      var seed = {}, byKey = {};
+      libraryTracks.forEach(function(t){ var k2 = favKey(t); if(k2) byKey[k2] = t; });
+      Object.keys(L.items || {}).forEach(function(k2){
+        var it = L.items[k2];
+        if(!it || !(it.l >= now - TOP_PICK_DAYS * 86400000) || (it.k !== 'm' && it.k !== 'r')) return;
+        var src = it.k === 'm' ? byKey[k2] : it.st;
+        if(!src) return;
+        var gs = []; try{ gs = genresForTags(stationTags(src)); }catch(e){}
+        gs.forEach(function(g){ seed[g] = (seed[g] || 0) + (it.s || 0); });
+      });
+      L.gSeed = { t: now, g: seed }; L.gSeedDone = 1;
+      listenDirty = true; saveListen(true);
+    }
+    Object.keys(L.days || {}).forEach(function(d){
+      var g = L.days[d] && L.days[d].g;
+      if(d < cutoff || !g) return;
+      Object.keys(g).forEach(function(n){ sc[n] = (sc[n] || 0) + g[n]; });
+    });
+    if(L.gSeed && L.gSeed.g && now - L.gSeed.t < TOP_PICK_DAYS * 86400000){
+      Object.keys(L.gSeed.g).forEach(function(n){ sc[n] = (sc[n] || 0) + L.gSeed.g[n]; });
+    }
+    return sc;
+  }
   function topGenres(){
+    var sc = {}; try{ sc = recentGenreScores(); }catch(e){}
+    var played = genreOrder.filter(function(g){ return sc[g] >= 60; })   // a minute or more
+      .sort(function(a, b){ return sc[b] - sc[a] || genreOrder.indexOf(a) - genreOrder.indexOf(b); });
+    var lib = libraryTopGenres().filter(function(g){ return played.indexOf(g) === -1; });
+    return played.concat(lib).slice(0, 4);
+  }
+  function libraryTopGenres(){
     var seen = recentStations.concat(favorites);
     var scored = genreOrder.map(function(g, i){
       var w = g.toLowerCase(), n = localTracksWithTag(g).length;
