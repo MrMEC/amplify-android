@@ -14891,11 +14891,18 @@
   // Only for a station with no artwork at all, where there is nothing to blur: the colour
   // comes from the same seed its generated cover is drawn from, so the screen matches the
   // placeholder instead of every artless station sharing one flat grey.
-  function placeholderTint(seedKey){
+  function placeholderTint(seedKey, el){
     if(!seedKey) return null;
-    var rand = mulberry32(seedHash(seedKey));
-    var hue = Math.floor(rand() * 360);
-    return 'hsl(' + hue + ',34%,17%)';
+    var hex = (el && el.dataset && el.dataset.artBand) || coverSpec(seedKey).vivid;
+    var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if(!m) return 'hsl(230,34%,17%)';
+    var r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
+    if(d){
+      if(mx === r) h = ((g - b) / d) % 6; else if(mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+      h = Math.round(h * 60); if(h < 0) h += 360;
+    }
+    return 'hsl(' + h + ',38%,18%)';
   }
 
   // The blurred wash behind everything. It is the same image the hero is showing, so it
@@ -14924,7 +14931,7 @@
     if(!img){
       applyNpBackdrop(null);
       applyPageBackdrop(null);
-      applyNpTint(placeholderTint(seed));
+      applyNpTint(placeholderTint(seed, npArt));
       // No picture, no page-tint either -- same rule Album/Artist follow for a coverless
       // page: fall back rather than hold onto whatever the last one painted.
       applyPageTint(null);
@@ -15030,7 +15037,7 @@
       ringWaitTimer = setTimeout(function(){
         ringWaitTimer = null;
         if(job !== ringJob) return;
-        var g = generatedRingColour(playerIcon.dataset.artSeed || favKey(st));
+        var g = (playerIcon.dataset && playerIcon.dataset.artBand) || generatedRingColour(playerIcon.dataset.artSeed || favKey(st));
         ringByItem[itemKey] = g;
         applyRingColour(g);
       }, RING_WAIT_MS);
@@ -16265,69 +16272,192 @@
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
   }
-  // Every colour stop in a generated cover is mixed with the live --accent so the wall of
-  // placeholder thumbnails reads as part of the theme instead of a random rainbow. Using the
-  // CSS variable rather than a resolved hex means the art re-tints itself the moment the
-  // accent or theme changes -- no need to hunt down and repaint every visible tile.
-  var ACCENT_TINT_OK = !!(window.CSS && CSS.supports && CSS.supports('background', 'color-mix(in srgb, red 50%, blue)'));
-  function accentTint(color, pct){
-    return ACCENT_TINT_OK ? 'color-mix(in srgb, var(--accent) ' + pct + '%, ' + color + ')' : color;
-  }
-  function placeholderArtBackground(seedKey){
-    var rand = mulberry32(seedHash(seedKey));
-    var hueA = Math.floor(rand() * 360);
-    var hueB = (hueA + 50 + Math.floor(rand() * 100)) % 360;
-    var hueC = (hueA + 190 + Math.floor(rand() * 90)) % 360;
-    var sat = 55 + Math.floor(rand() * 30);
-    var baseLight = 38 + Math.floor(rand() * 14);
-    var angle = Math.floor(rand() * 360);
-    var layers = [];
-    var shapeCount = 2 + Math.floor(rand() * 3);
-    var hues = [hueA, hueB, hueC];
-    for(var i = 0; i < shapeCount; i++){
-      var hue = hues[i % hues.length];
-      var px = Math.floor(rand() * 100);
-      var py = Math.floor(rand() * 100);
-      var spread = 30 + Math.floor(rand() * 55);
-      var light = baseLight + 10 + Math.floor(rand() * 25);
-      var alpha = (0.5 + rand() * 0.4).toFixed(2);
-      var shape = rand() > 0.5 ? 'circle' : 'ellipse';
-      // One blob per cover leans hard on the accent so it anchors the palette; the rest take
-      // a lighter tint, which keeps the covers distinguishable from one another.
-      var tint = (i === 0) ? 60 : 28;
-      var stop = accentTint('hsla(' + hue + ',' + sat + '%,' + light + '%,' + alpha + ')', tint);
-      layers.push(shape + ' at ' + px + '% ' + py + '%, ' + stop + ' 0%, transparent ' + spread + '%');
+  // ---------- default covers (build 413) ----------
+  // A cover with no picture is a small piece of vector art, not a wash of gradients. Five looks,
+  // each with four colour schemes, chosen by genre where the station says what it plays and by
+  // the seed otherwise, so the same station always wears the same cover. Station covers also
+  // carry their call letters / initials. The art is an SVG data address: crisp at any size,
+  // nothing to download, nothing to cache.
+  var COVER_GENRES = [
+    ['vinyl', /jazz|blues|\bsoul|swing|bebop|bossa|motown|funk|r&b|rnb|oldies|standards/i],
+    ['aurora', /chill|lounge|ambient|downtempo|relax|easy.?listening|new.?age|smooth|spa\b|meditat|sleep|lo-?fi|calm/i],
+    ['rock', /\brock|metal|punk|grunge|alternative|indie|hardcore|emo\b|garage/i],
+    ['synth', /\bpop\b|top.?40|\bhits\b|dance|disco|synth|electro|edm|house|techno|trance|80s|90s|charts|hot ac|adult contemporary|retro|wave/i],
+    ['bauhaus', /news|talk|sport|classical|public|npr|opera|orchestra|information|christian|gospel|world|folk|country/i]
+  ];
+  var COVER_STYLES = ['synth', 'aurora', 'bauhaus', 'vinyl', 'rock'];
+  var COVER_PALETTES = {
+    synth: [
+      { bg:'#1d0b3a', sun:'#ff5e7e', ground:'#2a0f55', grid:'#ff2fd0', hz:'#00e5ff' },
+      { bg:'#0a1f44', sun:'#ffb347', ground:'#10285a', grid:'#00d4ff', hz:'#ff4fa3' },
+      { bg:'#2b0a3d', sun:'#ffd23f', ground:'#3d0f57', grid:'#ff6bd6', hz:'#7cf5ff' },
+      { bg:'#12053a', sun:'#ff7a45', ground:'#1f0a52', grid:'#a66bff', hz:'#ffe14d' }
+    ],
+    aurora: [
+      { bg:'#0b1f4d', c:['#00d4aa', '#7c4dff', '#ff6bb5', '#ffd23f'] },
+      { bg:'#1a0b3d', c:['#ff7eb3', '#7afcff', '#feff9c', '#9d7cff'] },
+      { bg:'#062a2e', c:['#2effc4', '#3d8bff', '#ff9a5a', '#c7ff4d'] },
+      { bg:'#2a0a2e', c:['#ff5ea0', '#ffb36b', '#6b7bff', '#38e1d0'] }
+    ],
+    bauhaus: [
+      { bg:'#f4e3c1', a:'#e63946', b:'#1d3557', c:'#f1b300' },
+      { bg:'#f7ede2', a:'#f28482', b:'#264653', c:'#f6bd60' },
+      { bg:'#fdf0d5', a:'#c1121f', b:'#003049', c:'#669bbc' },
+      { bg:'#e9f5db', a:'#ff7b00', b:'#2b2d42', c:'#00b4d8' }
+    ],
+    vinyl: [
+      { bg:'#12b5a5', label:'#ffd23f', bars:['#ffd23f', '#ff5e7e'] },
+      { bg:'#ff6b4a', label:'#ffe08a', bars:['#ffe08a', '#2b2d42'] },
+      { bg:'#6c4bff', label:'#ffd23f', bars:['#ff8fd0', '#ffd23f'] },
+      { bg:'#ff9f1c', label:'#2ec4b6', bars:['#2ec4b6', '#7b2cbf'] }
+    ],
+    rock: [
+      { bg:'#111111', stripe:'#e63946', bolt:'#ffd23f' },
+      { bg:'#1b1b3a', stripe:'#ff2e63', bolt:'#08d9d6' },
+      { bg:'#0d0d0d', stripe:'#ff7a00', bolt:'#ffffff' },
+      { bg:'#20123a', stripe:'#b5179e', bolt:'#f9c80e' }
+    ]
+  };
+  var COVER_VIVID = {                    // the one colour each look is built around (band, ring)
+    synth: function(p){ return p.sun; }, aurora: function(p){ return p.c[1]; },
+    bauhaus: function(p){ return p.a; }, vinyl: function(p){ return p.bg; }, rock: function(p){ return p.stripe; }
+  };
+  function coverStyleFor(hintText, rand){
+    var t = String(hintText || '');
+    if(t){
+      for(var i = 0; i < COVER_GENRES.length; i++) if(COVER_GENRES[i][1].test(t)) return COVER_GENRES[i][0];
     }
-    var bg = layers.map(function(l){ return 'radial-gradient(' + l + ')'; }).join(', ');
-    bg += ', linear-gradient(' + angle + 'deg, '
-       + accentTint('hsl(' + hueA + ',' + sat + '%,' + baseLight + '%)', 42) + ', '
-       + accentTint('hsl(' + hueC + ',' + sat + '%,' + Math.max(baseLight - 14, 12) + '%)', 42) + ')';
-    return bg;
+    return COVER_STYLES[Math.floor(rand() * COVER_STYLES.length)];
   }
+  // KJAM, 93.3, Q104.3, or the initials of the name ("Smooth Jazz 24/7" -> SJ).
+  function coverLabel(name){
+    var n = String(name == null ? '' : name).trim();
+    if(!n) return '';
+    var m = n.match(/\b([KW][A-Z]{2,3})\b/) || n.match(/\b([A-Z]{1,2}\d{2,3}(?:\.\d)?)\b/) || n.match(/\b(\d{2,3}[.,]\d)\b/);
+    if(m) return m[1].replace(',', '.');
+    var skip = /^(radio|fm|am|the|station|stations|network|live|online|hd|stream|music|internet|web|official|channel|de|la|el|and|of)$/i;
+    var all = n.split(/[^0-9A-Za-zÀ-￿]+/).filter(Boolean);
+    var words = all.filter(function(w){ return !skip.test(w); });
+    // An acronym already in the name (NPR News Now, BBC Radio 2) is the label.
+    var ac = words.filter(function(w){ return /^[A-Z]{2,5}$/.test(w); })[0];
+    if(ac) return ac;
+    var alpha = words.filter(function(w){ return !/^[0-9]+$/.test(w); });
+    if(alpha.length >= 2) return alpha.slice(0, 4).map(function(w){ return w.charAt(0); }).join('').toUpperCase();
+    var one = (alpha[0] || words[0] || all[0] || '');
+    return one.slice(0, /[^\x00-\x7f]/.test(one) ? 3 : 7).toUpperCase();
+  }
+  function coverXml(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function coverText(label, x, y, fill, stroke){
+    if(!label) return '';
+    var wide = /[^\x00-\x7f]/.test(label) ? 1.0 : 0.72;
+    var fs = Math.max(11, Math.min(20, Math.floor(104 / (label.length * wide))));
+    return '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-family="Poppins,Roboto,Arial,Helvetica,sans-serif" font-weight="800" font-size="' + fs + '" fill="' + fill + '"'
+      + (stroke ? ' stroke="' + stroke + '" stroke-width="3" stroke-linejoin="round" paint-order="stroke"' : '') + '>' + coverXml(label) + '</text>';
+  }
+  var COVER_DRAW = {
+    synth: function(p, rand, label){
+      var cy = 68 + Math.floor(rand() * 6), r = 32 + Math.floor(rand() * 5), g = '';
+      [[4, 3], [12, 4], [21, 5]].forEach(function(b){ g += '<rect x="20" y="' + (cy + b[0]) + '" width="100" height="' + b[1] + '" fill="' + p.bg + '"/>'; });
+      var lines = '';
+      [106, 118, 131].forEach(function(y){ lines += '<line x1="0" y1="' + y + '" x2="140" y2="' + y + '" stroke="' + p.grid + '" stroke-width="1"/>'; });
+      [-20, 25, 70, 115, 160].forEach(function(x){ lines += '<line x1="70" y1="96" x2="' + x + '" y2="140" stroke="' + p.grid + '" stroke-width="1"/>'; });
+      return '<rect width="140" height="140" fill="' + p.bg + '"/><circle cx="70" cy="' + cy + '" r="' + r + '" fill="' + p.sun + '"/>' + g
+        + '<rect y="96" width="140" height="44" fill="' + p.ground + '"/>' + lines
+        + '<line x1="0" y1="96" x2="140" y2="96" stroke="' + p.hz + '" stroke-width="1.5"/>' + coverText(label, 70, 29, '#ffffff', p.bg);
+    },
+    aurora: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>';
+      var pos = [[32, 38], [112, 58], [58, 118], [124, 124]];
+      for(var i = 0; i < 4; i++){
+        var cx = pos[i][0] + Math.floor(rand() * 24) - 12, cy = pos[i][1] + Math.floor(rand() * 24) - 12;
+        var r = (i === 3 ? 28 : 50) + Math.floor(rand() * 14);
+        s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + p.c[i] + '" fill-opacity="0.85"/>';
+      }
+      if(label) s += '<rect x="' + (70 - Math.max(30, label.length * 7 + 14)) + '" y="56" width="' + Math.max(60, label.length * 14 + 28) + '" height="28" rx="14" fill="' + p.bg + '"/>' + coverText(label, 70, 77, '#ffffff', '');
+      return s;
+    },
+    bauhaus: function(p, rand, label){
+      var flip = rand() > 0.5, lx = flip ? 35 : 105;
+      var shapes = '<circle cx="46" cy="50" r="38" fill="' + p.a + '"/><rect x="70" y="60" width="70" height="80" fill="' + p.b + '"/>'
+        + '<path d="M0 140 L0 88 A52 52 0 0 1 52 140 Z" fill="' + p.c + '"/>'
+        + '<line x1="86" y1="16" x2="132" y2="16" stroke="' + p.b + '" stroke-width="4"/><line x1="86" y1="26" x2="132" y2="26" stroke="' + p.b + '" stroke-width="4"/><line x1="86" y1="36" x2="132" y2="36" stroke="' + p.b + '" stroke-width="4"/>';
+      return '<rect width="140" height="140" fill="' + p.bg + '"/>'
+        + (flip ? '<g transform="translate(140 0) scale(-1 1)">' + shapes + '</g>' : shapes) + coverText(label, lx, 106, '#ffffff', '');
+    },
+    vinyl: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/><circle cx="70" cy="76" r="42" fill="#14141f"/>'
+        + '<circle cx="70" cy="76" r="35" fill="none" stroke="#2c2c3d" stroke-width="1.5"/><circle cx="70" cy="76" r="28" fill="none" stroke="#2c2c3d" stroke-width="1.5"/>'
+        + '<circle cx="70" cy="76" r="14" fill="' + p.label + '"/><circle cx="70" cy="76" r="3" fill="' + p.bg + '"/>';
+      for(var i = 0; i < 10; i++){
+        var h = 8 + Math.floor(rand() * 12);
+        s += '<rect x="' + (12 + i * 12.5) + '" y="' + (140 - h) + '" width="8" height="' + h + '" fill="' + p.bars[i % 2] + '"/>';
+      }
+      return s + coverText(label, 70, 27, '#ffffff', '#14141f');
+    },
+    rock: function(p, rand, label){
+      var tilt = Math.floor(rand() * 10) - 5;
+      return '<rect width="140" height="140" fill="' + p.bg + '"/>'
+        + '<polygon points="0,' + (100 + tilt) + ' 0,' + (64 + tilt) + ' 140,' + (20 - tilt) + ' 140,' + (56 - tilt) + '" fill="' + p.stripe + '"/>'
+        + '<polygon points="0,' + (120 + tilt) + ' 0,' + (108 + tilt) + ' 140,' + (64 - tilt) + ' 140,' + (76 - tilt) + '" fill="' + p.stripe + '"/>'
+        + '<polygon points="84,10 46,70 68,70 56,112 100,56 78,56" fill="' + p.bolt + '" stroke="' + p.bg + '" stroke-width="3" stroke-linejoin="round"/>'
+        + coverText(label, 70, 127, '#ffffff', p.bg);
+    }
+  };
+  var coverSpecCache = {};
+  // seedKey keeps the cover stable; hint = { name, tags } adds the genre look and the letters.
+  function coverSpec(seedKey, hint){
+    hint = hint || {};
+    var tagText = Array.isArray(hint.tags) ? hint.tags.join(' ') : String(hint.tags || '');
+    var label = hint.name ? coverLabel(hint.name) : '';
+    var ck = seedKey + '|' + tagText + '|' + label;
+    var hit = coverSpecCache[ck];
+    if(hit) return hit;
+    var rand = mulberry32(seedHash(seedKey));
+    rand(); rand(); rand();                 // the first draws of nearby seeds run alike
+    var style = coverStyleFor(tagText ? tagText + ' ' + (hint.name || '') : (hint.name || ''), rand);
+    var pals = COVER_PALETTES[style];
+    var p = pals[Math.floor(rand() * pals.length)];
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" preserveAspectRatio="xMidYMid slice">' + COVER_DRAW[style](p, rand, label) + '</svg>';
+    var spec = {
+      style: style,
+      css: 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '") center / cover no-repeat',
+      vivid: COVER_VIVID[style](p)
+    };
+    var keys = Object.keys(coverSpecCache);
+    if(keys.length > 600) delete coverSpecCache[keys[0]];
+    coverSpecCache[ck] = spec;
+    return spec;
+  }
+  // What a station's cover is told about it: its name (for the letters) and its genre tags.
+  // Songs, episodes and videos are not stations -- a track title as initials would be noise --
+  // so those get the art alone, or the album's name for a local track.
+  function coverHintFor(station){
+    if(!station) return null;
+    if(isLocalTrack(station)) return { name: String(station.album || '').trim() };
+    if(isPodcastTrack(station) || isChartSong(station) || isLocalVideo(station)) return null;
+    return { name: station.name, tags: station.tags };
+  }
+  function placeholderArtBackground(seedKey, hint){ return coverSpec(seedKey, hint).css; }
   var CHANNEL_LOGO_BG = '#2b2c31';
   function channelLogoBg(el){
     el.style.background = CHANNEL_LOGO_BG;
-    if(el.dataset) delete el.dataset.artSeed;
+    if(el.dataset){ delete el.dataset.artSeed; delete el.dataset.artBand; }
   }
-  function applyPlaceholderArt(el, seedKey){
-    el.style.background = placeholderArtBackground(seedKey);
+  function applyPlaceholderArt(el, seedKey, hint){
+    var spec = coverSpec(seedKey, hint);
+    el.style.background = spec.css;
     el.classList.add('generated-art');
-    // Kept so anything that wants this cover's colour without reading its pixels can
-    // regenerate it from the same seed. A blurred copy of a multi-hue gradient averages out
-    // to grey, which is exactly what the favourite card's band must not be.
+    // Kept so anything that wants this cover's colour without reading its pixels can take it
+    // from here. A blurred copy of a busy cover averages out to grey, which is exactly what
+    // the favourite card's band must not be.
     if(seedKey) el.dataset.artSeed = seedKey;
+    el.dataset.artBand = spec.vivid;
   }
-  // The one colour a generated cover is built around, dark enough to carry white text. Same
-  // seed, same first two draws, so the band and the cover cannot drift apart.
-  function placeholderBandColor(seedKey){
-    if(!seedKey) return '';
-    var rand = mulberry32(seedHash(seedKey));
-    var hue = Math.floor(rand() * 360);
-    rand(); rand();                                  // hueB, hueC -- drawn but not used here
-    var sat = 55 + Math.floor(rand() * 30);
-    // Lighter than it looks: the band darkens it again with brightness() and then a scrim, so
-    // a colour picked to read well flat comes out near-black by the time it is on screen.
-    return accentTint('hsl(' + hue + ',' + sat + '%,46%)', 42);
+  // The one colour a generated cover is built around, dark enough to carry white text once
+  // the band darkens it. Taken from the box when the cover was drawn there (it knows the genre).
+  function placeholderBandColor(seedKey, el){
+    if(el && el.dataset && el.dataset.artBand) return el.dataset.artBand;
+    return seedKey ? coverSpec(seedKey).vivid : '';
   }
 
   // ---------- higher-quality cover art resolution ----------
@@ -16372,8 +16502,9 @@
     if(!entry.url && Date.now() - entry.ts > ART_MISS_TTL_MS) return undefined;
     return entry;
   }
-  function saveArtCacheEntry(key, url){
-    loadArtCache()[key] = { url: url, ts: Date.now() };
+  function saveArtCacheEntry(key, url, w){
+    // v 2 (build 413): remembers how sharp the picture is, so a soft one can be looked at again.
+    loadArtCache()[key] = { url: url, ts: Date.now(), w: w || 0, v: 2 };
     if(artCacheTimer) return;
     artCacheTimer = setTimeout(function(){ artCacheTimer = null; flushArtCache(); }, 300);
   }
@@ -16622,16 +16753,130 @@
     });
   }
 
+  // ---------- best-available station cover (build 413) ----------
+  // The lookup no longer stops at the first picture that loads. It collects the station's
+  // candidates, measures each one, and keeps the sharpest square-ish one: the directory's
+  // favicon and the site's touch icons first; if none is sharp enough, the station's own
+  // web page (touch icons at their real sizes, the web app manifest, the share picture) and a
+  // Wikipedia logo at 600px; the favicon service last.
+  var ART_GOOD_SIZE = 300;           // px (short side): a cover this sharp ends the search
+  var ART_UPGRADE_MS = 7 * 24 * 60 * 60 * 1000; // a soft cover is looked at again after a week
+
+  function probeImageInfo(url, timeoutMs){
+    return new Promise(function(resolve){
+      if(!url){ resolve(null); return; }
+      var img = new Image();
+      var done = false;
+      var timer = setTimeout(function(){
+        if(done) return;
+        done = true;
+        img.onload = img.onerror = null;
+        resolve(null);
+      }, timeoutMs || 5000);
+      img.onload = function(){
+        if(done) return;
+        done = true;
+        clearTimeout(timer);
+        var w = img.naturalWidth, h = img.naturalHeight;
+        resolve((w >= ART_MIN_SIZE && h >= ART_MIN_SIZE) ? { url: url, w: w, h: h } : null);
+      };
+      img.onerror = function(){
+        if(done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(null);
+      };
+      img.referrerPolicy = 'no-referrer';
+      img.src = secureUrl(url);
+    });
+  }
+  // A square-ish picture scores its short side. A banner would be cropped to a slice of
+  // itself, so it only wins when nothing squarer exists.
+  function artScore(info){
+    if(!info) return 0;
+    var lo = Math.min(info.w, info.h), hi = Math.max(info.w, info.h);
+    return (hi / lo <= 1.25) ? lo : lo * 0.25;
+  }
+  function bestOfArt(list){
+    var best = null, bs = 0;
+    list.forEach(function(i){ var s = artScore(i); if(s > bs){ bs = s; best = i; } });
+    return best ? { url: best.url, w: Math.min(best.w, best.h), score: bs } : null;
+  }
+  function betterArt(a, b){
+    if(!a) return b || null;
+    if(!b) return a;
+    return b.score > a.score ? b : a;
+  }
+
+  var ART_NAME_SKIP = /^(radio|fm|am|the|station|stations|network|live|online|hd|stream|music|internet|web|official|channel|and|of)$/i;
+  function artNameTokens(name){
+    return String(name || '').toLowerCase().split(/[^0-9a-z.À-￿]+/).filter(function(w){ return w.length >= 2 && !ART_NAME_SKIP.test(w); });
+  }
+  // The Wikipedia page for a station, by exact title and then by search, at 600px. The page has
+  // to read like a radio page and to share the station's name, or a generic name ("Hits")
+  // would pull in some unrelated page's picture.
   function wikipediaArtUrl(name){
     if(!name) return Promise.resolve(null);
-    var api = 'https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json'
-      + '&pithumbsize=300&origin=*&titles=' + encodeURIComponent(name);
-    return fetch(api).then(function(r){ return r.ok ? r.json() : null; }).then(function(data){
+    var base = 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*'
+      + '&prop=pageimages|pageterms&piprop=thumbnail&pithumbsize=600&pilicense=any&wbptterms=description';
+    var tokens = artNameTokens(name);
+    function pick(data){
       var pages = data && data.query && data.query.pages;
       if(!pages) return null;
-      var page = pages[Object.keys(pages)[0]];
-      return (page && page.thumbnail && page.thumbnail.source) || null;
-    }).catch(function(){ return null; });
+      var list = Object.keys(pages).map(function(k){ return pages[k]; })
+        .sort(function(a, b){ return (a.index || 0) - (b.index || 0); });
+      for(var i = 0; i < list.length; i++){
+        var p = list[i];
+        if(!p || !p.thumbnail || !p.thumbnail.source) continue;
+        var desc = (p.terms && p.terms.description && p.terms.description[0]) || '';
+        var title = String(p.title || '').toLowerCase();
+        var hit = tokens.filter(function(t){ return title.indexOf(t) !== -1; }).length;
+        if(tokens.length && hit / tokens.length >= 0.6 && /radio|station|broadcast|network|\bfm\b|\bam\b|channel|podcast/i.test(desc)) return p.thumbnail.source;
+      }
+      return null;
+    }
+    function get(url){ return fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(pick)['catch'](function(){ return null; }); }
+    return get(base + '&titles=' + encodeURIComponent(name)).then(function(found){
+      if(found) return found;
+      return get(base + '&generator=search&gsrlimit=3&gsrsearch=' + encodeURIComponent(name + ' radio station'));
+    });
+  }
+
+  // Touch icons (with the sizes they declare), the web app manifest's icons and the share
+  // picture of a station's own page. Fetched through the app on the phone (no CORS there).
+  function homepageArtCandidates(homepage){
+    if(!homepage || !/^https?:\/\//i.test(homepage)) return Promise.resolve([]);
+    return fetchTextAny(homepage, 400 * 1024).then(function(html){
+      html = String(html || '');
+      var out = [], manifest = null;
+      function abs(u, b){ try{ return new URL(u, b || homepage).href; }catch(e){ return null; } }
+      (html.match(/<link\b[^>]*>/gi) || []).forEach(function(t){
+        var rel = (/\brel\s*=\s*["']([^"']+)["']/i.exec(t) || [])[1] || '';
+        var href = (/\bhref\s*=\s*["']([^"']+)["']/i.exec(t) || [])[1];
+        var sz = parseInt((/\bsizes\s*=\s*["'](\d+)x\d+/i.exec(t) || [])[1], 10) || 0;
+        if(!href) return;
+        if(/apple-touch-icon/i.test(rel)) out.push({ u: abs(href), s: sz || 180 });
+        else if(/manifest/i.test(rel)) manifest = abs(href);
+        else if(/\bicon\b/i.test(rel) && !/mask/i.test(rel)) out.push({ u: abs(href), s: sz });
+      });
+      (html.match(/<meta\b[^>]*>/gi) || []).forEach(function(t){
+        var prop = (/\b(?:property|name)\s*=\s*["']([^"']+)["']/i.exec(t) || [])[1] || '';
+        var c = (/\bcontent\s*=\s*["']([^"']+)["']/i.exec(t) || [])[1];
+        if(c && /^(og:image|twitter:image)$/i.test(prop)) out.push({ u: abs(c), s: 1 });
+      });
+      var done = manifest ? fetchTextAny(manifest, 100 * 1024).then(function(txt){
+        var j = JSON.parse(txt);
+        (j.icons || []).forEach(function(ic){
+          var s = parseInt(String(ic.sizes || '').split(' ').pop(), 10) || 0;
+          if(ic.src) out.push({ u: abs(ic.src, manifest), s: s });
+        });
+      })['catch'](function(){}) : Promise.resolve();
+      return done.then(function(){
+        var seen = {};
+        return out.filter(function(o){ if(!o.u || seen[o.u]) return false; seen[o.u] = true; return true; })
+          .sort(function(a, b){ return b.s - a.s; }).slice(0, 6).map(function(o){ return o.u; });
+      });
+    })['catch'](function(){ return []; });
   }
 
   function tryArtCandidates(list, idx){
@@ -16639,21 +16884,32 @@
     return probeImage(list[idx]).then(function(ok){ return ok || tryArtCandidates(list, idx + 1); });
   }
 
+  // Resolves to { url, w } (w = the picture's short side in pixels) or null.
   function resolveStationArtNetwork(station){
     var domain = domainFromUrl(station.homepage) || domainFromUrl(station.urlToResolve);
-    var candidates = [];
-    if(station.favicon) candidates.push(station.favicon);
+    var first = [];
+    if(station.favicon) first.push(station.favicon);
     if(domain){
-      candidates.push('https://' + domain + '/apple-touch-icon.png');
-      candidates.push('https://' + domain + '/apple-touch-icon-precomposed.png');
+      first.push('https://' + domain + '/apple-touch-icon.png');
+      first.push('https://' + domain + '/apple-touch-icon-precomposed.png');
     }
-    return tryArtCandidates(candidates, 0).then(function(found){
-      if(found) return found;
-      return wikipediaArtUrl(station.name).then(probeImage);
-    }).then(function(found){
-      if(found) return found;
-      if(!domain) return null;
-      return probeImage('https://www.google.com/s2/favicons?sz=256&domain=' + encodeURIComponent(domain));
+    return Promise.all(first.map(function(u){ return probeImageInfo(u); })).then(function(infos){
+      var best = bestOfArt(infos);
+      if(best && best.score >= ART_GOOD_SIZE) return best;
+      return Promise.all([
+        homepageArtCandidates(station.homepage).then(function(urls){
+          return Promise.all(urls.map(function(u){ return probeImageInfo(u); }));
+        }),
+        wikipediaArtUrl(station.name).then(function(u){ return probeImageInfo(u, 7000); })
+      ]).then(function(r){
+        return bestOfArt(r[0].concat([r[1]]).concat(best ? [{ url: best.url, w: best.w, h: best.w }] : []));
+      });
+    }).then(function(best){
+      if(best && best.score >= 128) return best;
+      if(!domain) return best;
+      return probeImageInfo('https://www.google.com/s2/favicons?sz=256&domain=' + encodeURIComponent(domain)).then(function(g){
+        return betterArt(best, bestOfArt([g]));
+      });
     });
   }
 
@@ -16717,7 +16973,8 @@
     if(container.classList) container.classList.toggle('art-radio', isArtistRadio(station));
     var token = beginArtRender(container);
     var key = favKey(station);
-    applyPlaceholderArt(container, key);
+    var coverHint = coverHintFor(station);
+    applyPlaceholderArt(container, key, coverHint);
     // A channel's logo sits on a plain dark gray rather than a generated colour wash.
     var isCh = isChannelEntry(station);
     if(container.classList) container.classList.toggle('channel-art', isCh);
@@ -16815,17 +17072,36 @@
       // Build 272: a remembered miss still shows the station's own logo when it loads (a broken
       // one just removes itself), rather than going straight to the placeholder.
       paint(cached.url || station.favicon);
+      // Build 413: covers remembered before sharpness was measured, and soft ones after a
+      // week, get one more look. The new picture only replaces the old one if it is sharper.
+      if(cached.v !== 2 || (cached.url && cached.w && cached.w < ART_GOOD_SIZE && Date.now() - cached.ts > ART_UPGRADE_MS)){
+        enqueueArtTask(function(){
+          return Promise.all([cached.url ? probeImageInfo(cached.url) : null, resolveStationArtNetwork(station)]).then(function(r){
+            var cur = r[0] ? Math.min(r[0].w, r[0].h) : 0, res = r[1];
+            var keep = !res || (cached.url && res.url !== cached.url && res.w < cur * 1.25);
+            if(keep){ saveArtCacheEntry(key, cached.url || (res && res.url) || null, cur || (res && res.w) || 0); return; }
+            saveArtCacheEntry(key, res.url, res.w);
+            if(res.url !== cached.url && artRenderCurrent(container, token)){
+              container.innerHTML = '';
+              applyPlaceholderArt(container, key, coverHint);
+              if(isCh) channelLogoBg(container);
+              paint(res.url, true);
+            }
+          });
+        });
+      }
       return;
     }
     if(station.favicon) paint(station.favicon);
     enqueueArtTask(function(){
-      return resolveStationArtNetwork(station).then(function(url){
-        saveArtCacheEntry(key, url);
+      return resolveStationArtNetwork(station).then(function(res){
+        var url = res && res.url;
+        saveArtCacheEntry(key, url, res && res.w);
         // only swap the already-rendered image if this container is still on the page --
         // by the time an async lookup resolves, a filter/search/reload may have replaced it
         if(url && url !== station.favicon && artRenderCurrent(container, token)){
           container.innerHTML = '';
-          applyPlaceholderArt(container, key);
+          applyPlaceholderArt(container, key, coverHint);
           if(isCh) channelLogoBg(container);
           paint(url, true);
         }
@@ -19451,7 +19727,7 @@
       var src = artSourceForTracks(al.tracks) || { name: al.album };
       face.className = 'cf-face';
       face.style.background = '';
-      applyPlaceholderArt(face, favKey(src));
+      applyPlaceholderArt(face, favKey(src), { name: al.album });
       reflImg.style.background = face.style.background;
       requestThumb(al, function(url){
         if(el._album !== al || !url) return;
@@ -20787,7 +21063,7 @@
     // how the first cut of this came out. The seed the cover was drawn from is on the box, so
     // the band is regenerated from it as one flat colour instead.
     wash.style.backgroundImage = 'none';
-    wash.style.backgroundColor = placeholderBandColor(art.dataset.artSeed) || 'var(--panel)';
+    wash.style.backgroundColor = placeholderBandColor(art.dataset.artSeed, art) || 'var(--panel)';
     // The blur and the brightness knock-down exist to turn a photograph into a backdrop.
     // There is no photograph here, so all they do is drain the colour out of the band.
     wash.style.filter = 'none';
@@ -35603,7 +35879,7 @@
     if(container.dataset) container.dataset.artistArt = entry.key;
     var token = beginArtRender(container);
     var key = artistArtKey(entry.key);
-    applyPlaceholderArt(container, key);
+    applyPlaceholderArt(container, key, { name: entry.name });
 
     // `deferred` marks a paint that resolved asynchronously, which must prove it is still
     // the render that owns this box. A synchronous paint must NOT: a tile is built detached
