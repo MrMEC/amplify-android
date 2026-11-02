@@ -1,5 +1,7 @@
 package com.markcoleman.amplify;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
@@ -33,6 +35,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The player the MediaSession sees. It wraps the real ExoPlayer and does three things: - Transport
@@ -73,6 +77,12 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   private Remote remote;
   private boolean resumePending;
   private final Map<Player.Listener, SkipListener> wrapped;
+  // Build 422: the cover of the song on air, looked up here (not by the web page) so the car,
+  // lock screen and notification get it even when the page is asleep or the car started playback.
+  private static final ExecutorService ART_EXEC = Executors.newSingleThreadExecutor();
+  private final Handler artMain = new Handler(Looper.getMainLooper());
+  private String songArtKey;
+  private String songArtUrl;
 
   public interface OnAirListener {
     void onAirChanged(StreamTitle streamTitle);
@@ -311,7 +321,61 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     }
   }
 
+  private void startSongArt() {
+    final StreamTitle song = getOnAir();
+    MediaItem item = getCurrentMediaItem();
+    if (song == null || item == null || song.artist.isEmpty() || song.title.isEmpty()) {
+      this.songArtKey = null;
+      this.songArtUrl = null;
+      return;
+    }
+    final String key = item.mediaId + "|" + song.title + "|" + song.artist;
+    if (key.equals(this.songArtKey)) {
+      return;
+    }
+    this.songArtKey = key;
+    this.songArtUrl = null;
+    ART_EXEC.execute(
+        () -> {
+          final String url = SongCover.find(song.artist, song.title);
+          if (url == null) {
+            return;
+          }
+          this.artMain.post(
+              () -> {
+                if (!key.equals(this.songArtKey)) {
+                  return;
+                }
+                this.songArtUrl = url;
+                notifyMetadataChanged();
+              });
+        });
+  }
+
+  private String songArtNow() {
+    StreamTitle song = getOnAir();
+    MediaItem item = getCurrentMediaItem();
+    if (song == null || item == null || this.songArtUrl == null || this.songArtKey == null) {
+      return null;
+    }
+    return this.songArtKey.equals(item.mediaId + "|" + song.title + "|" + song.artist)
+        ? this.songArtUrl
+        : null;
+  }
+
+  private void notifyMetadataChanged() {
+    MediaMetadata mediaMetadata = getMediaMetadata();
+    Player.Events events = new Player.Events(new FlagSet.Builder().add(14).build());
+    Iterator it = new ArrayList(this.wrapped.values()).iterator();
+    while (it.hasNext()) {
+      SkipListener skipListener = (SkipListener) it.next();
+      skipListener.listener.onMediaMetadataChanged(mediaMetadata);
+      skipListener.listener.onEvents(this, events);
+    }
+  }
+
   private void announceOnAir() {
+    startSongArt();
     MediaMetadata mediaMetadata = getMediaMetadata();
     Player.Events events = new Player.Events(new FlagSet.Builder().add(14).build());
     Iterator it = new ArrayList(this.wrapped.values()).iterator();
@@ -377,6 +441,14 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
           displayTitle.setSubtitle(strJoinDot2).setStation(str2.isEmpty() ? null : str2);
       if (!strJoinDot.isEmpty()) {
         station.setArtist(strJoinDot);
+      }
+      String songArt = songArtNow();
+      if (songArt != null) {
+        android.net.Uri artUri = ArtProvider.uriFor(songArt);
+        if (artUri != null) {
+          station.setArtworkUri(artUri);
+          station.setArtworkData(null, null);
+        }
       }
       return station.build();
     }
