@@ -45704,7 +45704,7 @@
     if(isDisney){
       g.movies = disneyMovies(); g.shows = disneyShows();
       itunesSearchPodcasts('disney', 25).then(function(list){
-        if(genrePage !== g) return;
+        if(genrePage !== g || activeGenre !== tag) return;     // left the page meanwhile: never repaint it
         g.podcasts = (list || []).filter(function(r){ return isDisneyText([r.collectionName, r.artistName].join(' '), false); }).slice(0, 12).map(function(r){
           return { collectionId: r.collectionId, collectionName: r.collectionName, artistName: r.artistName, artworkUrl: r.artworkUrl600 || r.artworkUrl100 || '', feedUrl: r.feedUrl || '' };
         });
