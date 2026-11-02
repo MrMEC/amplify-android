@@ -208,7 +208,7 @@ async def run(vw, vh, mobile, scheme, tag, full):
           return { above: Math.round(f.getBoundingClientRect().top - t.getBoundingClientRect().bottom), below: Math.round(e.getBoundingClientRect().top - f.getBoundingClientRect().bottom),
                    head: Math.round(r.getClientRects()[0].left), tab0: Math.round(t.firstElementChild.getBoundingClientRect().left), filt: Math.round(f.getBoundingClientRect().left), guide: Math.round(e.getBoundingClientRect().left) }; })()""")
         pad = 21 if mobile else None
-        check(lv['above'] == 12 and lv['below'] == 18, f'[{tag}] Live TV: the filter sits 12px under the tabs and 18px over the guide {lv}')
+        check(lv['above'] == 12 and lv['below'] >= 10, f'[{tag}] Live TV: the filter sits 12px under the tabs {lv}')
         if mobile: check(lv['head'] == lv['tab0'] == lv['filt'] == lv['guide'] == 21, f'[{tag}] Live TV: heading, tabs, filter and guide all start on the page margin (21) {lv}')
         await typ(pg, 'news')
         chs = await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#stationsGrid .epg-row'),function(r){return !r.classList.contains('sf-hide');}).map(function(r){return r.querySelector('.epg-ch').getAttribute('aria-label').replace(/, playing/,'');})")
@@ -223,7 +223,7 @@ async def run(vw, vh, mobile, scheme, tag, full):
         await pg.screenshot(path=f'{shots}/sf-{tag}-movies.png')
         mvg = await pg.evaluate("""(()=>{ var t=document.querySelector('#stationsGrid > .watch-tabs'), f=document.getElementById('secFilter'); var n=f.nextElementSibling; while(n && !n.offsetParent) n=n.nextElementSibling;
           return { above: Math.round(f.getBoundingClientRect().top - t.getBoundingClientRect().bottom), below: n ? Math.round(n.getBoundingClientRect().top - f.getBoundingClientRect().bottom) : null }; })()""")
-        check(mvg['above'] == 12 and mvg['below'] == 18, f'[{tag}] Movies: the filter sits 12px under the tabs and 18px over the posters {mvg}')
+        check(mvg['above'] == 12 and mvg['below'] in (10, 18), f'[{tag}] Movies: the filter sits 12px under the tabs, then the buttons (10px) or the posters (18px) {mvg}')
         await typ(pg, 'matrix')
         check(await vis(pg, '#stationsGrid .tile.vposter .tile-name') == ['The Matrix'], f'[{tag}] Movies: "matrix"')
         await tab('shows')

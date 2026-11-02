@@ -2371,8 +2371,7 @@
   /* The rail is fixed, so it does not push anything aside by itself. The column hands it a
      gutter while it is up, rather than letting a strip of letters sit on top of the last
      column of covers. */
-  body.az-on .main{ padding-right:38px; }
-  @media (min-width: 901px){ body.az-on .main{ padding-right:60px; } }
+  /* Build 408 (Mark): no gutter for the A-Z rail any more; it shows only while scrolling, over the page. */
   .az-rail{
     position:fixed; right:var(--az-right); z-index:30;
     top:96px; bottom:124px;
@@ -3973,9 +3972,7 @@
   .tile-grid > .mv-row{ grid-column:1/-1; }
   /* Three artists across on a phone (as in the mockup), with room for the A to Z rail. */
   @media (max-width: 900px){
-    .tile-grid.mv-grid, .tile-grid.grid-artists{ grid-template-columns:repeat(3, minmax(0, 1fr)); column-gap:14px; padding-right:14px; }
-    .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .mv-recent, .tile-grid.mv-grid > .grid-section-label,
-    .tile-grid.mv-grid > .mv-artists-head{ margin-right:-14px; }
+    .tile-grid.mv-grid, .tile-grid.grid-artists{ grid-template-columns:repeat(3, minmax(0, 1fr)); column-gap:14px; }   /* build 408: no rail gutter */
     .tile-grid.mv-grid .tile.mv-artist .tile-name{ font-size:13px; }
   }
   .mv-row .vep-thumb{ position:relative; }
@@ -7081,16 +7078,26 @@
   body.sf-filtering .lib-fav-block{ display:none; }
   /* Build 406 (Mark): on the Library tabs the count and the page's buttons sit under the filter, so the
      "Library" heading has the top to itself. The header's own copies stay hidden there. */
-  body:has(#stationsGrid > .lib-tabs):not(.album-open):not(.artist-open) #sectionHeadingRow .section-heading-right{ display:none !important; }
-  .tile-grid > .lib-toolbar{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px;
-    margin:0 0 calc(14px - var(--lib-rg, 0px)) !important; }
-  .lib-toolbar-count{ font-size:13px; font-weight:600; color:var(--text-dim); white-space:nowrap; }
-  .lib-toolbar-btns{ display:flex; align-items:center; gap:8px; margin-left:auto; }
-  .lib-toolbar-btns > button{ margin:0 !important; }
+  .page-toolbar{ display:flex; align-items:center; min-height:40px; margin:0 0 14px; }
+  .page-toolbar[hidden]{ display:none !important; }
+  .tile-grid > .page-toolbar{ grid-column:1/-1; margin:0 0 calc(14px - var(--lib-rg, 0px)) !important; }
+  .page-toolbar > .section-heading-right{ flex:1 1 auto; min-width:0; margin:0 !important; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .page-toolbar #resultCount{ margin-right:auto; font-size:13px; font-weight:600; color:var(--text-dim); white-space:nowrap; }
   /* Build 407 (Mark): the A-Z rail stays out of sight until the page is scrolled, fades in, and fades
      out again a moment after scrolling (or a drag along it) stops. */
   .az-rail{ opacity:0; pointer-events:none; transition:opacity .25s ease; }
   body.az-show .az-rail{ opacity:1; pointer-events:auto; }
+  /* Build 408 (Mark): Favorite Artists on the Artists tab show no star; taking one off is done in Edit. */
+  .lib-fav-row .tile-fav, .lib-fav-row .tile-fav-btn, .lib-fav-row .tile-star{ display:none !important; }
+  /* Build 408 (Mark: spacing should match from page to page): Podcasts' Latest list is spaced like Songs
+     (rows 4px apart, 10px under a heading, 26px before the next), and Music Videos' sections sit 28px
+     apart with 10px between a heading and what it heads. */
+  #stationsGrid:has(> .podcast-date-row){ row-gap:4px !important; }
+  #stationsGrid > .podcast-date-heading{ margin-top:22px !important; margin-bottom:20px !important; }
+  #stationsGrid > .podcast-date-heading:first-child{ margin-top:0 !important; }
+  .tile-grid.mv-grid{ row-gap:18px !important; }
+  .tile-grid.mv-grid > .grid-section-label, .tile-grid.mv-grid > .mv-artists-head{ margin-top:10px !important; margin-bottom:-8px !important; }
+  .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .artist-videos{ margin-top:0 !important; margin-bottom:0 !important; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -21855,6 +21862,11 @@
 
   function setFavoriteArtistsEditing(on){
     favArtistsEditing = on;
+    // Build 408 (Mark): no A-Z rail while the list is being edited; Done puts the page (and rail) back.
+    if(activeLibrarySection === 'artists' && !activeArtistKey && !activeAlbumKey){
+      if(on) hideAzRail();
+      else { renderArtistsView(); return; }
+    }
     var old = stationsGrid.querySelector('.fav-artists-block');
     // The page may have been navigated away from between the button being wired up and being
     // pressed (it isn't removed from the DOM until the next render); nothing to refresh then.
@@ -29834,7 +29846,7 @@
     stationsGrid.insertBefore(bar, stationsGrid.firstChild);
     // Every tab gets the same space under the tabs and the filter, whatever its grid's own row gap.
     stationsGrid.style.setProperty('--lib-rg', (parseFloat(getComputedStyle(stationsGrid).rowGap) || 0) + 'px');
-    libToolbar(bar);
+    ensureToolbar();
     // The active tab in view when the row scrolls.
     var on = bar.querySelector('.active');
     if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
@@ -29847,43 +29859,68 @@
       libraryShuffleBtn.style.display = '';
     }
   }
-  // Build 406: the count and the buttons from the header, mirrored in a row under the filter (each
-  // button presses the real one, so everything they do stays where it is).
-  var libToolbarObs = null;
-  function libToolbar(tabsBar){
-    var right = sectionHeadingRow.querySelector('.section-heading-right');
-    if(!right) return;
-    var tb = document.createElement('div');
-    tb.className = 'lib-toolbar';
-    var count = document.createElement('span');
-    count.className = 'lib-toolbar-count';
-    var btns = document.createElement('div');
-    btns.className = 'lib-toolbar-btns';
-    tb.appendChild(count); tb.appendChild(btns);
-    var after = tabsBar.nextElementSibling && tabsBar.nextElementSibling.classList.contains('gb-find') ? tabsBar.nextElementSibling : tabsBar;
-    stationsGrid.insertBefore(tb, after.nextSibling);
-    function sync(){
-      if(!tb.isConnected){ if(libToolbarObs){ libToolbarObs.disconnect(); libToolbarObs = null; } return; }
-      var rc = document.getElementById('resultCount');
-      count.textContent = rc && rc.style.display !== 'none' ? rc.textContent : '';
-      btns.innerHTML = '';
-      Array.prototype.forEach.call(right.children, function(el){
-        if(el.id === 'resultCount' || el.tagName !== 'BUTTON' || el.style.display === 'none' || el.hidden) return;
-        var c = el.cloneNode(true);
-        c.removeAttribute('id');
-        c.dataset.mirrorOf = el.id;
-        c.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); el.click(); });
-        btns.appendChild(c);
-      });
-      tb.hidden = !count.textContent && !btns.children.length;
-      if(window.__sfTune) window.__sfTune();
-    }
-    if(libToolbarObs) libToolbarObs.disconnect();
-    libToolbarObs = new MutationObserver(function(){ clearTimeout(sync._t); sync._t = setTimeout(sync, 30); });
-    libToolbarObs.observe(right, { subtree: true, childList: true, attributes: true, characterData: true, attributeFilter: ['style', 'class', 'hidden', 'aria-pressed', 'title'] });
-    sync();
-    setTimeout(sync, 0);
+  // ---------- Build 408 (Mark): the page's count and buttons under the filter ----------
+  // On the Library tabs, the Watch tabs and Podcasts the header keeps only its heading (and the
+  // profile button): the real group of count and buttons moves into a row under the filter (or
+  // under the tabs when there is none), so every button, menus included, works as it did. It goes
+  // back into the header for every other page, and before the page's content is ever cleared.
+  var hdrRight = sectionHeadingRow.querySelector('.section-heading-right');
+  var hdrRightNext = hdrRight ? hdrRight.nextSibling : null;
+  function rescueHdrRight(){
+    if(!hdrRight || hdrRight.parentNode === sectionHeadingRow) return;
+    var tb = hdrRight.parentNode;
+    sectionHeadingRow.insertBefore(hdrRight, hdrRightNext && hdrRightNext.parentNode === sectionHeadingRow ? hdrRightNext : null);
+    if(tb && tb.classList && tb.classList.contains('page-toolbar')) tb.remove();
   }
+  (function(){
+    var desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    if(!desc || !desc.set) return;
+    Object.defineProperty(stationsGrid, 'innerHTML', {
+      configurable: true,
+      get: function(){ return desc.get.call(this); },
+      set: function(v){ if(hdrRight && stationsGrid.contains(hdrRight)) rescueHdrRight(); desc.set.call(this, v); }
+    });
+  })();
+  function toolbarAnchor(){
+    var cls = document.body.classList;
+    if(cls.contains('album-open') || cls.contains('artist-open') || cls.contains('vdetail-open') || cls.contains('search-view')) return null;
+    function after(el){ var n = el.nextElementSibling; while(n && n.classList.contains('page-toolbar')) n = n.nextElementSibling; return n && (n.classList.contains('sec-filter') || n.classList.contains('gb-find')) && getComputedStyle(n).display !== 'none' ? n : el; }
+    var lt = stationsGrid.querySelector(':scope > .lib-tabs');
+    if(lt) return { parent: stationsGrid, after: after(lt) };
+    if(typeof onVideoView !== 'undefined' && onVideoView && !onVideoDetailView){
+      var wt = stationsGrid.querySelector(':scope > .watch-tabs');
+      if(wt) return { parent: stationsGrid, after: after(wt) };
+    }
+    if(onPodcastsView && !activeShowCollectionId){
+      var pt = document.getElementById('podcastTabs');
+      if(pt && pt.offsetParent) return { parent: pt.parentNode, after: after(pt) };
+    }
+    return null;
+  }
+  var tbBusy = false;
+  function ensureToolbar(){
+    if(!hdrRight || tbBusy) return;
+    tbBusy = true;
+    try{
+      var anc = toolbarAnchor();
+      if(!anc){ rescueHdrRight(); return; }
+      var tb = hdrRight.parentNode && hdrRight.parentNode.classList && hdrRight.parentNode.classList.contains('page-toolbar') ? hdrRight.parentNode : null;
+      if(!tb){ tb = document.createElement('div'); tb.className = 'page-toolbar lib-toolbar'; tb.appendChild(hdrRight); }
+      if(anc.after.nextSibling !== tb) anc.parent.insertBefore(tb, anc.after.nextSibling);
+      tb.hidden = !Array.prototype.some.call(hdrRight.children, function(el){ return !el.hidden && el.style.display !== 'none' && getComputedStyle(el).display !== 'none'; });
+      if(anc.parent === stationsGrid) stationsGrid.style.setProperty('--lib-rg', (parseFloat(getComputedStyle(stationsGrid).rowGap) || 0) + 'px');
+      if(window.__sfTune) window.__sfTune();
+    } finally { tbBusy = false; }
+  }
+  (function(){
+    var t = 0;
+    function soon(){ if(!t) t = setTimeout(function(){ t = 0; ensureToolbar(); }, 30); }
+    new MutationObserver(soon).observe(stationsGrid, { childList: true });
+    var bv = document.getElementById('browseView');
+    if(bv) new MutationObserver(soon).observe(bv, { childList: true });
+    if(hdrRight) new MutationObserver(soon).observe(hdrRight, { subtree: true, attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
+    new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  })();
   // Favorite Artists on the Artists tab: a sideways row of circles above the A-Z of every artist.
   // Edit switches to the list that can be rearranged, as before.
   function buildFavArtistsRow(){
@@ -38704,6 +38741,7 @@
     function hideSoon(ms){ clearTimeout(timer); timer = setTimeout(function(){ if(!holding) document.body.classList.remove('az-show'); }, ms); }
     window.addEventListener('scroll', function(){
       if(azRail.style.display === 'none' || !azRail.children.length) return;
+      if(window.scrollY <= 4 && !holding){ clearTimeout(timer); document.body.classList.remove('az-show'); return; }   // build 408: gone at the top
       document.body.classList.add('az-show');
       hideSoon(1600);
     }, { passive: true });
@@ -49056,7 +49094,7 @@
           if(first){
             var gapB = first.getBoundingClientRect().top - bar.getBoundingClientRect().bottom;
             var mb = parseFloat(getComputedStyle(bar).marginBottom) || 0;
-            bar.style.setProperty('margin-bottom', (mb + 18 - gapB) + 'px', 'important');
+            bar.style.setProperty('margin-bottom', (mb + (first.classList.contains('page-toolbar') ? 10 : 18) - gapB) + 'px', 'important');
           }
         }
         return;
@@ -49068,7 +49106,7 @@
       var next = bar.nextElementSibling;
       while(next && !next.offsetParent) next = next.nextElementSibling;
       var nextMt = next ? (parseFloat(getComputedStyle(next).marginTop) || 0) : 0;
-      bar.style.setProperty('margin-bottom', ((next && next.classList.contains('lib-toolbar') ? 10 : 18) - rg - nextMt) + 'px', 'important');
+      bar.style.setProperty('margin-bottom', ((next && next.classList.contains('page-toolbar') ? 10 : 18) - rg - nextMt) + 'px', 'important');
     }
     window.__sfTune = tune;
     function place(ctx){

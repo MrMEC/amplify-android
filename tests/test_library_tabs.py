@@ -68,10 +68,11 @@ LT = """(()=>{ var g = document.getElementById('stationsGrid'), bar = g.querySel
     favRow: Array.from(g.querySelectorAll('.lib-fav-row > .tile .tile-name')).map(function(e){ return e.textContent; }),
     favRowScroll: (function(){ var r = g.querySelector('.lib-fav-row'); return r ? getComputedStyle(r).overflowX : null; })(),
     allHead: !!g.querySelector('.lib-all-head'), gridArtists: g.querySelectorAll(':scope > .tile[data-entity="artist"]').length,
-    rightHidden: getComputedStyle(document.querySelector('#sectionHeadingRow .section-heading-right')).display === 'none',
-    toolbar: (function(){ var tb = g.querySelector(':scope > .lib-toolbar'); if(!tb || tb.hidden) return null; var f = g.querySelector(':scope > .sec-filter, :scope > .gb-find');
-      return { count: tb.querySelector('.lib-toolbar-count').textContent, btns: Array.from(tb.querySelectorAll('.lib-toolbar-btns > button')).map(function(b){ return b.dataset.mirrorOf; }),
+    rightHidden: !document.querySelector('#sectionHeadingRow .section-heading-right'),
+    toolbar: (function(){ var tb = document.querySelector('.page-toolbar'); if(!tb || tb.hidden) return null; var f = g.querySelector(':scope > .sec-filter, :scope > .gb-find'); var rc = tb.querySelector('#resultCount');
+      return { count: rc && rc.style.display !== 'none' ? rc.textContent : '', btns: Array.from(tb.querySelectorAll('button')).filter(function(b){ return b.offsetParent; }).map(function(b){ return b.id; }),
         afterFilter: !!f && (f.compareDocumentPosition(tb) & 4) !== 0, gap: f ? Math.round(tb.getBoundingClientRect().top - f.getBoundingClientRect().bottom) : null }; })(),
+    favStars: Array.from(g.querySelectorAll('.lib-fav-row .tile-fav')).filter(function(b){ return b.offsetParent; }).length,
     headW: (function(){ var h = document.getElementById('stationsHeading'); return [h.scrollWidth, h.clientWidth]; })(),
     gapTF: (function(){ var f = bar && bar.nextElementSibling; return f ? Math.round(f.getBoundingClientRect().top - bar.getBoundingClientRect().bottom) : null; })(),
     tabLeft: (function(){ var a = bar && bar.firstElementChild; return a ? Math.round(a.getBoundingClientRect().left) : null; })(), barLeft: bar ? Math.round(bar.getBoundingClientRect().left) : null,
@@ -107,7 +108,15 @@ async def run(b, scheme, w, h):
     check(r['filterAfter'], f'{T} the filter box sits right under the tabs')
     check(r['rightHidden'] and r['toolbar'] and r['toolbar']['count'] == '3 artists' and 'libraryShuffleBtn' in r['toolbar']['btns'] and r['toolbar']['afterFilter'] and r['toolbar']['gap'] == 10, f'{T} build 406: the count and buttons sit under the filter, not in the header {r["toolbar"]}')
     check(r['headW'][0] <= r['headW'][1] + 1, f'{T} "Library" shows whole at the top {r["headW"]}')
-    await pg.evaluate("document.querySelector('.lib-toolbar [data-mirror-of=libraryShuffleBtn]').click()"); await pg.wait_for_timeout(1200)
+    check(r['favStars'] == 0, f'{T} build 408: no stars on the Favorite Artists row')
+    await pg.evaluate("document.querySelector('.fav-artists-edit').click()"); await pg.wait_for_timeout(500)
+    ed = await pg.evaluate("({ az: getComputedStyle(document.getElementById('azRail')).display, trash: document.querySelectorAll('.fav-remove-btn').length })")
+    await pg.evaluate("window.scrollBy(0, 300)"); await pg.wait_for_timeout(300)
+    ed2 = await pg.evaluate("document.body.classList.contains('az-show')")
+    check(ed['az'] == 'none' and not ed2 and ed['trash'] == 2, f'{T} editing Favorite Artists: no A-Z rail, each can be removed {ed} {ed2}')
+    await pg.evaluate("window.scrollTo(0,0)"); await pg.evaluate("document.querySelector('.fav-artists-edit').click()"); await pg.wait_for_timeout(600)
+    check((await pg.evaluate(LT))['favRow'] == ['Ann', 'Bob'], f'{T} Done puts the row back')
+    await pg.evaluate("document.querySelector('.page-toolbar #libraryShuffleBtn').click()"); await pg.wait_for_timeout(1200)
     q = await pg.evaluate('__t.q()')
     check(q['cur'] and q['label'] == 'Library', f'{T} the Shuffle button under the filter shuffles the library {q["label"]} {q["cur"]}')
     await pg.evaluate("__t.ev('closeNowPlaying()')"); await pg.wait_for_timeout(500)
@@ -129,8 +138,14 @@ async def run(b, scheme, w, h):
     check(len(set(gaps)) == 1 and gaps[0] == 12, f'{T} the same 12px between the tabs and the filter on every tab {gaps}')
     # the last tab is remembered
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1200)
-    wb = await pg.evaluate("({ right: getComputedStyle(document.querySelector('#sectionHeadingRow .section-heading-right')).display, add: getComputedStyle(document.getElementById('videoAddHeaderBtn')).display })")
-    check(wb['right'] != 'none' and wb['add'] != 'none', f'{T} leaving the Library, Watch keeps its header buttons {wb}')
+    wb = await pg.evaluate("({ inBar: !!document.querySelector('.page-toolbar #videoAddHeaderBtn'), add: getComputedStyle(document.getElementById('videoAddHeaderBtn')).display, hdr: !document.querySelector('#sectionHeadingRow .section-heading-right') })")
+    check(wb['inBar'] and wb['add'] != 'none' and wb['hdr'], f'{T} build 408: Watch puts its buttons under the filter too {wb}')
+    await pg.evaluate("__t.ev('openPodcastsHome()')"); await pg.wait_for_timeout(1000)
+    pb = await pg.evaluate("({ inBar: !!document.querySelector('.page-toolbar #podcastAddHeaderBtn'), hdr: !document.querySelector('#sectionHeadingRow .section-heading-right') })")
+    check(pb['inBar'] and pb['hdr'], f'{T} build 408: and so does Podcasts {pb}')
+    await pg.evaluate("__t.ev('loadTopStations()')"); await pg.wait_for_timeout(800)
+    hb = await pg.evaluate("({ back: !!document.querySelector('#sectionHeadingRow .section-heading-right'), bars: document.querySelectorAll('.page-toolbar').length })")
+    check(hb['back'] and hb['bars'] == 0, f'{T} on Home the buttons are back in the header and no toolbar is left behind {hb}')
     await pg.evaluate("__t.ev('loadTopStations()')"); await pg.wait_for_timeout(600)
     await lib(pg)
     check((await pg.evaluate(LT))['active'] == 'Genres', f'{T} the Library reopens on the last tab used')
@@ -156,6 +171,10 @@ async def run(b, scheme, w, h):
         f0 = await pg.evaluate("({ shown: document.body.classList.contains('az-show'), op: getComputedStyle(document.getElementById('azRail')).opacity, disp: getComputedStyle(document.getElementById('azRail')).display })")
         await pg.mouse.wheel(0, 600); await pg.evaluate("window.scrollBy(0, 400)"); await pg.wait_for_timeout(400)
         f1 = await pg.evaluate("({ shown: document.body.classList.contains('az-show'), op: getComputedStyle(document.getElementById('azRail')).opacity })")
+        await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(350)
+        ftop = await pg.evaluate("document.body.classList.contains('az-show')")
+        check(not ftop, f'{T} back at the top the rail goes at once')
+        await pg.evaluate("window.scrollBy(0, 500)"); await pg.wait_for_timeout(200)
         await pg.wait_for_timeout(2300)
         f2 = await pg.evaluate("({ shown: document.body.classList.contains('az-show'), op: getComputedStyle(document.getElementById('azRail')).opacity })")
         check(f0['disp'] != 'none' and not f0['shown'] and f0['op'] == '0' and f1['shown'] and f1['op'] == '1' and not f2['shown'] and f2['op'] == '0', f'{T} the A-Z rail is hidden until scrolling, fades in, then fades out {f0} {f1} {f2}')
