@@ -1222,6 +1222,11 @@
   .tile:hover .tile-art{ filter:brightness(1.08); box-shadow:0 6px 18px rgba(0,0,0,.4); }
   .tile.playing .tile-art{ outline:3px solid var(--accent); outline-offset:2px; }
   .tile-art img{ width:100%; height:100%; object-fit:cover; display:block; max-width:none; }
+  /* Build 414: a small or wide station logo sits whole and crisp in the middle of a blurred,
+     enlarged copy of itself, rather than being stretched across the cover. */
+  .art-soft{ position:relative; overflow:hidden; }
+  .art-soft::before{ content:''; position:absolute; inset:-25%; background:var(--soft-src) center / cover no-repeat; filter:blur(16px) saturate(1.5) brightness(.85); pointer-events:none; }
+  .art-soft > img{ position:absolute !important; left:14%; top:14%; width:72% !important; height:72% !important; object-fit:contain !important; max-width:none; border-radius:10%; filter:drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
   .tile-name{
     margin-top:9px; font-size:10px; font-weight:normal; text-align:left; color:var(--text);
     overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
@@ -16759,6 +16764,14 @@
   // favicon and the site's touch icons first; if none is sharp enough, the station's own
   // web page (touch icons at their real sizes, the web app manifest, the share picture) and a
   // Wikipedia logo at 600px; the favicon service last.
+  var ART_SOFT_PX = 220;             // px (short side): below this a station logo gets the blurred backdrop
+  function softenArt(container, img){
+    var w = img.naturalWidth, h = img.naturalHeight, lo = Math.min(w, h), hi = Math.max(w, h);
+    var soft = lo > 0 && (lo < ART_SOFT_PX || hi / lo > 1.3);
+    container.classList.toggle('art-soft', soft);
+    if(soft) container.style.setProperty('--soft-src', 'url("' + String(img.currentSrc || img.src).replace(/"/g, '\\"') + '")');
+    else container.style.removeProperty('--soft-src');
+  }
   var ART_GOOD_SIZE = 300;           // px (short side): a cover this sharp ends the search
   var ART_UPGRADE_MS = 7 * 24 * 60 * 60 * 1000; // a soft cover is looked at again after a week
 
@@ -16972,6 +16985,8 @@
     if(container.dataset && container.dataset.artistArt) delete container.dataset.artistArt;
     if(container.classList) container.classList.toggle('art-radio', isArtistRadio(station));
     var token = beginArtRender(container);
+    if(container.classList) container.classList.remove('art-soft');
+    var softOK = false;      // set below, for a station's own logo only
     var key = favKey(station);
     var coverHint = coverHintFor(station);
     applyPlaceholderArt(container, key, coverHint);
@@ -16988,10 +17003,12 @@
       if(deferred && !artRenderCurrent(container, token)) return;
       var previous = container.querySelector('img');
       if(previous) previous.remove();
+      if(softOK) container.classList.remove('art-soft');
       var img = document.createElement('img');
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
-      img.onerror = function(){ img.remove(); };
+      img.onerror = function(){ img.remove(); if(softOK) container.classList.remove('art-soft'); };
+      if(softOK) img.onload = function(){ if(img.parentNode === container) softenArt(container, img); };
       img.src = secureUrl(url);
       container.appendChild(img);
     }
@@ -17067,6 +17084,7 @@
       return;
     }
 
+    softOK = !isCh;
     var cached = getArtCacheEntry(key);
     if(cached !== undefined){
       // Build 272: a remembered miss still shows the station's own logo when it loads (a broken

@@ -29,7 +29,11 @@ def png(name, w, h):
     path = f'{ROOT}/{name}'
     subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', f'color=c=0xff8800:s={w}x{h}', '-frames:v', '1', path], check=True)
     return open(path, 'rb').read()
-PNGS = {'fav32.png': png('fav32.png', 32, 32), 'touch180.png': png('touch180.png', 180, 180), 'icon512.png': png('icon512.png', 512, 512),
+def tpng(name, w, h):
+    path = f'{ROOT}/{name}'
+    subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', f'testsrc2=size={w}x{h}', '-frames:v', '1', path], check=True)
+    return open(path, 'rb').read()
+PNGS = {'logo64.png': tpng('logo64.png', 64, 64), 'logo180.png': tpng('logo180.png', 180, 180), 'cover512.png': tpng('cover512.png', 512, 512), 'wide.png': tpng('wide.png', 600, 200),'fav32.png': png('fav32.png', 32, 32), 'touch180.png': png('touch180.png', 180, 180), 'icon512.png': png('icon512.png', 512, 512),
         'banner.png': png('banner.png', 1200, 630), 'wiki600.png': png('wiki600.png', 600, 600), 'tiny16.png': png('tiny16.png', 16, 16)}
 HOME = '<html><head><link rel="apple-touch-icon" sizes="180x180" href="/touch180.png"><link rel="manifest" href="/site.webmanifest"><meta property="og:image" content="/banner.png"></head></html>'
 MANI = json.dumps({'icons': [{'src': '/touch180.png', 'sizes': '180x180'}, {'src': '/icon512.png', 'sizes': '512x512'}]})
@@ -110,6 +114,17 @@ async def main():
         check(src.endswith('icon512.png'), f'the tile upgrades to the 512px cover {src}')
         cache = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerArtCache')||'{}')")
         print(cache)
+        # 4. small and wide logos sit on a blurred backdrop; a sharp square cover fills the tile
+        await pg.evaluate("""()=>{ var d=document.createElement('div'); d.id='softsheet';
+          d.style.cssText='position:fixed;inset:0;z-index:99999;background:#101014;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;padding:16px;align-content:start';
+          document.body.appendChild(d);
+          [['64px logo','logo64.png'],['180px logo','logo180.png'],['512px cover','cover512.png'],['wide banner','wide.png']].forEach(function(a,i){
+            var w=document.createElement('div'); w.innerHTML='<div class="tile-art"></div><div style="color:#ccc;font:12px sans-serif;margin-top:4px">'+a[0]+'</div>'; d.appendChild(w);
+            window.__cv.render(w.firstChild, {name:a[0], urlToResolve:'https://a.radio.example/s'+i, stationuuid:'soft'+i, tags:'pop', favicon:'https://a.radio.example/'+a[1]}); }); }""")
+        await pg.wait_for_timeout(1500)
+        cls = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#softsheet .tile-art'), function(e){ return e.classList.contains('art-soft'); })")
+        check(cls == [True, True, False, True], f'small and wide logos are soft, the 512px cover is not {cls}')
+        await pg.screenshot(path=f'{SHOTS}/covers-soft.png')
         await b.close()
     print('FAILS:', fails)
 asyncio.run(main())
