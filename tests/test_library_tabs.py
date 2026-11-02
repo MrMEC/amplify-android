@@ -68,6 +68,11 @@ LT = """(()=>{ var g = document.getElementById('stationsGrid'), bar = g.querySel
     favRow: Array.from(g.querySelectorAll('.lib-fav-row > .tile .tile-name')).map(function(e){ return e.textContent; }),
     favRowScroll: (function(){ var r = g.querySelector('.lib-fav-row'); return r ? getComputedStyle(r).overflowX : null; })(),
     allHead: !!g.querySelector('.lib-all-head'), gridArtists: g.querySelectorAll(':scope > .tile[data-entity="artist"]').length,
+    rightHidden: getComputedStyle(document.querySelector('#sectionHeadingRow .section-heading-right')).display === 'none',
+    toolbar: (function(){ var tb = g.querySelector(':scope > .lib-toolbar'); if(!tb || tb.hidden) return null; var f = g.querySelector(':scope > .sec-filter, :scope > .gb-find');
+      return { count: tb.querySelector('.lib-toolbar-count').textContent, btns: Array.from(tb.querySelectorAll('.lib-toolbar-btns > button')).map(function(b){ return b.dataset.mirrorOf; }),
+        afterFilter: !!f && (f.compareDocumentPosition(tb) & 4) !== 0, gap: f ? Math.round(tb.getBoundingClientRect().top - f.getBoundingClientRect().bottom) : null }; })(),
+    headW: (function(){ var h = document.getElementById('stationsHeading'); return [h.scrollWidth, h.clientWidth]; })(),
     gapTF: (function(){ var f = bar && bar.nextElementSibling; return f ? Math.round(f.getBoundingClientRect().top - bar.getBoundingClientRect().bottom) : null; })(),
     tabLeft: (function(){ var a = bar && bar.firstElementChild; return a ? Math.round(a.getBoundingClientRect().left) : null; })(), barLeft: bar ? Math.round(bar.getBoundingClientRect().left) : null,
     sw: document.documentElement.scrollWidth, vw: innerWidth }; })()"""
@@ -100,6 +105,12 @@ async def run(b, scheme, w, h):
     check(r['heading'] == 'Library' and not r['back'], f'{T} headed Library, no back button')
     check(r['favRow'] == ['Ann', 'Bob'] and r['favRowScroll'] == 'auto' and r['allHead'] and r['gridArtists'] == 3, f'{T} Favorite Artists as a sideways row above All Artists {r["favRow"]} {r["gridArtists"]}')
     check(r['filterAfter'], f'{T} the filter box sits right under the tabs')
+    check(r['rightHidden'] and r['toolbar'] and r['toolbar']['count'] == '3 artists' and 'libraryShuffleBtn' in r['toolbar']['btns'] and r['toolbar']['afterFilter'] and r['toolbar']['gap'] == 10, f'{T} build 406: the count and buttons sit under the filter, not in the header {r["toolbar"]}')
+    check(r['headW'][0] <= r['headW'][1] + 1, f'{T} "Library" shows whole at the top {r["headW"]}')
+    await pg.evaluate("document.querySelector('.lib-toolbar [data-mirror-of=libraryShuffleBtn]').click()"); await pg.wait_for_timeout(1200)
+    q = await pg.evaluate('__t.q()')
+    check(q['cur'] and q['label'] == 'Library', f'{T} the Shuffle button under the filter shuffles the library {q["label"]} {q["cur"]}')
+    await pg.evaluate("__t.ev('closeNowPlaying()')"); await pg.wait_for_timeout(500)
     check(r['barLeft'] == 0 and r['tabLeft'] == 21, f'{T} the tab row runs to the screen edge and the first tab lines up with the page margin ({r["barLeft"]}, {r["tabLeft"]})')
     check(r['sw'] <= r['vw'], f'{T} nothing scrolls sideways')
     await pg.screenshot(path=f'{shots}/libtabs-artists-{scheme}-{w}.png')
@@ -112,6 +123,9 @@ async def run(b, scheme, w, h):
         await pg.screenshot(path=f'{shots}/libtabs-{tab}-{scheme}-{w}.png')
     check(len(set(gaps)) == 1 and gaps[0] == 12, f'{T} the same 12px between the tabs and the filter on every tab {gaps}')
     # the last tab is remembered
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1200)
+    wb = await pg.evaluate("({ right: getComputedStyle(document.querySelector('#sectionHeadingRow .section-heading-right')).display, add: getComputedStyle(document.getElementById('videoAddHeaderBtn')).display })")
+    check(wb['right'] != 'none' and wb['add'] != 'none', f'{T} leaving the Library, Watch keeps its header buttons {wb}')
     await pg.evaluate("__t.ev('loadTopStations()')"); await pg.wait_for_timeout(600)
     await lib(pg)
     check((await pg.evaluate(LT))['active'] == 'Genres', f'{T} the Library reopens on the last tab used')

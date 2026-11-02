@@ -199,6 +199,14 @@ async def run(vw, vh, mobile, scheme, tag, full):
         check(i and i['inGrid'] and i['ph'] == 'Filter channels' and not i['focused'] and await pg.evaluate("document.getElementById('secFilter').previousElementSibling.classList.contains('watch-tabs')"),
               f'[{tag}] Live TV: box right under the tabs {i}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-livetv.png')
+        # Build 406: 12px under the tabs, 18px over the guide; Live TV starts on the page margin like the other tabs
+        lv = await pg.evaluate("""(()=>{ var t=document.querySelector('#stationsGrid > .watch-tabs'), f=document.getElementById('secFilter'), e=document.querySelector('#stationsGrid > .epg');
+          var h=document.getElementById('stationsHeading'), r=document.createRange(); r.selectNodeContents(h);
+          return { above: Math.round(f.getBoundingClientRect().top - t.getBoundingClientRect().bottom), below: Math.round(e.getBoundingClientRect().top - f.getBoundingClientRect().bottom),
+                   head: Math.round(r.getClientRects()[0].left), tab0: Math.round(t.firstElementChild.getBoundingClientRect().left), filt: Math.round(f.getBoundingClientRect().left), guide: Math.round(e.getBoundingClientRect().left) }; })()""")
+        pad = 21 if mobile else None
+        check(lv['above'] == 12 and lv['below'] == 18, f'[{tag}] Live TV: the filter sits 12px under the tabs and 18px over the guide {lv}')
+        if mobile: check(lv['head'] == lv['tab0'] == lv['filt'] == lv['guide'] == 21, f'[{tag}] Live TV: heading, tabs, filter and guide all start on the page margin (21) {lv}')
         await typ(pg, 'news')
         chs = await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#stationsGrid .epg-row'),function(r){return !r.classList.contains('sf-hide');}).map(function(r){return r.querySelector('.epg-ch').getAttribute('aria-label').replace(/, playing/,'');})")
         check(sorted(chs) == ['ABC News Live', 'BBC News'], f'[{tag}] Live TV: "news" leaves two channels {chs}')
@@ -210,6 +218,9 @@ async def run(vw, vh, mobile, scheme, tag, full):
         check(i and i['inGrid'] and i['ph'] == 'Filter movies' and not await pg.evaluate("document.getElementById('secFilterInput').value"), f'[{tag}] Movies: its own, emptied box {i}')
         mv = await vis(pg, '#stationsGrid .tile.vposter .tile-name'); print(mv)
         await pg.screenshot(path=f'{shots}/sf-{tag}-movies.png')
+        mvg = await pg.evaluate("""(()=>{ var t=document.querySelector('#stationsGrid > .watch-tabs'), f=document.getElementById('secFilter'); var n=f.nextElementSibling; while(n && !n.offsetParent) n=n.nextElementSibling;
+          return { above: Math.round(f.getBoundingClientRect().top - t.getBoundingClientRect().bottom), below: n ? Math.round(n.getBoundingClientRect().top - f.getBoundingClientRect().bottom) : null }; })()""")
+        check(mvg['above'] == 12 and mvg['below'] == 18, f'[{tag}] Movies: the filter sits 12px under the tabs and 18px over the posters {mvg}')
         await typ(pg, 'matrix')
         check(await vis(pg, '#stationsGrid .tile.vposter .tile-name') == ['The Matrix'], f'[{tag}] Movies: "matrix"')
         await tab('shows')

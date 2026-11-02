@@ -974,9 +974,6 @@
   .sec-filter .sf-empty{ padding:18px 4px 4px; color:var(--text-dim); font-size:14px; }
   .sec-filter .sf-empty[hidden]{ display:none; }
   .sf-hide, .sf-mvh{ display:none !important; }
-  @media (max-width:900px){
-    body:has(#stationsGrid > .epg):not(.np-open) #stationsGrid > .sec-filter{ margin-left:calc(4px - var(--main-pad)); margin-right:calc(4px - var(--main-pad)); }
-  }
   .home-tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:2px 0 18px; }
   .home-tab{
     padding:7px 16px; border-radius:var(--r-pill, 999px); font-size:12.5px; font-weight:700;
@@ -3632,7 +3629,7 @@
      mode too, so white logos show. */
   html[data-theme="light"]{ --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; }
   @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; } }
-  .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1); }
+  .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1) 0 0; }   /* build 406: starts on the page margin */
   .epg{ background:var(--epg-bg); min-width:0; }
   .epg.epg-np{ margin:0 calc(var(--main-pad) * -1); }
   .epg-scroll{ overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
@@ -6448,14 +6445,8 @@
       margin-right:calc(48px - (38px - var(--main-pad)));
     }
   }
-  /* ---------- Build 325 (Mark) ----------
-     Watch with the Live TV guide showing: the tabs and the Watch heading start on the channel
-     column's edge (its cells are inset 4px from the screen), not the page's usual gutter. */
-  @media (max-width: 900px){
-    body:has(#stationsGrid > .epg):not(.np-open) #stationsGrid > .video-tabs,
-    body:has(#stationsGrid > .epg):not(.np-open) .video-tabs.scroll-tabs{ padding-left:4px; scroll-padding-left:4px; scroll-padding-inline:4px; }
-    body:has(#stationsGrid > .epg):not(.np-open):not(.vdetail-open) #sectionHeadingRow:not(.has-back) #stationsHeading{ margin-left:calc(4px - var(--main-pad)); }
-  }
+  /* Build 325's 4px inset for Live TV removed in build 406 (Mark): its heading, tabs, filter and guide start on
+     the page margin like every other Watch tab. */
   /* Light theme: the guide's channel column is a lighter grey (build 315's #2b2c31 was too dark),
      still dark enough for white channel logos and names. */
   html[data-theme="light"]{ --epg-ch-cell:#7a7e88; }
@@ -7088,6 +7079,14 @@
   .lib-fav-row > .tile{ flex:0 0 var(--w-artist); width:var(--w-artist); min-width:0; scroll-snap-align:start; }
   .tile-grid.grid-artists > .lib-fav-block{ grid-column:1/-1; }
   body.sf-filtering .lib-fav-block{ display:none; }
+  /* Build 406 (Mark): on the Library tabs the count and the page's buttons sit under the filter, so the
+     "Library" heading has the top to itself. The header's own copies stay hidden there. */
+  body:has(#stationsGrid > .lib-tabs):not(.album-open):not(.artist-open) #sectionHeadingRow .section-heading-right{ display:none !important; }
+  .tile-grid > .lib-toolbar{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px;
+    margin:0 0 calc(14px - var(--lib-rg, 0px)) !important; }
+  .lib-toolbar-count{ font-size:13px; font-weight:600; color:var(--text-dim); white-space:nowrap; }
+  .lib-toolbar-btns{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .lib-toolbar-btns > button{ margin:0 !important; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -9844,7 +9843,7 @@
   // Emptying the grid has to drop the layout modifier too, or a song list's tight row
   // spacing survives into whatever view is drawn next.
   function resetStationsGrid(){
-    document.body.classList.remove('genre-open', 'genres-open');   // build 403
+    document.body.classList.remove('genre-open', 'genres-open', 'lib-tabs-on');   // build 403/406
     if(typeof songsRender !== 'undefined') songsRender = null;   // build 405
     stationsGrid._ctxList = null; stationsGrid._ctxLabel = null;
     var allArtists = document.getElementById('allArtistsLink');
@@ -29831,6 +29830,7 @@
     stationsGrid.insertBefore(bar, stationsGrid.firstChild);
     // Every tab gets the same space under the tabs and the filter, whatever its grid's own row gap.
     stationsGrid.style.setProperty('--lib-rg', (parseFloat(getComputedStyle(stationsGrid).rowGap) || 0) + 'px');
+    libToolbar(bar);
     // The active tab in view when the row scrolls.
     var on = bar.querySelector('.active');
     if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
@@ -29840,6 +29840,43 @@
       libraryRefreshHeaderBtn.style.display = NATIVE_APP ? '' : 'none';
       libraryShuffleBtn.style.display = '';
     }
+  }
+  // Build 406: the count and the buttons from the header, mirrored in a row under the filter (each
+  // button presses the real one, so everything they do stays where it is).
+  var libToolbarObs = null;
+  function libToolbar(tabsBar){
+    var right = sectionHeadingRow.querySelector('.section-heading-right');
+    if(!right) return;
+    var tb = document.createElement('div');
+    tb.className = 'lib-toolbar';
+    var count = document.createElement('span');
+    count.className = 'lib-toolbar-count';
+    var btns = document.createElement('div');
+    btns.className = 'lib-toolbar-btns';
+    tb.appendChild(count); tb.appendChild(btns);
+    var after = tabsBar.nextElementSibling && tabsBar.nextElementSibling.classList.contains('gb-find') ? tabsBar.nextElementSibling : tabsBar;
+    stationsGrid.insertBefore(tb, after.nextSibling);
+    function sync(){
+      if(!tb.isConnected){ if(libToolbarObs){ libToolbarObs.disconnect(); libToolbarObs = null; } return; }
+      var rc = document.getElementById('resultCount');
+      count.textContent = rc && rc.style.display !== 'none' ? rc.textContent : '';
+      btns.innerHTML = '';
+      Array.prototype.forEach.call(right.children, function(el){
+        if(el.id === 'resultCount' || el.tagName !== 'BUTTON' || el.style.display === 'none' || el.hidden) return;
+        var c = el.cloneNode(true);
+        c.removeAttribute('id');
+        c.dataset.mirrorOf = el.id;
+        c.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); el.click(); });
+        btns.appendChild(c);
+      });
+      tb.hidden = !count.textContent && !btns.children.length;
+      if(window.__sfTune) window.__sfTune();
+    }
+    if(libToolbarObs) libToolbarObs.disconnect();
+    libToolbarObs = new MutationObserver(function(){ clearTimeout(sync._t); sync._t = setTimeout(sync, 30); });
+    libToolbarObs.observe(right, { subtree: true, childList: true, attributes: true, characterData: true, attributeFilter: ['style', 'class', 'hidden', 'aria-pressed', 'title'] });
+    sync();
+    setTimeout(sync, 0);
   }
   // Favorite Artists on the Artists tab: a sideways row of circles above the A-Z of every artist.
   // Edit switches to the list that can be rearranged, as before.
@@ -29879,7 +29916,7 @@
     renderArtistsView = after(renderArtistsView, function(){
       addLibTabs();
       if(libTabNow() !== 'artists') return;
-      var bar = stationsGrid.querySelector(':scope > .lib-tabs');
+      var bar = stationsGrid.querySelector(':scope > .lib-toolbar') || stationsGrid.querySelector(':scope > .lib-tabs');
       var block = buildFavArtistsRow();
       if(block) stationsGrid.insertBefore(block, bar ? bar.nextSibling : stationsGrid.firstChild);
     });
@@ -48982,7 +49019,21 @@
       return null;
     }
 
+    // Build 406 (Mark: too much space around the Watch filters): the box sits 12px under the tabs
+    // and 18px over what follows, whatever the page's own grid gap.
+    function tune(){
+      if(bar.parentNode !== stationsGrid || !bar.offsetParent) return;
+      var rg = parseFloat(getComputedStyle(stationsGrid).rowGap) || 0;
+      var prev = bar.previousElementSibling, prevMb = prev ? (parseFloat(getComputedStyle(prev).marginBottom) || 0) : 0;
+      bar.style.setProperty('margin-top', (12 - rg - prevMb) + 'px', 'important');
+      var next = bar.nextElementSibling;
+      while(next && !next.offsetParent) next = next.nextElementSibling;
+      var nextMt = next ? (parseFloat(getComputedStyle(next).marginTop) || 0) : 0;
+      bar.style.setProperty('margin-bottom', ((next && next.classList.contains('lib-toolbar') ? 10 : 18) - rg - nextMt) + 'px', 'important');
+    }
+    window.__sfTune = tune;
     function place(ctx){
+      setTimeout(tune, 0);
       if(ctx.tabs){
         if(ctx.tabs.nextElementSibling !== bar) ctx.tabs.insertAdjacentElement('afterend', bar);
       } else if(bar.previousElementSibling !== sectionHeadingRow || bar.parentNode !== sectionHeadingRow.parentNode){
