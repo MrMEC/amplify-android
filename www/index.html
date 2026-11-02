@@ -7035,6 +7035,8 @@
   body.genre-open #stationsHeading{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   @media (max-width: 900px){
     body.genre-open #sectionHeadingRow{ position:absolute; top:12px; left:var(--main-pad); z-index:5; margin:0; width:auto; }
+    /* Build 411 (Mark): the header starts at the very top from the first frame, whatever page it came from (no gap that closes once it loads). */
+    body.genre-open .browse-view, body.genre-open.search-open.search-view .browse-view{ padding-top:0 !important; }
     body.genre-open #detailBackBtn{ color:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.45)); margin-bottom:0; }
   }
   @media (min-width: 901px){
@@ -29783,7 +29785,7 @@
     var input = search ? search.querySelector('input') : null;
     var top = topGenres(), topHead = null, topRow = null;
     if(top.length >= 2){
-      topHead = document.createElement('h2'); topHead.className = 'gb-head'; topHead.textContent = 'Your top genres';
+      topHead = document.createElement('h2'); topHead.className = 'gb-head'; topHead.textContent = 'Your top picks';
       topRow = document.createElement('div'); topRow.className = 'gb-top';
       top.forEach(function(g){
         var look = genreLook(g), card = document.createElement('div');
@@ -29801,7 +29803,7 @@
       });
       stationsGrid.appendChild(topHead); stationsGrid.appendChild(topRow);
     }
-    var allHead = document.createElement('h2'); allHead.className = 'gb-head'; allHead.textContent = 'Browse all';
+    var allHead = document.createElement('h2'); allHead.className = 'gb-head'; allHead.textContent = 'Browse categories';
     var grid = document.createElement('div'); grid.className = 'gb-grid';
     var cards = genreOrder.map(function(g){
       var look = genreLook(g), card = document.createElement('button');
@@ -29818,7 +29820,7 @@
       var q = input.value.trim().toLowerCase(), shown = 0;
       cards.forEach(function(c){ var on = !q || c.dataset.genre.toLowerCase().indexOf(q) !== -1; c.hidden = !on; if(on) shown++; });
       if(topHead){ topHead.hidden = !!q; topRow.hidden = !!q; }
-      allHead.textContent = q ? 'Genres' : 'Browse all';
+      allHead.textContent = q ? 'Genres' : 'Browse categories';
       none.hidden = !(q && !shown);
       if(q && !shown) none.textContent = 'No genre called \u201c' + input.value.trim() + '\u201d. Press Enter to find stations for it.';
     }
@@ -36041,6 +36043,8 @@
         if(tab && searchState && searchState.q === q){ searchState.tab = tab; applySearchResults(); }
       });
     }
+    // Build 411: the empty Search page (its genre cards) comes back as itself.
+    if(onSearchView) return entry('Search', function(){ setSearchBoxes(''); searchByName('', true); });
     return entry('Home', function(){ loadTopStations(); });
   }
 

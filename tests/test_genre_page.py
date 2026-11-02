@@ -100,7 +100,7 @@ async def run(b, scheme, w, h, full):
     # ---- Genres: the browse grid ----
     await pg.evaluate("__t.home()"); await pg.wait_for_timeout(800)
     r = await pg.evaluate(GB); print(T, r)
-    check(r['search'] and r['heads'] == ['Your top genres', 'Browse all'], f'{T} a find field, then Your top genres and Browse all {r["heads"]}')
+    check(r['search'] and r['heads'] == ['Your top picks', 'Browse categories'], f'{T} a find field, then Your top genres and Browse all {r["heads"]}')
     check(r['top'][:2] == ['Rock', 'Jazz'], f'{T} top genres follow what is in the library (Rock 3 songs, then Jazz) {r["top"]}')
     check(len(r['cards']) == 15 and r['colors'] >= 12, f'{T} every genre is a card in its own colour ({len(r["cards"])} cards, {r["colors"]} colours)')
     check(r['lefts'] == (2 if w < 900 else r['lefts']) and r['lefts'] >= 2, f'{T} cards in columns ({r["lefts"]})')
