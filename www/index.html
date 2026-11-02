@@ -4243,6 +4243,7 @@
     transition:transform .12s ease, box-shadow .12s ease;
   }
   .art-suggest-tile[hidden]{ display:none; }
+  .art-suggest-badge{ position:absolute; left:4px; bottom:4px; font-size:10px; font-weight:600; line-height:1; padding:3px 6px; border-radius:9px; background:rgba(0,0,0,.7); color:#fff; pointer-events:none; }
   .art-suggest-tile img{ width:100%; height:100%; object-fit:cover; display:block; }
   .art-suggest-tile:hover, .art-suggest-tile:focus-visible{ transform:scale(1.04); box-shadow:0 0 0 2px var(--accent); outline:none; }
   .art-suggest-tile.busy::after{
@@ -7934,6 +7935,9 @@
                   <button type="button" class="np-menu-item" id="npArtEditBtn" role="menuitem">
                     <i class="fa-solid fa-pen"></i><span>Edit cover art</span>
                   </button>
+                  <button type="button" class="np-menu-item" id="npFindCoverBtn" role="menuitem" style="display:none;">
+                    <i class="fa-solid fa-magnifying-glass"></i><span>Find better cover</span>
+                  </button>
                   <button type="button" class="np-menu-item" id="npCopyBtn" role="menuitem">
                     <i class="fa-regular fa-copy"></i><span>Copy stream URL</span>
                   </button>
@@ -9197,6 +9201,10 @@
   <!-- Build 381: a music video's picture, from any frame of it. -->
   <button type="button" class="np-menu-item" id="rowMenuThumb" role="menuitem" style="display:none;">
     <svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 15.5l5-4.5 4 3.5 3-2.5 6 5"/><circle class="fill" cx="16" cy="9" r="1.6"/></svg><span>Choose Thumbnail</span>
+  </button>
+  <!-- Build 415: a station's covers, to pick the sharpest -->
+  <button type="button" class="np-menu-item" id="rowMenuCover" role="menuitem" style="display:none;">
+    <i class="fa-solid fa-magnifying-glass"></i><span>Find better cover</span>
   </button>
   <!-- Build 247: a channel in search results -->
   <button type="button" class="np-menu-item" id="rowMenuAddChannel" role="menuitem" style="display:none;">
@@ -15536,9 +15544,30 @@
       files: isLocalTrack(st) ? [libraryById[favKey(st)] || st] : null,
       name: stripExclusively(st.name),
       suggest: isLocalTrack(st) ? { kind: 'album', artist: st.artist || '', album: st.name || '' }
-        : artistLink ? { kind: 'artist', name: artistLink.name } : null,
+        : artistLink ? { kind: 'artist', name: artistLink.name }
+        : isFindableStation(st) ? { kind: 'station', station: st } : null,
       refresh: function(){ refreshStationArt(st); }
     });
+  }
+  // A radio station of the directory (not a song, episode, video, channel or a station that
+  // stands for something else): the kind whose logo the lookup finds and can be asked again.
+  function isFindableStation(t){
+    return !!t && !!t.urlToResolve && !isLocalTrack(t) && !isPodcastTrack(t) && !isChartSong(t) && !isLocalVideo(t)
+      && !isChannelEntry(t) && !isPlaylistRadio(t) && !isCustomStation(t) && !isArtistRadio(t)
+      && !t.liveCh && !t.videoChannel && !t.archive;
+  }
+  // Build 415: "Find better cover" -- the cover dialog, straight on its pictures: every cover
+  // found for the station, the sharpest first, each with its size.
+  function openFindBetterCover(st){
+    if(!isFindableStation(st)) return;
+    openArtUrlDialogFor({
+      key: favKey(st),
+      name: stripExclusively(st.name),
+      title: 'Find Better Cover',
+      suggest: { kind: 'station', station: st },
+      refresh: function(){ refreshStationArt(st); }
+    });
+    showArtSuggestScreen();
   }
   function closeArtUrlDialog(){
     if(artFilesBusy) return; // the song files are being written; it closes itself after
@@ -15554,6 +15583,10 @@
   npArtEditBtn.addEventListener('click', function(){
     closeNpMenu();
     openArtUrlDialog();
+  });
+  document.getElementById('npFindCoverBtn').addEventListener('click', function(){
+    closeNpMenu();
+    openFindBetterCover(npTarget());
   });
   artUrlCloseBtn.addEventListener('click', closeArtUrlDialog);
   artUrlOverlay.addEventListener('click', function(e){
@@ -15722,6 +15755,35 @@
     });
   }
 
+  // Every cover the lookup can find for a station, measured, the sharpest first.
+  function stationSuggestions(station, add){
+    var domain = domainFromUrl(station.homepage) || domainFromUrl(station.urlToResolve);
+    var found = [];
+    function note(u, l){ if(u) found.push({ u: u, l: l }); }
+    note(station.favicon, 'Station listing');
+    if(domain){
+      note('https://' + domain + '/apple-touch-icon.png', 'Website icon');
+      note('https://' + domain + '/apple-touch-icon-precomposed.png', 'Website icon');
+    }
+    return Promise.all([homepageArtCandidates(station.homepage), wikipediaArtUrl(station.name)]).then(function(r){
+      r[0].forEach(function(u){ note(u, 'Station website'); });
+      note(r[1], 'Wikipedia');
+      if(domain) note('https://www.google.com/s2/favicons?sz=256&domain=' + encodeURIComponent(domain), 'Favicon service');
+      return Promise.all(found.map(function(f){
+        return probeImageInfo(f.u, 8000).then(function(i){ return i ? { info: i, label: f.l } : null; });
+      }));
+    }).then(function(list){
+      list = list.filter(Boolean);
+      list.sort(function(a, b){ return artScore(b.info) - artScore(a.info); });
+      add(list.map(function(x){
+        var url = secureUrl(x.info.url);
+        return { thumb: url, full: function(){ return Promise.resolve(url); },
+          label: x.label + ' \u00b7 ' + x.info.w + '\u00d7' + x.info.h,
+          badge: Math.max(x.info.w, x.info.h) / Math.min(x.info.w, x.info.h) > 1.25 ? x.info.w + '\u00d7' + x.info.h : Math.min(x.info.w, x.info.h) + ' px' };
+      }));
+    });
+  }
+
   var artSuggest = document.getElementById('artSuggest');
   var artSuggestGrid = document.getElementById('artSuggestGrid');
   var artSuggestNote = document.getElementById('artSuggestNote');
@@ -15745,7 +15807,7 @@
     var t = artDialogTarget;
     if(!t || !t.suggest) return;
     artMainTitle = artUrlTitle.textContent;
-    artUrlTitle.textContent = 'Suggested Images';
+    artUrlTitle.textContent = (t.suggest.kind === 'station') ? 'Better Covers' : 'Suggested Images';
     artUrlMain.hidden = true;
     artSuggest.hidden = false;
     artUrlBackBtn.hidden = false;
@@ -15761,8 +15823,8 @@
     artSuggestGrid.classList.remove('picking');
     artSuggestNote.textContent = '';
     if(!want) return;
-    artSuggestSrc.textContent = want.kind === 'artist'
-      ? 'MusicBrainz \u00b7 Wikimedia Commons' : 'MusicBrainz \u00b7 Cover Art Archive';
+    artSuggestSrc.textContent = want.kind === 'artist' ? 'MusicBrainz \u00b7 Wikimedia Commons'
+      : want.kind === 'station' ? 'The station\u2019s website \u00b7 Wikipedia' : 'MusicBrainz \u00b7 Cover Art Archive';
     for(var i = 0; i < 8; i++){
       var sk = document.createElement('div');
       sk.className = 'art-suggest-skel';
@@ -15781,9 +15843,11 @@
       var keepSkeletons = ok === 0 && (pending > 0 || !finished);
       if(!keepSkeletons) artSuggestGrid.querySelectorAll('.art-suggest-skel').forEach(function(k){ k.remove(); });
       if(finished && ok === 0 && pending === 0){
+        var svc = want.kind === 'station' ? 'the station\u2019s website' : 'MusicBrainz';
         artSuggestNote.textContent = failed
-          ? 'Couldn\u2019t reach MusicBrainz. Check the connection and try again.'
-          : 'No covers found in MusicBrainz. Upload one or paste a link below.';
+          ? 'Couldn\u2019t reach ' + svc + '. Check the connection and try again.'
+          : (want.kind === 'station' ? 'No better cover found for this station. Upload one or paste a link below.'
+            : 'No covers found in MusicBrainz. Upload one or paste a link below.');
       }
     }
     function add(items, first){
@@ -15807,12 +15871,19 @@
         img.onerror = function(){ b.remove(); settle(); };
         img.src = it.thumb;
         b.appendChild(img);
+        if(it.badge){
+          var bd = document.createElement('span');
+          bd.className = 'art-suggest-badge';
+          bd.textContent = it.badge;
+          b.appendChild(bd);
+        }
         b.onclick = function(){ chooseSuggestedArt(b, it); };
         if(anchor) artSuggestGrid.insertBefore(b, anchor); else artSuggestGrid.appendChild(b);
       });
       settle();
     }
-    var job = want.kind === 'artist' ? artistSuggestions(want.name, add) : albumSuggestions(want.artist, want.album, add);
+    var job = want.kind === 'artist' ? artistSuggestions(want.name, add)
+      : want.kind === 'station' ? stationSuggestions(want.station, add) : albumSuggestions(want.artist, want.album, add);
     job.then(function(){ finished = true; settle(); }, function(){ finished = true; failed = true; settle(); });
   }
   // Fetches the full-size original, makes sure it really loads (a cover that fails later
@@ -17084,6 +17155,11 @@
       return;
     }
 
+    // Build 415: the song on air, for a station with no real logo (player bar and Now Playing).
+    if(container === playerIcon || container === npArt){
+      var songUrl = onAirArtFor(station);
+      if(songUrl){ paint(songUrl); return; }
+    }
     softOK = !isCh;
     var cached = getArtCacheEntry(key);
     if(cached !== undefined){
@@ -40639,6 +40715,7 @@
     rowMenuRemoveLabel.textContent = (opts && opts.removeLabel) || 'Remove';
     rowMenuTags.style.display = tracks.length === 1 && isLocalTrack(tracks[0]) ? '' : 'none';
     rowMenuThumb.style.display = tracks.length === 1 && tracks[0] && tracks[0].videoKind === 'music' && tracks[0].uri && thumbPlugin() ? '' : 'none';
+    rowMenuCover.style.display = tracks.length === 1 && isFindableStation(tracks[0]) ? '' : 'none';
     rowMenu._anchor = anchor;
     rowMenu.classList.add('open');
     var r = anchor.getBoundingClientRect();
@@ -40660,6 +40737,12 @@
     rowMenuOnRename = null;
     rowMenuOnAddChannel = null;
   }
+  var rowMenuCover = document.getElementById('rowMenuCover');
+  rowMenuCover.addEventListener('click', function(e){
+    e.stopPropagation();
+    var t = rowMenuTracks && rowMenuTracks[0]; closeRowMenu();
+    if(t) openFindBetterCover(t);
+  });
   var rowMenuThumb = document.getElementById('rowMenuThumb');
   rowMenuThumb.addEventListener('click', function(e){
     e.stopPropagation();
@@ -40725,6 +40808,7 @@
     // Build 243: a channel has no queue (sideways swipes are for the guide grid).
     try{ npQueueMenuBtn.style.display = isNpChannel(npTarget()) ? 'none' : ''; }catch(e){}
     try{ document.getElementById('npLyricsMenuBtn').style.display = lyricsApplies() ? '' : 'none'; }catch(e){}
+    try{ document.getElementById('npFindCoverBtn').style.display = isFindableStation(npTarget()) ? '' : 'none'; }catch(e){}
     try{ document.getElementById('npArchiveDlBtn').style.display = archiveDlPlugin() && npArchiveItem(npTarget() || currentStation) ? '' : 'none'; }catch(e){}
     var open = npMenu.classList.toggle('open');
     npMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -47609,6 +47693,35 @@
     var a = r.a && nameKey(r.a) !== nameKey(stripExclusively(st.name || '')) ? r.a : '';
     return a ? r.t + ' \u00b7 ' + a : r.t;
   }
+  // Build 415: a station with no logo of its own (or only a tiny one) wears the cover of the
+  // song it is playing, on the player bar and the Now Playing screen. The song's cover comes
+  // from the same lookup the Top 100 uses; with no artist in the stream title nothing is asked.
+  var onAirArt = null;     // { key, song, url }
+  function stationWeakLogo(st){
+    if(!isFindableStation(st) || customArtFor(st)) return false;
+    var c = getArtCacheEntry(favKey(st));
+    if(c && c.url && !c.w) return false;                 // sharpness not measured: assume it is fine
+    var has = c ? !!c.url : !!st.favicon;
+    return !has || !!(c && c.w && c.w < 128);
+  }
+  function onAirArtFor(st){
+    var song = onAirFor(st);
+    return (song && onAirArt && onAirArt.key === song.key && onAirArt.song === song.title + '\n' + song.artist && stationWeakLogo(st)) ? onAirArt.url : null;
+  }
+  function dropOnAirArt(){
+    if(!onAirArt) return;
+    onAirArt = null;
+    if(currentStation) try{ refreshStationArt(currentStation); }catch(e){}
+  }
+  function fetchOnAirArt(){
+    var song = onAir, st = currentStation;
+    if(!song || !song.artist || !st || !stationWeakLogo(st)) return;
+    requestSongArt({ artist: song.artist, name: song.title }, function(url){
+      if(!onAir || onAir.key !== song.key || onAir.title !== song.title || onAir.artist !== song.artist) return;
+      onAirArt = { key: song.key, song: song.title + '\n' + song.artist, url: url };
+      if(currentStation && favKey(currentStation) === song.key) try{ refreshStationArt(currentStation); }catch(e){}
+    }, null);
+  }
   function setOnAir(ev){
     var prev = onAir;
     var st = currentStation;
@@ -47620,10 +47733,13 @@
       var key = favKey(st);
       if(prev && prev.key === key && prev.title === title && prev.artist === artist) return;
       onAir = { key: key, title: title, artist: artist, at: Date.now() };
+      if(onAirArt) dropOnAirArt();
+      fetchOnAirArt();
       onAirLog.unshift({ key: key, station: stripExclusively(st.name), title: title, artist: artist, at: onAir.at });
       if(onAirLog.length > ON_AIR_LOG_MAX) onAirLog.length = ON_AIR_LOG_MAX;
       noteStationSong(st, title, artist);
     }
+    if(!onAir && onAirArt) dropOnAirArt();
     if(!prev && !onAir) return;
     // The bar only when it is showing the normal line: never over "Buffering…", "Paused",
     // a reconnect countdown or an error.
