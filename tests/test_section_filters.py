@@ -106,7 +106,7 @@ async def run(vw, vh, mobile, scheme, tag, full):
         # ---- Artists
         await pg.evaluate("__t.sec('artists')"); await pg.wait_for_timeout(1200)
         i = await info(pg)
-        check(i and i['prevId'] == 'sectionHeadingRow' and i['shown'] and i['ph'] == 'Filter artists' and not i['focused'], f'[{tag}] Artists: box just under the heading, not focused {i}')
+        check(i and (i['prevId'] == 'sectionHeadingRow' or 'lib-tabs' in i['prevId']) and i['shown'] and i['ph'] == 'Filter artists' and not i['focused'], f'[{tag}] Artists: box just under the heading, not focused {i}')
         n_all = len(await vis(pg, "#stationsGrid .tile[data-entity='artist'] .tile-name"))
         await pg.screenshot(path=f'{shots}/sf-{tag}-artists.png')
         await typ(pg, 'bo')

@@ -7072,6 +7072,22 @@
   /* Build 404 (Mark): with the keyboard up, the mini Now Playing never shows (any input, any page). */
   body.kb-open .player-bar{ display:none !important; }
   .gb-find{ grid-column:1/-1; margin:0 0 22px !important; }
+  /* Build 405: rows of a long list off screen aren't laid out until they come near. */
+  #stationsGrid.grid-songs > .song-row, #stationsGrid.grid-songs > .song-letter{ content-visibility:auto; contain-intrinsic-size:auto var(--song-row-h, 72px); }
+  #stationsGrid.grid-songs > .song-letter{ contain-intrinsic-size:auto var(--song-letter-h, 36px); }
+  /* Build 405 (Mark): Library tabs, and Favorite Artists as a sideways row on the Artists tab. */
+  .tile-grid > .lib-tabs{ grid-column:1/-1; margin-bottom:calc(12px - var(--lib-rg, 0px)) !important; }
+  body.lib-tabs-on .tile-grid > .sec-filter, body.lib-tabs-on .tile-grid > .gb-find{ margin:0 0 calc(18px - var(--lib-rg, 0px)) !important; }
+  .lib-fav-block{ grid-column:1/-1; margin:2px 0 0; }
+  .lib-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); line-height:1.25; }
+  .lib-head .section-text-btn{ font-size:13px; }
+  .lib-all-head{ margin:22px 0 4px; }
+  .lib-fav-row{ display:flex; gap:14px; overflow-x:auto; overflow-y:hidden; margin:0 calc(-1 * var(--main-pad)); padding:0 var(--main-pad) 4px;
+    scroll-snap-type:x proximity; scroll-padding-left:var(--main-pad); scrollbar-width:none; overscroll-behavior-x:contain; }
+  .lib-fav-row::-webkit-scrollbar{ display:none; }
+  .lib-fav-row > .tile{ flex:0 0 var(--w-artist); width:var(--w-artist); min-width:0; scroll-snap-align:start; }
+  .tile-grid.grid-artists > .lib-fav-block{ grid-column:1/-1; }
+  body.sf-filtering .lib-fav-block{ display:none; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -9829,6 +9845,8 @@
   // spacing survives into whatever view is drawn next.
   function resetStationsGrid(){
     document.body.classList.remove('genre-open', 'genres-open');   // build 403
+    if(typeof songsRender !== 'undefined') songsRender = null;   // build 405
+    stationsGrid._ctxList = null; stationsGrid._ctxLabel = null;
     var allArtists = document.getElementById('allArtistsLink');
     if(allArtists) allArtists.style.display = 'none';
     sectionHeadingRow.classList.remove('has-side-link');
@@ -21826,7 +21844,7 @@
   // exact spot the old one occupied, without redrawing (and scrolling to the top of) the
   // whole page just to flip Reorder on or off.
   function renderFavoriteArtistsRow(beforeNode){
-    var block = buildFavoriteArtistsBlock();
+    var block = (activeLibrarySection === 'artists' && !activeArtistKey && !activeAlbumKey) ? buildFavArtistsRow() : buildFavoriteArtistsBlock();
     if(!block) return;
     if(beforeNode) stationsGrid.insertBefore(block, beforeNode);
     else stationsGrid.appendChild(block);
@@ -21866,7 +21884,10 @@
       '<svg class="tile-art-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
       'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>');
   }
-  function openMyLibraryHome(){
+  // Build 405 (Mark): the Library is a row of tabs (Artists, Albums, Songs, Playlists, Genres); it
+  // opens on the one used last. The old overview page is kept below, unused.
+  function openMyLibraryHome(){ openLibTab(libLastTab()); }
+  function openLibraryOverview(){
     enterLibraryChrome();
     onMyLibraryHomeView = true;
     activeLibrarySection = null;
@@ -29588,7 +29609,7 @@
   function openPlaylistsHome(){
     enterLibraryChrome();
     onPlaylistsHomeView = true;
-    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
+    libTabBack();
     renderStationPlaylistList();
     stationsHeading.textContent = 'Playlists';
     pageTitle.style.display = 'none';
@@ -29754,10 +29775,124 @@
     });
   }
 
+  // ---------- Build 405 (Mark): Library tabs ----------
+  var LIB_TAB_KEY = 'radioPlayerLibTab';
+  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres']];
+  var libRootNav = false;
+  function libLastTab(){
+    var t = null; try{ t = localStorage.getItem(LIB_TAB_KEY); }catch(e){}
+    return LIB_TABS.some(function(x){ return x[0] === t; }) ? t : 'artists';
+  }
+  // A tab (or the Library button) opens a root page; reached from elsewhere (Home's Playlists
+  // heading, Back), it keeps the way back there.
+  function libTabBack(){
+    if(libRootNav || !backLabel()) setDetailBack(null);
+    else setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
+  }
+  function openLibTab(id){
+    try{ localStorage.setItem(LIB_TAB_KEY, id); }catch(e){}
+    libRootNav = true;
+    try{
+      if(id === 'playlists') openPlaylistsHome();
+      else if(id === 'genres') openGenresHome();
+      else runLibrarySection(id);
+    } finally { libRootNav = false; }
+  }
+  function libTabNow(){
+    if(activeArtistKey || activeAlbumKey || activeHomeSection || activeGenre) return null;
+    if(onPlaylistsHomeView) return 'playlists';
+    if(onGenresHomeView) return 'genres';
+    if(activeLibrarySection === 'artists' || activeLibrarySection === 'albums' || activeLibrarySection === 'songs') return activeLibrarySection;
+    return null;
+  }
+  function addLibTabs(){
+    var id = libTabNow();
+    var old = stationsGrid.querySelector(':scope > .lib-tabs');
+    if(old) old.remove();
+    document.body.classList.toggle('lib-tabs-on', !!id);
+    if(!id) return;
+    try{ localStorage.setItem(LIB_TAB_KEY, id); }catch(e){}
+    stationsHeading.textContent = 'Library';
+    var bar = document.createElement('div');
+    bar.className = 'home-tabs video-tabs watch-tabs scroll-tabs lib-tabs';
+    bar.setAttribute('role', 'tablist');
+    bar.setAttribute('aria-label', 'Library');
+    LIB_TABS.forEach(function(t){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'home-tab' + (t[0] === id ? ' active' : '');
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', t[0] === id ? 'true' : 'false');
+      b.dataset.libtab = t[0];
+      b.textContent = t[1];
+      b.addEventListener('click', function(){ if(t[0] !== libTabNow()) openLibTab(t[0]); });
+      bar.appendChild(b);
+    });
+    stationsGrid.insertBefore(bar, stationsGrid.firstChild);
+    // Every tab gets the same space under the tabs and the filter, whatever its grid's own row gap.
+    stationsGrid.style.setProperty('--lib-rg', (parseFloat(getComputedStyle(stationsGrid).rowGap) || 0) + 'px');
+    // The active tab in view when the row scrolls.
+    var on = bar.querySelector('.active');
+    if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
+    if(id === 'artists' || id === 'albums' || id === 'songs'){
+      libraryAddHeaderBtn.style.display = '';
+      libraryAddHeaderBtn.onclick = openAddMusicDialog;
+      libraryRefreshHeaderBtn.style.display = NATIVE_APP ? '' : 'none';
+      libraryShuffleBtn.style.display = '';
+    }
+  }
+  // Favorite Artists on the Artists tab: a sideways row of circles above the A-Z of every artist.
+  // Edit switches to the list that can be rearranged, as before.
+  function buildFavArtistsRow(){
+    if(favArtistsEditing) return buildFavoriteArtistsBlock();
+    var favArtists = favorites.filter(isArtistFav).map(artistEntryForFav);
+    if(!favArtists.length) return null;
+    if(favArtistOrder === 'az') favArtists.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name || ''), alphaSortKey(b.name || '')); });
+    var block = document.createElement('div');
+    block.className = 'fav-artists-block lib-fav-block';
+    var label = document.createElement('div');
+    label.className = 'lib-head fav-artists-head';
+    var title = document.createElement('span');
+    title.textContent = 'Favorite Artists';
+    label.appendChild(title);
+    var editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'section-text-btn fav-artists-edit';
+    editBtn.textContent = 'Edit';
+    editBtn.setAttribute('aria-pressed', 'false');
+    editBtn.addEventListener('click', function(e){ e.stopPropagation(); setFavoriteArtistsEditing(true); });
+    label.appendChild(editBtn);
+    block.appendChild(label);
+    var row = document.createElement('div');
+    row.className = 'lib-fav-row';
+    favArtists.forEach(function(entry){ row.appendChild(buildArtistTile(entry)); });
+    row._ctxNone = true;
+    block.appendChild(row);
+    var all = document.createElement('div');
+    all.className = 'lib-head lib-all-head';
+    all.textContent = 'All Artists';
+    block.appendChild(all);
+    return block;
+  }
+  (function(){
+    function after(fn, extra){ return function(){ var r = fn.apply(this, arguments); try{ extra(); }catch(e){} return r; }; }
+    renderArtistsView = after(renderArtistsView, function(){
+      addLibTabs();
+      if(libTabNow() !== 'artists') return;
+      var bar = stationsGrid.querySelector(':scope > .lib-tabs');
+      var block = buildFavArtistsRow();
+      if(block) stationsGrid.insertBefore(block, bar ? bar.nextSibling : stationsGrid.firstChild);
+    });
+    renderAlbumsView = after(renderAlbumsView, addLibTabs);
+    renderSongsView = after(renderSongsView, addLibTabs);
+    renderPlaylistsGrid = after(renderPlaylistsGrid, addLibTabs);
+    renderGenresGrid = after(renderGenresGrid, addLibTabs);
+  })();
+
   function openGenresHome(){
     enterLibraryChrome();
     onGenresHomeView = true;
-    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
+    libTabBack();
     renderGenreNav();
     stationsHeading.textContent = 'Genres';
     pageTitle.style.display = 'none';
@@ -35906,7 +36041,7 @@
     // Artists / Albums / Songs are My Library's own subsections, so their back button always
     // returns there -- same fixed-destination treatment as the Podcasts show page's back
     // button, rather than a history-based one.
-    setDetailBackToHistory(function(){ openMyLibraryHome(); }, 'Library');
+    libTabBack();
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
@@ -38418,7 +38553,21 @@
       var el = azTargets[AZ_LETTERS[i]];
       if(el){
         var y = el.getBoundingClientRect().top + window.pageYOffset - azHeaderOffset();
-        window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+        window.scrollTo({ top: Math.max(0, y), behavior: Math.abs(y - window.pageYOffset) > 6000 ? 'auto' : 'smooth' });
+        // Build 405: rows drawn on the way can be a little taller or shorter than estimated, so
+        // once the scroll settles the letter is brought exactly to the top.
+        (function(target){
+          var tries = 0, still = 0;
+          (function settle(){
+            setTimeout(function(){
+              if(azDragLetter !== null || ++tries > 12) return;
+              var off = target.getBoundingClientRect().top - azHeaderOffset();
+              if(Math.abs(off) > 6){ still = 0; window.scrollTo(0, Math.max(0, window.pageYOffset + off)); }
+              else if(++still >= 2) return;
+              settle();
+            }, tries ? 250 : 650);
+          })();
+        })(el);
         return AZ_LETTERS[i];
       }
     }
@@ -40316,6 +40465,13 @@
   });
 
   // ---------- Songs ----------
+  // Build 405 (Mark: the Songs page lagged badly): the first screenful of rows is drawn at once
+  // and the rest follow in batches between frames, and rows off screen aren't laid out (CSS
+  // content-visibility), so even a library of thousands opens straight away. Tapping a song
+  // still queues the whole list, the A-Z rail knows every letter from the start (a jump draws
+  // up to there first), and the filter box draws the rest before it filters.
+  var songsRender = null;
+  function songsFlush(){ if(songsRender && songsRender.flush) songsRender.flush(); }
   function renderSongsView(){
     resetStationsGrid();
     var tracks = libraryTracks.filter(function(t){ return !isBlacklisted(t); });
@@ -40330,26 +40486,48 @@
     // name of -- and an alphabet rail over an unsorted list would send you nowhere.
     stationsGrid.classList.add('grid-songs');
     tracks.sort(byNameAsc);
+    stationsGrid._ctxList = tracks;
+    stationsGrid._ctxLabel = 'Songs';
     // A Shuffle All row heads the list (the car's Songs list starts with the same one).
     if(tracks.length > 1) stationsGrid.appendChild(buildShuffleAllRow(tracks, 'Songs'));
-    // Broken into letters, with the letter over each run. A few hundred titles in one
-    // unbroken column gives you no way to tell how far through the alphabet you are without
-    // reading; the headings are what the rail on the right is pointing at, made visible.
-    var letter = null;
-    tracks.forEach(function(t){
-      var first = azLetterFor(t.name);
-      if(first !== letter){
-        letter = first;
-        var head = document.createElement('div');
-        head.className = 'song-letter';
-        head.dataset.letter = first;
-        head.textContent = first;
-        stationsGrid.appendChild(head);
+    // Broken into letters, with the letter over each run.
+    var job = songsRender = {}, i = 0, letter = null, heads = {};
+    function step(n){
+      var frag = document.createDocumentFragment(), end = Math.min(tracks.length, i + n);
+      for(; i < end; i++){
+        var t = tracks[i], first = azLetterFor(t.name);
+        if(first !== letter){
+          letter = first;
+          var head = document.createElement('div');
+          head.className = 'song-letter';
+          head.dataset.letter = first;
+          head.textContent = first;
+          heads[first] = head;
+          frag.appendChild(head);
+        }
+        frag.appendChild(buildTile(t));
       }
-      stationsGrid.appendChild(buildTile(t));
-    });
+      stationsGrid.appendChild(frag);
+    }
+    job.flush = function(){ if(songsRender === job && i < tracks.length) step(tracks.length); };
+    step(40);
+    // Off-screen rows are sized like the real ones, so the page is the right length before they draw.
+    var sample = stationsGrid.querySelector(':scope > .song-row:not(.shuffle-all-row)');
+    if(sample){ var sh = sample.getBoundingClientRect().height; if(sh > 20) stationsGrid.style.setProperty('--song-row-h', Math.round(sh) + 'px'); }
+    var sampleHead = stationsGrid.querySelector(':scope > .song-letter');
+    if(sampleHead){ var hh = sampleHead.getBoundingClientRect().height; if(hh > 8) stationsGrid.style.setProperty('--song-letter-h', Math.round(hh) + 'px'); }
+    (function next(){
+      if(songsRender !== job || i >= tracks.length) return;
+      setTimeout(function(){ if(songsRender !== job) return; step(200); next(); }, 16);
+    })();
     setResultCount(tracks.length, 'song');
-    buildAzRail(azItemsFromGrid('.song-row:not(.shuffle-all-row)', '.song-row-title'));
+    // The rail from the list itself; a letter not drawn yet draws the rest when it is chosen.
+    var proxies = {};
+    buildAzRail(tracks.map(function(t){
+      var L = azLetterFor(t.name);
+      if(!proxies[L]) proxies[L] = { getBoundingClientRect: function(){ job.flush(); var h = heads[L]; return h ? h.getBoundingClientRect() : { top: 0 }; } };
+      return { el: proxies[L], label: t.name };
+    }));
   }
 
   // ---------- library search ----------
@@ -48798,9 +48976,9 @@
       if(activeHomeSection || onHomeView || activeArtistKey || activeAlbumKey) return null;
       if(cls.contains('album-open') || cls.contains('artist-open')) return null;
       var h = (stationsHeading.textContent || '').trim();
-      if(activeLibrarySection === 'artists' && h === 'Artists') return { key: 'artists', tabs: null };
-      if(activeLibrarySection === 'albums' && h === 'Albums') return { key: 'albums', tabs: null };
-      if(activeLibrarySection === 'songs' && h === 'Songs') return { key: 'songs', tabs: null };
+      if(activeLibrarySection === 'artists' && (h === 'Artists' || h === 'Library')) return { key: 'artists', tabs: stationsGrid.querySelector(':scope > .lib-tabs') };
+      if(activeLibrarySection === 'albums' && (h === 'Albums' || h === 'Library')) return { key: 'albums', tabs: stationsGrid.querySelector(':scope > .lib-tabs') };
+      if(activeLibrarySection === 'songs' && (h === 'Songs' || h === 'Library')) return { key: 'songs', tabs: stationsGrid.querySelector(':scope > .lib-tabs') };
       return null;
     }
 
@@ -48850,6 +49028,7 @@
     }
 
     function apply(){
+      if(typeof songsFlush === 'function' && input.value.trim()) songsFlush();   // build 405: every song drawn before filtering
       if(curKey === 'music'){
         var n = mvResults();
         if(n !== false){

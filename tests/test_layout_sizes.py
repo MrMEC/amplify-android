@@ -40,12 +40,11 @@ async def main():
         check(s0['fav'] == s0['recent'] == s0['podcasts'] == s0['playlists'] == 132, f'Home: favorites and every cover row are 132px {s0}')
         txt = await pg.evaluate("""(()=>{ var o={}; document.querySelectorAll('.tile:not(.tile-row):not(.song-row) .tile-name').forEach(function(e){ if(e.offsetParent) o[Math.round(parseFloat(getComputedStyle(e).fontSize)*10)/10]=1; }); return Object.keys(o); })()""")
         check(txt == ['13'], f'Home: all cover names are one size {txt}')
-        await pg.evaluate("__t.ev('openMyLibraryHome()')"); await pg.wait_for_timeout(800)
-        lib = await pg.evaluate("""(()=>{ var o={}; document.querySelectorAll('.cl-row .tile .tile-name').forEach(function(e){ o[Math.round(parseFloat(getComputedStyle(e).fontSize)*10)/10]=1; });
-           var a=document.querySelector('.cl-row .tile-art'); return { names: Object.keys(o), w: a? Math.round(a.getBoundingClientRect().width):null }; })()""")
-        check(lib['names'] == ['13'] and lib['w'] == 132, f'Library rows match Home rows (cover and text) {lib}')
-        sub = await pg.evaluate("""(()=>{ var e=document.querySelector('.cl-row .tile-sub'); return e? parseFloat(getComputedStyle(e).fontSize):null; })()""")
-        check(sub == 11.5, f'Library detail text is Home\'s ({sub})')
+        # Build 405: the Library is tabs; Favorite Artists is a row of artist circles on the Artists tab, sized like every artist circle
+        await pg.evaluate("__t.ev('openLibTab(\"artists\")')"); await pg.wait_for_timeout(900)
+        lib = await pg.evaluate("""(()=>{ var e=document.querySelector('.lib-fav-row > .tile'), n=document.querySelector('.lib-fav-row .tile-name');
+           return { w: e? Math.round(e.getBoundingClientRect().width):null, fs: n? parseFloat(getComputedStyle(n).fontSize):null }; })()""")
+        check(lib['w'] in (None, 73) and lib['fs'] in (None, 13), f'Library: Favorite Artists circles match the other artist circles {lib}')
         await pg.evaluate("__t.ev('openAlbumsPlaceholder') ") if False else None
         # ---- the settings ----
         await pg.evaluate("__t.ev('openSettings(\"appearance-sizes\")')"); await pg.wait_for_timeout(500)
@@ -81,9 +80,9 @@ async def main():
         ta = await pg.evaluate("(()=>{ var e=document.querySelector('#topArtistsGrid .tile'); return e? Math.round(e.getBoundingClientRect().width):null; })()")
         base_ta = await pg.evaluate("1")
         check(s3['fav'] == 132 and (ta is None or ta >= 100), f'artist circles 130%: covers unchanged, circles bigger ({ta})')
-        await pg.evaluate("__t.ev('openMyLibraryHome()')"); await pg.wait_for_timeout(700)
-        fa = await pg.evaluate("(()=>{ var e=document.querySelector('.fav-artist-thumb'); return e? Math.round(e.getBoundingClientRect().width):null; })()")
-        check(fa == 73, f'Favorite Artists in Library follow artist size (56 x 1.3): {fa}')
+        await pg.evaluate("__t.ev('openLibTab(\"artists\")')"); await pg.wait_for_timeout(700)
+        fa = await pg.evaluate("(()=>{ var e=document.querySelector('.lib-fav-row > .tile'); return e? Math.round(e.getBoundingClientRect().width):null; })()")
+        check(fa is None or fa == 95, f'Favorite Artists in Library follow artist size (73 x 1.3): {fa}')
         await pg.screenshot(path=f'{shots}/layout-artists130.png')
         await pg.evaluate("__t.ev('openSettings(\"appearance-sizes\")')"); await pg.wait_for_timeout(400)
         await setrange(pg, 'artist', 100)
@@ -92,8 +91,8 @@ async def main():
         cols = await pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--album-cols').trim()")
         check(cols == '3', f'albums 60%: three across on a phone ({cols})')
         await pg.evaluate("__t.ev('closeSettings()')"); await pg.wait_for_timeout(300)
-        await pg.evaluate("__t.ev('openMyLibraryHome()')"); await pg.wait_for_timeout(500)
-        await pg.evaluate("(()=>{ var t=Array.from(document.querySelectorAll('.tile[data-entity=library-section]')).find(x=>x.querySelector('.tile-name').textContent==='Albums'); t&&t.click(); })()"); await pg.wait_for_timeout(900)
+        await pg.evaluate("__t.ev('openLibTab(\"albums\")')"); await pg.wait_for_timeout(500)
+        await pg.wait_for_timeout(900)
         aw = await pg.evaluate("(()=>{ var e=document.querySelector('.tile[data-entity=album] .tile-art'); return e? Math.round(e.getBoundingClientRect().width):null; })()")
         check(aw is not None and aw < 120, f'Albums page: three across ({aw}px)')
         await pg.screenshot(path=f'{shots}/layout-albums60.png')

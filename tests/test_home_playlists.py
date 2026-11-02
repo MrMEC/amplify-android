@@ -114,12 +114,12 @@ async def main():
         check((await pg.evaluate(ROW))['shown'], 'Back returns Home')
         # heading opens the Playlists page
         await pg.evaluate("document.getElementById('playlistsHomeHeading').click()"); await pg.wait_for_timeout(600)
-        check(await pg.evaluate("document.getElementById('stationsHeading').textContent") == 'Playlists', 'the heading opens the Playlists page')
+        check(await pg.evaluate("(document.querySelector('#stationsGrid .lib-tabs .active') || {}).textContent === 'Playlists' || document.getElementById('stationsHeading').textContent === 'Playlists'"), 'the heading opens the Playlists page (build 405: Library, on its Playlists tab)')
         # from the Playlists page, a playlist's Back still says Playlists
         await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .tile')).filter(function(t){ return /Mix/.test(t.textContent); })[0].click()"); await pg.wait_for_timeout(600)
         check(await pg.evaluate("document.getElementById('detailBackLabel').textContent") == 'Playlists', 'opened from the Playlists page, Back says Playlists')
         await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(600)
-        check(await pg.evaluate("document.getElementById('stationsHeading').textContent") == 'Playlists', 'and goes back there')
+        check(await pg.evaluate("(document.querySelector('#stationsGrid .lib-tabs .active') || {}).textContent === 'Playlists' || document.getElementById('stationsHeading').textContent === 'Playlists'"), 'and goes back there')
         await pg.evaluate('__h.home()'); await pg.wait_for_timeout(600)
         # follows changes
         await pg.evaluate("__h.rename('pl_mix', 'Road Trip')"); await pg.evaluate("__h.del('pl_empty')"); await pg.wait_for_timeout(200)
