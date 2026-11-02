@@ -17049,6 +17049,12 @@
   }
 
   function renderStationArt(container, station){
+    // Build 416: a re-render while the same song cover is already showing must not blank the
+    // box (that was the flashing between song and station cover).
+    if(container === playerIcon || container === npArt){
+      var keepUrl = onAirArtFor(station), shown = container.querySelector('img');
+      if(keepUrl && shown && shown.parentNode === container && shown.getAttribute('data-song-src') === keepUrl) return;
+    }
     container.innerHTML = '';
     // A box that showed an artist's picture before stops being refreshed as one.
     container._artistEntry = null;
@@ -17058,6 +17064,7 @@
     var token = beginArtRender(container);
     if(container.classList) container.classList.remove('art-soft');
     var softOK = false;      // set below, for a station's own logo only
+    var songPaint = false;
     var key = favKey(station);
     var coverHint = coverHintFor(station);
     applyPlaceholderArt(container, key, coverHint);
@@ -17081,6 +17088,7 @@
       img.onerror = function(){ img.remove(); if(softOK) container.classList.remove('art-soft'); };
       if(softOK) img.onload = function(){ if(img.parentNode === container) softenArt(container, img); };
       img.src = secureUrl(url);
+      if(songPaint) img.setAttribute('data-song-src', url);
       container.appendChild(img);
     }
 
@@ -17158,7 +17166,7 @@
     // Build 415: the song on air, for a station with no real logo (player bar and Now Playing).
     if(container === playerIcon || container === npArt){
       var songUrl = onAirArtFor(station);
-      if(songUrl){ paint(songUrl); return; }
+      if(songUrl){ songPaint = true; paint(songUrl); songPaint = false; return; }
     }
     softOK = !isCh;
     var cached = getArtCacheEntry(key);
@@ -34970,15 +34978,14 @@
     if(!HAS_MEDIA_SESSION || !track) return;
     var isLocal = isLocalTrack(track);
     var isPodcast = isPodcastTrack(track);
-    var song = (!isLocal && !isPodcast && !isChartSong(track) && typeof onAirFor === 'function') ? onAirFor(track) : null;
     mediaArtworkUrl(track).then(function(art){
       // A late artwork lookup must not overwrite metadata for a track that has since changed.
       if(!currentStation || favKey(currentStation) !== favKey(track)) return;
       try{
         navigator.mediaSession.metadata = new window.MediaMetadata({
-          title: song ? song.title : (stripExclusively(track.name) || 'Unknown'),
-          artist: song ? (song.artist || stripExclusively(track.name)) : ((isLocal || isChartSong(track)) ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio'))),
-          album: song ? stripExclusively(track.name) : (isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify')),
+          title: stripExclusively(track.name) || 'Unknown',
+          artist: (isLocal || isChartSong(track)) ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
+          album: isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify'),
           artwork: art ? [{ src: secureUrl(art), sizes: '512x512', type: '' }] : []
         });
       }catch(e){}
