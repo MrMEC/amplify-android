@@ -102,7 +102,7 @@ async def run(b, scheme, w, h):
     await pg.evaluate("__t.ev(\"['Ann','Bob'].forEach(function(n){ toggleFavorite(artistFavRecord(findArtistEntry(artistMatchKey(n)))); })\")"); await pg.wait_for_timeout(300)
     await lib(pg)
     r = await pg.evaluate(LT); print(T, r)
-    check(r['first'] and r['tabs'] == ['Artists', 'Albums', 'Songs', 'Playlists', 'Genres'] and r['active'] == 'Artists', f'{T} the Library opens on tabs, Artists first {r["tabs"]} {r["active"]}')
+    check(r['first'] and r['tabs'] == ['Artists', 'Albums', 'Songs', 'Playlists'] and r['active'] == 'Artists', f'{T} the Library opens on tabs, Artists first {r["tabs"]} {r["active"]}')
     check(r['heading'] == 'Library' and not r['back'], f'{T} headed Library, no back button')
     check(r['favRow'] == ['Ann', 'Bob'] and r['favRowScroll'] == 'auto' and r['allHead'] and r['gridArtists'] == 3, f'{T} Favorite Artists as a sideways row above All Artists {r["favRow"]} {r["gridArtists"]}')
     check(r['filterAfter'], f'{T} the filter box sits right under the tabs')
@@ -124,7 +124,7 @@ async def run(b, scheme, w, h):
     check(r['sw'] <= r['vw'], f'{T} nothing scrolls sideways')
     await pg.screenshot(path=f'{shots}/libtabs-artists-{scheme}-{w}.png')
     gaps = [r['gapTF']]
-    for tab, extra in (('albums', None), ('songs', None), ('playlists', None), ('genres', 'find')):
+    for tab, extra in (('albums', None), ('songs', None), ('playlists', None)):
         await pg.evaluate("(t)=>document.querySelector('.lib-tabs [data-libtab='+t+']').click()", tab); await pg.wait_for_timeout(900)
         r = await pg.evaluate(LT)
         check(r['first'] and r['active'] == tab.title() and r['heading'] == 'Library' and not r['back'], f'{T} {tab}: the tabs stay on top, {tab.title()} active {r["active"]} {r["heading"]}')
@@ -149,7 +149,7 @@ async def run(b, scheme, w, h):
     check(hb['back'] and hb['bars'] == 0, f'{T} on Home the buttons are back in the header and no toolbar is left behind {hb}')
     await pg.evaluate("__t.ev('loadTopStations()')"); await pg.wait_for_timeout(600)
     await lib(pg)
-    check((await pg.evaluate(LT))['active'] == 'Genres', f'{T} the Library reopens on the last tab used')
+    check((await pg.evaluate(LT))['active'] == 'Playlists', f'{T} the Library reopens on the last tab used')
     # an artist from the Artists tab, and Back
     await pg.evaluate("document.querySelector('.lib-tabs [data-libtab=artists]').click()"); await pg.wait_for_timeout(900)
     await pg.evaluate("document.querySelector('#stationsGrid > .tile[data-entity=\"artist\"]').click()"); await pg.wait_for_timeout(1200)

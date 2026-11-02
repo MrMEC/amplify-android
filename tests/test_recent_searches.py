@@ -63,8 +63,8 @@ async def main():
         for i in range(6):
             await pg.evaluate("document.querySelector('.recent-search-row .recent-search-del').click()"); await pg.wait_for_timeout(150)
         n = await pg.evaluate("document.querySelectorAll('.recent-search-row').length")
-        emp = await pg.evaluate("(document.querySelector('#stationsGrid .empty-state')||{}).textContent||''")
-        check(n == 0 and 'Search for' in emp, f'none left: the empty message ({n}, {emp[:30]})')
+        emp = await pg.evaluate("document.querySelectorAll('#stationsGrid .gb-card').length")
+        check(n == 0 and emp > 0, f'none left: the genre cards instead (build 410) ({n}, {emp})')
         # bigger text at 360 wide
         await pg.evaluate("localStorage.setItem('radioPlayerRecentSearches', JSON.stringify(['A very long search that will not fit on one line at all','Sting']))")
         await pg.reload(); await pg.wait_for_timeout(2000)

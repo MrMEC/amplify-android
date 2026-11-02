@@ -2366,6 +2366,9 @@
      below can sit inside the main column on desktop, where the right panel occupies the last
      280px, and against the screen edge on a phone, where that panel is gone. */
   :root{ --az-right: 2px; }
+  /* Build 410: the phone Search page's heading row and box row (desktop never shows the heading). */
+  :root{ --search-title-h: 60px; --search-sheet-h: 122px; }
+  .search-sheet-title{ display:none; }
   /* No right panel to clear any more, so the rail sits at the edge of the column. */
   @media (min-width: 901px){ :root{ --az-right: 10px; } }
   /* The rail is fixed, so it does not push anything aside by itself. The column hands it a
@@ -4851,14 +4854,29 @@
     .search-sheet.open{ transform:none; }
     .search-sheet-inner{ height:100%; box-sizing:border-box; padding:0 var(--main-pad, 16px); gap:10px; }
     .search-sheet-inner .search-sheet-field input{ padding:10px 44px 10px 14px; font-size:15px; }
-    body.search-open .sidebar-top{ visibility:hidden; transition:none; }
+    /* Build 410 (Mark): a "Search" heading like every other page, the header's menu button at
+       the top right, and the box under them. The sheet is the heading row plus the box row. */
+    .search-sheet{ height:var(--search-sheet-h); }
+    .search-sheet-title{
+      display:flex; align-items:center; height:var(--search-title-h); box-sizing:border-box;
+      padding:var(--hdr-row-top, 11px) 70px 0 var(--main-pad, 16px);
+      font-size:calc(22px * var(--title-fit, 1)); line-height:1.2; font-weight:700; color:var(--text);
+      white-space:nowrap; overflow:hidden;
+    }
+    body.home-stacked .search-sheet-title{ font-size:24px; }
+    .search-sheet-inner{ height:auto; padding-top:6px; padding-bottom:10px; }
+    body.search-open .sidebar-top{ visibility:visible; transition:none; z-index:310; background:transparent !important; box-shadow:none !important; border-color:transparent !important; pointer-events:none; transform:none !important; }
+    body.search-open .sidebar-top .top-actions{ pointer-events:auto; }
+    body.search-open .sidebar-top > :not(.top-actions){ visibility:hidden; }
+    body.search-open.search-view .browse-view{ padding-top:calc(var(--search-sheet-h) + 12px); }
+    body.search-open.search-view #searchTabs{ top:var(--search-sheet-h) !important; }
     /* Build 255: no tab bar while the keyboard is up (see the kb-open script). */
     body.kb-open .mobile-nav{ display:none; }
     /* Build 330: nor the black fade that sits behind the tab bar and mini player, which with both gone is just a dark smear over the list. */
     body.kb-open .mobile-scroll-fade{ display:none !important; }
     /* Build 329: and the mini Now Playing too, while a section filter box is the field being typed in. */
     body.kb-open:has(.sec-filter input:focus) .player-bar{ display:none !important; }
-    body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:60px; }
+    body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:var(--search-sheet-h); }
 
     /* Content clears the tab bar plus the player bar above it. */
     .main, body.album-open .main, body.artist-open .main{
@@ -7010,7 +7028,7 @@
   .gb-card-name{ position:absolute; left:14px; top:12px; right:46px; font-size:17px; font-weight:700; line-height:1.15; }
   .gb-card-icon{ position:absolute; right:-8px; bottom:-8px; width:64px; height:64px; transform:rotate(22deg); color:rgba(255,255,255,.92); pointer-events:none; }
   .gb-none{ grid-column:1/-1; margin:4px 0 0; font-size:14px; color:var(--text-dim); }
-  body.genre-open #stationsGrid, body.genres-open #stationsGrid{ row-gap:0; }
+  body.genre-open #stationsGrid, body.genres-open #stationsGrid, #stationsGrid.search-browse{ row-gap:0; }
   .gp-grid{ grid-column:1/-1; margin:0 0 24px; }
 
   /* The genre page: a header in the genre's colour (the text always sits on the colour), fading into the page. */
@@ -8047,6 +8065,7 @@
      at the top of the screen: search is something you go and do, not something that should
      cost a strip of every screen. -->
 <div class="search-sheet" id="searchSheet" aria-hidden="true">
+  <div class="search-sheet-title" aria-hidden="true">Search</div>
   <div class="search-sheet-inner">
     <div class="search-sheet-field">
       <input type="text" id="searchSheetInput" placeholder="Search or add stream" aria-label="Search">
@@ -9856,6 +9875,7 @@
   // spacing survives into whatever view is drawn next.
   function resetStationsGrid(){
     document.body.classList.remove('genre-open', 'genres-open', 'lib-tabs-on');   // build 403/406
+    stationsGrid.classList.remove('search-browse');
     if(typeof songsRender !== 'undefined') songsRender = null;   // build 405
     if(typeof mvPlayHdr !== 'undefined' && mvPlayHdr){ mvPlayHdr.style.display = 'none'; mvShuffleHdr.style.display = 'none'; }   // build 409
     stationsGrid._ctxList = null; stationsGrid._ctxLabel = null;
@@ -29742,19 +29762,25 @@
     })['catch'](function(err){ setStatus((err && err.message) || 'Stations could not be reached.', true); });
   }
   function openGenre(g){ pushView(); searchInput.value = ''; searchByTag(g); }
-  function renderGenresGrid(){
-    if(genresEditing){ renderGenresRows(); return; }
-    resetStationsGrid();
-    document.body.classList.add('genres-open');
+  // Build 410 (Mark): Search's empty page is this same browse content, without the filter box.
+  var genreFromSearch = false;
+  function renderGenresGrid(inSearch){
+    inSearch = inSearch === true;
+    if(genresEditing && !inSearch){ renderGenresRows(); return; }
+    if(!inSearch){ resetStationsGrid(); document.body.classList.add('genres-open'); }
+    else stationsGrid.classList.add('search-browse');
+    function openG(g){ genreFromSearch = inSearch; openGenre(g); }
     // A field to narrow the cards; Enter on a style that isn't a card looks it up.
-    var search = document.createElement('div');
+    var search = inSearch ? null : document.createElement('div');
+    if(search){
     search.className = 'sec-filter gb-find';
     search.setAttribute('role', 'search');
     search.innerHTML = '<i class="fa-solid fa-magnifying-glass sf-ico" aria-hidden="true"></i>'
       + '<input type="search" id="genreFindInput" placeholder="Filter genres" aria-label="Filter genres" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">'
       + '<button type="button" class="sf-clear" aria-label="Clear filter" title="Clear" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>';
     stationsGrid.appendChild(search);
-    var input = search.querySelector('input');
+    }
+    var input = search ? search.querySelector('input') : null;
     var top = topGenres(), topHead = null, topRow = null;
     if(top.length >= 2){
       topHead = document.createElement('h2'); topHead.className = 'gb-head'; topHead.textContent = 'Your top genres';
@@ -29768,8 +29794,8 @@
           + '<button type="button" class="gb-topcard-play" aria-label="Play ' + escapeHtml(g) + '"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>';
         card.querySelector('.gb-topcard-name').textContent = g;
         card.querySelector('.gb-topcard-blurb').textContent = look.blurb;
-        card.addEventListener('click', function(){ openGenre(g); });
-        card.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openGenre(g); } });
+        card.addEventListener('click', function(){ openG(g); });
+        card.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openG(g); } });
         card.querySelector('.gb-topcard-play').addEventListener('click', function(e){ e.stopPropagation(); playGenre(g, false); });
         topRow.appendChild(card);
       });
@@ -29782,7 +29808,7 @@
       card.type = 'button'; card.className = 'gb-card'; card.style.setProperty('--gc', look.color); card.dataset.genre = g;
       card.innerHTML = '<span class="gb-card-name"></span>' + genreIconSvg(g, 'gb-card-icon');
       card.querySelector('.gb-card-name').textContent = g;
-      card.addEventListener('click', function(){ openGenre(g); });
+      card.addEventListener('click', function(){ openG(g); });
       grid.appendChild(card);
       return card;
     });
@@ -29796,6 +29822,7 @@
       none.hidden = !(q && !shown);
       if(q && !shown) none.textContent = 'No genre called \u201c' + input.value.trim() + '\u201d. Press Enter to find stations for it.';
     }
+    if(!input) return;
     var clearBtn = search.querySelector('.sf-clear');
     input.addEventListener('input', function(){ clearBtn.hidden = !input.value; apply(); });
     clearBtn.addEventListener('click', function(){ input.value = ''; clearBtn.hidden = true; apply(); input.focus(); });
@@ -29811,7 +29838,7 @@
 
   // ---------- Build 405 (Mark): Library tabs ----------
   var LIB_TAB_KEY = 'radioPlayerLibTab';
-  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres']];
+  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists']];   // build 410: Genres moved to Search
   var libRootNav = false;
   function libLastTab(){
     var t = null; try{ t = localStorage.getItem(LIB_TAB_KEY); }catch(e){}
@@ -29835,7 +29862,6 @@
   function libTabNow(){
     if(activeArtistKey || activeAlbumKey || activeHomeSection || activeGenre) return null;
     if(onPlaylistsHomeView) return 'playlists';
-    if(onGenresHomeView) return 'genres';
     if(activeLibrarySection === 'artists' || activeLibrarySection === 'albums' || activeLibrarySection === 'songs') return activeLibrarySection;
     return null;
   }
@@ -38726,8 +38752,14 @@
 
   // `label` pulls the text a row is filed under out of each tile, so the rail always indexes
   // what the caption actually says rather than a field the list happens to be keyed on.
+  // Build 410 (Mark): never on Playlists, Genres, Live TV or Search, whatever drew it.
+  function azBlocked(){
+    return onPlaylistsHomeView || onGenresHomeView || (onVideoView && videoTab === 'channels') ||
+      document.body.classList.contains('search-view') || document.body.classList.contains('genres-open') || document.body.classList.contains('genre-open');
+  }
   function buildAzRail(items){
     hideAzRail();
+    if(azBlocked()) return;
     if(!azRail || !items || items.length < AZ_MIN_ITEMS) return;
 
     azTargets = {};
@@ -38770,6 +38802,7 @@
     function hideSoon(ms){ clearTimeout(timer); timer = setTimeout(function(){ if(!holding) document.body.classList.remove('az-show'); }, ms); }
     window.addEventListener('scroll', function(){
       if(azRail.style.display === 'none' || !azRail.children.length) return;
+      if(azBlocked()){ hideAzRail(); return; }
       if(window.scrollY <= 4 && !holding){ clearTimeout(timer); document.body.classList.remove('az-show'); return; }   // build 408: gone at the top
       document.body.classList.add('az-show');
       hideSoon(1600);
@@ -45005,11 +45038,17 @@
     searchInput.value = q;
     if(searchSheetInput) searchSheetInput.value = q;
   }
+  // Build 410 (Mark): the box in use (focused, empty) shows recent searches; otherwise the page
+  // is the genre browse cards.
+  function searchBoxFocused(){
+    var a = document.activeElement;
+    return !!a && (a === searchSheetInput || a === searchInput);
+  }
   function renderSearchHome(){
     hideSearchTabsRow();
     resetStationsGrid();
-    if(!recentSearches.length){
-      stationsGrid.innerHTML = '<div class="empty-state">Search for stations, artists, albums, songs, podcasts and TV channels, or paste a stream link.</div>';
+    if(!recentSearches.length || !searchBoxFocused()){
+      renderGenresGrid(true);
       return;
     }
     stationsGrid.classList.add('grid-songs');
@@ -45092,7 +45131,8 @@
     // A genre's station list is Genres' own category, so its back button always returns
     // there -- same fixed-destination treatment as the other sections' items above, rather
     // than a history-based one.
-    setDetailBackToHistory(function(){ openGenresHome(); }, 'Genres');
+    if(genreFromSearch){ genreFromSearch = false; setDetailBackToHistory(function(){ searchInput.value = ''; if(searchSheetInput) searchSheetInput.value = ''; searchByName('', true); }, 'Search'); }
+    else setDetailBackToHistory(function(){ openGenresHome(); }, 'Genres');
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
     // views reach for hideArtistHero but not for its twin, so arriving at Home, a genre, a
@@ -45267,8 +45307,8 @@
     closeNowPlaying();
     var v = searchInput.value.trim();
     if(searchTypeTimer){ clearTimeout(searchTypeTimer); searchTypeTimer = null; }
-    // Nothing typed: the results page, on the last search (or empty if there hasn't been one).
-    if(!v){ showLastSearchResults(); return; }
+    // Nothing typed: the Search page as it is (build 410: never brings back the last search).
+    if(!v){ if(!onSearchView) searchByName('', true); return; }
     if(!isUrlLike(v)) addRecentSearch(v);
     flushSearchRemote();
     // The same words as the kept search: bring those results back rather than searching again.
@@ -45377,9 +45417,19 @@
     else if(e.key === 'Escape') closeSearchSheet(true);
   });
   // Tapping the box opens the results page at once; typing updates it letter by letter.
+  function searchHomeShowing(){ return onSearchView && !searchState && !String(searchSheetInput.value || '').trim(); }
   searchSheetInput.addEventListener('focus', function(){
     searchInput.value = searchSheetInput.value;
+    if(searchHomeShowing() && recentSearches.length){ renderSearchHome(); return; }
     openSearchFromInput(searchSheetInput);
+  });
+  searchSheetInput.addEventListener('blur', function(){
+    setTimeout(function(){
+      if(searchBoxFocused() || !searchHomeShowing()) return;
+      if(confirmPending) return;
+      if(!stationsGrid.querySelector('.recent-searches-head')) return;
+      renderSearchHome();
+    }, 250);
   });
   searchSheetInput.addEventListener('input', function(){
     searchInput.value = searchSheetInput.value;
@@ -45451,8 +45501,9 @@
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView || document.body.classList.contains('lc-page-open')) return 'video';
+    if(onGenresHomeView || activeGenre) return 'search';   // build 410: Genres live on Search
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
-       onPlaylistsHomeView || onGenresHomeView || activeStationPlaylistId || activeGenre) return 'library';
+       onPlaylistsHomeView || activeStationPlaylistId) return 'library';
     // For You (and its searches) lives on Home now.
     if(onHomeView || activeHomeSection || onStationsHomeView || activeCustomSearchId) return 'home';
     return null;
