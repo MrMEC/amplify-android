@@ -34960,6 +34960,8 @@
     if(custom) return Promise.resolve(custom);
     if(isLocalTrack(track)) return localArtUrl(track);
     if(isChartSong(track)) return Promise.resolve(songArt[track.songKey] || null);
+    var songCover = (typeof onAirArtFor === 'function') ? onAirArtFor(track) : null;
+    if(songCover) return Promise.resolve(songCover);
     var cached = getArtCacheEntry(key);
     if(cached !== undefined && cached.url) return Promise.resolve(cached.url);
     return Promise.resolve(track.favicon || null);
@@ -34968,14 +34970,15 @@
     if(!HAS_MEDIA_SESSION || !track) return;
     var isLocal = isLocalTrack(track);
     var isPodcast = isPodcastTrack(track);
+    var song = (!isLocal && !isPodcast && !isChartSong(track) && typeof onAirFor === 'function') ? onAirFor(track) : null;
     mediaArtworkUrl(track).then(function(art){
       // A late artwork lookup must not overwrite metadata for a track that has since changed.
       if(!currentStation || favKey(currentStation) !== favKey(track)) return;
       try{
         navigator.mediaSession.metadata = new window.MediaMetadata({
-          title: stripExclusively(track.name) || 'Unknown',
-          artist: (isLocal || isChartSong(track)) ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio')),
-          album: isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify'),
+          title: song ? song.title : (stripExclusively(track.name) || 'Unknown'),
+          artist: song ? (song.artist || stripExclusively(track.name)) : ((isLocal || isChartSong(track)) ? (track.artist || 'Unknown artist') : (isPodcast ? (track.collectionName || 'Podcast') : (displayCountry(track.country) || 'Internet radio'))),
+          album: song ? stripExclusively(track.name) : (isLocal ? (track.album || '') : (isPodcast ? (track.artistName || '') : 'Amplify')),
           artwork: art ? [{ src: secureUrl(art), sizes: '512x512', type: '' }] : []
         });
       }catch(e){}
@@ -47697,13 +47700,9 @@
   // song it is playing, on the player bar and the Now Playing screen. The song's cover comes
   // from the same lookup the Top 100 uses; with no artist in the stream title nothing is asked.
   var onAirArt = null;     // { key, song, url }
-  function stationWeakLogo(st){
-    if(!isFindableStation(st) || customArtFor(st)) return false;
-    var c = getArtCacheEntry(favKey(st));
-    if(c && c.url && !c.w) return false;                 // sharpness not measured: assume it is fine
-    var has = c ? !!c.url : !!st.favicon;
-    return !has || !!(c && c.w && c.w < 128);
-  }
+  // Build 416: every live radio station shows the on-air song's cover when the stream names
+  // artist and title, and falls back to the station's own cover otherwise.
+  function stationWeakLogo(st){ return !!st && isLiveStream(st); }
   function onAirArtFor(st){
     var song = onAirFor(st);
     return (song && onAirArt && onAirArt.key === song.key && onAirArt.song === song.title + '\n' + song.artist && stationWeakLogo(st)) ? onAirArt.url : null;
@@ -47711,7 +47710,7 @@
   function dropOnAirArt(){
     if(!onAirArt) return;
     onAirArt = null;
-    if(currentStation) try{ refreshStationArt(currentStation); }catch(e){}
+    if(currentStation){ try{ refreshStationArt(currentStation); }catch(e){} }
   }
   function fetchOnAirArt(){
     var song = onAir, st = currentStation;
@@ -47719,7 +47718,7 @@
     requestSongArt({ artist: song.artist, name: song.title }, function(url){
       if(!onAir || onAir.key !== song.key || onAir.title !== song.title || onAir.artist !== song.artist) return;
       onAirArt = { key: song.key, song: song.title + '\n' + song.artist, url: url };
-      if(currentStation && favKey(currentStation) === song.key) try{ refreshStationArt(currentStation); }catch(e){}
+      if(currentStation && favKey(currentStation) === song.key){ try{ refreshStationArt(currentStation); }catch(e){} try{ updateMediaSession(currentStation); }catch(e){} }
     }, null);
   }
   function setOnAir(ev){
@@ -47735,11 +47734,13 @@
       onAir = { key: key, title: title, artist: artist, at: Date.now() };
       if(onAirArt) dropOnAirArt();
       fetchOnAirArt();
+      try{ updateMediaSession(st); }catch(e){}
       onAirLog.unshift({ key: key, station: stripExclusively(st.name), title: title, artist: artist, at: onAir.at });
       if(onAirLog.length > ON_AIR_LOG_MAX) onAirLog.length = ON_AIR_LOG_MAX;
       noteStationSong(st, title, artist);
     }
     if(!onAir && onAirArt) dropOnAirArt();
+    if(!onAir && prev && currentStation) try{ updateMediaSession(currentStation); }catch(e){}
     if(!prev && !onAir) return;
     // The bar only when it is showing the normal line: never over "Buffering…", "Paused",
     // a reconnect countdown or an error.

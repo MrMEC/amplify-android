@@ -95,11 +95,14 @@ async def main():
         npm = await pg.evaluate("window.__fc.np()")
         check(npm[0] == '', f'the Now Playing menu shows Find better cover for a station {npm}')
         await pg.evaluate("document.getElementById('npMenu').classList.remove('open')")
-        # a station with a real logo never asks
+        # build 416: a station with a real logo shows the song cover too
         await pg.evaluate("(s)=>{ window.__fc.setCur(s); }", STN)
         await pg.evaluate("window.__fc.onAir({title:'Blue Skies', artist:'Ella Vale'})")
         await pg.wait_for_timeout(1500)
-        check(not await pg.evaluate("window.__fc.art()"), 'a station with its own logo keeps it')
+        check(bool(await pg.evaluate("window.__fc.art()")), 'a station with its own logo also shows the song cover')
+        await pg.evaluate("window.__fc.onAir({title:'', artist:''})")
+        await pg.wait_for_timeout(600)
+        check(not await pg.evaluate("window.__fc.art()"), 'and falls back to the station cover when nothing is named')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print('FAILS:', fails)

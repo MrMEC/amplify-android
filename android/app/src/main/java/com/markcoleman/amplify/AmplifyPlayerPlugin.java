@@ -492,7 +492,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     if (m != null) {
       if (m.title != null) title = m.title.toString();
       if (m.artist != null) artist = m.artist.toString();
-      if (m.artworkUri != null) art = m.artworkUri.toString();
+      if (lastArtHttp != null) art = lastArtHttp;
+      else if (m.artworkUri != null) art = m.artworkUri.toString();
     }
     final boolean local = CastRelay.isLocal(castUrl);
     final boolean live = !local && !castVodHint && CastBridge.liveFor(castUrl, castLiveHint || lastLive);
@@ -1171,6 +1172,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         });
   }
 
+  private volatile String lastArtHttp = null;
+
   @PluginMethod
   public void setMetadata(final PluginCall pluginCall) {
     MediaMetadata.Builder isPlayable =
@@ -1182,6 +1185,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean zEquals = Boolean.TRUE.equals(pluginCall.getBoolean("live", false));
     String string = pluginCall.getString("artUrl");
     String string2 = pluginCall.getString("artData");
+    this.lastArtHttp = null;
     if (string2 != null && !string2.isEmpty()) {
       byte[] bArrShrinkArt = shrinkArt(string2);
       if (bArrShrinkArt != null) {
@@ -1189,7 +1193,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       }
       this.lastArtBytes = bArrShrinkArt;
     } else if (string != null && string.startsWith("http")) {
-      isPlayable.setArtworkUri(Uri.parse(string));
+      isPlayable.setArtworkUri(ArtProvider.uriFor(string));
+      this.lastArtHttp = string;
       this.lastArtBytes = null;
     } else {
       this.lastArtBytes = null;
