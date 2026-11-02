@@ -347,7 +347,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
                   return;
                 }
                 this.songArtUrl = url;
-                notifyMetadataChanged();
+                notifySongArtChanged();
               });
         });
   }
@@ -363,7 +363,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
         : null;
   }
 
-  private void notifyMetadataChanged() {
+  private void notifySongArtChanged() {
     MediaMetadata mediaMetadata = getMediaMetadata();
     Player.Events events = new Player.Events(new FlagSet.Builder().add(14).build());
     Iterator it = new ArrayList(this.wrapped.values()).iterator();
