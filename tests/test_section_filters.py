@@ -166,7 +166,7 @@ async def run(vw, vh, mobile, scheme, tag, full):
         await typ(pg, 'eclair')
         check(await vis(pg, '#stationsGrid .song-row:not(.shuffle-all-row) .song-row-title') == ['Café Song'], f'[{tag}] Songs: the artist counts too ("eclair")')
         await typ(pg, '')
-        check(len(await vis(pg, '#stationsGrid .song-row:not(.shuffle-all-row)')) == 6 and await vis(pg, '#stationsGrid .shuffle-all-row'), f'[{tag}] Songs: emptied, all six and Shuffle All back')
+        check(len(await vis(pg, '#stationsGrid .song-row:not(.shuffle-all-row)')) == 6, f'[{tag}] Songs: emptied, all six back (build 407: no Shuffle All row)')
         # the box leaves with the page
         await pg.evaluate("__t.home('favorites')"); await pg.wait_for_timeout(800)
         check(await info(pg) is None, f'[{tag}] no box on a Home "see all" page')
@@ -174,8 +174,11 @@ async def run(vw, vh, mobile, scheme, tag, full):
         # ---- Podcasts
         await pg.evaluate("__t.pods()"); await pg.wait_for_timeout(1200)
         i = await info(pg)
-        check(i and i['prevId'] == 'sectionHeadingRow' and i['ph'] == 'Filter podcasts' and not i['focused'], f'[{tag}] Podcasts: box under the heading {i}')
+        check(i and i['prevId'] in ('sectionHeadingRow', 'podcastTabs') and i['ph'] == 'Filter podcasts' and not i['focused'], f'[{tag}] Podcasts: box under the heading and its tabs {i}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-podcasts.png')
+        po = await pg.evaluate("""(()=>{ var f=document.getElementById('secFilter').getBoundingClientRect(), t=document.getElementById('podcastTabs'); var tr=t&&t.offsetParent?t.getBoundingClientRect():null;
+          return { fBottom: Math.round(f.bottom), fTop: Math.round(f.top), tTop: tr?Math.round(tr.top):null, tBottom: tr?Math.round(tr.bottom):null, az: getComputedStyle(document.getElementById('azRail')).display }; })()""")
+        check(po['tTop'] is not None and po['fTop'] - po['tBottom'] == 12, f'[{tag}] build 407: Podcasts\' filter sits 12px under its tabs, as on Library and Watch {po}')
         await typ(pg, 'garden')
         names = await vis(pg, "#stationsGrid .tile[data-entity='podcastshow'] .tile-name")
         check(names == ['The Garden Hour'], f'[{tag}] Podcasts: "garden" {names}')

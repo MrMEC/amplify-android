@@ -7087,6 +7087,10 @@
   .lib-toolbar-count{ font-size:13px; font-weight:600; color:var(--text-dim); white-space:nowrap; }
   .lib-toolbar-btns{ display:flex; align-items:center; gap:8px; margin-left:auto; }
   .lib-toolbar-btns > button{ margin:0 !important; }
+  /* Build 407 (Mark): the A-Z rail stays out of sight until the page is scrolled, fades in, and fades
+     out again a moment after scrolling (or a drag along it) stops. */
+  .az-rail{ opacity:0; pointer-events:none; transition:opacity .25s ease; }
+  body.az-show .az-rail{ opacity:1; pointer-events:auto; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -29834,6 +29838,8 @@
     // The active tab in view when the row scrolls.
     var on = bar.querySelector('.active');
     if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
+    if(id === 'playlists' || id === 'genres') hideAzRail();   // build 407: no A-Z on these two
+    if(id === 'playlists') setResultCount(stationPlaylists.length, 'playlist');
     if(id === 'artists' || id === 'albums' || id === 'songs'){
       libraryAddHeaderBtn.style.display = '';
       libraryAddHeaderBtn.onclick = openAddMusicDialog;
@@ -38643,6 +38649,7 @@
   var azBeforeJump = null;
   function hideAzRail(){
     azBeforeJump = null;
+    document.body.classList.remove('az-show');
     if(!azRail) return;
     azRail.style.display = 'none';
     document.body.classList.remove('az-on');
@@ -38690,6 +38697,20 @@
       });
   }
 
+  // Build 407 (Mark): the A-Z rail shows only while scrolling.
+  (function(){
+    if(!azRail) return;
+    var timer = 0, holding = false;
+    function hideSoon(ms){ clearTimeout(timer); timer = setTimeout(function(){ if(!holding) document.body.classList.remove('az-show'); }, ms); }
+    window.addEventListener('scroll', function(){
+      if(azRail.style.display === 'none' || !azRail.children.length) return;
+      document.body.classList.add('az-show');
+      hideSoon(1600);
+    }, { passive: true });
+    azRail.addEventListener('pointerdown', function(){ holding = true; clearTimeout(timer); document.body.classList.add('az-show'); });
+    window.addEventListener('pointerup', function(){ if(holding){ holding = false; hideSoon(1600); } });
+    window.addEventListener('pointercancel', function(){ if(holding){ holding = false; hideSoon(1600); } });
+  })();
   if(azRail){
     // A plain tap is a click; a press-and-drag is the pointer sequence below. The click
     // handler is skipped during a drag so one gesture never fires both.
@@ -40525,9 +40546,7 @@
     tracks.sort(byNameAsc);
     stationsGrid._ctxList = tracks;
     stationsGrid._ctxLabel = 'Songs';
-    // A Shuffle All row heads the list (the car's Songs list starts with the same one).
-    if(tracks.length > 1) stationsGrid.appendChild(buildShuffleAllRow(tracks, 'Songs'));
-    // Broken into letters, with the letter over each run.
+    // Build 407 (Mark): no Shuffle All row here; the Shuffle button under the filter does it.
     var job = songsRender = {}, i = 0, letter = null, heads = {};
     function step(n){
       var frag = document.createDocumentFragment(), end = Math.min(tracks.length, i + n);
@@ -49008,7 +49027,8 @@
       }
       if(onPodcastsView){
         if(activeShowCollectionId) return null;
-        return { key: 'podcasts', tabs: null };
+        var pt = document.getElementById('podcastTabs');   // build 407: under the tabs, as on Library and Watch
+        return { key: 'podcasts', tabs: pt && pt.offsetParent ? pt : null };
       }
       if(activeHomeSection || onHomeView || activeArtistKey || activeAlbumKey) return null;
       if(cls.contains('album-open') || cls.contains('artist-open')) return null;
@@ -49022,7 +49042,26 @@
     // Build 406 (Mark: too much space around the Watch filters): the box sits 12px under the tabs
     // and 18px over what follows, whatever the page's own grid gap.
     function tune(){
-      if(bar.parentNode !== stationsGrid || !bar.offsetParent) return;
+      // Build 407 (Mark: Podcasts' filter sat over its tabs): outside the grid (Podcasts) the box
+      // keeps its own stylesheet spacing, not what a grid page set on it before.
+      if(bar.parentNode !== stationsGrid){
+        bar.style.removeProperty('margin-top'); bar.style.removeProperty('margin-bottom');
+        var pv = bar.previousElementSibling;
+        if(pv && pv.id === 'podcastTabs' && bar.offsetParent){
+          var gapA = bar.getBoundingClientRect().top - pv.getBoundingClientRect().bottom;
+          var mt = parseFloat(getComputedStyle(bar).marginTop) || 0;
+          bar.style.setProperty('margin-top', (mt + 12 - gapA) + 'px', 'important');
+          var nx = bar.nextElementSibling; while(nx && !nx.offsetParent) nx = nx.nextElementSibling;
+          var first = nx && nx.id === 'stationsGrid' ? Array.prototype.filter.call(nx.children, function(c){ return c.offsetParent; })[0] : nx;
+          if(first){
+            var gapB = first.getBoundingClientRect().top - bar.getBoundingClientRect().bottom;
+            var mb = parseFloat(getComputedStyle(bar).marginBottom) || 0;
+            bar.style.setProperty('margin-bottom', (mb + 18 - gapB) + 'px', 'important');
+          }
+        }
+        return;
+      }
+      if(!bar.offsetParent) return;
       var rg = parseFloat(getComputedStyle(stationsGrid).rowGap) || 0;
       var prev = bar.previousElementSibling, prevMb = prev ? (parseFloat(getComputedStyle(prev).marginBottom) || 0) : 0;
       bar.style.setProperty('margin-top', (12 - rg - prevMb) + 'px', 'important');
