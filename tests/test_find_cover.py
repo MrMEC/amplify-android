@@ -9,7 +9,7 @@ shutil.rmtree(ROOT, ignore_errors=True); os.makedirs(ROOT); os.makedirs(SHOTS, e
 html = open(os.path.join(HERE, '..', 'www', 'index.html')).read()
 mark = '  function renderStationArt(container, station){'
 assert html.count(mark) == 1
-html = html.replace(mark, "  window.__fc = { open: openFindBetterCover, rowMenu: function(a, t){ openRowMenu(a, t, {}); }, findable: isFindableStation, setCur: function(s){ currentStation = s; }, onAir: setOnAir, rerender: function(){ refreshStationArt(currentStation); try{ renderNowPlayingScreen(); }catch(e){} },  art: function(){ return onAirArt; }, np: function(){ toggleNpMenu(); return [document.getElementById('npFindCoverBtn').style.display, JSON.stringify(npTarget() && npTarget().name)]; } };\n" + mark, 1)
+html = html.replace(mark, "  window.__fc = { open: openFindBetterCover, rowMenu: function(a, t){ openRowMenu(a, t, {}); }, findable: isFindableStation, setCur: function(s){ currentStation = s; }, onAir: setOnAir, dbg: function(){ try{ refreshStationArt(currentStation); }catch(e){ return String(e); } return [document.getElementById('playerIcon').innerHTML.slice(0,160),songArtPending, !!onAirArt, onAir && onAir.title, currentStation && currentStation.name]; }, rerender: function(){ refreshStationArt(currentStation); try{ renderNowPlayingScreen(); }catch(e){} },  art: function(){ return onAirArt; }, np: function(){ toggleNpMenu(); return [document.getElementById('npFindCoverBtn').style.display, JSON.stringify(npTarget() && npTarget().name)]; } };\n" + mark, 1)
 open(ROOT + '/index.html', 'w').write(html)
 H = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT); H.log_message = lambda *a: None
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 8841), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -86,6 +86,15 @@ async def main():
         src = await pg.evaluate("(document.querySelector('#playerIcon img')||{}).src || ''")
         check(src.endswith('cover.png'), f'the player bar wears the song cover {src}')
         await pg.screenshot(path=f'{SHOTS}/findcover-song.png')
+        fade = await pg.evaluate("(()=>{ var i=document.querySelector('#playerIcon img.song-fade'); return i ? [i.classList.contains('in'), getComputedStyle(i).transitionDuration] : null; })()")
+        check(fade and fade[0] and fade[1] != '0s', f'the song cover is set to fade in {fade}')
+        await pg.evaluate("window.__fc.onAir({title:'Second Song', artist:'Ella Vale'})")
+        await pg.wait_for_timeout(150)
+        xf = await pg.evaluate("[document.querySelectorAll('#playerIcon img').length, !!document.querySelector('#playerIcon img.song-out'), !!document.querySelector('#playerIcon img.song-fade')]")
+        await pg.screenshot(path=f'{SHOTS}/findcover-xfade.png')
+        await pg.wait_for_timeout(1500)
+        xf2 = await pg.evaluate("[document.querySelectorAll('#playerIcon img').length, !!document.querySelector('#playerIcon img.song-fade.in')]")
+        check(xf2 == [1, True], f'next song crossfades then settles on one picture {xf} -> {xf2}')
         # repeated renders must not blank or swap the picture (the flashing bug)
         await pg.evaluate("window.__fc.mark = document.querySelector('#playerIcon img')")
         flips = await pg.evaluate("() => new Promise(r => { var n = 0, bad = 0; var t = setInterval(() => { window.__fc.rerender(); var i = document.querySelector('#playerIcon img'); if(i !== window.__fc.mark) bad++; if(++n >= 20){ clearInterval(t); r(bad); } }, 30); })")

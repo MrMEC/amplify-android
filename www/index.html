@@ -4648,6 +4648,12 @@
     display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:18px; color:var(--text-faint);
   }
   .player-icon img{ width:100%; height:100%; object-fit:cover; }
+  .player-icon{ position:relative; }
+  /* Build 418: a song cover fades in over what was showing instead of popping in. */
+  img.song-fade{ opacity:0; transition:opacity .55s ease; }
+  img.song-fade.in{ opacity:1; }
+  img.song-out{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:1; transition:opacity .55s ease; pointer-events:none; z-index:2; }
+  img.song-out.gone{ opacity:0; }
   .player-info{ min-width:0; flex: 1 1 200px; }
   .player-info .name{ font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .player-info .sub{ font-size:11.5px; color:var(--text-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -17053,7 +17059,12 @@
     // box (that was the flashing between song and station cover).
     if(container === playerIcon || container === npArt){
       var keepUrl = onAirArtFor(station), shown = container.querySelector('img');
-      if(keepUrl && shown && shown.parentNode === container && shown.getAttribute('data-song-src') === keepUrl) return;
+      if(shown && shown.parentNode === container && shown.hasAttribute('data-song-src') && ((keepUrl && shown.getAttribute('data-song-src') === keepUrl) || (!keepUrl && songArtPending && isLiveStream(station)))) return;
+    }
+    var outgoing = null;
+    if((container === playerIcon || container === npArt) && onAirArtFor(station)){
+      var oi = container.querySelector('img:not(.song-out)');
+      if(oi && oi.complete && oi.naturalWidth) outgoing = oi.cloneNode(false);
     }
     container.innerHTML = '';
     // A box that showed an artist's picture before stops being refreshed as one.
@@ -17088,7 +17099,20 @@
       img.onerror = function(){ img.remove(); if(softOK) container.classList.remove('art-soft'); };
       if(softOK) img.onload = function(){ if(img.parentNode === container) softenArt(container, img); };
       img.src = secureUrl(url);
-      if(songPaint) img.setAttribute('data-song-src', url);
+      if(songPaint){
+        img.setAttribute('data-song-src', url);
+        img.className = 'song-fade';
+        var reveal = function(){
+          if(img.parentNode !== container) return;
+          requestAnimationFrame(function(){ requestAnimationFrame(function(){
+            img.classList.add('in');
+            if(outgoing){ outgoing.classList.add('gone'); setTimeout(function(){ if(outgoing.parentNode) outgoing.remove(); }, 650); }
+          }); });
+        };
+        var oldLoad = img.onload;
+        img.onload = function(){ if(oldLoad) oldLoad(); reveal(); };
+        if(outgoing){ outgoing.className = 'song-out'; container.appendChild(outgoing); }
+      }
       container.appendChild(img);
     }
 
@@ -47714,16 +47738,18 @@
     var song = onAirFor(st);
     return (song && onAirArt && onAirArt.key === song.key && onAirArt.song === song.title + '\n' + song.artist && stationWeakLogo(st)) ? onAirArt.url : null;
   }
-  function dropOnAirArt(){
+  function dropOnAirArt(quiet){
     if(!onAirArt) return;
     onAirArt = null;
-    if(currentStation){ try{ refreshStationArt(currentStation); }catch(e){} }
+    if(!quiet && currentStation){ try{ refreshStationArt(currentStation); }catch(e){} }
   }
+  var onAirArtSettle = null, songArtPending = false;
   function fetchOnAirArt(){
     var song = onAir, st = currentStation;
     if(!song || !song.artist || !st || !stationWeakLogo(st)) return;
     requestSongArt({ artist: song.artist, name: song.title }, function(url){
       if(!onAir || onAir.key !== song.key || onAir.title !== song.title || onAir.artist !== song.artist) return;
+      songArtPending = false;
       onAirArt = { key: song.key, song: song.title + '\n' + song.artist, url: url };
       if(currentStation && favKey(currentStation) === song.key){ try{ refreshStationArt(currentStation); }catch(e){} try{ updateMediaSession(currentStation); }catch(e){} }
     }, null);
@@ -47739,14 +47765,21 @@
       var key = favKey(st);
       if(prev && prev.key === key && prev.title === title && prev.artist === artist) return;
       onAir = { key: key, title: title, artist: artist, at: Date.now() };
-      if(onAirArt) dropOnAirArt();
+      var hadSongArt = !!onAirArt || songArtPending || !!(playerIcon.querySelector('img[data-song-src]') || npArt.querySelector('img[data-song-src]'));
+      if(onAirArt) dropOnAirArt(true);
+      songArtPending = hadSongArt;
+      if(hadSongArt && !artist){ hadSongArt = false; songArtPending = false; if(currentStation) try{ refreshStationArt(currentStation); }catch(e){} }
       fetchOnAirArt();
+      // The new song's cover fades in over the old one; if none turns up, settle back to the
+      // station's cover rather than leaving the last song's on show.
+      clearTimeout(onAirArtSettle);
+      if(hadSongArt && !onAirArt) onAirArtSettle = setTimeout(function(){ songArtPending = false; if(!onAirArt && currentStation) try{ refreshStationArt(currentStation); }catch(e){} }, 7000);
       try{ updateMediaSession(st); }catch(e){}
       onAirLog.unshift({ key: key, station: stripExclusively(st.name), title: title, artist: artist, at: onAir.at });
       if(onAirLog.length > ON_AIR_LOG_MAX) onAirLog.length = ON_AIR_LOG_MAX;
       noteStationSong(st, title, artist);
     }
-    if(!onAir && onAirArt) dropOnAirArt();
+    if(!onAir){ var wasPending = songArtPending; songArtPending = false; clearTimeout(onAirArtSettle); if(onAirArt) dropOnAirArt(); else if(wasPending && currentStation) try{ refreshStationArt(currentStation); }catch(e){} }
     if(!onAir && prev && currentStation) try{ updateMediaSession(currentStation); }catch(e){}
     if(!prev && !onAir) return;
     // The bar only when it is showing the normal line: never over "Buffering…", "Paused",
