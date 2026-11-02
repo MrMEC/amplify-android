@@ -47794,8 +47794,10 @@
     if(!item.artist || !item.name || songArt[item.songKey] || songArtIsNone(item.songKey)) return;
     requestSongArt(item, function(url){
       if(!url || !currentStation || favKey(currentStation) !== favKey(t)) return;
-      try{ refreshStationArt(currentStation); }catch(e){}
-      try{ updateMediaSession(currentStation); }catch(e){}
+      setTimeout(function(){
+        try{ refreshStationArt(currentStation); }catch(e){}
+        try{ updateMediaSession(currentStation); }catch(e){}
+      }, 0);
     }, null);
   }
   function songCoverNow(st){ return onAirArtFor(st) || radioSongCoverFor(st); }
@@ -47808,14 +47810,15 @@
   }
   function lastSongCoverFor(st){
     var it = lastSongItem(st);
-    return it ? (songArt[it.songKey] || null) : null;
+    return it ? (songArtKnown(it.songKey) || null) : null;
   }
   function requestLastSongCover(st, slide){
     var it = lastSongItem(st);
-    if(!it || songArt[it.songKey] || songArtIsNone(it.songKey)) return;
+    if(!it || songArtKnown(it.songKey) || songArtIsNone(it.songKey) || slide._coverAsked === it.songKey) return;
+    slide._coverAsked = it.songKey;       // once per song: a repaint must never ask again in a loop
     requestSongArt(it, function(url){
       if(!url || !slide || slide._item !== st) return;
-      repaintHeroSlideArt(slide);
+      setTimeout(function(){ repaintHeroSlideArt(slide); }, 0);
     }, null);
   }
   function dropOnAirArt(quiet){
