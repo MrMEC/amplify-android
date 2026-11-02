@@ -7098,6 +7098,7 @@
   .tile-grid.mv-grid{ row-gap:18px !important; }
   .tile-grid.mv-grid > .grid-section-label, .tile-grid.mv-grid > .mv-artists-head{ margin-top:10px !important; margin-bottom:-8px !important; }
   .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .artist-videos{ margin-top:0 !important; margin-bottom:0 !important; }
+  #sectionHeadingRow .section-heading-right.tb-pending{ visibility:hidden; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -9856,6 +9857,7 @@
   function resetStationsGrid(){
     document.body.classList.remove('genre-open', 'genres-open', 'lib-tabs-on');   // build 403/406
     if(typeof songsRender !== 'undefined') songsRender = null;   // build 405
+    if(typeof mvPlayHdr !== 'undefined' && mvPlayHdr){ mvPlayHdr.style.display = 'none'; mvShuffleHdr.style.display = 'none'; }   // build 409
     stationsGrid._ctxList = null; stationsGrid._ctxLabel = null;
     var allArtists = document.getElementById('allArtistsLink');
     if(allArtists) allArtists.style.display = 'none';
@@ -22084,6 +22086,21 @@
     if(typeof renderChannelsHome === 'function') renderChannelsHome();
   }
   var videoAddHeaderBtnEl = document.getElementById('videoAddHeaderBtn');
+  // Build 409: Music Videos' Play All and Shuffle, as icon buttons in the page's button group.
+  var mvPlayHdr = null, mvShuffleHdr = null;
+  (function(){
+    var add = document.getElementById('videoAddHeaderBtn');
+    if(!add) return;
+    function mk(id, title, icon){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'clear-search-btn'; b.id = id; b.title = title; b.setAttribute('aria-label', title);
+      b.style.display = 'none'; b.innerHTML = icon;
+      add.parentNode.insertBefore(b, add);
+      return b;
+    }
+    mvPlayHdr = mk('mvPlayAllHdrBtn', 'Play all', '<i class="fa-solid fa-play"></i>');
+    mvShuffleHdr = mk('mvShuffleHdrBtn', 'Shuffle', '<svg class="hdr-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/><path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>');
+  })();
   var videoReorderHeaderBtnEl = document.getElementById('videoReorderHeaderBtn');
   window.videoAddHeaderBtnEl = videoAddHeaderBtnEl;
   window.videoReorderHeaderBtnEl = videoReorderHeaderBtnEl;
@@ -22227,6 +22244,7 @@
   // channels, Add a Folder / Sort for movies and shows.
   function renderVideoHome(){
     resetStationsGrid();
+    setResultCount(null);   // build 409: each tab sets its own count
     closeChannelSortMenu();
     if(videoTab !== 'channels') videoChannelsEditing = false;
     appendVideoTabs();
@@ -22236,6 +22254,8 @@
     videoAddHeaderBtnEl.lastElementChild.textContent = videoTab === 'channels' ? 'Add' : 'Add Folder';
     if(videoTab !== 'channels') syncVideoMenuBtn();
     videoAddHeaderBtnEl.setAttribute('aria-label', videoAddHeaderBtnEl.title);
+    videoAddHeaderBtnEl.style.display = videoTab === 'channels' ? 'none' : '';   // build 409: Add Channels is in Live TV's Edit menu
+    if(mvPlayHdr){ mvPlayHdr.style.display = 'none'; mvShuffleHdr.style.display = 'none'; }
     if(videoTab === 'channels') renderChannelsTab();
     else if(videoTab === 'continue') renderVideoContinueTab();
     else if(videoTab === 'music') renderMusicVideosTab();
@@ -25333,13 +25353,16 @@
   function syncVideoMenuBtn(){
     var b = videoReorderHeaderBtnEl;
     if(videoTab === 'channels' && !videoChannelsEditing){
-      b.innerHTML = '<span aria-hidden="true">⋯</span>';
-      b.title = 'Guide options';
-      b.classList.add('dots-btn');
+      // Build 409 (Mark): the guide's menu button reads "Edit" (Add Channels is its first item).
+      b.innerHTML = '<i class="fa-solid fa-pen"></i><span class="btn-text">Edit</span>';
+      b.title = 'Edit';
+      b.classList.remove('dots-btn');
+      b.classList.add('show-label');
       b.setAttribute('aria-haspopup', 'true');
     } else {
       updateReorderHeaderBtn(b, videoChannelsEditing, 'Edit');
       b.classList.remove('dots-btn');
+      b.classList.toggle('show-label', videoTab === 'channels');
       b.removeAttribute('aria-haspopup');
     }
     b.setAttribute('aria-label', b.title);
@@ -25362,6 +25385,7 @@
       b.addEventListener('click', function(e){ e.stopPropagation(); closeChannelSortMenu(); fn(); });
       m.appendChild(b);
     }
+    opt('Add Channels', false, function(){ pushView(); openAddChannelsPage(); }, 'fa-solid fa-plus');   // build 409
     opt('Arrange Channels', false, function(){ setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
     var sep = document.createElement('div'); sep.className = 'ch-menu-sep'; m.appendChild(sep);
     label('Layout');
@@ -27980,6 +28004,7 @@
       add.addEventListener('click', addVideoFolder);
       stationsGrid.appendChild(add);
     } else {
+      setResultCount(items.length, tab === 'shows' ? 'show' : 'movie');   // build 409
       items.forEach(function(x){ stationsGrid.appendChild(tab === 'shows' ? buildShowTile(x) : buildMovieTile(x)); });
       // The A to Z rail (build 134). In A to Z order a letter jumps straight there; in Recently
       // Added a letter first switches the tab to A to Z, then jumps.
@@ -28374,19 +28399,13 @@
       stationsGrid.appendChild(empty);
       return;
     }
-    // Count, Play All and Shuffle (across every artist).
-    var top = document.createElement('div');
-    top.className = 'mv-top';
-    var sum = document.createElement('div');
-    sum.className = 'mv-sum';
-    sum.textContent = mvCountText(cat.all.length) + ' · ' + cat.artists.length + ' artist' + (cat.artists.length === 1 ? '' : 's');
-    top.appendChild(sum);
-    var acts = document.createElement('div');
-    acts.className = 'mv-acts';
-    acts.appendChild(mvButton('<i class="fa-solid fa-play"></i><span>Play All</span>', 'vd-play mv-btn', function(){ mvPlayList(cat.all, false); }));
-    acts.appendChild(mvButton('<span>Shuffle</span>', 'vd-secondary mv-btn', function(){ mvPlayList(cat.all, true); }));
-    top.appendChild(acts);
-    stationsGrid.appendChild(top);
+    // Build 409 (Mark): the count (videos only) and Play All / Shuffle as icons beside the + under the filter.
+    setResultCount(cat.all.length, 'video');
+    if(mvPlayHdr){
+      mvPlayHdr.style.display = ''; mvShuffleHdr.style.display = '';
+      mvPlayHdr.onclick = function(){ mvPlayList(cat.all, false); };
+      mvShuffleHdr.onclick = function(){ mvPlayList(cat.all, true); };
+    }
     // Build 306 (Mark): the day's artist (the same one as Home's daily videos), above Recently Added.
     appendMvDailySection(cat);
     // Recently added: the newest dozen, a sideways row of stills.
@@ -29878,7 +29897,16 @@
     Object.defineProperty(stationsGrid, 'innerHTML', {
       configurable: true,
       get: function(){ return desc.get.call(this); },
-      set: function(v){ if(hdrRight && stationsGrid.contains(hdrRight)) rescueHdrRight(); desc.set.call(this, v); }
+      set: function(v){
+        // Build 409 (Mark: the buttons flashed at the top on every Watch tab): while a page redraws,
+        // the group waits hidden and is placed before the next paint (header or under the filter).
+        if(hdrRight){
+          if(stationsGrid.contains(hdrRight)) rescueHdrRight();
+          hdrRight.classList.add('tb-pending');
+          (window.queueMicrotask || function(f){ Promise.resolve().then(f); })(ensureToolbar);
+        }
+        desc.set.call(this, v);
+      }
     });
   })();
   function toolbarAnchor(){
@@ -29887,7 +29915,7 @@
     function after(el){ var n = el.nextElementSibling; while(n && n.classList.contains('page-toolbar')) n = n.nextElementSibling; return n && (n.classList.contains('sec-filter') || n.classList.contains('gb-find')) && getComputedStyle(n).display !== 'none' ? n : el; }
     var lt = stationsGrid.querySelector(':scope > .lib-tabs');
     if(lt) return { parent: stationsGrid, after: after(lt) };
-    if(typeof onVideoView !== 'undefined' && onVideoView && !onVideoDetailView){
+    if(typeof onVideoView !== 'undefined' && onVideoView && !onVideoDetailView && videoTab !== 'channels'){   // build 409: Live TV's Edit stays at the top
       var wt = stationsGrid.querySelector(':scope > .watch-tabs');
       if(wt) return { parent: stationsGrid, after: after(wt) };
     }
@@ -29902,6 +29930,7 @@
     if(!hdrRight || tbBusy) return;
     tbBusy = true;
     try{
+      hdrRight.classList.remove('tb-pending');
       var anc = toolbarAnchor();
       if(!anc){ rescueHdrRight(); return; }
       var tb = hdrRight.parentNode && hdrRight.parentNode.classList && hdrRight.parentNode.classList.contains('page-toolbar') ? hdrRight.parentNode : null;

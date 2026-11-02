@@ -202,6 +202,14 @@ async def run(vw, vh, mobile, scheme, tag, full):
         check(i and i['inGrid'] and i['ph'] == 'Filter channels' and not i['focused'] and await pg.evaluate("document.getElementById('secFilter').previousElementSibling.classList.contains('watch-tabs')"),
               f'[{tag}] Live TV: box right under the tabs {i}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-livetv.png')
+        # Build 409: Live TV keeps one button at the top, "Edit", whose menu starts with Add Channels; no Add button
+        ed = await pg.evaluate("""(()=>{ var b=document.getElementById('videoReorderHeaderBtn'), a=document.getElementById('videoAddHeaderBtn');
+          return { inHdr: !!b.closest('#sectionHeadingRow'), text: b.textContent.trim(), shown: !!b.offsetParent, add: !!a.offsetParent, bar: !!document.querySelector('.page-toolbar'), count: getComputedStyle(document.getElementById('resultCount')).display }; })()""")
+        check(ed['inHdr'] and ed['text'] == 'Edit' and ed['shown'] and not ed['add'] and not ed['bar'] and ed['count'] == 'none', f'[{tag}] Live TV: an Edit button at the top, no Add button, no count {ed}')
+        await pg.evaluate("document.getElementById('videoReorderHeaderBtn').click()"); await pg.wait_for_timeout(400)
+        items = await pg.evaluate("Array.from(document.querySelectorAll('#guideMenu .np-menu-item')).map(b=>b.textContent.trim())")
+        check(items[:2] == ['Add Channels', 'Arrange Channels'], f'[{tag}] Live TV: Edit opens the menu with Add Channels first {items}')
+        await pg.evaluate("document.body.click()"); await pg.wait_for_timeout(300)
         # Build 406: 12px under the tabs, 18px over the guide; Live TV starts on the page margin like the other tabs
         lv = await pg.evaluate("""(()=>{ var t=document.querySelector('#stationsGrid > .watch-tabs'), f=document.getElementById('secFilter'), e=document.querySelector('#stationsGrid > .epg');
           var h=document.getElementById('stationsHeading'), r=document.createRange(); r.selectNodeContents(h);
@@ -221,6 +229,15 @@ async def run(vw, vh, mobile, scheme, tag, full):
         check(i and i['inGrid'] and i['ph'] == 'Filter movies' and not await pg.evaluate("document.getElementById('secFilterInput').value"), f'[{tag}] Movies: its own, emptied box {i}')
         mv = await vis(pg, '#stationsGrid .tile.vposter .tile-name'); print(mv)
         await pg.screenshot(path=f'{shots}/sf-{tag}-movies.png')
+        mc = await pg.evaluate("(document.querySelector('.page-toolbar #resultCount')||{}).textContent || ''")
+        check(mc.endswith(' movies') or mc.endswith(' movie'), f'[{tag}] Movies: the count sits by the buttons ({mc!r})')
+        # no flash of the buttons at the top when a tab is chosen
+        fl = await pg.evaluate("""()=>new Promise(function(res){ var hr=document.querySelector('.section-heading-right'), row=document.getElementById('sectionHeadingRow'), bad=0, n=0;
+          document.querySelector('.video-tabs [data-vtab=shows]').click();
+          (function f(){ if(hr.parentNode===row && getComputedStyle(hr).visibility!=='hidden' && Array.from(hr.querySelectorAll('button')).some(function(b){ return b.offsetParent; })) bad++;
+            if(++n < 30) requestAnimationFrame(f); else res(bad); })(); })""")
+        check(fl == 0, f'[{tag}] TV Shows: the buttons never show at the top while the tab opens ({fl} frames)')
+        await pg.evaluate("document.querySelector('.video-tabs [data-vtab=movies]').click()"); await pg.wait_for_timeout(700)
         mvg = await pg.evaluate("""(()=>{ var t=document.querySelector('#stationsGrid > .watch-tabs'), f=document.getElementById('secFilter'); var n=f.nextElementSibling; while(n && !n.offsetParent) n=n.nextElementSibling;
           return { above: Math.round(f.getBoundingClientRect().top - t.getBoundingClientRect().bottom), below: n ? Math.round(n.getBoundingClientRect().top - f.getBoundingClientRect().bottom) : null }; })()""")
         check(mvg['above'] == 12 and mvg['below'] in (10, 18), f'[{tag}] Movies: the filter sits 12px under the tabs, then the buttons (10px) or the posters (18px) {mvg}')
@@ -231,6 +248,8 @@ async def run(vw, vh, mobile, scheme, tag, full):
         check(await vis(pg, '#stationsGrid .tile.vposter .tile-name') == ['The Office'] and (await info(pg))['ph'] == 'Filter TV shows', f'[{tag}] TV Shows: "office"')
         await pg.screenshot(path=f'{shots}/sf-{tag}-shows-filtered.png')
         await tab('music')
+        mv = await pg.evaluate("""(()=>{ var tb=document.querySelector('.page-toolbar'); return { count: (tb && tb.querySelector('#resultCount')||{}).textContent, btns: tb ? Array.from(tb.querySelectorAll('button')).filter(b=>b.offsetParent).map(b=>b.id) : [], top: !!document.querySelector('#stationsGrid .mv-top') }; })()""")
+        check(mv['count'] and mv['count'].endswith('videos') and 'artist' not in mv['count'] and mv['btns'][-3:] == ['mvPlayAllHdrBtn', 'mvShuffleHdrBtn', 'videoAddHeaderBtn'] and not mv['top'], f'[{tag}] Music Videos: the count, then Play All and Shuffle icons by the + {mv}')
         i = await info(pg)
         check(i and i['inGrid'] and i['ph'] == 'Filter music videos', f'[{tag}] Music Videos: box {i}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-mv.png')
@@ -246,7 +265,7 @@ async def run(vw, vh, mobile, scheme, tag, full):
         await pg.evaluate("localStorage.setItem('radioPlayerShape', JSON.stringify({radius:'square'})); __t.ev ? 0 : 0") if False else None
         await pg.evaluate("(()=>{ document.documentElement.style.setProperty('--r-pill','0px'); document.documentElement.style.setProperty('--r-btn','0px'); })()"); await pg.wait_for_timeout(200)
         rr = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .mv-seg, #stationsGrid .mv-seg-btn.on, #stationsGrid .mv-btn, .watch-tabs .home-tab.active')).filter(e=>e.offsetParent).map(e=>[e.className.slice(0,22), getComputedStyle(e).borderTopLeftRadius])")
-        check(len(rr) >= 4 and all(r[1] == '0px' for r in rr), f'[{tag}] Music Videos: tabs, sort switch and Play All / Shuffle all follow the shape setting {rr}')
+        check(len(rr) >= 3 and all(r[1] == '0px' for r in rr), f'[{tag}] Music Videos: the tabs and the sort switch follow the shape setting {rr}')
         await pg.screenshot(path=f'{shots}/sf-{tag}-mv-square.png')
         await pg.evaluate("(()=>{ document.documentElement.style.removeProperty('--r-pill'); document.documentElement.style.removeProperty('--r-btn'); })()")
         await pg.set_viewport_size(vp); await pg.wait_for_timeout(300)

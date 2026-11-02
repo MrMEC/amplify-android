@@ -138,6 +138,7 @@ async def run(b, scheme, w, h):
     check(len(set(gaps)) == 1 and gaps[0] == 12, f'{T} the same 12px between the tabs and the filter on every tab {gaps}')
     # the last tab is remembered
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("document.querySelector('.video-tabs [data-vtab=movies]').click()"); await pg.wait_for_timeout(900)
     wb = await pg.evaluate("({ inBar: !!document.querySelector('.page-toolbar #videoAddHeaderBtn'), add: getComputedStyle(document.getElementById('videoAddHeaderBtn')).display, hdr: !document.querySelector('#sectionHeadingRow .section-heading-right') })")
     check(wb['inBar'] and wb['add'] != 'none' and wb['hdr'], f'{T} build 408: Watch puts its buttons under the filter too {wb}')
     await pg.evaluate("__t.ev('openPodcastsHome()')"); await pg.wait_for_timeout(1000)
