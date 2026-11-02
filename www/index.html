@@ -17143,6 +17143,15 @@
       renderPlaylistCoverArt(container, ppl || { id: station.playlistId });
       return;
     }
+    // Build 419: an artist's Radio wears the cover of the song it is playing, then the portrait.
+    if(isArtistRadio(station) && (container === playerIcon || container === npArt)){
+      var arSong = onAirArtFor(station);
+      if(arSong){
+        songPaint = true; paint(arSong); songPaint = false;
+        container.classList.add('art-radio');
+        return;
+      }
+    }
     // An artist's Radio with no cover of its own wears the artist's picture.
     if(isArtistRadio(station)){
       var re = findArtistEntry(station.artistKey) || { key: station.artistKey, name: String(station.name || '').replace(/ Radio$/, ''), tracks: [], stations: [] };
@@ -47744,10 +47753,19 @@
     if(!quiet && currentStation){ try{ refreshStationArt(currentStation); }catch(e){} }
   }
   var onAirArtSettle = null, songArtPending = false;
+  // The artist to look a song up under: the one the stream names, or, on an artist's Radio
+  // where the stream usually gives only the song, the artist the station is for.
+  function onAirLookupArtist(song, st){
+    if(song.artist) return song.artist;
+    if(!isArtistRadio(st)) return '';
+    var e = st.artistKey ? findArtistEntry(st.artistKey) : null;
+    return (e && e.name) || String(st.name || '').replace(/ Radio$/, '');
+  }
   function fetchOnAirArt(){
     var song = onAir, st = currentStation;
-    if(!song || !song.artist || !st || !stationWeakLogo(st)) return;
-    requestSongArt({ artist: song.artist, name: song.title }, function(url){
+    var who = (song && st) ? onAirLookupArtist(song, st) : '';
+    if(!song || !who || !st || !stationWeakLogo(st)) return;
+    requestSongArt({ artist: who, name: song.title }, function(url){
       if(!onAir || onAir.key !== song.key || onAir.title !== song.title || onAir.artist !== song.artist) return;
       songArtPending = false;
       onAirArt = { key: song.key, song: song.title + '\n' + song.artist, url: url };
@@ -47768,7 +47786,7 @@
       var hadSongArt = !!onAirArt || songArtPending || !!(playerIcon.querySelector('img[data-song-src]') || npArt.querySelector('img[data-song-src]'));
       if(onAirArt) dropOnAirArt(true);
       songArtPending = hadSongArt;
-      if(hadSongArt && !artist){ hadSongArt = false; songArtPending = false; if(currentStation) try{ refreshStationArt(currentStation); }catch(e){} }
+      if(hadSongArt && !onAirLookupArtist(onAir, st)){ hadSongArt = false; songArtPending = false; if(currentStation) try{ refreshStationArt(currentStation); }catch(e){} }
       fetchOnAirArt();
       // The new song's cover fades in over the old one; if none turns up, settle back to the
       // station's cover rather than leaving the last song's on show.
