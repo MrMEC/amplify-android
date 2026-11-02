@@ -11,7 +11,7 @@ hook = """  window.__dz = {
     open: function(t){ searchByTag(t); },
     setLib: function(tracks){ libraryTracks.length = 0; tracks.forEach(function(t){ libraryTracks.push(t); }); },
     stub: function(){
-      apiFetch = function(u){ var d = /name=disney/.test(u) ? [{ name: 'Disney Hits Radio', url_resolved: 'http://s/dz1', stationuuid: 'dz1', tags: 'kids', favicon: '' }] : [{ name: 'Magic Mix', url_resolved: 'http://s/dz2', stationuuid: 'dz2', tags: 'disney,pop', favicon: '' }]; return Promise.resolve(d); };
+      apiFetch = function(u){ var d = /name=disney/.test(u) ? [{ name: 'Disney Hits Radio', url_resolved: 'http://s/dz1', stationuuid: 'dz1', tags: 'kids', favicon: '' }, { name: 'Disney Classics', url_resolved: 'http://s/dz3', stationuuid: 'dz3', tags: 'kids', favicon: '' }] : [{ name: 'Magic Mix', url_resolved: 'http://s/dz2', stationuuid: 'dz2', tags: 'disney,pop', favicon: '' }]; return Promise.resolve(d); };
       itunesSearchPodcasts = function(){ return Promise.resolve([{ collectionId: 1, collectionName: 'Disney Dreamlight Podcast', artistName: 'Disney', artworkUrl600: '', feedUrl: '' }, { collectionId: 2, collectionName: 'Unrelated Show', artistName: 'Someone' }]); };
       var lib = { movies: [{ id: 'm1', kind: 'movie', title: 'The Lion King', year: 1994, duration: 5300, relPath: 'Movies/The Lion King (1994).mp4', fileName: 'The Lion King (1994).mp4', poster: '', uri: 'x1' }, { id: 'm2', kind: 'movie', title: 'Alien', year: 1979, duration: 7000, relPath: 'Movies/Alien.mp4', fileName: 'Alien.mp4', poster: '', uri: 'x2' }],
         shows: [{ key: 'ducktales', title: 'DuckTales', episodes: [{ relPath: 'TV/DuckTales/s01e01.mp4', season: 1, episode: 1, uri: 'e1', id: 'e1' }], seasons: [1], poster: '', backdrop: '', seasonPosters: {} }, { key: 'seinfeld', title: 'Seinfeld', episodes: [{ relPath: 'TV/Seinfeld/s01e01.mp4', season: 1, episode: 1, uri: 'e2', id: 'e2' }], seasons: [1], poster: '', backdrop: '', seasonPosters: {} }], byId: {}, showsByKey: {} };
@@ -68,7 +68,7 @@ async def main():
         n2 = await pg.evaluate("document.querySelectorAll('.gp-songs .song-row').length")
         check(n2 == 7, f'Show more reveals the rest ({n2} rows incl. Shuffle All)')
         check(all(h in info['heads'] for h in ['Top stations', 'In your library', 'Podcasts', 'Movies', 'TV shows']), f"all the sections {info['heads']}")
-        check('Disney Hits Radio' in info['tiles'] and 'Magic Mix' in info['tiles'], f"stations from the tag and the name {info['tiles']}")
+        check(info['tiles'][:3] == ['Disney Hits Radio', 'Disney Classics', 'Magic Mix'], f"name matches first, tag-only last {info['tiles'][:3]}")
         check('Disney Dreamlight Podcast' in info['tiles'] and 'Unrelated Show' not in info['tiles'], 'only Disney podcasts')
         check('The Lion King' in info['tiles'] and 'Alien' not in info['tiles'], 'only Disney movies')
         check('DuckTales' in info['tiles'] and 'Seinfeld' not in info['tiles'], 'only Disney shows')
@@ -77,6 +77,39 @@ async def main():
         await pg.evaluate("window.scrollTo(0, 1500)"); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'{SHOTS}/disney-low.png')
         await pg.evaluate("openGenresHome ? 0 : 0") if False else None
+        # --- long-press a station: reorder / remove
+        await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
+        async def hold(name):
+            await pg.evaluate("(n)=>{ var tl=Array.prototype.filter.call(document.querySelectorAll('.gp-row .tile'), x=>x.querySelector('.tile-name').textContent===n)[0]; var r=tl.getBoundingClientRect(); var tc=new Touch({identifier:1,target:tl,clientX:r.left+20,clientY:r.top+20}); tl.dispatchEvent(new TouchEvent('touchstart',{touches:[tc],targetTouches:[tc],changedTouches:[tc],bubbles:true,cancelable:true})); window.__held=tl; window.__tc=tc; }", name)
+            await pg.wait_for_timeout(650)
+        await hold('Magic Mix')
+        items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
+        await pg.screenshot(path=f'{SHOTS}/disney-menu.png')
+        check(items == ['Move to Top', 'Move Up', 'Remove from Disney'], f'long press opens the menu {items}')
+        await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))")
+        await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.indexOf('Move to Top')>=0)[0].click()")
+        await pg.wait_for_timeout(300)
+        order = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-row .tile-name'), x=>x.textContent).slice(0,3)")
+        check(order == ['Magic Mix', 'Disney Hits Radio', 'Disney Classics'], f'Move to Top puts it first {order}')
+        saved = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerGenreStations'))")
+        check(saved['disney']['order'][0] == 'dz2' or 'Magic' in json.dumps(saved), f'the order is saved {saved}')
+        await pg.evaluate("window.__dz.open('Disney')"); await pg.wait_for_timeout(900)
+        order2 = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-row .tile-name'), x=>x.textContent).slice(0,3)")
+        check(order2[0] == 'Magic Mix', f'and survives reopening {order2}')
+        await hold('Disney Classics')
+        await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.indexOf('Remove from')>=0)[0].click()")
+        await pg.wait_for_timeout(300)
+        dlg = await pg.evaluate("!!document.querySelector('#confirmOverlay.open, .confirm-overlay.open') || document.body.innerText.indexOf('Remove') >= 0")
+        check(dlg, 'removing asks for confirmation first')
+        await pg.screenshot(path=f'{SHOTS}/disney-confirm.png')
+        await pg.evaluate("document.getElementById('confirmOk').click()"); await pg.wait_for_timeout(400)
+        names = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-row .tile-name'), x=>x.textContent)")
+        check('Disney Classics' not in names, f'the station is removed {names}')
+        rest = await pg.evaluate("(Array.prototype.filter.call(document.querySelectorAll('.gp-more'), b=>b.textContent.indexOf('Restore')>=0)[0]||{}).textContent")
+        check(rest == 'Restore 1 removed station', f'with a Restore link ({rest})')
+        await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('.gp-more'), b=>b.textContent.indexOf('Restore')>=0)[0].click()"); await pg.wait_for_timeout(300)
+        names2 = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-row .tile-name'), x=>x.textContent)")
+        check('Disney Classics' in names2, 'Restore brings it back')
         await pg.evaluate("window.__dz.home()"); await pg.wait_for_timeout(800)
         await pg.evaluate("window.scrollTo(0, document.body.scrollHeight)"); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{SHOTS}/disney-genres-home.png')
