@@ -46824,8 +46824,9 @@
     g.artistRadio = [];
     if(libArtistRadioOn()) loadArtistStations().then(function(list){
       if(genrePage !== g || activeGenre !== tag) return;
-      g.artistRadio = genreArtistRadio(tag, list || [], g.songs);
-      if(g.artistRadio.length){ var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); }
+      g.allArtistRadio = genreArtistRadio(tag, list || [], g.songs);
+      g.artistRadio = applyGenrePrefs(tag, g.allArtistRadio, 'radio');
+      if(g.allArtistRadio.length){ var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); }
     })['catch'](function(){});
     var stationAsks = [apiFetch('/json/stations/search?tag=' + encodeURIComponent(tag.toLowerCase()) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')];
     // Build 428: Disney lists the stations with Disney in their name first (most listened first),
@@ -46852,20 +46853,29 @@
   // and Stations (the directory's stations for the tag), as tabs, Songs first. Tabs only when it
   // has both; otherwise just the one list. Each tab names its own count.
   var genrePage = null;
-  // The artist radio (Exclusively channels) for a genre: the channels of artists whose songs in the
-  // library carry it first, then the channels the directory tags with it, most listened first.
+  // The artist radio (Exclusively channels) for a genre, in this order:
+  //  1. channels named for it ("Exclusively Disney", "Exclusively Country"),
+  //  2. channels of artists the library holds mostly in it -- at least half their songs (build 449,
+  //     Mark: Phil Collins and Louis Armstrong were "Disney" for one soundtrack song each),
+  //  3. channels the directory tags with it, most listened first.
   var GENRE_ARTIST_RADIO_MAX = 40;
+  function genreWordIn(text, want){
+    if(want === 'disney') return isDisneyText(text, false);
+    return new RegExp('(^|[^a-z0-9])' + want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])', 'i').test(String(text || ''));
+  }
   function genreArtistRadio(tag, list, songs){
-    var want = String(tag || '').trim().toLowerCase(), mine = {}, lib = [], tagged = [];
+    var want = String(tag || '').trim().toLowerCase(), inGenre = {}, all = {}, named = [], lib = [], tagged = [];
     if(!want) return [];
-    (songs || []).forEach(function(t){ var k = artistMatchKey(t.artist || ''); if(k) mine[k] = 1; });
+    (songs || []).forEach(function(t){ var k = artistMatchKey(t.artist || ''); if(k) inGenre[k] = (inGenre[k] || 0) + 1; });
+    libraryTracks.forEach(function(t){ var k = artistMatchKey(t.artist || ''); if(k && inGenre[k]) all[k] = (all[k] || 0) + 1; });
     list.forEach(function(st){
       if(!st || isBlacklisted(st)) return;
-      var k = artistMatchKey(artistNameFromStation(st));
-      if(k && mine[k]) lib.push(st);
+      var name = artistNameFromStation(st), k = artistMatchKey(name);
+      if(genreWordIn(name, want)) named.push(st);
+      else if(k && inGenre[k] && inGenre[k] * 2 >= (all[k] || inGenre[k])) lib.push(st);
       else if(stationTags(st).some(function(x){ return x === want || x.indexOf(want) !== -1; })) tagged.push(st);
     });
-    return lib.concat(tagged).slice(0, GENRE_ARTIST_RADIO_MAX);
+    return named.concat(lib, tagged).slice(0, GENRE_ARTIST_RADIO_MAX);
   }
   var GENRE_TABS = [['songs', 'Songs', 'song', 'songs'], ['stations', 'Stations', 'station', 'stations']];
   // ---- Build 428: put favourite stations first, or remove stations, within a genre ----
@@ -46876,40 +46886,45 @@
   var genrePrefs = (function(){ try{ var v = JSON.parse(localStorage.getItem(GENRE_PREF_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
   function saveGenrePrefs(){ try{ localStorage.setItem(GENRE_PREF_KEY, JSON.stringify(genrePrefs)); }catch(e){} }
   function genrePref(tag){ var k = String(tag).toLowerCase(); return genrePrefs[k] || (genrePrefs[k] = { order: [], hidden: [] }); }
-  function applyGenrePrefs(tag, list){
+  // which: 'radio' for the Artist radio row (build 449), kept apart from the stations' own order.
+  function genrePrefKeys(which){ return which === 'radio' ? ['radioOrder', 'radioHidden'] : ['order', 'hidden']; }
+  function applyGenrePrefs(tag, list, which){
     var p = genrePrefs[String(tag).toLowerCase()];
     if(!p) return list;
-    var hidden = {}, byKey = {}, out = [], used = {};
-    (p.hidden || []).forEach(function(k){ hidden[k] = 1; });
+    var f = genrePrefKeys(which), hidden = {}, byKey = {}, out = [], used = {};
+    (p[f[1]] || []).forEach(function(k){ hidden[k] = 1; });
     list.forEach(function(st){ var k = favKey(st); if(!hidden[k] && !byKey[k]) byKey[k] = st; });
-    (p.order || []).forEach(function(k){ if(byKey[k] && !used[k]){ out.push(byKey[k]); used[k] = 1; } });
+    (p[f[0]] || []).forEach(function(k){ if(byKey[k] && !used[k]){ out.push(byKey[k]); used[k] = 1; } });
     list.forEach(function(st){ var k = favKey(st); if(byKey[k] && !used[k]){ out.push(st); used[k] = 1; } });
     return out;
   }
   function genreRefresh(g){
     g.stations = applyGenrePrefs(g.tag, g.allStations || g.stations);
+    g.artistRadio = applyGenrePrefs(g.tag, g.allArtistRadio || [], 'radio');
     var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y);
   }
-  function genreMoveStation(g, st, how){
-    var keys = g.stations.map(favKey), k = favKey(st), i = keys.indexOf(k);
+  function genreMoveStation(g, st, how, which){
+    var keys = (which === 'radio' ? (g.radioShown || []) : g.stations).map(favKey), k = favKey(st), i = keys.indexOf(k);
     if(i < 0) return;
     if(how === 'top'){ keys.splice(i, 1); keys.unshift(k); }
     else if(how === 'up' && i > 0){ keys[i] = keys[i - 1]; keys[i - 1] = k; }
     else if(how === 'down' && i < keys.length - 1){ keys[i] = keys[i + 1]; keys[i + 1] = k; }
     else return;
-    genrePref(g.tag).order = keys;
+    genrePref(g.tag)[genrePrefKeys(which)[0]] = keys;
     saveGenrePrefs();
     genreRefresh(g);
   }
-  function genreRemoveStation(g, st){
-    var p = genrePref(g.tag), k = favKey(st);
-    if(p.hidden.indexOf(k) < 0) p.hidden.push(k);
-    p.order = (p.order || []).filter(function(x){ return x !== k; });
+  function genreRemoveStation(g, st, which){
+    var p = genrePref(g.tag), k = favKey(st), f = genrePrefKeys(which);
+    p[f[1]] = p[f[1]] || [];
+    if(p[f[1]].indexOf(k) < 0) p[f[1]].push(k);
+    p[f[0]] = (p[f[0]] || []).filter(function(x){ return x !== k; });
     saveGenrePrefs();
     genreRefresh(g);
   }
   function genreRestoreStations(g){
     genrePref(g.tag).hidden = [];
+    genrePref(g.tag).radioHidden = [];
     saveGenrePrefs();
     genreRefresh(g);
   }
@@ -46918,10 +46933,10 @@
     if(m) m.remove();
   }
   function openGenreStMenu(tile){
-    var g = genrePage, st = tile && tile._genreSt;
+    var g = genrePage, st = tile && tile._genreSt, which = tile && tile._genreWhich;
     if(!g || !st) return;
     closeGenreStMenu();
-    var keys = g.stations.map(favKey), i = keys.indexOf(favKey(st));
+    var keys = (which === 'radio' ? (g.radioShown || []) : g.stations).map(favKey), i = keys.indexOf(favKey(st));
     if(i < 0) return;
     var m = document.createElement('div');
     m.className = 'np-menu row-menu open';
@@ -46940,11 +46955,11 @@
       b.addEventListener('click', function(e){ e.stopPropagation(); closeGenreStMenu(); fn(); });
       m.appendChild(b);
     }
-    if(i > 0) item('top', 'Move to Top', function(){ genreMoveStation(g, st, 'top'); });
-    if(i > 0) item('up', 'Move Up', function(){ genreMoveStation(g, st, 'up'); });
-    if(i < keys.length - 1) item('down', 'Move Down', function(){ genreMoveStation(g, st, 'down'); });
+    if(i > 0) item('top', 'Move to Top', function(){ genreMoveStation(g, st, 'top', which); });
+    if(i > 0) item('up', 'Move Up', function(){ genreMoveStation(g, st, 'up', which); });
+    if(i < keys.length - 1) item('down', 'Move Down', function(){ genreMoveStation(g, st, 'down', which); });
     item('fa-trash', 'Remove from ' + g.tag, function(){
-      confirmThen({ title: 'Remove ' + quoteName(stripExclusively(st.name || '')) + ' from ' + g.tag + '?', message: 'It stays in the app; you can restore it from the bottom of this page.', ok: 'Remove' }, function(){ genreRemoveStation(g, st); });
+      confirmThen({ title: 'Remove ' + quoteName(stripExclusively(st.name || '')) + ' from ' + g.tag + '?', message: 'It stays in the app; you can restore it from the bottom of this page.', ok: 'Remove' }, function(){ genreRemoveStation(g, st, which); });
     });
     document.body.appendChild(m);
     var r = tile.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
@@ -47084,12 +47099,12 @@
     // Build 447: artist radio, less any already listed among the genre's stations.
     var listed = {};
     g.stations.forEach(function(st){ listed[st.urlToResolve] = 1; });
-    var radio = (g.artistRadio || []).filter(function(st){ return !listed[st.urlToResolve] && !isBlacklisted(st); });
+    var radio = g.radioShown = (g.artistRadio || []).filter(function(st){ return !listed[st.urlToResolve] && !isBlacklisted(st); });
     if(radio.length && libArtistRadioOn()){
       head('Artist radio');
       var arow = document.createElement('div');
       arow.className = 'gp-row gp-artist-radio';
-      radio.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); arow.appendChild(t); });
+      radio.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'radio'; arow.appendChild(t); });
       arow._ctxList = radio;
       stationsGrid.appendChild(arow);
     }
@@ -47140,6 +47155,7 @@
     // Build 436 (Mark): Restore sits at the bottom of the page.
     var gp = genrePrefs[String(g.tag).toLowerCase()];
     var hiddenNow = gp && g.allStations ? g.allStations.filter(function(st){ return (gp.hidden || []).indexOf(favKey(st)) >= 0; }).length : 0;
+    if(gp && g.allArtistRadio && libArtistRadioOn()) hiddenNow += g.allArtistRadio.filter(function(st){ return (gp.radioHidden || []).indexOf(favKey(st)) >= 0; }).length;
     if(hiddenNow){
       var restore = document.createElement('button');
       restore.type = 'button'; restore.className = 'gp-more';
