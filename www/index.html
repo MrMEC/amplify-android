@@ -15760,6 +15760,18 @@
       });
       return;
     }
+    // Build 442: an audiobook's cover is the book's, like an album's: one picture for all its sections.
+    if(isPodcastTrack(st) && isAudiobookGuid(st.guid)){
+      var abId = String(st.guid).slice(3).split('/')[0];
+      openArtUrlDialogFor({
+        key: 'audiobook:' + abId,
+        clearAlso: favKey(st),
+        name: (st.collectionName || st.name) + (st.artistName ? ' ' + st.artistName : ''),
+        title: 'Book Cover',
+        refresh: function(){ refreshStationArt(st); refreshAudiobookArt(abId); }
+      });
+      return;
+    }
     var artistLink = isLocalTrack(st) ? null : stationArtistLink(st);
     openArtUrlDialogFor({
       key: favKey(st),
@@ -17120,6 +17132,8 @@
       try{
         if(k.indexOf('artist:') === 0){ var e = findArtistEntry(k.slice(7)); if(e) refreshArtistArt(e); return; }
         if(k.indexOf('album:') === 0){ refreshAlbumArt(k.slice(6)); return; }
+        if(k.indexOf('audiobook:') === 0){ refreshAudiobookArt(k.slice(10)); return; }
+        if(k.indexOf('podcast:ia:') === 0 && isAudiobookGuid(k.slice(8))){ refreshAudiobookArt(k.slice(11).split('/')[0]); }
         document.querySelectorAll('[data-key]').forEach(function(el){
           if(el.dataset.key !== k || !el._ctxItem) return;
           var art = el.querySelector('.tile-art, .row-thumb');
@@ -17441,6 +17455,11 @@
   // is set once and every song, the album tile, the album page and the lock screen follow.
   // Untagged songs (no album) never share one: "Singles" would lump them all together.
   function customArtFor(track){
+    // Build 442: an audiobook's cover belongs to the book, so every section shows it.
+    if(track && track.type === 'podcast' && isAudiobookGuid(track.guid)){
+      var bookArt = abBookArt(String(track.guid).slice(3).split('/')[0]);
+      if(bookArt) return bookArt;
+    }
     var own = getCustomArtUrl(favKey(track));
     if(own || !isLocalTrack(track) || !String(track.album || '').trim()) return own;
     var key = albumKeyFor(track), legacy = legacyAlbumKeyFor(track);
@@ -31045,9 +31064,37 @@
     return AB_BASE + ' AND (title:(' + w + ') OR creator:(' + w + '))';
   }
   function abCategoryQuery(subject){ return AB_BASE + ' AND subject:(' + subject + ')'; }
+  // The cover chosen for a book (Book Cover in Now Playing's menu), else one chosen before covers
+  // belonged to books, for any one of its sections.
+  function abBookArt(id){
+    var own = getCustomArtUrl('audiobook:' + id);
+    if(own) return own;
+    var m = loadCustomArtMap(), pre = 'podcast:ia:' + id + '/';
+    for(var k in m){ if(k.indexOf(pre) === 0 && m[k]) return m[k]; }
+    return null;
+  }
   function abArt(art, item){
     applyPlaceholderArt(art, 'audiobook:' + item.id);
+    var custom = abBookArt(item.id);
+    if(custom){
+      var cimg = document.createElement('img');
+      cimg.alt = ''; cimg.referrerPolicy = 'no-referrer';
+      art.appendChild(cimg);
+      setCustomCoverImg(cimg, custom, function(){ cimg.remove(); art.appendChild(vImg(archiveArtUrl(item.id))); },
+        function(){ if(art.isConnected) abArt(art, item); });
+      return;
+    }
     art.appendChild(vImg(archiveArtUrl(item.id)));
+    // A cover saved on the phone can arrive after the page is drawn.
+    whenCustomArtLoaded(function(){ if(art.isConnected && abBookArt(item.id)) abArt(art, item); });
+  }
+  // Every cover of the book on the page, and wherever else its sections are showing.
+  function refreshAudiobookArt(id){
+    document.querySelectorAll('[data-key="audiobook:' + id + '"]').forEach(function(el){
+      var art = el.querySelector('.tile-art');
+      if(art){ art.innerHTML = ''; abArt(art, { id: id }); }
+    });
+    try{ if(currentStation && isAudiobookGuid(currentStation.guid) && String(currentStation.guid).slice(3).split('/')[0] === id) refreshStationArt(currentStation); }catch(e){}
   }
   function abSub(item){ return [item.creator, abLength(item.secs)].filter(Boolean).join(' · '); }
   // Tapping a book plays it from where it was left: the section last played (its own saved
