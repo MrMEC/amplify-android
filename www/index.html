@@ -34968,9 +34968,10 @@
   // Songs imported before the album-artist tag was kept get it read in the background, a
   // batch at a time and saved back, so it only ever happens once. Albums sharing a name
   // across several performers go first, since those are the ones that might be compilations.
-  var aaBackfillRunning = false;
+  var aaBackfillRunning = false, AA_BACKFILL_KEY = 'amp.albumArtistsRead.v1';
   function backfillAlbumArtists(){
     if(aaBackfillRunning) return;
+    try{ if(localStorage.getItem(AA_BACKFILL_KEY) === '1') return; }catch(e){}
     // A scan or import in progress has the phone busy already; try again once it is done.
     if(importInProgress || musicRefreshBusy){ setTimeout(backfillAlbumArtists, 8000); return; }
     var perAlbum = {};
@@ -34987,11 +34988,13 @@
       return !!o && Object.keys(o).length > 1;
     }
     var todo = libraryTracks.filter(function(t){ return isLocalTrack(t) && !t.aaRead && !t.opened && multi(t); });
-    if(!todo.length) return;
+    // Songs added from now on have their album artist read at import, so this is a one-time job.
+    if(!todo.length){ try{ localStorage.setItem(AA_BACKFILL_KEY, '1'); }catch(e){} return; }
     aaBackfillRunning = true;
     var changed = false, i = 0;
     function finish(){
       aaBackfillRunning = false;
+      if(!todo.some(function(t){ return !t.aaRead; })){ try{ localStorage.setItem(AA_BACKFILL_KEY, '1'); }catch(e){} }
       if(changed){
         compilationVersion++;
         renderLibraryList();
@@ -35100,7 +35103,11 @@
   // Runs once per load over whatever is already stored. Survivors keep their identity, and
   // anything pointing at a removed copy (a favorite, a playlist entry, a recent) is
   // repointed at the survivor rather than left dangling.
+  // Build 463: copies are stopped at import now, so this pass only ever finds the ones from before
+  // that; once it has run clean it is not repeated on every start.
+  var DUPES_SWEPT_KEY = 'amp.dupesSwept.v1';
   function collapseDuplicateRecords(rows){
+    try{ if(localStorage.getItem(DUPES_SWEPT_KEY) === '1') return { keep: rows.filter(function(r){ return r && r.localId; }), drop: [], remap: {} }; }catch(e){}
     var bySig = {}, keep = [], drop = [], remap = {};
     rows.forEach(function(r){
       if(!r || !r.localId) return;
@@ -35117,7 +35124,10 @@
     return { keep: keep, drop: drop, remap: remap };
   }
   function applyDuplicateCleanup(result){
-    if(!result.drop.length) return Promise.resolve(result.keep);
+    if(!result.drop.length){
+      try{ localStorage.setItem(DUPES_SWEPT_KEY, '1'); }catch(e){}
+      return Promise.resolve(result.keep);
+    }
     var remap = result.remap;
     function repoint(list){
       var changed = false;
@@ -35189,8 +35199,10 @@
       // subtitle only become resolvable once the library is in memory.
       renderFavoritesList();
       renderRecentList();
-      renderRecentSection();
       pruneStaleLibraryRefs();
+      // Build 463: Home's rows in a task of their own, so the screen can answer a touch between
+      // the library being read and Home being redrawn rather than freezing for both at once.
+      setTimeout(renderRecentSection, 0);
       setTimeout(backfillArtSigs, 1500);
       setTimeout(backfillAlbumArtists, 2500);
       return libraryTracks;
@@ -35806,10 +35818,9 @@
   function albumMateArtUrl(track){
     var key = albumKeyFor(track);
     if(Object.prototype.hasOwnProperty.call(albumMateArt, key)) return Promise.resolve(albumMateArt[key]);
-    var mate = null;
-    for(var i = 0; i < libraryTracks.length; i++){
-      var t = libraryTracks[i];
-      if(t.hasArt && albumKeyFor(t) === key){ mate = t; break; }
+    var mate = null, al = albumByKey(key), list = al ? al.tracks : [];
+    for(var i = 0; i < list.length; i++){
+      if(list[i].hasArt){ mate = list[i]; break; }
     }
     if(!mate){ albumMateArt[key] = null; return Promise.resolve(null); }
     return localArtUrl(mate).then(function(url){
@@ -36458,7 +36469,22 @@
 
   // Library artists are added first, so where a channel and a local tag disagree on
   // spelling the user's own tag is the one shown.
+  // Build 463: one opening of the app asked for this list 13 times and the album list 8 times,
+  // each a full pass over every song. Both are kept until the library changes (a song added,
+  // removed or retagged, a regroup, a hidden item, the artist stations reloaded).
+  function libraryIndexSig(){
+    return libraryTracks.length + '|' + compilationVersion + '|' + blacklist.length + '|' + (artistStations || []).length;
+  }
+  var artistIndexCache = null, artistIndexCacheSig = '';
   function buildArtistIndex(){
+    var sig = libraryIndexSig();
+    if(!artistIndexCache || artistIndexCacheSig !== sig){
+      artistIndexCache = buildArtistIndexFresh();
+      artistIndexCacheSig = sig;
+    }
+    return artistIndexCache.slice();
+  }
+  function buildArtistIndexFresh(){
     var map = {};
     function ensure(key, name){
       if(!map[key]) map[key] = { key: key, name: name, tracks: [], stations: [] };
@@ -36596,12 +36622,17 @@
   }
   function isCompilationKey(key){ return String(key || '').indexOf('va|') === 0; }
 
+  var albumKeyMemo = new WeakMap(), albumKeyMemoSig = '';
   function albumKeyFor(track){
-    if(track && track.localId){
-      var c = compilationMap()[favKey(track)];
-      if(c) return c;
-    }
-    return legacyAlbumKeyFor(track);
+    if(!track || typeof track !== 'object') return legacyAlbumKeyFor(track || {});
+    var cm = compilationMap();
+    if(albumKeyMemoSig !== compilationSig){ albumKeyMemo = new WeakMap(); albumKeyMemoSig = compilationSig; }
+    var memo = albumKeyMemo.get(track);
+    // The song's own artist and album are part of the key, so a retag outside a regroup is caught.
+    if(memo && memo.ar === track.artist && memo.al === track.album) return memo.k;
+    var k = (track.localId && cm[favKey(track)]) || legacyAlbumKeyFor(track);
+    albumKeyMemo.set(track, { k: k, ar: track.artist, al: track.album });
+    return k;
   }
   // An album key saved before a regroup (a favourite, an open page, a car shortcut) resolves
   // to whatever album its songs belong to now.
@@ -36621,7 +36652,27 @@
     }
     return key;
   }
+  var albumIndexCache = null, albumIndexCacheSig = '', albumByKeyCache = null;
   function buildAlbumIndex(tracks){
+    if(tracks) return buildAlbumIndexFresh(tracks);
+    var sig = libraryIndexSig();
+    if(!albumIndexCache || albumIndexCacheSig !== sig){
+      albumIndexCache = buildAlbumIndexFresh(null);
+      albumIndexCacheSig = sig;
+      albumByKeyCache = null;
+    }
+    return albumIndexCache.slice();
+  }
+  // Album entries by key, for lookups that would otherwise walk the whole list or library.
+  function albumByKey(key){
+    buildAlbumIndex();
+    if(!albumByKeyCache){
+      albumByKeyCache = {};
+      albumIndexCache.forEach(function(a){ albumByKeyCache[a.key] = a; });
+    }
+    return Object.prototype.hasOwnProperty.call(albumByKeyCache, key) ? albumByKeyCache[key] : null;
+  }
+  function buildAlbumIndexFresh(tracks){
     var source = tracks || libraryTracks;
     var map = {};
     source.forEach(function(t){
@@ -39311,7 +39362,9 @@
   // other songs, and it follows the counts as they change (no longer fixed for the day).
   function hearItAgainSongs(){
     var plays = loadSongPlays();
-    return dailyPool().filter(function(t){ var r = plays[favKey(t)]; return r && (r[0] || 0) >= 1; })
+    // From the songs played (a few hundred) rather than a pass over the whole library.
+    return Object.keys(plays).map(function(k){ return libraryById[k]; })
+      .filter(function(t){ var r = t && plays[favKey(t)]; return r && (r[0] || 0) >= 1 && isLocalTrack(t) && !isBlacklisted(t); })
       .sort(function(a, b){
         var x = plays[favKey(a)], y = plays[favKey(b)];
         return ((y[0] || 0) - (x[0] || 0)) || ((y[1] || 0) - (x[1] || 0));
@@ -50659,11 +50712,24 @@
         artists: artists
       };
     }
-    var carLibTimer = null, carLibLast = '', carLibBusy = false;
+    var carLibTimer = null, carLibLast = '', carLibBusy = false, carLibStarted = Date.now();
+    // Build 463: what was last sent is remembered across starts, so opening the app no longer
+    // re-sends the whole library to the car side when nothing in it has changed.
+    var CAR_LIB_SIG_KEY = 'amp.carLibSig.v1';
+    function carLibSig(json){
+      var h1 = 0x811c9dc5, h2 = 0x01000193;
+      for(var i = 0; i < json.length; i++){
+        var c = json.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+        h2 = Math.imul(h2 + c, 2246822519) >>> 0;
+      }
+      return json.length + ':' + h1.toString(16) + h2.toString(16);
+    }
     function scheduleCarLibrary(){
       if(!P.setCarLibrary) return;
       clearTimeout(carLibTimer);
-      carLibTimer = setTimeout(publishCarLibrary, 3000);
+      // Not while the app is still opening: the car's copy is only needed for the next drive.
+      carLibTimer = setTimeout(publishCarLibrary, Math.max(3000, 20000 - (Date.now() - carLibStarted)));
     }
     // Each artist's picture, as its tile shows it (custom, portrait, then its songs' art).
     // Only pictures the phone already has in hand: a custom one, or the portrait/art its own
@@ -50705,8 +50771,12 @@
         var json;
         try{ json = JSON.stringify(buildCarLibrary(artistArt)); }catch(e){ console.warn('Car library not built', e); return; }
         if(json === carLibLast) return;
+        var sig = carLibSig(json), sent = '';
+        try{ sent = localStorage.getItem(CAR_LIB_SIG_KEY) || ''; }catch(e){}
+        if(sig === sent){ carLibLast = json; return uploadCarArt(); }
         return sendCarLibrary(json).then(function(){
           carLibLast = json;
+          try{ localStorage.setItem(CAR_LIB_SIG_KEY, sig); }catch(e){}
           return uploadCarArt();
         });
       })['catch'](function(err){ console.warn('Car library not saved', err); }).then(function(){ carLibBusy = false; });
