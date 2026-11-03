@@ -59,7 +59,7 @@ async def route(r):
 
 GB = """(()=>{ var g = document.getElementById('stationsGrid');
   var cards = Array.from(g.querySelectorAll('.gb-card')).filter(function(c){ return !c.hidden; });
-  return { search: !!g.querySelector('.sec-filter.gb-find input'), heads: Array.from(g.querySelectorAll('.gb-head')).filter(function(h){ return !h.hidden; }).map(function(h){ return h.textContent; }),
+  return { search: !!g.querySelector('.sec-filter.gb-find input'), heads: Array.from(g.querySelectorAll('.gb-head')).filter(function(h){ return !h.hidden; }).map(function(h){ return h.querySelector('.gb-edit') ? h.firstChild.textContent : h.textContent; }), edit: !!g.querySelector('.gb-head .gb-edit:not([hidden])'),
     top: Array.from(g.querySelectorAll('.gb-top:not([hidden]) .gb-topcard-name')).map(function(e){ return e.textContent; }),
     cards: cards.map(function(c){ return c.dataset.genre; }), lefts: Array.from(new Set(cards.map(function(c){ return Math.round(c.getBoundingClientRect().left); }))).length,
     colors: Array.from(new Set(cards.map(function(c){ return getComputedStyle(c).backgroundColor; }))).length,
@@ -100,13 +100,13 @@ async def run(b, scheme, w, h, full):
     # ---- Genres: the browse grid ----
     await pg.evaluate("__t.home()"); await pg.wait_for_timeout(800)
     r = await pg.evaluate(GB); print(T, r)
-    check(r['search'] and r['heads'] == ['Your top picks', 'Browse categories'], f'{T} a find field, then Your top genres and Browse all {r["heads"]}')
+    check(r['search'] and r['heads'] == ['Your top picks', 'Browse categories'] and r['edit'], f'{T} a find field, then Your top genres and Browse all {r["heads"]}')
     check(r['top'][:2] == ['Rock', 'Jazz'], f'{T} top genres follow what is in the library (Rock 3 songs, then Jazz) {r["top"]}')
     # build 412: ten minutes of Jazz played puts it first, ahead of the library's Rock
     await pg.evaluate("__t.ev(\"listenCredit(localTracksWithTag('Jazz')[0], 600)\")"); await pg.evaluate("__t.home()"); await pg.wait_for_timeout(600)
     r2 = await pg.evaluate(GB)
     check(r2['top'][:2] == ['Jazz', 'Rock'], f'{T} top picks follow recent listening (Jazz played, then the library\'s Rock) {r2["top"]}')
-    check(len(r['cards']) == 15 and r['colors'] >= 12, f'{T} every genre is a card in its own colour ({len(r["cards"])} cards, {r["colors"]} colours)')
+    check(len(r['cards']) == 16 and r['colors'] >= 12, f'{T} every genre is a card in its own colour ({len(r["cards"])} cards, {r["colors"]} colours)')
     check(r['lefts'] == (2 if w < 900 else r['lefts']) and r['lefts'] >= 2, f'{T} cards in columns ({r["lefts"]})')
     check(r['sw'] <= r['vw'], f'{T} nothing scrolls sideways ({r["sw"]} > {r["vw"]})')
     await pg.screenshot(path=f'{shots}/genres-{scheme}-{w}.png', full_page=full)
@@ -157,11 +157,11 @@ async def run(b, scheme, w, h, full):
     check(q['cur'] == 'Rock Station 0' and q['label'] == 'Rock' and len(q['list']) == 14, f'{T} a top card\'s play button plays the genre\'s top station, its stations queued {q["cur"]} {q["label"]} {len(q["list"])}')
     await pg.evaluate("__t.ev('closeNowPlaying()')"); await pg.wait_for_timeout(400)
     await pg.evaluate("__t.home()"); await pg.wait_for_timeout(600)
-    await pg.evaluate("document.getElementById('genresReorderHeaderBtn').click()"); await pg.wait_for_timeout(500)
+    await pg.evaluate("document.querySelector('.gb-edit').click()"); await pg.wait_for_timeout(500)
     r = await pg.evaluate(GB)
-    check(r['rows'] == 15 and not r['cards'], f'{T} rearranging shows the list to drag ({r["rows"]} rows)')
-    await pg.evaluate("document.getElementById('genresReorderHeaderBtn').click()"); await pg.wait_for_timeout(500)
-    check(len((await pg.evaluate(GB))['cards']) == 15, f'{T} and the cards come back after')
+    check(r['rows'] == 16 and not r['cards'], f'{T} rearranging shows the list to drag ({r["rows"]} rows)')
+    await pg.evaluate("document.querySelector('.gb-edit').click()"); await pg.wait_for_timeout(500)
+    check(len((await pg.evaluate(GB))['cards']) == 16, f'{T} and the cards come back after')
     # ---- a genre page ----
     await pg.evaluate("document.querySelector('.gb-card[data-genre=\"Rock\"]').click()"); await pg.wait_for_timeout(1500)
     p = await pg.evaluate(GP); print(T, p)
