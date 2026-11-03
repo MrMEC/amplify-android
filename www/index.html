@@ -34971,8 +34971,8 @@
   var aaBackfillRunning = false;
   function backfillAlbumArtists(){
     if(aaBackfillRunning) return;
-    var todo = libraryTracks.filter(function(t){ return isLocalTrack(t) && !t.aaRead && !t.opened; });
-    if(!todo.length) return;
+    // A scan or import in progress has the phone busy already; try again once it is done.
+    if(importInProgress || musicRefreshBusy){ setTimeout(backfillAlbumArtists, 8000); return; }
     var perAlbum = {};
     libraryTracks.forEach(function(t){
       var a = artistMatchKey((t.album || '').trim());
@@ -34980,11 +34980,14 @@
       var o = perAlbum[a] = perAlbum[a] || {};
       o[artistMatchKey(t.artist || UNKNOWN_ARTIST)] = true;
     });
+    // Only songs on an album name that several artists share can belong to a compilation; the
+    // rest of the library is never touched, which keeps this to a few seconds.
     function multi(t){
       var o = perAlbum[artistMatchKey((t.album || '').trim())];
-      return o && Object.keys(o).length > 1 ? 0 : 1;
+      return !!o && Object.keys(o).length > 1;
     }
-    todo.sort(function(a, b){ return multi(a) - multi(b); });
+    var todo = libraryTracks.filter(function(t){ return isLocalTrack(t) && !t.aaRead && !t.opened && multi(t); });
+    if(!todo.length) return;
     aaBackfillRunning = true;
     var changed = false, i = 0;
     function finish(){
@@ -34996,6 +34999,7 @@
       }
     }
     function batch(){
+      if(importInProgress || musicRefreshBusy){ setTimeout(batch, 3000); return; }
       var slice = todo.slice(i, i + 20);
       i += 20;
       if(!slice.length){ finish(); return; }
@@ -35030,7 +35034,7 @@
           slice.forEach(function(t){ if(t.aaRead) last = store.put(t); });
           return last;
         });
-      })['catch'](function(){}).then(function(){ setTimeout(batch, 0); });
+      })['catch'](function(){}).then(function(){ setTimeout(batch, 60); });
     }
     batch();
   }

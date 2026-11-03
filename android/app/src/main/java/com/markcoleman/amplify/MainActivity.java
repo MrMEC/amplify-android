@@ -5,13 +5,46 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.PluginHandle;
 
 public class MainActivity extends BridgeActivity {
+  private final Handler imeHandler = new Handler(Looper.getMainLooper());
+
+  /**
+   * Build 460: the white gap along the bottom. The window leaves room for the keyboard while
+   * the system still counts it as showing, even though no text field is being edited and
+   * nothing is drawn there, so the whole app sat on a shortened screen. If the keyboard has
+   * been "up" for a moment with nothing to type into, it is told to go away, which hands the
+   * room back. A keyboard with a field being edited is never touched.
+   */
+  private final Runnable imeGhostCheck =
+      () -> {
+        try {
+          View decor = getWindow().getDecorView();
+          WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(decor);
+          if (insets == null || !insets.isVisible(WindowInsetsCompat.Type.ime())) return;
+          InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+          if (imm == null || imm.isAcceptingText()) return;
+          WindowInsetsControllerCompat c = WindowCompat.getInsetsController(getWindow(), decor);
+          if (c != null) c.hide(WindowInsetsCompat.Type.ime());
+          imm.hideSoftInputFromWindow(decor.getWindowToken(), 0);
+        } catch (Exception ignored) {
+          // Nothing to correct.
+        }
+      };
+
   @Override // com.getcapacitor.BridgeActivity, androidx.fragment.app.FragmentActivity,
   // androidx.activity.ComponentActivity, androidx.core.app.ComponentActivity,
   // android.app.Activity
@@ -19,6 +52,21 @@ public class MainActivity extends BridgeActivity {
     CrashLog.install(this);
     registerPlugin(AmplifyPlayerPlugin.class);
     super.onCreate(bundle);
+    try {
+      final View decor = getWindow().getDecorView();
+      decor
+          .getViewTreeObserver()
+          .addOnGlobalLayoutListener(
+              () -> {
+                WindowInsetsCompat in = ViewCompat.getRootWindowInsets(decor);
+                imeHandler.removeCallbacks(imeGhostCheck);
+                if (in != null && in.isVisible(WindowInsetsCompat.Type.ime())) {
+                  imeHandler.postDelayed(imeGhostCheck, 1500);
+                }
+              });
+    } catch (Exception ignored) {
+      // The page just keeps the keyboard room it was given.
+    }
     // Build 274: followed podcasts are refreshed in the background about once an hour.
     PodcastRefreshWorker.schedule(this);
     // Build 237: while a Favorites cover on Home is held to drag it, the WebView's own long
