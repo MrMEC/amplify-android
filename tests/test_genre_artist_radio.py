@@ -6,6 +6,10 @@ Run: python3 tests/test_genre_artist_radio.py (screenshots in /tmp/claude-0/t/sh
 import os, sys, json, asyncio
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 src = open(os.path.join(HERE, 'test_genre_page.py')).read().split('async def run(')[0]
+src = src.replace("SONGS = [('Rock One', 'Ann', 'Rock'), ('Rock Two', 'Ann', 'Rock'), ('Rock Three', 'Bob', 'Rock'), ('Jazz Tune', 'Cal', 'Jazz')]",
+    # build 450: Phil sings one Disney song among his pop; Dee's only song is Disney's
+    "SONGS = [('Rock One', 'Ann', 'Rock'), ('Rock Two', 'Ann', 'Rock'), ('Rock Three', 'Bob', 'Rock'), ('Jazz Tune', 'Cal', 'Jazz'), ('Pop A', 'Phil', 'Pop'), ('Pop B', 'Phil', 'Pop'), ('Disney Song', 'Phil', 'Pop'), ('Disney Tune', 'Dee', 'Soundtrack')]")
+assert 'Disney Tune' in src
 src = src.replace("os.path.dirname(os.path.abspath(__file__))", repr(HERE)).replace('PORT = 8888', 'PORT = 8897').replace("srv_genrepage", "srv_genreradio")
 exec(src)
 
@@ -15,6 +19,9 @@ EXCL = [  # the directory's "exclusively" search, most listened first
     {'name': 'Exclusively Rock Legend', 'url_resolved': 'http://s/rock0', 'stationuuid': 'x-dup', 'favicon': '', 'tags': 'rock', 'codec': 'MP3'},  # also Rock's top station
     {'name': 'Exclusively Ann', 'url_resolved': 'http://x/ann', 'stationuuid': 'x-ann', 'favicon': '', 'tags': '', 'codec': 'MP3'},
     {'name': 'Exclusively Cal', 'url_resolved': 'http://x/cal', 'stationuuid': 'x-cal', 'favicon': '', 'tags': '', 'codec': 'MP3'},
+    {'name': 'Exclusively Phil', 'url_resolved': 'http://x/phil', 'stationuuid': 'x-phil', 'favicon': '', 'tags': 'pop', 'codec': 'MP3'},
+    {'name': 'Exclusively Dee', 'url_resolved': 'http://x/dee', 'stationuuid': 'x-dee', 'favicon': '', 'tags': '', 'codec': 'MP3'},
+    {'name': 'Exclusively Disney', 'url_resolved': 'http://x/disney', 'stationuuid': 'x-disney', 'favicon': '', 'tags': 'kids,soundtrack', 'codec': 'MP3'},
 ]
 async def route2(r):
     u = r.request.url
@@ -62,6 +69,44 @@ async def run2(b, scheme, w, h):
     await pg.evaluate("__t.genre('Polka')"); await pg.wait_for_timeout(1500)
     p = await pg.evaluate(PROBE)
     check(p['radio'] is None, f'{T} no row when no channel fits {p["heads"]}')
+    # Disney: the channel named Disney first; Dee (all her songs Disney's); not Phil (one of three)
+    await pg.evaluate("__t.genre('Disney')"); await pg.wait_for_timeout(1500)
+    p = await pg.evaluate(PROBE)
+    check(p['radio'] == ['Disney', 'Dee'], f'{T} Disney: the Disney channel first, then an artist the library holds mostly as Disney; not one Disney song among pop {p["radio"]}')
+    await pg.evaluate("document.querySelector('.gp-artist-radio').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(300)
+    await pg.screenshot(path=f'{shots}/genre-radio-disney-{scheme}-{w}.png')
+    # ---- long-press: reorder and remove, kept per genre ----
+    await pg.evaluate("__t.genre('Rock')"); await pg.wait_for_timeout(1500)
+    async def hold(name):
+        await pg.evaluate("(n)=>{ var tl=Array.prototype.filter.call(document.querySelectorAll('.gp-artist-radio .tile'), x=>x.querySelector('.tile-name').textContent===n)[0]; tl.scrollIntoView({block:'center'}); var r=tl.getBoundingClientRect(); var tc=new Touch({identifier:1,target:tl,clientX:r.left+20,clientY:r.top+20}); tl.dispatchEvent(new TouchEvent('touchstart',{touches:[tc],targetTouches:[tc],changedTouches:[tc],bubbles:true,cancelable:true})); window.__held=tl; window.__tc=tc; }", name)
+        await pg.wait_for_timeout(650)
+        items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
+        await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))")
+        return items
+    async def pick(label):
+        await pg.evaluate("(l)=>Array.prototype.filter.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.indexOf(l)>=0)[0].click()", label); await pg.wait_for_timeout(400)
+    items = await hold('Zed')
+    check(items == ['Move to Top', 'Move Up', 'Remove from Rock'], f'{T} long-pressing an artist radio tile opens the genre menu {items}')
+    await pg.screenshot(path=f'{shots}/genre-radio-menu-{scheme}-{w}.png')
+    await pick('Move to Top')
+    p = await pg.evaluate(PROBE)
+    tops = await pg.evaluate("Array.from(document.querySelectorAll('.gp-row:not(.gp-artist-radio) .tile-name')).slice(0,2).map(function(e){ return e.textContent; })")
+    check(p['radio'] == ['Zed', 'Ann'] and tops == ['Rock Station 0', 'Rock Station 1'], f'{T} Move to Top reorders the artist radio row only {p["radio"]} {tops}')
+    await pg.evaluate("__t.genre('Rock')"); await pg.wait_for_timeout(1500)
+    check((await pg.evaluate(PROBE))['radio'] == ['Zed', 'Ann'], f'{T} and is kept for next time')
+    await pg.evaluate("__t.genre('Jazz')"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("__t.genre('Rock')"); await pg.wait_for_timeout(1500)
+    items = await hold('Ann')
+    check(items == ['Move Up', 'Remove from Rock'] or items == ['Move to Top', 'Move Up', 'Remove from Rock'], f'{T} the last tile can move up {items}')
+    await pick('Remove from')
+    await pg.evaluate("document.getElementById('confirmOk').click()"); await pg.wait_for_timeout(500)
+    p = await pg.evaluate(PROBE)
+    rest = await pg.evaluate("(Array.prototype.filter.call(document.querySelectorAll('.gp-more'), b=>b.textContent.indexOf('Restore')>=0)[0]||{}).textContent")
+    check(p['radio'] == ['Zed'] and rest == 'Restore 1 removed station', f'{T} Remove takes it off the row, with Restore at the bottom {p["radio"]} {rest!r}')
+    await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('.gp-more'), b=>b.textContent.indexOf('Restore')>=0)[0].click()"); await pg.wait_for_timeout(500)
+    check((await pg.evaluate(PROBE))['radio'] == ['Zed', 'Ann'], f'{T} Restore brings it back')
+    await pg.evaluate("__t.genre('Jazz')"); await pg.wait_for_timeout(1200)
+    check((await pg.evaluate(PROBE))['radio'] == ['Cal'], f'{T} another genre is untouched')
     # Hidden in Settings > Library
     await pg.evaluate("__t.ev('setLibArtistRadio(false)')"); await pg.wait_for_timeout(300)
     await pg.evaluate("__t.genre('Rock')"); await pg.wait_for_timeout(1500)
