@@ -8581,6 +8581,13 @@
           <option value="off">Off</option>
         </select>
       </div>
+      <div class="settings-row" id="audiobooksSourceRow">
+        <div class="set-text"><span class="settings-label" id="audiobooksSourceLabel">Audiobooks</span><span class="set-desc">The Audiobooks tab in Library: free LibriVox recordings from archive.org</span></div>
+        <select class="settings-select" id="audiobooksSourceSelect" aria-labelledby="audiobooksSourceLabel">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
       <!-- Build 390 (Mark): YouTube, on by default; off, an artist's On YouTube row and Home's Top 100 go. -->
       <div class="settings-row" id="youtubeSourceRow">
         <div class="set-text"><span class="settings-label" id="youtubeSourceLabel">YouTube</span><span class="set-desc">Everything from YouTube: the On YouTube row on artist pages, music videos in Search and Home, Top 100 on Home and the YouTube button in Now Playing</span></div>
@@ -10349,6 +10356,7 @@
   var onGuideView = false; // Video > Live TV > TV Guide (build 240)
   var onPlaylistsHomeView = false;
   var onGenresHomeView = false;
+  var onAudiobooksView = false;   // build 440: Library > Audiobooks
   // Which home section's own "see all" page the centre grid is showing --
   // 'favorites' | 'recentStations' | 'recentSongs' | 'topStations' -- or null for any other
   // view. Mirrors activeLibrarySection: one flag, reset at every other view's entry point,
@@ -22884,7 +22892,7 @@
   function channelVisible(e){ return !isAdultChannel(e) && channelSourceOn(e); }
   // The switches in Settings > Sources; whatever is showing behind Settings is redrawn.
   (function(){
-    [['pluto', 'plutoSourceSelect'], ['archive', 'archiveSourceSelect'], ['youtube', 'youtubeSourceSelect']].forEach(function(pair){
+    [['pluto', 'plutoSourceSelect'], ['archive', 'archiveSourceSelect'], ['audiobooks', 'audiobooksSourceSelect'], ['youtube', 'youtubeSourceSelect']].forEach(function(pair){
       var sel = document.getElementById(pair[1]);
       if(!sel) return;
       sel.value = sourceOn(pair[0]) ? 'on' : 'off';
@@ -22895,6 +22903,11 @@
     });
   })();
   function refreshAfterSourceChange(){
+    // Build 440: Audiobooks' tab comes and goes with its switch; off while it is showing, Artists opens.
+    try{
+      if(typeof onAudiobooksView !== 'undefined' && onAudiobooksView && !sourceOn('audiobooks')) openLibTab('artists');
+      else if(typeof libTabNow === 'function' && libTabNow()) addLibTabs();
+    }catch(e){}
     try{
       if(typeof onAddChannelsView !== 'undefined' && onAddChannelsView) renderAddChannels();
       else if(typeof onGuideView !== 'undefined' && onGuideView) renderGuidePage();
@@ -30762,12 +30775,14 @@
   window.addEventListener('error', function(ev){ noteAppError(ev.error || ev.message); });
   window.addEventListener('unhandledrejection', function(ev){ noteAppError(ev.reason); });
   var LIB_TAB_KEY = 'radioPlayerLibTab';
-  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres']];   // build 430: Genres is back as the last tab (Search keeps its own Genres browse)
+  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres'], ['audiobooks', 'Audiobooks']];   // build 430: Genres is back as the last tab (Search keeps its own Genres browse)
   var libRootNav = false;
   function libLastTab(){
     var t = null; try{ t = localStorage.getItem(LIB_TAB_KEY); }catch(e){}
-    return LIB_TABS.some(function(x){ return x[0] === t; }) ? t : 'artists';
+    return libTabList().some(function(x){ return x[0] === t; }) ? t : 'artists';
   }
+  // Build 440: Audiobooks is a tab only while its source is on (Settings > Sources).
+  function libTabList(){ return LIB_TABS.filter(function(x){ return x[0] !== 'audiobooks' || sourceOn('audiobooks'); }); }
   // A tab (or the Library button) opens a root page; reached from elsewhere (Home's Playlists
   // heading, Back), it keeps the way back there.
   function libTabBack(){
@@ -30780,6 +30795,7 @@
     try{
       if(id === 'playlists') openPlaylistsHome();
       else if(id === 'genres') openGenresHome();
+      else if(id === 'audiobooks') openAudiobooksHome();
       else runLibrarySection(id);
     } finally { libRootNav = false; }
   }
@@ -30788,6 +30804,7 @@
     if(activeArtistKey || activeAlbumKey || activeHomeSection || (activeGenre && document.body.classList.contains('genre-open'))) return null;
     if(onPlaylistsHomeView) return 'playlists';
     if(onGenresHomeView) return 'genres';
+    if(onAudiobooksView) return 'audiobooks';
     if(activeLibrarySection === 'artists' || activeLibrarySection === 'albums' || activeLibrarySection === 'songs') return activeLibrarySection;
     return null;
   }
@@ -30803,7 +30820,7 @@
     bar.className = 'home-tabs video-tabs watch-tabs scroll-tabs lib-tabs';
     bar.setAttribute('role', 'tablist');
     bar.setAttribute('aria-label', 'Library');
-    LIB_TABS.forEach(function(t){
+    libTabList().forEach(function(t){
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'home-tab' + (t[0] === id ? ' active' : '');
@@ -30821,7 +30838,7 @@
     // The active tab in view when the row scrolls.
     var on = bar.querySelector('.active');
     if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
-    if(id === 'playlists' || id === 'genres') hideAzRail();   // build 407: no A-Z on these two
+    if(id === 'playlists' || id === 'genres' || id === 'audiobooks') hideAzRail();   // build 407: no A-Z on these two
     if(id === 'playlists') setResultCount(stationPlaylists.length, 'playlist');
     if(id === 'artists' || id === 'albums' || id === 'songs'){
       libraryAddHeaderBtn.style.display = '';
@@ -30949,6 +30966,7 @@
     renderSongsView = after(renderSongsView, addLibTabs);
     renderPlaylistsGrid = after(renderPlaylistsGrid, addLibTabs);
     renderGenresGrid = after(renderGenresGrid, addLibTabs);
+    renderAudiobooksGrid = after(renderAudiobooksGrid, addLibTabs);
   })();
 
   function openGenresHome(){
@@ -30963,6 +30981,300 @@
     setResultCount(null);
     genresReorderHeaderBtn.style.display = 'none';   // build 432: Edit is on the Browse categories line
     renderGenresGrid();
+  }
+
+  // ---------- Library > Audiobooks (build 440) ----------
+  // LibriVox's recordings, which archive.org keeps in the librivoxaudio collection, so everything
+  // here runs on what Search's Archive tab already does: the same advanced search, the same file
+  // lists, the same podcast-style playback (resume position, speed, skip buttons, Up Next as the
+  // book's sections, Continue Listening), the same More menu (Play Next, Add to Queue, Download).
+  // The page is a Library tab like Genres: a find box (the app's filter box, never focused by
+  // itself), Continue Listening and Popular as sideways rows of covers (the Genre page's rows),
+  // and Browse categories as colour cards (the Genres tab's cards). A category opens a list page
+  // with a back button; typing in the find box lists matches under it. Off in Settings > Sources.
+  var AB_BASE = 'collection:(librivoxaudio) AND mediatype:(audio) AND (language:eng OR language:English)';
+  var AB_PAGE = 30;
+  var AB_CATS = [
+    ['Classics', 'classics'], ['Mystery', 'mystery'], ['Science Fiction', '"science fiction"'], ['Adventure', 'adventure'],
+    ['Short Stories', '"short stories"'], ['Poetry', 'poetry'], ['Children', 'children'], ['Romance', 'romance'],
+    ['History', 'history'], ['Philosophy', 'philosophy'], ['Humor', 'humor'], ['Non-fiction', 'nonfiction']
+  ];
+  var AB_ICONS = {
+    'Mystery': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    'Science Fiction': '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/>',
+    'Adventure': '<circle cx="12" cy="12" r="9"/><path d="m15.8 8.2-2 5.6-5.6 2 2-5.6z"/>',
+    'Poetry': '<path d="M20 12a6 6 0 0 0-8.5-8.5L5 10v9h8.5z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/>',
+    'Children': '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+    'History': '<path d="M3 21h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M12 3 20 8H4z"/>',
+    'Philosophy': '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 21h4"/>',
+    'Humor': '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>'
+  };
+  var AB_BOOK_ICON = '<path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/>';
+  // A recording's guid is "ia:<identifier>/<file>"; LibriVox identifiers end in _librivox.
+  function isAudiobookGuid(g){ return /^ia:[^\/]*_librivox\//.test(String(g || '')); }
+  function abLength(sec){
+    sec = Math.round(Number(sec) || 0);
+    if(sec <= 0) return '';
+    var h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    if(m === 60){ h++; m = 0; }
+    return h ? (h + ' h' + (m ? ' ' + m + ' m' : '')) : Math.max(1, m) + ' m';
+  }
+  function abUrl(q, rows, page){
+    return 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(q)
+      + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=creator&fl%5B%5D=runtime&fl%5B%5D=year&fl%5B%5D=downloads'
+      + '&sort%5B%5D=' + encodeURIComponent('downloads desc') + '&rows=' + rows + '&page=' + (page || 1) + '&output=json';
+  }
+  function abQuery(q, page){
+    return extJson(abUrl(q, AB_PAGE, page), { 'Accept': 'application/json' }).then(function(d){
+      var docs = (d && d.response && d.response.docs) || [];
+      var items = docs.filter(function(x){ return x && x.identifier && x.title; }).map(function(x){
+        var cr = Array.isArray(x.creator) ? x.creator[0] : x.creator;
+        var rt = Array.isArray(x.runtime) ? x.runtime[0] : x.runtime;
+        return { id: String(x.identifier), title: String(Array.isArray(x.title) ? x.title[0] : x.title), creator: cr ? String(cr) : '',
+          year: x.year ? String(x.year).slice(0, 4) : '', video: false, secs: archiveSeconds(rt) };
+      });
+      items.total = Number(d && d.response && d.response.numFound) || items.length;
+      items.page = page || 1;
+      return items;
+    });
+  }
+  function abSearchQuery(term){
+    var words = String(term || '').replace(/[^A-Za-z0-9À-￿\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
+    if(!words.length) return '';
+    var w = words.join(' AND ');
+    return AB_BASE + ' AND (title:(' + w + ') OR creator:(' + w + '))';
+  }
+  function abCategoryQuery(subject){ return AB_BASE + ' AND subject:(' + subject + ')'; }
+  function abArt(art, item){
+    applyPlaceholderArt(art, 'audiobook:' + item.id);
+    art.appendChild(vImg(archiveArtUrl(item.id)));
+  }
+  function abSub(item){ return [item.creator, abLength(item.secs)].filter(Boolean).join(' · '); }
+  // Tapping a book plays it from where it was left: the section last played (its own saved
+  // position picks up inside it), or the first. Its sections are Up Next, so the book plays on.
+  function abLastGuid(id){
+    for(var i = 0; i < recentStations.length; i++){
+      var r = recentStations[i];
+      if(r && r.type === 'podcast' && String(r.guid || '').indexOf('ia:' + id + '/') === 0) return r.guid;
+    }
+    return null;
+  }
+  function playAudiobook(item, el){
+    archiveNpResults = null;
+    if(el) el.classList.add('loading');
+    extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
+      if(el) el.classList.remove('loading');
+      var list = archivePlayables(meta, item);
+      if(!list.length){ archiveNothingNotice(meta, item); return; }
+      var start = list[0], last = abLastGuid(item.id);
+      if(last) for(var i = 0; i < list.length; i++){ if(list[i].guid === last){ start = list[i]; break; } }
+      if(list.length > 1) setQueue(list, start, item.title); else clearQueue();
+      playStation(start);
+      openNowPlaying(start, true);
+    })['catch'](function(){
+      if(el) el.classList.remove('loading');
+      setStatus('Could not reach the Internet Archive.', true);
+    });
+  }
+  function buildAudiobookTile(item){
+    return buildEntityTile({ key: 'audiobook:' + item.id, entity: 'audiobook', name: item.title, sub: item.creator,
+      renderArt: function(art){ abArt(art, item); }, onClick: function(){ playAudiobook(item); } });
+  }
+  // A list row, the way an episode is on a show's page: cover, title, author and length, More.
+  function buildAudiobookRow(item){
+    var row = document.createElement('div');
+    row.className = 'tile song-row archive-result-row';
+    row.dataset.kind = 'audiobook';
+    row.dataset.key = 'audiobook:' + item.id;
+    var art = document.createElement('div');
+    art.className = 'tile-art song-row-art';
+    abArt(art, item);
+    row.appendChild(art);
+    var body = document.createElement('div');
+    body.className = 'song-row-body';
+    var t = document.createElement('div');
+    t.className = 'tile-name song-row-title';
+    t.textContent = item.title;
+    body.appendChild(t);
+    var sub = abSub(item);
+    if(sub){ var s = document.createElement('div'); s.className = 'song-row-sub'; s.textContent = sub; body.appendChild(s); }
+    row.appendChild(body);
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'row-more-btn ia-more-btn';
+    more.title = 'More';
+    more.setAttribute('aria-label', 'More');
+    more.setAttribute('aria-haspopup', 'true');
+    more.innerHTML = '<span class="icon-ellipsis-v" aria-hidden="true"></span>';
+    more.addEventListener('click', function(e){ e.stopPropagation(); openArchiveRowMenu(more, item); });
+    row.appendChild(more);
+    row.addEventListener('click', function(){ playAudiobook(item, row); });
+    return row;
+  }
+  // Books with something saved (the last section played of each), newest first, one per book.
+  function abContinueBooks(){
+    var seen = {}, out = [];
+    recentStations.forEach(function(r){
+      if(!r || r.type !== 'podcast' || !isAudiobookGuid(r.guid)) return;
+      var id = String(r.guid).slice(3).split('/')[0];
+      if(seen[id]) return;
+      seen[id] = 1;
+      out.push({ id: id, title: r.collectionName || r.name, creator: r.artistName || '', secs: 0, section: r.name });
+    });
+    return out;
+  }
+  function abSpinner(){ var d = document.createElement('div'); d.className = 'loading-state ab-loading'; d.innerHTML = '<div class="spinner"></div>'; return d; }
+  // Rows for a list of books, with More Results while there are more; used by the find box and a category.
+  function abAppendList(items, q, onMoreDone){
+    items.forEach(function(it){ stationsGrid.appendChild(buildAudiobookRow(it)); });
+    function more(total, page){
+      if(total <= page * AB_PAGE) return;
+      var btn = archiveMoreButton(function(){
+        return abQuery(q, page + 1).then(function(next){
+          btn.remove();
+          if(!stationsGrid.isConnected) return;
+          abAppendList(next, q);
+        });
+      });
+      btn.classList.add('ab-more');
+      btn.style.gridColumn = '1 / -1';
+      stationsGrid.appendChild(btn);
+    }
+    more(items.total, items.page);
+  }
+  function renderAudiobooksGrid(){
+    resetStationsGrid();
+    var search = document.createElement('div');
+    search.className = 'sec-filter gb-find';
+    search.setAttribute('role', 'search');
+    search.innerHTML = '<i class="fa-solid fa-magnifying-glass sf-ico" aria-hidden="true"></i>'
+      + '<input type="search" id="abFindInput" placeholder="Search audiobooks" aria-label="Search audiobooks" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">'
+      + '<button type="button" class="sf-clear" aria-label="Clear search" title="Clear" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>';
+    stationsGrid.appendChild(search);
+    var input = search.querySelector('input'), clearBtn = search.querySelector('.sf-clear');
+    var token = 0, timer = 0;
+    function clearBelow(){ while(search.nextSibling) search.nextSibling.remove(); }
+    function head(text){ var h = document.createElement('h2'); h.className = 'gp-head'; h.textContent = text; stationsGrid.appendChild(h); return h; }
+    function tileRow(items){
+      var row = document.createElement('div'); row.className = 'gp-row';
+      items.forEach(function(it){ row.appendChild(buildAudiobookTile(it)); });
+      stationsGrid.appendChild(row);
+      return row;
+    }
+    function browse(){
+      var my = ++token;
+      stationsGrid.classList.remove('grid-songs');
+      clearBelow();
+      var cont = abContinueBooks();
+      if(cont.length){
+        head('Continue Listening');
+        var cr = tileRow(cont.slice(0, 12));
+        Array.prototype.forEach.call(cr.children, function(tile, i){
+          var sub = tile.querySelector('.tile-sub'); if(sub && cont[i].section) sub.textContent = cont[i].section;
+        });
+      }
+      var popHead = head('Popular'), popSlot = abSpinner();
+      stationsGrid.appendChild(popSlot);
+      var catHead = document.createElement('h2'); catHead.className = 'gb-head'; catHead.textContent = 'Browse categories';
+      var grid = document.createElement('div'); grid.className = 'gb-grid';
+      AB_CATS.forEach(function(c){
+        var look = genreLook(c[0]), card = document.createElement('button');
+        card.type = 'button'; card.className = 'gb-card'; card.style.setProperty('--gc', look.color); card.dataset.category = c[0];
+        card.innerHTML = '<span class="gb-card-name"></span><svg class="gb-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (AB_ICONS[c[0]] || AB_BOOK_ICON) + '</svg>';
+        card.querySelector('.gb-card-name').textContent = c[0];
+        card.addEventListener('click', function(){ pushView(); openAudiobookCategory(c[0], c[1]); });
+        grid.appendChild(card);
+      });
+      stationsGrid.appendChild(catHead); stationsGrid.appendChild(grid);
+      abQuery(AB_BASE, 1).then(function(items){
+        if(my !== token || !popSlot.isConnected) return;
+        var row = document.createElement('div'); row.className = 'gp-row';
+        items.slice(0, 12).forEach(function(it){ row.appendChild(buildAudiobookTile(it)); });
+        popSlot.replaceWith(row);
+        if(!items.length){ popHead.remove(); row.remove(); }
+      })['catch'](function(){
+        if(my !== token || !popSlot.isConnected) return;
+        popHead.remove(); popSlot.remove();
+        setStatus('Could not reach the Internet Archive.', true);
+      });
+    }
+    function find(q){
+      var my = ++token;
+      clearBelow();
+      stationsGrid.classList.add('grid-songs');
+      var sp = abSpinner(); sp.style.gridColumn = '1 / -1'; stationsGrid.appendChild(sp);
+      var aq = abSearchQuery(q);
+      (aq ? abQuery(aq, 1) : Promise.resolve([])).then(function(items){
+        if(my !== token) return;
+        sp.remove();
+        if(!items.length){
+          var e = document.createElement('div'); e.className = 'empty-state'; e.style.gridColumn = '1 / -1';
+          e.textContent = 'No audiobooks match “' + q + '”.';
+          stationsGrid.appendChild(e);
+          return;
+        }
+        abAppendList(items, aq);
+      })['catch'](function(){
+        if(my !== token) return;
+        sp.remove();
+        setStatus('Could not reach the Internet Archive.', true);
+      });
+    }
+    function go(){ var q = input.value.trim(); if(q) find(q); else browse(); }
+    input.addEventListener('input', function(){
+      clearBtn.hidden = !input.value;
+      clearTimeout(timer);
+      if(!input.value.trim()){ go(); return; }
+      timer = setTimeout(go, 450);
+    });
+    input.addEventListener('keydown', function(e){
+      if(e.key !== 'Enter') return;
+      clearTimeout(timer); go(); input.blur();
+    });
+    clearBtn.addEventListener('click', function(){ input.value = ''; clearBtn.hidden = true; clearTimeout(timer); go(); });
+    browse();
+  }
+  function openAudiobooksHome(){
+    enterLibraryChrome();
+    onAudiobooksView = true;
+    libTabBack();
+    stationsHeading.textContent = 'Library';
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    genresReorderHeaderBtn.style.display = 'none';
+    renderAudiobooksGrid();
+  }
+  // A category's page: its books, most downloaded first, the way a genre opens from the Genres tab.
+  function openAudiobookCategory(label, subject){
+    enterLibraryChrome();
+    setDetailBackToHistory(function(){ openAudiobooksHome(); }, 'Audiobooks');
+    stationsHeading.textContent = label;
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    genresReorderHeaderBtn.style.display = 'none';
+    resetStationsGrid();
+    stationsGrid.classList.add('grid-songs');
+    var sp = abSpinner(); sp.style.gridColumn = '1 / -1'; stationsGrid.appendChild(sp);
+    var q = abCategoryQuery(subject);
+    abQuery(q, 1).then(function(items){
+      if(!sp.isConnected) return;
+      sp.remove();
+      if(!items.length){
+        var e = document.createElement('div'); e.className = 'empty-state'; e.style.gridColumn = '1 / -1';
+        e.textContent = 'No audiobooks found in ' + label + '.';
+        stationsGrid.appendChild(e);
+        return;
+      }
+      abAppendList(items, q);
+    })['catch'](function(){
+      if(!sp.isConnected) return;
+      sp.remove();
+      setStatus('Could not reach the Internet Archive.', true);
+    });
   }
 
   // A show's own page: art, name, publisher, a Follow/Unfollow toggle, and its episodes as
@@ -31408,6 +31720,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
+    onAudiobooksView = false;
     // A playlist is Playlists' own item, so its back button always returns there -- same
     // fixed-destination treatment as My Library's Artists/Albums/Songs and the Podcasts show
     // page, rather than a history-based one.
@@ -32201,6 +32514,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
+    onAudiobooksView = false;
     // A true back button: it returns to wherever the search was opened from (Home's For You
     // row, the For You page, the sidebar...). Every place that opens one records where it was
     // first (pushView); re-running it in place (a new result limit, an edit) doesn't.
@@ -36844,6 +37158,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
+    onAudiobooksView = false;
     onHomeView = false;
     renderGenreNav();
     renderCustomSearchList();
@@ -36961,6 +37276,7 @@
     if(onGuideView) return entry('TV Guide', function(){ openGuidePage(); });
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
+    if(onAudiobooksView) return entry('Audiobooks', function(){ openAudiobooksHome(); });
     if(section) return entry(sectionLabel(section), function(){ runLibrarySection(section); });
     if(homeSection) return entry(homeSectionTitle(homeSection) || 'Back', function(){ openHomeSectionPage(homeSection); });
     if(query && String(query).trim()){
@@ -43906,6 +44222,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
+    onAudiobooksView = false;
     setDetailBack(null);
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
@@ -43995,6 +44312,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
+    onAudiobooksView = false;
     setDetailBack(null);
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
@@ -44109,7 +44427,7 @@
   function archivePrivacySweep(){
     try{
       var before = recentStations.length;
-      recentStations = recentStations.filter(function(r){ return !(r && r.type === 'podcast' && /^ia:/.test(r.guid || '')); });
+      recentStations = recentStations.filter(function(r){ return !(r && r.type === 'podcast' && /^ia:/.test(r.guid || '') && !isAudiobookGuid(r.guid)); });   // build 440: an audiobook keeps its place
       if(recentStations.length !== before){ saveRecent(); renderRecentList(); renderRecentSection(); }
     }catch(e){}
     try{
@@ -46106,6 +46424,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
+    onAudiobooksView = false;
     // A genre's station list is Genres' own category, so its back button always returns
     // there -- same fixed-destination treatment as the other sections' items above, rather
     // than a history-based one.
@@ -46670,7 +46989,7 @@
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView || document.body.classList.contains('lc-page-open')) return 'video';
-    if(onGenresHomeView) return 'library';       // build 430: the Genres tab is under Library
+    if(onGenresHomeView || onAudiobooksView) return 'library';       // build 430: the Genres tab is under Library (440: Audiobooks too)
     if(activeGenre) return genreNavSec;          // a genre page belongs to where it was opened from
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || activeStationPlaylistId) return 'library';
