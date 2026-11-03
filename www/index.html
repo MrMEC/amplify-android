@@ -46819,6 +46819,14 @@
       })['catch'](function(){});
     }
     renderGenrePage();
+    // Build 447 (Mark: "Exclusively Radio stations don't appear under Genres"): the genre's tag
+    // search rarely reaches them, so they come from the Exclusively list the app already keeps.
+    g.artistRadio = [];
+    if(libArtistRadioOn()) loadArtistStations().then(function(list){
+      if(genrePage !== g || activeGenre !== tag) return;
+      g.artistRadio = genreArtistRadio(tag, list || [], g.songs);
+      if(g.artistRadio.length){ var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); }
+    })['catch'](function(){});
     var stationAsks = [apiFetch('/json/stations/search?tag=' + encodeURIComponent(tag.toLowerCase()) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')];
     // Build 428: Disney lists the stations with Disney in their name first (most listened first),
     // and only then the ones that merely carry the tag.
@@ -46844,6 +46852,21 @@
   // and Stations (the directory's stations for the tag), as tabs, Songs first. Tabs only when it
   // has both; otherwise just the one list. Each tab names its own count.
   var genrePage = null;
+  // The artist radio (Exclusively channels) for a genre: the channels of artists whose songs in the
+  // library carry it first, then the channels the directory tags with it, most listened first.
+  var GENRE_ARTIST_RADIO_MAX = 40;
+  function genreArtistRadio(tag, list, songs){
+    var want = String(tag || '').trim().toLowerCase(), mine = {}, lib = [], tagged = [];
+    if(!want) return [];
+    (songs || []).forEach(function(t){ var k = artistMatchKey(t.artist || ''); if(k) mine[k] = 1; });
+    list.forEach(function(st){
+      if(!st || isBlacklisted(st)) return;
+      var k = artistMatchKey(artistNameFromStation(st));
+      if(k && mine[k]) lib.push(st);
+      else if(stationTags(st).some(function(x){ return x === want || x.indexOf(want) !== -1; })) tagged.push(st);
+    });
+    return lib.concat(tagged).slice(0, GENRE_ARTIST_RADIO_MAX);
+  }
   var GENRE_TABS = [['songs', 'Songs', 'song', 'songs'], ['stations', 'Stations', 'station', 'stations']];
   // ---- Build 428: put favourite stations first, or remove stations, within a genre ----
   // Long-press a station on a genre page: Move to top, Move up, Move down, Remove from <genre>.
@@ -47057,6 +47080,18 @@
       g.stations.slice(0, TOP).forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; row.appendChild(t); });
       row._ctxList = g.stations.slice(0, TOP);
       stationsGrid.appendChild(row);
+    }
+    // Build 447: artist radio, less any already listed among the genre's stations.
+    var listed = {};
+    g.stations.forEach(function(st){ listed[st.urlToResolve] = 1; });
+    var radio = (g.artistRadio || []).filter(function(st){ return !listed[st.urlToResolve] && !isBlacklisted(st); });
+    if(radio.length && libArtistRadioOn()){
+      head('Artist radio');
+      var arow = document.createElement('div');
+      arow.className = 'gp-row gp-artist-radio';
+      radio.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); arow.appendChild(t); });
+      arow._ctxList = radio;
+      stationsGrid.appendChild(arow);
     }
     if(songs.length){
       head('In your library');
