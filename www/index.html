@@ -31154,7 +31154,7 @@
     var input = search.querySelector('input'), clearBtn = search.querySelector('.sf-clear');
     var token = 0, timer = 0;
     function clearBelow(){ while(search.nextSibling) search.nextSibling.remove(); }
-    function head(text){ var h = document.createElement('h2'); h.className = 'gp-head'; h.textContent = text; stationsGrid.appendChild(h); return h; }
+    function head(text){ var h = document.createElement('h2'); h.className = 'gb-head'; h.textContent = text; stationsGrid.appendChild(h); return h; }
     function tileRow(items){
       var row = document.createElement('div'); row.className = 'gp-row';
       items.forEach(function(it){ row.appendChild(buildAudiobookTile(it)); });
@@ -31164,6 +31164,7 @@
     function browse(){
       var my = ++token;
       stationsGrid.classList.remove('grid-songs');
+      document.body.classList.add('genres-open');   // the Genres page's spacing, and no A-Z rail
       clearBelow();
       var cont = abContinueBooks();
       if(cont.length){
@@ -31201,6 +31202,7 @@
     function find(q){
       var my = ++token;
       clearBelow();
+      document.body.classList.remove('genres-open');
       stationsGrid.classList.add('grid-songs');
       var sp = abSpinner(); sp.style.gridColumn = '1 / -1'; stationsGrid.appendChild(sp);
       var aq = abSearchQuery(q);
@@ -31236,6 +31238,7 @@
   }
   function openAudiobooksHome(){
     enterLibraryChrome();
+    activeLibrarySection = null;   // a late library refresh must not redraw Artists over this page
     onAudiobooksView = true;
     libTabBack();
     stationsHeading.textContent = 'Library';
@@ -31249,6 +31252,7 @@
   // A category's page: its books, most downloaded first, the way a genre opens from the Genres tab.
   function openAudiobookCategory(label, subject){
     enterLibraryChrome();
+    activeLibrarySection = null;
     setDetailBackToHistory(function(){ openAudiobooksHome(); }, 'Audiobooks');
     stationsHeading.textContent = label;
     pageTitle.style.display = 'none';

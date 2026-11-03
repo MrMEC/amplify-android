@@ -9,6 +9,9 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 src = open(os.path.join(HERE, 'test_archive_download.py')).read().split('async def notice(pg):')[0]
 src = src.replace('PORT = 8881', 'PORT = 8893').replace("ROOT = '/tmp/claude-0/t/srv-iadl'", "ROOT = '/tmp/claude-0/t/srv-ab'").replace("HERE = os.path.dirname(os.path.abspath(__file__))", "HERE = %r" % HERE)
 exec(src)
+# The shared mock never reports a native player's state, so nothing "plays"; this one does, as a phone would.
+MOCK = MOCK.replace("downloadToFolder: function(o){", "load: function(o){ setTimeout(function(){ emit('state', { id: o.id, state: 'ready', isPlaying: true, playWhenReady: true, position: 0, duration: 600 }); }, 20); return Promise.resolve({}); },\n    cacheCheck: function(){ return Promise.resolve({ url: 'file:///cache/x.mp3' }); },\n    downloadToFolder: function(o){", 1)
+assert 'cacheCheck' in MOCK
 
 BOOKS = [
     ('letters_brides_0709_librivox', 'Letters of Two Brides', 'Honoré de Balzac', 32960),
@@ -63,6 +66,9 @@ STATE = """(()=>{ var g = document.getElementById('stationsGrid');
     empty: (g.querySelector('.empty-state') || {}).textContent || '', spinner: !!g.querySelector('.loading-state'),
     sw: document.documentElement.scrollWidth, vw: innerWidth }; })()"""
 
+async def ev(pg, js):
+    return await pg.evaluate("(js)=>__t.ev(js)", js)
+
 async def tap_tab(pg, name):
     await pg.evaluate("(n)=>{ var b=Array.from(document.querySelectorAll('.lib-tabs .home-tab')).find(function(x){ return x.textContent===n; }); b.click(); }", name)
     await pg.wait_for_timeout(900)
@@ -115,7 +121,7 @@ async def run(B, theme):
     check('title:(twain)' in qs and 'creator:(twain)' in qs, f'{T} it searches title and author')
     check(r['heads'] == [] and r['cards'] == [], f'{T} browse content gives way to the matches')
     await pg.screenshot(path=f'{SHOTS}/audiobooks-search-{theme}.png')
-    await pg.evaluate("document.querySelector('.ab-more, .ia-more').click()"); await pg.wait_for_timeout(1500)
+    await pg.evaluate("document.querySelector('.ia-more').click()"); await pg.wait_for_timeout(1500)
     r = await pg.evaluate(STATE)
     check(len(r['rows']) == 40 and not r['more'], f'{T} More Results adds the rest ({len(r["rows"])})')
     await pg.fill('#abFindInput', 'zzzz'); await pg.wait_for_timeout(1800)
@@ -127,23 +133,23 @@ async def run(B, theme):
 
     # ---- playing a book ----
     await pg.evaluate("document.querySelector('.gp-row > .tile').click()"); await pg.wait_for_timeout(1800)
-    q = await pg.evaluate("({ cur: currentStation && currentStation.guid, qn: playQueue.length, label: queueLabel, type: currentStation && currentStation.type })")
+    q = await ev(pg, "({ cur: currentStation && currentStation.guid, qn: playQueue.length, label: queueLabel, type: currentStation && currentStation.type })")
     check(q['type'] == 'podcast' and q['cur'].startswith('ia:letters_brides_0709_librivox/') and q['qn'] == SECTIONS and q['label'] == 'Letters of Two Brides', f'{T} a book plays as a podcast with its sections as Up Next {q}')
     await pg.screenshot(path=f'{SHOTS}/audiobooks-playing-{theme}.png')
     # listen to section 3: it is what Continue Listening holds
-    await pg.evaluate("""(()=>{ var s = playQueue[2]; playStation(s); })()"""); await pg.wait_for_timeout(1200)
-    rec = await pg.evaluate("recentStations.filter(function(r){ return isAudiobookGuid(r.guid); }).map(function(r){ return r.name; })")
+    await ev(pg, "(function(){ var s = playQueue[2]; playStation(s); })()"); await pg.wait_for_timeout(1200)
+    rec = await ev(pg, "recentStations.filter(function(r){ return isAudiobookGuid(r.guid); }).map(function(r){ return r.name; })")
     check(rec and rec[0] == 'Section 3', f'{T} the section played is remembered {rec}')
-    await pg.evaluate("closeNowPlaying()"); await pg.wait_for_timeout(500)
+    await ev(pg, "closeNowPlaying()"); await pg.wait_for_timeout(500)
     await pg.evaluate("__t.ev('openLibTab(\"audiobooks\")')"); await pg.wait_for_timeout(1500)
     r = await pg.evaluate(STATE)
     check(r['heads'][0] == 'Continue Listening' and r['tiles'][0] == 'Letters of Two Brides' and r['subs'][0] == 'Section 3', f'{T} Continue Listening holds the book and its section {r["heads"]} {r["tiles"][:1]} {r["subs"][:1]}')
     await pg.screenshot(path=f'{SHOTS}/audiobooks-continue-{theme}.png')
-    await pg.evaluate("playQueue = []; currentStation = null;")
+    await ev(pg, "playQueue = []; currentStation = null;")
     await pg.evaluate("document.querySelector('.gp-row > .tile').click()"); await pg.wait_for_timeout(1800)
-    q = await pg.evaluate("({ cur: currentStation && currentStation.name, qn: playQueue.length })")
+    q = await ev(pg, "({ cur: currentStation && currentStation.name, qn: playQueue.length })")
     check(q['cur'] == 'Section 3' and q['qn'] == SECTIONS, f'{T} tapping the book picks up at the section left off {q}')
-    await pg.evaluate("closeNowPlaying()"); await pg.wait_for_timeout(400)
+    await ev(pg, "closeNowPlaying()"); await pg.wait_for_timeout(400)
 
     # ---- a category ----
     await pg.evaluate("__t.ev('openLibTab(\"audiobooks\")')"); await pg.wait_for_timeout(1000)
@@ -166,10 +172,10 @@ async def run(B, theme):
     await pg.mouse.click(10, 300); await pg.wait_for_timeout(300)
 
     # ---- Search everything keeps an audiobook's place ----
-    await pg.evaluate("""(()=>{ recentStations.unshift({ type:'podcast', guid:'ia:some_movie/a.mp3', name:'A', collectionName:'Movie', artistName:'' }); setArchiveSearchAll(true); })()""")
-    left = await pg.evaluate("recentStations.filter(function(r){ return /^ia:/.test(r.guid); }).map(function(r){ return r.guid.split('/')[0]; })")
-    check('ia:letters_brides_0709_librivox' in left and 'ia:some_movie' not in left, f'{T} Search everything clears other archive.org history but keeps the audiobook {left}')
-    await pg.evaluate("setArchiveSearchAll(false)")
+    await ev(pg, "(function(){ recentStations.unshift({ type:'podcast', guid:'ia:some_movie/a.mp3', name:'A', collectionName:'Movie', artistName:'' }); setArchiveSearchAll(true); })()")
+    left = await ev(pg, "recentStations.filter(function(r){ return /^ia:/.test(r.guid); }).map(function(r){ return r.guid.split('/')[0]; })")
+    check('letters_brides_0709_librivox' in ''.join(left) and 'some_movie' not in ''.join(left), f'{T} Search everything clears other archive.org history but keeps the audiobook {left}')
+    await ev(pg, "setArchiveSearchAll(false)")
 
     # ---- Settings > Sources ----
     sw = await pg.evaluate("""(()=>{ var s = document.getElementById('audiobooksSourceSelect'); return { there: !!s, val: s && s.value, label: (document.getElementById('audiobooksSourceLabel')||{}).textContent }; })()""")
