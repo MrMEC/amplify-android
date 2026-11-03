@@ -18,6 +18,7 @@ hook = """  window.__dz = {
       vlib = function(){ return lib; };
     },
     songs: function(){ return localTracksWithTag('Disney').map(function(t){ return t.name; }); },
+    many: function(){ var a = []; for(var i = 0; i < 14; i++) a.push({ name: 'Disney Radio ' + i, url_resolved: 'http://s/m' + i, stationuuid: 'm' + i, tags: 'kids', favicon: '' }); var old = apiFetch; apiFetch = function(u){ return /name=disney/.test(u) ? Promise.resolve(a) : Promise.resolve([]); }; },
     home: function(){ openGenresHome(); },
     genres: function(){ return genreOrder.slice(); }
   };
@@ -115,6 +116,23 @@ async def main():
         await pg.evaluate("window.scrollTo(0, document.body.scrollHeight)"); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f'{SHOTS}/disney-genres-home.png')
         check(await pg.evaluate("!!document.querySelector('[data-genre=Disney], .genre-card[data-genre=Disney]') || document.body.innerText.indexOf('Disney') >= 0"), 'Disney is on the Genres page')
+        # build 435: Pogo is never Disney; a Genre tag of "Disney" puts any song in the genre
+        more = TRACKS + [
+          {'name': 'Wishery', 'artist': 'Pogo', 'album': 'Disney Remixes', 'relPath': 'Music/Pogo/Disney/Wishery.mp3', 'uri': 'content://t/20', 'type': 'local', 'localTrack': True, 'tags': 'Electronic'},
+          {'name': 'Lionhearted', 'artist': 'Pogo', 'album': 'The Lion King', 'uri': 'content://t/21', 'type': 'local', 'localTrack': True, 'tags': 'Disney'},
+          {'name': 'Mystery Song', 'artist': 'Nobody', 'album': 'Misc', 'uri': 'content://t/22', 'type': 'local', 'localTrack': True, 'tags': 'Disney'},
+          {'name': 'Two Genres', 'artist': 'Somebody', 'album': 'Misc', 'uri': 'content://t/23', 'type': 'local', 'localTrack': True, 'tags': 'Pop, Disney'},
+          {'name': 'Slash Genre', 'artist': 'Anybody', 'album': 'Misc', 'uri': 'content://t/24', 'type': 'local', 'localTrack': True, 'tags': 'Soundtrack/Disney'}]
+        await pg.evaluate("window.__dz.setLib(%s)" % json.dumps(more))
+        got = await pg.evaluate("(function(){ return window.__dz.songs(); })()")
+        check('Wishery' not in got and 'Lionhearted' not in got, f'build 435: Pogo songs are not Disney, even tagged {sorted(got)}')
+        check(all(x in got for x in ['Mystery Song', 'Two Genres', 'Slash Genre']), f'build 435: a Genre tag of Disney puts a song in the Disney genre {sorted(got)}')
+        # build 435: More Disney stations come before Podcasts, Movies and TV shows
+        await pg.evaluate("window.__dz.many(); window.__dz.open('Disney')"); await pg.wait_for_timeout(1500)
+        heads = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-head'), h => h.textContent)")
+        check(heads == ['Top stations', 'In your library', 'More Disney stations', 'Podcasts', 'Movies', 'TV shows'], f'build 435: More Disney stations sits above Podcasts and Movies {heads}')
+        await pg.evaluate("document.querySelectorAll('.gp-head')[2].scrollIntoView({block:'start'}); window.scrollBy(0, -80)"); await pg.wait_for_timeout(400)
+        await pg.screenshot(path=f'{SHOTS}/disney-more-stations.png')
         check(not errs, f'no page errors {errs[:2]}')
         await b.close()
         print('FAILS:', fails)

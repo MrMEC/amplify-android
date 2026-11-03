@@ -41302,6 +41302,12 @@
     txt = String(txt || '');
     return DISNEY_STRONG_RE.test(txt) || (titleToo && DISNEY_TITLE_RE.test(txt));
   }
+  // Build 435 (Mark): artists kept out of the Disney genre altogether (Pogo remixes Disney films
+  // but isn't Disney music), whatever their files are called or tagged.
+  var DISNEY_EXCLUDED_ARTISTS = ['pogo'];
+  function isDisneyExcluded(t){
+    return [t.artist, t.albumArtist].some(function(a){ return a && DISNEY_EXCLUDED_ARTISTS.indexOf(String(a).trim().toLowerCase()) !== -1; });
+  }
   function isDisneyTrack(t){
     var fields = [t.artist, t.album, t.name, t.relPath, t.folder, t.dir, t.path].filter(Boolean).join(' / ');
     if(DISNEY_STRONG_RE.test(fields)) return true;
@@ -41320,7 +41326,10 @@
     if(!want || !libraryTracks.length) return [];
     return libraryTracks.filter(function(t){
       if(isBlacklisted(t)) return false;
-      if(want === 'disney' && isDisneyTrack(t)) return true;
+      if(want === 'disney'){
+        if(isDisneyExcluded(t)) return false;
+        if(isDisneyTrack(t)) return true;
+      }
       return stationTags(t).some(function(x){ return x === want || x.indexOf(want) !== -1; });
     });
   }
@@ -46029,6 +46038,23 @@
         stationsGrid.appendChild(more);
       }
     }
+    // Build 435 (Mark): the rest of the stations come before Podcasts, Movies and TV shows.
+    if(g.stations.length > TOP){
+      head('More ' + g.tag + ' stations');
+      var moreGrid = document.createElement('div');
+      moreGrid.className = 'tile-grid gp-grid';
+      g.stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); tile._genreSt = st; moreGrid.appendChild(tile); });
+      stationsGrid.appendChild(moreGrid);
+    }
+    var gp = genrePrefs[String(g.tag).toLowerCase()];
+    var hiddenNow = gp && g.allStations ? g.allStations.filter(function(st){ return (gp.hidden || []).indexOf(favKey(st)) >= 0; }).length : 0;
+    if(hiddenNow){
+      var restore = document.createElement('button');
+      restore.type = 'button'; restore.className = 'gp-more';
+      restore.textContent = 'Restore ' + hiddenNow + ' removed station' + (hiddenNow === 1 ? '' : 's');
+      restore.addEventListener('click', function(){ genreRestoreStations(g); });
+      stationsGrid.appendChild(restore);
+    }
     if(g.podcasts && g.podcasts.length){
       head('Podcasts');
       var prow = document.createElement('div');
@@ -46051,22 +46077,6 @@
       (g.allShows ? g.shows : g.shows.slice(0, 10)).forEach(function(sh){ srow.appendChild(buildShowTile(sh)); });
       stationsGrid.appendChild(srow);
       if(g.shows.length > 10) stationsGrid.appendChild(genreMoreLink(g, 'allShows'));
-    }
-    if(g.stations.length > TOP){
-      head('More ' + g.tag + ' stations');
-      var moreGrid = document.createElement('div');
-      moreGrid.className = 'tile-grid gp-grid';
-      g.stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); tile._genreSt = st; moreGrid.appendChild(tile); });
-      stationsGrid.appendChild(moreGrid);
-    }
-    var gp = genrePrefs[String(g.tag).toLowerCase()];
-    var hiddenNow = gp && g.allStations ? g.allStations.filter(function(st){ return (gp.hidden || []).indexOf(favKey(st)) >= 0; }).length : 0;
-    if(hiddenNow){
-      var restore = document.createElement('button');
-      restore.type = 'button'; restore.className = 'gp-more';
-      restore.textContent = 'Restore ' + hiddenNow + ' removed station' + (hiddenNow === 1 ? '' : 's');
-      restore.addEventListener('click', function(){ genreRestoreStations(g); });
-      stationsGrid.appendChild(restore);
     }
     if(g.pending){
       var spin = document.createElement('div');
