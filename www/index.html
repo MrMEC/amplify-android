@@ -30332,6 +30332,16 @@
   }
 
   // ---------- Build 405 (Mark): Library tabs ----------
+  // build 431: the last few page errors are kept so a problem on the phone can be traced
+  function noteAppError(e){
+    try{
+      var list = JSON.parse(localStorage.getItem('amplifyErrors') || '[]');
+      list.unshift(new Date().toISOString() + ' ' + String(e && (e.stack || e.message) || e).slice(0, 600));
+      localStorage.setItem('amplifyErrors', JSON.stringify(list.slice(0, 15)));
+    }catch(x){}
+  }
+  window.addEventListener('error', function(ev){ noteAppError(ev.error || ev.message); });
+  window.addEventListener('unhandledrejection', function(ev){ noteAppError(ev.reason); });
   var LIB_TAB_KEY = 'radioPlayerLibTab';
   var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres']];   // build 430: Genres is back as the last tab (Search keeps its own Genres browse)
   var libRootNav = false;
@@ -30507,7 +30517,8 @@
     return block;
   }
   (function(){
-    function after(fn, extra){ return function(){ var r = fn.apply(this, arguments); try{ extra(); }catch(e){} return r; }; }
+    // build 431: the tabs go on even when the list itself trips over one bad item
+    function after(fn, extra){ return function(){ try{ return fn.apply(this, arguments); } finally { try{ extra(); }catch(e){ noteAppError(e); } } }; }
     renderArtistsView = after(renderArtistsView, function(){
       addLibTabs();
       if(libTabNow() !== 'artists') return;
@@ -36700,7 +36711,11 @@
     } else {
       stationsHeading.textContent = 'Songs';
     }
-    refreshLibraryView();
+    try{ refreshLibraryView(); }
+    finally {
+      // build 431: whatever happened above, a Library tab page always shows its tabs
+      try{ if(libTabNow() && !stationsGrid.querySelector(':scope > .lib-tabs')) addLibTabs(); }catch(e){ noteAppError(e); }
+    }
   }
 
   // ---------- home section "see all" pages ----------
@@ -37236,7 +37251,7 @@
 
     // Build 304: three across on a phone.
     stationsGrid.classList.add('grid-artists');
-    entries.forEach(function(e){ stationsGrid.appendChild(buildArtistTile(e)); });
+    entries.forEach(function(e){ try{ stationsGrid.appendChild(buildArtistTile(e)); }catch(err){ noteAppError(err); } });   // build 431: one bad artist can't stop the list
     buildAzRail(azItemsFromGrid(".tile[data-entity='artist']", '.tile-name'));
 
     if(pending){

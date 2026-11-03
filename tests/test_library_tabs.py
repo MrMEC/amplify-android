@@ -102,7 +102,7 @@ async def run(b, scheme, w, h):
     await pg.evaluate("__t.ev(\"['Ann','Bob'].forEach(function(n){ toggleFavorite(artistFavRecord(findArtistEntry(artistMatchKey(n)))); })\")"); await pg.wait_for_timeout(300)
     await lib(pg)
     r = await pg.evaluate(LT); print(T, r)
-    check(r['first'] and r['tabs'] == ['Artists', 'Albums', 'Songs', 'Playlists'] and r['active'] == 'Artists', f'{T} the Library opens on tabs, Artists first {r["tabs"]} {r["active"]}')
+    check(r['first'] and r['tabs'] == ['Artists', 'Albums', 'Songs', 'Playlists', 'Genres'] and r['active'] == 'Artists', f'{T} the Library opens on tabs, Artists first {r["tabs"]} {r["active"]}')
     check(r['heading'] == 'Library' and not r['back'], f'{T} headed Library, no back button')
     check(r['favRow'] == ['Ann', 'Bob'] and r['favRowScroll'] == 'auto' and r['allHead'] and r['gridArtists'] == 3, f'{T} Favorite Artists as a sideways row above All Artists {r["favRow"]} {r["gridArtists"]}')
     check(r['filterAfter'], f'{T} the filter box sits right under the tabs')
@@ -197,6 +197,14 @@ async def run(b, scheme, w, h):
         await pg.fill('#secFilterInput', ''); await pg.wait_for_timeout(500)
         await cdp.send('Emulation.setCPUThrottlingRate', {'rate': 1})
         await pg.screenshot(path=f'{shots}/libtabs-songs-big-{scheme}-{w}.png')
+    # build 431: one artist that fails to draw must not take the tabs with it
+    await pg.evaluate("__t.ev(\"window.__bt = buildArtistTile; buildArtistTile = function(e){ if(e.name === 'Bob') throw new Error('bad artist'); return window.__bt(e); }; 0\")")
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(600)
+    await pg.evaluate("__t.ev(\"openLibTab('artists'); 0\")"); await pg.wait_for_timeout(1000)
+    r = await pg.evaluate(LT)
+    logged = await pg.evaluate("JSON.parse(localStorage.getItem('amplifyErrors') || '[]').some(function(x){ return x.indexOf('bad artist') !== -1; })")
+    check(r['tabs'] == ['Artists', 'Albums', 'Songs', 'Playlists', 'Genres'] and r['heading'] == 'Library' and r['gridArtists'] == 2 and logged, f'{T} build 431: a bad artist is skipped, the tabs stay {r["tabs"]} {r["heading"]} {r["gridArtists"]} {logged}')
+    await pg.evaluate("__t.ev(\"buildArtistTile = window.__bt; 0\")")
     check(not errs, f'{T} no page errors {errs[:3]}')
     await ctx.close()
 
