@@ -31224,19 +31224,38 @@
   }
   function abSpinner(){ var d = document.createElement('div'); d.className = 'loading-state ab-loading'; d.innerHTML = '<div class="spinner"></div>'; return d; }
   // Rows for a list of books, with More Results while there are more; used by the find box and a category.
+  // A page of rows; books still on their way (items.pending) come in through the returned late(),
+  // above a spinner that stands where More Results will be.
   function abAppendList(items, pager){
-    items.forEach(function(it){ stationsGrid.appendChild(buildAudiobookRow(it)); });
-    if(!pager || !pager.hasMore()) return;
-    var btn = archiveMoreButton(function(){
-      return pager.next().then(function(next){
-        btn.remove();
-        if(!stationsGrid.isConnected) return;
-        abAppendList(next, pager);
+    var spin = null;
+    function addRows(list){
+      list.forEach(function(it){
+        var r = buildAudiobookRow(it);
+        if(spin && spin.parentNode === stationsGrid) stationsGrid.insertBefore(r, spin); else stationsGrid.appendChild(r);
       });
-    });
-    btn.classList.add('ab-more');
-    btn.style.gridColumn = '1 / -1';
-    stationsGrid.appendChild(btn);
+    }
+    function addMore(){
+      if(!pager || !pager.hasMore() || !stationsGrid.isConnected) return;
+      var page = null;
+      var btn = archiveMoreButton(function(){
+        return pager.next(function(late, done){ if(page) page.late(late, done); }).then(function(next){
+          btn.remove();
+          if(!stationsGrid.isConnected) return;
+          page = abAppendList(next, pager);
+        });
+      });
+      btn.classList.add('ab-more');
+      btn.style.gridColumn = '1 / -1';
+      stationsGrid.appendChild(btn);
+    }
+    addRows(items);
+    if(items.pending){ spin = abSpinner(); spin.classList.add('ab-late'); spin.style.gridColumn = '1 / -1'; stationsGrid.appendChild(spin); }
+    else addMore();
+    return { late: function(list, done){
+      if(!stationsGrid.isConnected) return;
+      addRows(list);
+      if(done){ if(spin){ spin.remove(); spin = null; } addMore(); }
+    } };
   }
   // Pages of books for a list: next() gives the next page (the first, the first time), hasMore()
   // whether there is one. A category is archive.org alone.
@@ -31264,23 +31283,47 @@
     function within(p, ms){ return Promise.race([p, new Promise(function(r, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
     return {
       hasMore: function(){ return s.iaMore || s.gbMore; },
-      next: function(){
-        var bad = 0, asked = 0;
-        var ia = s.iaMore ? (asked++, abQuery(aq, ++s.ia).then(function(items){
-          s.iaMore = items.length > 0 && items.total > s.ia * AB_PAGE;
-          items.forEach(function(it){ it.audiobook = true; });
-          return items;
-        }, function(){ s.iaMore = false; bad++; return []; })) : Promise.resolve([]);
-        var gb = s.gbMore ? (asked++, within(gbQuery(words, ++s.gb), 15000).then(function(items){
-          s.gbMore = items.length > 0 && items.more;
-          return items;
-        }, function(){ s.gbMore = false; bad++; return []; })) : Promise.resolve([]);
-        return Promise.all([ia, gb]).then(function(r){
+      next: function(onLate){
+        // Build 445 (Mark: "very slow"): whichever library answers first is listed at once; the
+        // other's books follow through onLate(books, done), so a slow Gutendex never holds up
+        // archive.org's. A page resolves empty only once neither has anything.
+        var bad = 0, asked = 0, pend = 0, resolved = false;
+        function keep(list){
           var out = [];
-          r[0].forEach(function(it){ if(s.ids[it.id]) return; s.ids[it.id] = 1; s.seen[key(it)] = 1; out.push(it); });
-          r[1].forEach(function(it){ var k = key(it); if(s.ids[it.id] || s.seen[k]) return; s.ids[it.id] = 1; s.seen[k] = 1; out.push(it); });
-          out.failed = asked > 0 && bad === asked;
+          list.forEach(function(it){
+            var k = key(it);
+            if(s.ids[it.id] || s.seen[k]) return;   // the same book from the other library, already listed
+            s.ids[it.id] = 1; s.seen[k] = 1; out.push(it);
+          });
           return out;
+        }
+        return new Promise(function(resolve){
+          function settle(list, gut){
+            pend--;
+            var out = keep(list, gut);
+            if(!resolved){
+              if(!out.length && pend > 0) return;
+              resolved = true;
+              out.pending = pend > 0;
+              out.failed = asked > 0 && bad === asked;
+              resolve(out);
+            } else if(onLate){
+              var done = pend === 0;
+              setTimeout(function(){ onLate(out, done); }, 0);   // after the caller has drawn the first books
+            }
+          }
+          if(s.iaMore){ asked++; pend++; }
+          if(s.gbMore){ asked++; pend++; }
+          if(!pend){ resolved = true; var none = []; none.pending = false; none.failed = false; resolve(none); return; }
+          if(s.iaMore) abQuery(aq, ++s.ia).then(function(items){
+            s.iaMore = items.length > 0 && items.total > s.ia * AB_PAGE;
+            items.forEach(function(it){ it.audiobook = true; });
+            settle(items, false);
+          }, function(){ s.iaMore = false; bad++; settle([], false); });
+          if(s.gbMore) within(gbQuery(words, ++s.gb), 12000).then(function(items){
+            s.gbMore = items.length > 0 && items.more;
+            settle(items, true);
+          }, function(){ s.gbMore = false; bad++; settle([], true); });
         });
       }
     };
@@ -31428,8 +31471,8 @@
       document.body.classList.remove('genres-open');
       stationsGrid.classList.add('grid-songs');
       var sp = abSpinner(); sp.style.gridColumn = '1 / -1'; stationsGrid.appendChild(sp);
-      var pager = abFinder(q);
-      pager.next().then(function(items){
+      var pager = abFinder(q), page = null;
+      pager.next(function(late, done){ if(my === token && page) page.late(late, done); }).then(function(items){
         if(my !== token) return;
         sp.remove();
         if(!items.length){
@@ -31439,7 +31482,7 @@
           if(items.failed) setStatus('Could not reach the Internet Archive or Project Gutenberg.', true);
           return;
         }
-        abAppendList(items, pager);
+        page = abAppendList(items, pager);
       })['catch'](function(){
         if(my !== token) return;
         sp.remove();
@@ -45902,13 +45945,26 @@
   }
   // Build 443: the Audiobooks page's own search (archive.org's audiobooks, then Gutenberg's), as a tab.
   function abPhraseOk(pq){ return function(it){ return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases }); }; }
+  // The slower library's books, once they come: added to the tab where it stands.
+  function abSearchLate(st, pq){
+    return function(late, done){
+      if(lastSearch !== st) return;
+      st.audiobooks = (st.audiobooks || []).concat(late.filter(abPhraseOk(pq)));
+      if(done) st.audiobooksLate = false;
+      if(searchState !== st) return;
+      var y = window.scrollY;
+      applySearchResults();
+      window.scrollTo(0, y);
+    };
+  }
   function searchAudiobooksFor(st, remoteQ, pq){
     if(!String(remoteQ || '').trim()){ st.audiobooksPending = false; return; }
     st.audiobooksPending = true;
     st.abPager = abFinder(remoteQ);
-    st.abPager.next().then(function(items){
+    st.abPager.next(abSearchLate(st, pq)).then(function(items){
       if(lastSearch !== st) return;
       st.audiobooks = items.filter(abPhraseOk(pq));
+      st.audiobooksLate = !!items.pending;
       st.audiobooksPending = false;
       if(searchState === st) applySearchResults();
     })['catch'](function(){
@@ -46177,11 +46233,15 @@
         });
       }));
     }
-    if(group.id === 'audiobooks' && searchState.abPager && searchState.abPager.hasMore()){
-      var sa = searchState;
+    if(group.id === 'audiobooks' && searchState.audiobooksLate){
+      var late = abSpinner(); late.classList.add('ab-late'); late.style.gridColumn = '1 / -1';
+      stationsGrid.appendChild(late);
+    } else if(group.id === 'audiobooks' && searchState.abPager && searchState.abPager.hasMore()){
+      var sa = searchState, saq = parseSearchQuery(sa.q || '');
       stationsGrid.appendChild(archiveMoreButton(function(){
-        return sa.abPager.next().then(function(more){
-          sa.audiobooks = (sa.audiobooks || []).concat(more.filter(abPhraseOk(parseSearchQuery(sa.q || ''))));
+        return sa.abPager.next(abSearchLate(sa, saq)).then(function(more){
+          sa.audiobooksLate = !!more.pending;
+          sa.audiobooks = (sa.audiobooks || []).concat(more.filter(abPhraseOk(saq)));
           if(searchState !== sa) return;
           var y = window.scrollY;
           applySearchResults();
