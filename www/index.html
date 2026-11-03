@@ -30261,11 +30261,26 @@
     return scored.slice(0, 4).map(function(x){ return x.g; });
   }
   var genreStationCache = {};
+  // Build 433 (Mark): the Disney genre leaves out Spanish-language stations (Radio Disney's
+  // Latin American stations and the like). The directory's language field is often empty, so the
+  // country, Mexican call signs and Spanish words in the name or tags count too.
+  var SPANISH_COUNTRIES = { ar:1, bo:1, cl:1, co:1, cr:1, cu:1, do:1, ec:1, es:1, gq:1, gt:1, hn:1, mx:1, ni:1, pa:1, pe:1, pr:1, py:1, sv:1, uy:1, ve:1 };
+  var SPANISH_LANG_RE = /\b(spanish|espa(n|ñ)ol|castellano|es)\b/i;
+  var SPANISH_NAME_RE = /(\bespa(n|ñ)ol|\blatin[oa]s?\b|\blatinoam[eé]rica|\bm[eé]xico\b|\bargentina\b|\bchile\b|\bcolombia\b|\bper[uú]\b|\buruguay\b|\bparaguay\b|\becuador\b|\bbolivia\b|\bguatemala\b|\bcosta rica\b|\bpanam[aá]\b|\bvenezuela\b|\bhonduras\b|\bnicaragua\b|\bel salvador\b|\brep[uú]blica dominicana\b|\bespa(n|ñ)a\b|\ben vivo\b|\bm[uú]sica\b|\bcanciones\b|\binfantil(es)?\b|\bni(n|ñ)os\b|\bemisora\b|\bla radio\b|\b(?:XH|XE)[A-Z]{2,4}\b)/i;
+  function isSpanishStation(s){
+    if(!s) return false;
+    if(SPANISH_LANG_RE.test(String(s.language || '')) || /(^|,)\s*es\s*(,|$)/i.test(String(s.languagecodes || ''))) return true;
+    if(SPANISH_COUNTRIES[String(s.countrycode || '').toLowerCase()]) return true;
+    return SPANISH_NAME_RE.test([s.name, s.tags].join(' '));
+  }
+  function genreStationFilter(tag){
+    return String(tag).toLowerCase() === 'disney' ? function(s){ return !isSpanishStation(s); } : function(){ return true; };
+  }
   function genreStations(tag){
     if(genreStationCache[tag]) return Promise.resolve(genreStationCache[tag]);
     return apiFetch('/json/stations/search?tag=' + encodeURIComponent(tag.toLowerCase()) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
       .then(function(data){
-        var list = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        var list = dedupeByStreamUrl((data || []).filter(genreStationFilter(tag)).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
         if(list.length) genreStationCache[tag] = list;
         return list;
       });
@@ -45768,7 +45783,7 @@
       .then(function(lists){
         var data = [].concat.apply([], lists.map(function(l){ return l || []; }));
         if(genrePage !== g || activeGenre !== tag) return;
-        g.allStations = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        g.allStations = dedupeByStreamUrl((data || []).filter(genreStationFilter(tag)).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
         g.stations = applyGenrePrefs(tag, g.allStations);
         if(g.allStations.length) genreStationCache[tag] = g.allStations;
         g.pending = false;
