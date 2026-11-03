@@ -34965,6 +34965,76 @@
     batch();
   }
 
+  // Songs imported before the album-artist tag was kept get it read in the background, a
+  // batch at a time and saved back, so it only ever happens once. Albums sharing a name
+  // across several performers go first, since those are the ones that might be compilations.
+  var aaBackfillRunning = false;
+  function backfillAlbumArtists(){
+    if(aaBackfillRunning) return;
+    var todo = libraryTracks.filter(function(t){ return isLocalTrack(t) && !t.aaRead && !t.opened; });
+    if(!todo.length) return;
+    var perAlbum = {};
+    libraryTracks.forEach(function(t){
+      var a = artistMatchKey((t.album || '').trim());
+      if(!a) return;
+      var o = perAlbum[a] = perAlbum[a] || {};
+      o[artistMatchKey(t.artist || UNKNOWN_ARTIST)] = true;
+    });
+    function multi(t){
+      var o = perAlbum[artistMatchKey((t.album || '').trim())];
+      return o && Object.keys(o).length > 1 ? 0 : 1;
+    }
+    todo.sort(function(a, b){ return multi(a) - multi(b); });
+    aaBackfillRunning = true;
+    var changed = false, i = 0;
+    function finish(){
+      aaBackfillRunning = false;
+      if(changed){
+        compilationVersion++;
+        renderLibraryList();
+        refreshLibraryView();
+      }
+    }
+    function batch(){
+      var slice = todo.slice(i, i + 20);
+      i += 20;
+      if(!slice.length){ finish(); return; }
+      var files = [];
+      idbDo([LIB_STORE_FILES], 'readonly', function(tx){
+        var store = tx.objectStore(LIB_STORE_FILES);
+        slice.forEach(function(t, k){
+          var r = store.get(t.localId);
+          r.onsuccess = function(){ files[k] = r.result; };
+        });
+        return null;
+      }).then(function(){
+        return Promise.all(slice.map(function(t, k){
+          var f = files[k];
+          if(!f || !f.size) return null;
+          if(!f.name) { try{ f = new File([f], t.fileName || 'x.mp3', { type: t.mime || f.type || '' }); }catch(e){ return null; } }
+          return readTags(f)['catch'](function(){ return null; });
+        }));
+      }).then(function(tagsList){
+        var any = false;
+        slice.forEach(function(t, k){
+          var tg = tagsList && tagsList[k];
+          if(tg === null || tg === undefined) return; // unreadable now; tried again next start
+          t.albumArtist = trimNulls(tg.albumArtist) || '';
+          t.aaRead = true;
+          any = true;
+        });
+        if(!any) return null;
+        changed = true;
+        return idbDo([LIB_STORE_TRACKS], 'readwrite', function(tx){
+          var store = tx.objectStore(LIB_STORE_TRACKS), last = null;
+          slice.forEach(function(t){ if(t.aaRead) last = store.put(t); });
+          return last;
+        });
+      })['catch'](function(){}).then(function(){ setTimeout(batch, 0); });
+    }
+    batch();
+  }
+
   // ---------- content identity ----------
   // Size plus the first and last 64KB. Enough to distinguish any two real audio files
   // without reading gigabytes, and cheap enough to run on every file of a folder import.
@@ -35118,6 +35188,7 @@
       renderRecentSection();
       pruneStaleLibraryRefs();
       setTimeout(backfillArtSigs, 1500);
+      setTimeout(backfillAlbumArtists, 2500);
       return libraryTracks;
     })['catch'](function(err){
       // The streaming half of the app is unaffected, and so is Artists, which is mostly
@@ -35221,6 +35292,11 @@
       name: title,
       artist: artist,
       album: album,
+      // The album-artist tag, kept so an album tagged "Various Artists" stays one album even
+      // though every song on it has a different performer. aaRead marks that the tag has been
+      // read, so the background pass for older imports never repeats it.
+      albumArtist: trimNulls(t.albumArtist) || '',
+      aaRead: true,
       genre: genre,
       year: t.year || '',
       trackNo: t.trackNo || guess.trackNo || 0,
@@ -36460,6 +36536,18 @@
   // the cover keeps two different records that happen to share a name and a folder apart.
   var VARIOUS_ARTISTS = 'Various Artists';
   var compilationById = null, compilationSig = '', compilationVersion = 0;
+  // An album whose album-artist tag says it is by many artists is one album, whatever the
+  // folders or covers look like -- the tag is the person saying so outright.
+  function isVariousAlbumArtist(name){
+    var n = String(name || '').toLowerCase().replace(/[\s._\/\-]+/g, '');
+    return n === 'variousartists' || n === 'various' || n === 'va' || n === 'variousartist'
+      || n === 'variosartistas' || n === 'varios' || n === 'verschiedeneinterpreten'
+      || n === 'artistesvariés' || n === 'artistesvaries' || n === 'divers';
+  }
+  function taggedCompilationKey(track){
+    var album = (track.album || '').trim();
+    return 'va|' + artistMatchKey(album) + '|*';
+  }
   function compilationGroupOf(track){
     var album = (track.album || '').trim();
     if(!album || !isLocalTrack(track)) return '';
@@ -36474,8 +36562,18 @@
       if(g) (groups[g] = groups[g] || []).push(t);
     });
     var map = {};
+    // Songs tagged Various Artists group by album name alone.
+    libraryTracks.forEach(function(t){
+      if(isLocalTrack(t) && (t.album || '').trim() && isVariousAlbumArtist(t.albumArtist)){
+        map[favKey(t)] = taggedCompilationKey(t);
+      }
+    });
     Object.keys(groups).forEach(function(g){
       var tracks = groups[g], artists = {}, arts = {}, nArtists = 0, nArts = 0;
+      // A folder holding some tagged and some untagged songs of one album is that tagged album.
+      var taggedKey = '';
+      tracks.forEach(function(t){ if(!taggedKey && map[favKey(t)]) taggedKey = map[favKey(t)]; });
+      if(taggedKey){ tracks.forEach(function(t){ map[favKey(t)] = taggedKey; }); return; }
       tracks.forEach(function(t){
         var a = artistMatchKey(t.artist || UNKNOWN_ARTIST);
         if(!artists[a]){ artists[a] = true; nArtists++; }
@@ -43172,7 +43270,8 @@
     if(track._oldAlbumKey === undefined){ try{ track._oldAlbumKey = albumKeyFor(track); }catch(e){} }
     return Promise.all([readTags(newFile), computeContentKey(newFile)['catch'](function(){ return ''; })]).then(function(r){
       var fresh = buildTrackRecord(newFile, r[0], track.duration, null, r[1]);
-      ['name', 'artist', 'album', 'genre', 'tags', 'year', 'trackNo', 'metaKey'].forEach(function(k){ track[k] = fresh[k]; });
+      ['name', 'artist', 'album', 'albumArtist', 'aaRead', 'genre', 'tags', 'year', 'trackNo', 'metaKey'].forEach(function(k){ track[k] = fresh[k]; });
+      if(typeof compilationVersion === 'number') compilationVersion++;
       if(r[1]) track.contentKey = r[1];
       if(disk){
         // What the folder copy looks like now, so a refresh doesn't take it for a new song.
