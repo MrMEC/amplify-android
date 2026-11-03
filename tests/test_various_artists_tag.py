@@ -145,9 +145,9 @@ async def main():
         after = await pg.evaluate(ALBUMS)
         check('Lego Rock Band / Various Artists · 4 songs' in after and 'Now 60 / Various Artists · 2 songs' in after,
               'background pass regroups from the file tags: %r' % after)
-        stored = await pg.evaluate("""__t.idbDo([__t.store()],'readonly',function(tx){ return tx.objectStore(__t.store()).getAll(); })
-          .then(function(r){ return r.filter(function(t){ return t.aaRead; }).length; })""")
-        check(stored == len(files), 'album artists saved back')
+        # Only songs on an album name several artists share are read: Solo Record (one artist) is not.
+        read = await pg.evaluate("__t.tracks().filter(function(t){ return t.aaRead; }).map(function(t){ return t.album; }).sort()")
+        check(len(read) == 8 and 'Solo Record' not in read, 'only shared-name albums were read: %r' % read)
 
         # Reload: grouping holds from storage alone.
         await pg.reload(); await pg.wait_for_timeout(3000)
