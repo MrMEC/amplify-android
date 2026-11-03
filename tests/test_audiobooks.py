@@ -145,6 +145,31 @@ async def run(B, theme):
     r = await pg.evaluate(STATE)
     check(r['heads'][0] == 'Continue Listening' and r['tiles'][0] == 'Letters of Two Brides' and r['subs'][0] == 'Section 3', f'{T} Continue Listening holds the book and its section {r["heads"]} {r["tiles"][:1]} {r["subs"][:1]}')
     await pg.screenshot(path=f'{SHOTS}/audiobooks-continue-{theme}.png')
+    # ---- a changed cover shows on the Audiobooks page ----
+    BLUE = "data:image/svg+xml;utf8," + urllib.parse.quote("<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><rect width='60' height='60' fill='#0000ff'/></svg>")
+    probe = """(function(){ var t = document.querySelector('.gp-row > .tile'); var im = t && t.querySelector('.tile-art img'); return im ? im.currentSrc || im.src : null; })()"""
+    async def cover():
+        await pg.wait_for_timeout(900)
+        return await pg.evaluate("(js)=>__t.ev(js)", probe)
+    before = await cover()
+    check(before and 'services/img' in before, f'{T} the book starts with archive.org\'s cover {before}')
+    # as the first Build 441 users did it: saved under the section playing
+    await ev(pg, "setCustomArtUrl('podcast:' + currentStation.guid, %s)" % json.dumps(BLUE) if False else "0")
+    await ev(pg, "(function(){ var g = playQueue.length ? playQueue[0].guid : 'ia:letters_brides_0709_librivox/s1.mp3'; setCustomArtUrl('podcast:' + g, %s); })()" % json.dumps(BLUE))
+    await ev(pg, "openLibTab('audiobooks')"); 
+    after = await cover()
+    check(after and after.startswith('data:image/svg'), f'{T} a cover saved from a section shows on the Continue Listening tile {str(after)[:40]}')
+    # the book's own cover wins, and a change repaints the open page at once
+    GREEN = BLUE.replace('0000ff', '00aa00')
+    await ev(pg, "setCustomArtUrl('audiobook:letters_brides_0709_librivox', %s); refreshAudiobookArt('letters_brides_0709_librivox')" % json.dumps(GREEN))
+    after = await cover()
+    check(after and '00aa00' in urllib.parse.unquote(after), f'{T} the book cover replaces it without leaving the page {str(after)[:60]}')
+    await pg.screenshot(path=f'{SHOTS}/audiobooks-cover-{theme}.png')
+    sec = await ev(pg, "customArtFor({ type:'podcast', guid:'ia:letters_brides_0709_librivox/other.mp3' })")
+    check(sec and '00aa00' in urllib.parse.unquote(sec), f'{T} every section of the book uses the book cover {str(sec)[:40]}')
+    await ev(pg, "clearCustomArtUrl('audiobook:letters_brides_0709_librivox'); Object.keys(loadCustomArtMap()).forEach(function(k){ if(k.indexOf('podcast:ia:letters')===0) clearCustomArtUrl(k); }); openLibTab('audiobooks')")
+    after = await cover()
+    check(after and 'services/img' in after, f'{T} clearing the cover brings back archive.org\'s {after}')
     await ev(pg, "playQueue = []; currentStation = null;")
     await pg.evaluate("document.querySelector('.gp-row > .tile').click()"); await pg.wait_for_timeout(1800)
     q = await ev(pg, "({ cur: currentStation && currentStation.name, qn: playQueue.length })")
