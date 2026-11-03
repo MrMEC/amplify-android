@@ -46904,7 +46904,7 @@
     var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y);
   }
   function genreMoveStation(g, st, how, which){
-    var keys = (which === 'radio' ? (g.radioShown || []) : g.stations).map(favKey), k = favKey(st), i = keys.indexOf(k);
+    var keys = (which === 'radio' ? (g.radioShown || []) : (g.stationsShown || g.stations)).map(favKey), k = favKey(st), i = keys.indexOf(k);
     if(i < 0) return;
     if(how === 'top'){ keys.splice(i, 1); keys.unshift(k); }
     else if(how === 'up' && i > 0){ keys[i] = keys[i - 1]; keys[i - 1] = k; }
@@ -46936,7 +46936,7 @@
     var g = genrePage, st = tile && tile._genreSt, which = tile && tile._genreWhich;
     if(!g || !st) return;
     closeGenreStMenu();
-    var keys = (which === 'radio' ? (g.radioShown || []) : g.stations).map(favKey), i = keys.indexOf(favKey(st));
+    var keys = (which === 'radio' ? (g.radioShown || []) : (g.stationsShown || g.stations)).map(favKey), i = keys.indexOf(favKey(st));
     if(i < 0) return;
     var m = document.createElement('div');
     m.className = 'np-menu row-menu open';
@@ -47028,6 +47028,14 @@
     document.body.classList.add('genre-open');   // build 403: the header takes the top of the page
     var look = genreLook(g.tag);
     var songs = g.songs.filter(function(t){ return !isBlacklisted(t); }).sort(byNameAsc);
+    // Build 451 (Mark: Disney Radio never showed): an artist's channel belongs in Artist radio, so it
+    // is taken out of the genre's own station lists rather than the other way round (the Disney
+    // channel is also one of Disney's stations, which left Artist radio empty). One removed from
+    // Artist radio stays out of the station lists too.
+    var radioOn = libArtistRadioOn(), inRadio = {};
+    if(radioOn) (g.allArtistRadio || []).forEach(function(st){ inRadio[st.urlToResolve] = 1; });
+    var radio = g.radioShown = radioOn ? (g.artistRadio || []).filter(function(st){ return !isBlacklisted(st); }) : [];
+    var stations = g.stationsShown = g.stations.filter(function(st){ return !inRadio[st.urlToResolve]; });
     var hero = document.createElement('div');
     hero.className = 'gp-hero';
     hero.style.setProperty('--gc', look.color);
@@ -47049,8 +47057,8 @@
     shuf.type = 'button'; shuf.className = 'gp-round'; shuf.setAttribute('aria-label', 'Shuffle ' + g.tag);
     shuf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/><path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.4 3.2L21.5 6l-3.1 2.8"/><path d="M18.4 14.2l3.1 2.8-3.1 2.8"/></svg>';
     function start(shuffle){
-      if(g.stations.length){
-        var q = g.stations.slice();
+      if(stations.length){
+        var q = stations.slice();
         if(shuffle){ for(var i = q.length - 1; i > 0; i--){ var j = Math.floor(Math.random() * (i + 1)), t = q[i]; q[i] = q[j]; q[j] = t; } }
         setQueue(q, q[0], g.tag); playStation(q[0]);
       } else if(songs.length){
@@ -47059,7 +47067,7 @@
         playTrackInList(s2, s2[0], g.tag);
       }
     }
-    var can = g.stations.length || songs.length;
+    var can = stations.length || songs.length;
     play.disabled = !can; shuf.disabled = !can;
     play.addEventListener('click', function(){ start(false); });
     shuf.addEventListener('click', function(){ start(true); });
@@ -47067,7 +47075,7 @@
     var meta = document.createElement('span');
     meta.className = 'gp-meta';
     var bits = [];
-    if(g.stations.length) bits.push(g.stations.length + (g.stations.length === 1 ? ' station' : ' stations'));
+    if(stations.length) bits.push(stations.length + (stations.length === 1 ? ' station' : ' stations'));
     if(songs.length) bits.push(songs.length + (songs.length === 1 ? ' song' : ' songs') + ' in your library');
     if(g.podcasts && g.podcasts.length) bits.push(g.podcasts.length + (g.podcasts.length === 1 ? ' podcast' : ' podcasts'));
     var vcount = (g.movies ? g.movies.length : 0) + (g.shows ? g.shows.length : 0);
@@ -47088,19 +47096,16 @@
     }
     function head(text){ var h = document.createElement('h2'); h.className = 'gp-head grid-section-label'; h.textContent = text; stationsGrid.appendChild(h); }
     var TOP = 10;
-    if(g.stations.length){
+    if(stations.length){
       head('Top stations');
       var row = document.createElement('div');
       row.className = 'gp-row';
-      g.stations.slice(0, TOP).forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; row.appendChild(t); });
-      row._ctxList = g.stations.slice(0, TOP);
+      stations.slice(0, TOP).forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; row.appendChild(t); });
+      row._ctxList = stations.slice(0, TOP);
       stationsGrid.appendChild(row);
     }
-    // Build 447: artist radio, less any already listed among the genre's stations.
-    var listed = {};
-    g.stations.forEach(function(st){ listed[st.urlToResolve] = 1; });
-    var radio = g.radioShown = (g.artistRadio || []).filter(function(st){ return !listed[st.urlToResolve] && !isBlacklisted(st); });
-    if(radio.length && libArtistRadioOn()){
+    // Build 447: artist radio.
+    if(radio.length){
       head('Artist radio');
       var arow = document.createElement('div');
       arow.className = 'gp-row gp-artist-radio';
@@ -47124,11 +47129,11 @@
       }
     }
     // Build 435 (Mark): the rest of the stations come before Podcasts, Movies and TV shows.
-    if(g.stations.length > TOP){
+    if(stations.length > TOP){
       head('More ' + g.tag + ' stations');
       var moreGrid = document.createElement('div');
       moreGrid.className = 'tile-grid gp-grid';
-      g.stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); tile._genreSt = st; moreGrid.appendChild(tile); });
+      stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); tile._genreSt = st; moreGrid.appendChild(tile); });
       stationsGrid.appendChild(moreGrid);
     }
     if(g.podcasts && g.podcasts.length){
@@ -47168,7 +47173,7 @@
       spin.className = 'loading-state genre-loading';
       spin.innerHTML = '<div class="spinner"></div>';
       stationsGrid.appendChild(spin);
-    } else if(!g.stations.length && !songs.length && !(g.podcasts && g.podcasts.length) && !(g.movies && g.movies.length) && !(g.shows && g.shows.length)){
+    } else if(!stations.length && !radio.length && !songs.length && !(g.podcasts && g.podcasts.length) && !(g.movies && g.movies.length) && !(g.shows && g.shows.length)){
       var empty = document.createElement('div');
       empty.className = 'empty-state';
       empty.textContent = 'No songs or stations found for ' + g.tag + '.';
