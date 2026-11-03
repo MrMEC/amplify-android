@@ -5181,6 +5181,29 @@
     padding:8px 12px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;
   }
   .settings-select:hover{ border-color:var(--accent-dim); }
+  /* Build 437: the language picker, a drop-down of tick boxes. */
+  .lang-pick{ position:relative; min-width:0; flex:0 1 auto; }
+  .lang-pick-btn{ display:inline-flex; align-items:center; gap:8px; max-width:200px; text-align:left; }
+  .lang-pick-text{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lang-pick-chev{ flex:0 0 14px; width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; transition:transform .15s; }
+  .lang-pick-btn[aria-expanded="true"] .lang-pick-chev{ transform:rotate(180deg); }
+  .lang-pick-menu{ position:absolute; right:0; top:calc(100% + 6px); z-index:30; width:min(260px, calc(100vw - 64px)); background:var(--panel-2); border:1px solid var(--border);
+    border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.35); display:flex; flex-direction:column; overflow:hidden; }
+  .lang-pick-menu[hidden]{ display:none; }
+  .lang-pick-find{ padding:8px; border-bottom:1px solid var(--border); }
+  .lang-pick-find input{ width:100%; box-sizing:border-box; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; }
+  .lang-pick-find input:focus{ outline:none; border-color:var(--accent); }
+  .lang-pick-list{ max-height:260px; overflow-y:auto; overscroll-behavior:contain; padding:4px 0; }
+  .lang-opt{ display:flex; align-items:center; gap:10px; padding:9px 12px; font-size:13.5px; color:var(--text); cursor:pointer; user-select:none; }
+  .lang-opt[hidden]{ display:none; }
+  .lang-opt:hover{ background:var(--hover, rgba(127,127,127,.12)); }
+  .lang-opt-box{ flex:0 0 18px; width:18px; height:18px; border-radius:5px; border:2px solid var(--text-dim); display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+  .lang-opt[aria-selected="true"] .lang-opt-box{ background:var(--accent); border-color:var(--accent); }
+  .lang-opt-box svg{ width:12px; height:12px; fill:none; stroke:var(--accent-text); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; opacity:0; }
+  .lang-opt[aria-selected="true"] .lang-opt-box svg{ opacity:1; }
+  .lang-pick-foot{ display:flex; justify-content:space-between; gap:8px; padding:8px; border-top:1px solid var(--border); }
+  .lang-pick-foot button{ border:none; background:none; color:var(--accent); font:inherit; font-size:13.5px; font-weight:600; padding:6px 10px; border-radius:8px; cursor:pointer; }
+  .lang-pick-foot .lang-pick-done{ background:var(--accent); color:var(--accent-text); }
   .settings-select:focus{ outline:none; border-color:var(--accent); }
   .settings-data-btn:hover{ border-color:var(--accent-dim); }
 
@@ -8242,7 +8265,7 @@
       </button>
       <button type="button" class="set-cat" data-set-cat="radio">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="10.5" r="1.8"/><path d="M8.4 6.9a5.1 5.1 0 0 0 0 7.2M15.6 6.9a5.1 5.1 0 0 1 0 7.2M5.6 4.1a9 9 0 0 0 0 12.8M18.4 4.1a9 9 0 0 1 0 12.8M12 12.3v8.2"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Radio</span><span class="set-cat-sub">Stations Near Me, search results</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Radio</span><span class="set-cat-sub">Station languages, Stations Near Me, search results</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="sources">
@@ -8485,6 +8508,39 @@
           <option value="50">50 miles</option>
           <option value="100">100 miles</option>
           <option value="200">200 miles</option>
+        </select>
+      </div>
+      <!-- Build 437 (Mark): which languages' stations show anywhere in the app. -->
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="langModeLabel">Station languages</span><span class="set-desc">Show stations in every language, only the ones you pick, or all but the ones you pick</span></div>
+        <select class="settings-select" id="langModeSelect" aria-labelledby="langModeLabel">
+          <option value="all">All</option>
+          <option value="only">Only</option>
+          <option value="hide">Exclude</option>
+        </select>
+      </div>
+      <div class="settings-row lang-pick-row" id="langPickRow" style="display:none;">
+        <span class="settings-label" id="langPickLabel">Languages</span>
+        <div class="lang-pick">
+          <button type="button" class="settings-select lang-pick-btn" id="langPickBtn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="langPickLabel langPickText">
+            <span class="lang-pick-text" id="langPickText">Choose</span>
+            <svg class="lang-pick-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="lang-pick-menu" id="langPickMenu" hidden>
+            <div class="lang-pick-find"><input type="search" id="langPickFind" placeholder="Find a language" aria-label="Find a language" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+            <div class="lang-pick-list" id="langPickList" role="listbox" aria-multiselectable="true" aria-labelledby="langPickLabel"></div>
+            <div class="lang-pick-foot">
+              <button type="button" class="lang-pick-clear" id="langPickClear">Clear</button>
+              <button type="button" class="lang-pick-done" id="langPickDone">Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-row" id="langUnknownRow" style="display:none;">
+        <div class="set-text"><span class="settings-label" id="langUnknownLabel">No language listed</span><span class="set-desc">Stations the directory gives no language for</span></div>
+        <select class="settings-select" id="langUnknownSelect" aria-labelledby="langUnknownLabel">
+          <option value="show">Show</option>
+          <option value="hide">Hide</option>
         </select>
       </div>
       <div class="settings-row">
@@ -11002,6 +11058,144 @@
     sel.addEventListener('change', function(){
       P.setEq({ preset: sel.value }).then(show)['catch'](function(){ setStatus('Couldn\u2019t change the equalizer', true); });
     });
+  })();
+  // ---------- Build 437 (Mark): station language filter ----------
+  // Settings > Radio > Station languages: every language, only the chosen ones, or all but the
+  // chosen ones. The directory's language field is often empty, so a station without one is read
+  // from its name (Spanish words, Mexican call signs) and then its country.
+  var LANG_FILTER_KEY = 'radioPlayerLangFilter';
+  var STATION_LANGS = [
+    ['afrikaans', 'Afrikaans'], ['albanian', 'Albanian', 'shqip'], ['arabic', 'Arabic', 'ar'], ['armenian', 'Armenian'], ['basque', 'Basque', 'euskara'],
+    ['bengali', 'Bengali', 'bangla'], ['bosnian', 'Bosnian'], ['bulgarian', 'Bulgarian', 'bg'], ['catalan', 'Catalan', 'català', 'ca'], ['chinese', 'Chinese', 'mandarin', 'cantonese', 'zh'],
+    ['croatian', 'Croatian', 'hrvatski', 'hr'], ['czech', 'Czech', 'čeština', 'cs'], ['danish', 'Danish', 'dansk', 'da'], ['dutch', 'Dutch', 'nederlands', 'flemish', 'nl'], ['english', 'English', 'american english', 'british english', 'en'],
+    ['estonian', 'Estonian', 'et'], ['filipino', 'Filipino', 'tagalog', 'tl'], ['finnish', 'Finnish', 'suomi', 'fi'], ['french', 'French', 'français', 'francais', 'fr'], ['galician', 'Galician', 'galego'],
+    ['georgian', 'Georgian'], ['german', 'German', 'deutsch', 'de'], ['greek', 'Greek', 'ελληνικά', 'el'], ['haitian creole', 'Haitian Creole', 'creole', 'kreyòl'], ['hebrew', 'Hebrew', 'he', 'iw'],
+    ['hindi', 'Hindi', 'hi'], ['hungarian', 'Hungarian', 'magyar', 'hu'], ['icelandic', 'Icelandic', 'is'], ['indonesian', 'Indonesian', 'bahasa indonesia', 'id'], ['irish', 'Irish', 'gaeilge', 'ga'],
+    ['italian', 'Italian', 'italiano', 'it'], ['japanese', 'Japanese', '日本語', 'ja'], ['korean', 'Korean', '한국어', 'ko'], ['latvian', 'Latvian', 'lv'], ['lithuanian', 'Lithuanian', 'lt'],
+    ['macedonian', 'Macedonian', 'mk'], ['malay', 'Malay', 'bahasa melayu', 'ms'], ['norwegian', 'Norwegian', 'norsk', 'no', 'nb'], ['persian', 'Persian', 'farsi', 'fa'], ['polish', 'Polish', 'polski', 'pl'],
+    ['portuguese', 'Portuguese', 'português', 'portugues', 'brazilian portuguese', 'pt'], ['punjabi', 'Punjabi', 'pa'], ['romanian', 'Romanian', 'română', 'ro'], ['russian', 'Russian', 'русский', 'ru'], ['serbian', 'Serbian', 'srpski', 'sr'],
+    ['slovak', 'Slovak', 'slovenčina', 'sk'], ['slovenian', 'Slovenian', 'slovene', 'sl'], ['somali', 'Somali'], ['spanish', 'Spanish', 'español', 'espanol', 'castellano', 'castilian', 'es'], ['swahili', 'Swahili', 'sw'],
+    ['swedish', 'Swedish', 'svenska', 'sv'], ['tamil', 'Tamil', 'ta'], ['thai', 'Thai', 'th'], ['turkish', 'Turkish', 'türkçe', 'turkce', 'tr'], ['ukrainian', 'Ukrainian', 'українська', 'uk'],
+    ['urdu', 'Urdu', 'ur'], ['vietnamese', 'Vietnamese', 'tiếng việt', 'vi'], ['welsh', 'Welsh', 'cymraeg', 'cy']
+  ];
+  var LANG_ALIAS = (function(){ var m = {}; STATION_LANGS.forEach(function(l){ l.forEach(function(a, i){ if(i !== 1 || true) m[String(a).toLowerCase()] = l[0]; }); }); return m; })();
+  var COUNTRY_LANG = {
+    us:'english', gb:'english', au:'english', nz:'english', ie:'english', jm:'english', tt:'english', za:'english', ng:'english', gh:'english', ke:'english',
+    mx:'spanish', ar:'spanish', bo:'spanish', cl:'spanish', co:'spanish', cr:'spanish', cu:'spanish', do:'spanish', ec:'spanish', es:'spanish', gt:'spanish', hn:'spanish', ni:'spanish', pa:'spanish', pe:'spanish', pr:'spanish', py:'spanish', sv:'spanish', uy:'spanish', ve:'spanish', gq:'spanish',
+    br:'portuguese', pt:'portuguese', ao:'portuguese', mz:'portuguese', fr:'french', mc:'french', sn:'french', ci:'french', ht:'haitian creole', de:'german', at:'german', li:'german', it:'italian', sm:'italian', nl:'dutch',
+    pl:'polish', ru:'russian', ua:'ukrainian', tr:'turkish', gr:'greek', cy:'greek', cz:'czech', sk:'slovak', hu:'hungarian', ro:'romanian', md:'romanian', bg:'bulgarian', rs:'serbian', hr:'croatian', si:'slovenian',
+    ba:'bosnian', mk:'macedonian', al:'albanian', se:'swedish', no:'norwegian', dk:'danish', fi:'finnish', is:'icelandic', ee:'estonian', lv:'latvian', lt:'lithuanian', jp:'japanese', kr:'korean', cn:'chinese', tw:'chinese', hk:'chinese',
+    il:'hebrew', ir:'persian', sa:'arabic', ae:'arabic', eg:'arabic', ma:'arabic', dz:'arabic', tn:'arabic', jo:'arabic', lb:'arabic', iq:'arabic', kw:'arabic', qa:'arabic', th:'thai', vn:'vietnamese', id:'indonesian', my:'malay', ph:'filipino',
+    pk:'urdu', bd:'bengali', am:'armenian', ge:'georgian'
+  };
+  var SPANISH_NAME_RE = /(\bespa(n|ñ)ol\b|\blatin[oa]s?\b|\ben vivo\b|\bm[uú]sica\b|\bcanciones\b|\bemisora\b|\bla radio\b|\bni(n|ñ)os\b|\b(?:XH|XE)[A-Z]{2,4}\b)/i;
+  var langFilter = (function(){
+    var v = null; try{ v = JSON.parse(localStorage.getItem(LANG_FILTER_KEY) || 'null'); }catch(e){}
+    v = v && typeof v === 'object' ? v : {};
+    return { mode: v.mode === 'only' || v.mode === 'hide' ? v.mode : 'all', langs: Array.isArray(v.langs) ? v.langs.filter(function(l){ return LANG_ALIAS[l]; }) : [], unknown: v.unknown === 'hide' ? 'hide' : 'show' };
+  })();
+  function saveLangFilter(){ try{ localStorage.setItem(LANG_FILTER_KEY, JSON.stringify(langFilter)); }catch(e){} }
+  function langName(id){ var l = STATION_LANGS.filter(function(x){ return x[0] === id; })[0]; return l ? l[1] : id; }
+  // The languages a station is in, as STATION_LANGS ids; [] when nothing says.
+  function stationLanguages(s){
+    var out = [];
+    function add(id){ if(id && out.indexOf(id) < 0) out.push(id); }
+    String((s && s.language) || '').split(/[,;\/|]+/).forEach(function(x){ add(LANG_ALIAS[x.trim().toLowerCase()]); });
+    if(!out.length) String((s && s.languagecodes) || '').split(/[,;\s]+/).forEach(function(x){ add(LANG_ALIAS[x.trim().toLowerCase()]); });
+    if(out.length) return out;
+    if(SPANISH_NAME_RE.test([s && s.name, s && s.tags].join(' '))) return ['spanish'];
+    add(COUNTRY_LANG[String((s && s.countrycode) || '').toLowerCase()]);
+    return out;
+  }
+  function stationPassesLanguage(s){
+    if(langFilter.mode === 'all' || !langFilter.langs.length) return true;
+    var ls = stationLanguages(s);
+    if(!ls.length) return langFilter.mode === 'hide' || langFilter.unknown !== 'hide';
+    var hit = ls.some(function(l){ return langFilter.langs.indexOf(l) >= 0; });
+    return langFilter.mode === 'only' ? hit : !hit;
+  }
+  function filterStationsByLanguage(data){
+    if(!Array.isArray(data) || langFilter.mode === 'all' || !langFilter.langs.length) return data;
+    return data.filter(function(s){ return !s || typeof s !== 'object' || !('stationuuid' in s) || stationPassesLanguage(s); });
+  }
+  // Build 437: Station languages (Settings > Radio).
+  (function(){
+    var modeSel = document.getElementById('langModeSelect'), pickRow = document.getElementById('langPickRow');
+    var btn = document.getElementById('langPickBtn'), menu = document.getElementById('langPickMenu'), list = document.getElementById('langPickList');
+    var find = document.getElementById('langPickFind'), txt = document.getElementById('langPickText');
+    var unkRow = document.getElementById('langUnknownRow'), unkSel = document.getElementById('langUnknownSelect');
+    if(!modeSel || !btn) return;
+    var TICK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    STATION_LANGS.forEach(function(l){
+      var o = document.createElement('div');
+      o.className = 'lang-opt'; o.setAttribute('role', 'option'); o.tabIndex = 0; o.dataset.lang = l[0];
+      o.innerHTML = '<span class="lang-opt-box">' + TICK + '</span><span class="lang-opt-name"></span>';
+      o.querySelector('.lang-opt-name').textContent = l[1];
+      function toggle(){
+        var i = langFilter.langs.indexOf(l[0]);
+        if(i >= 0) langFilter.langs.splice(i, 1); else langFilter.langs.push(l[0]);
+        changed = true; sync();
+      }
+      o.addEventListener('click', toggle);
+      o.addEventListener('keydown', function(e){ if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggle(); } });
+      list.appendChild(o);
+    });
+    var changed = false;
+    function summary(){
+      var ls = langFilter.langs.slice().sort().map(langName);
+      if(!ls.length) return 'Choose';
+      return ls.length <= 2 ? ls.join(', ') : ls.length + ' languages';
+    }
+    function sync(){
+      modeSel.value = langFilter.mode;
+      pickRow.style.display = langFilter.mode === 'all' ? 'none' : '';
+      unkRow.style.display = langFilter.mode === 'only' ? '' : 'none';
+      unkSel.value = langFilter.unknown;
+      txt.textContent = summary();
+      Array.prototype.forEach.call(list.children, function(o){ o.setAttribute('aria-selected', langFilter.langs.indexOf(o.dataset.lang) >= 0 ? 'true' : 'false'); });
+    }
+    function apply(){
+      saveLangFilter();
+      // Lists already fetched were filtered the old way: drop them and fetch again.
+      genreStationCache = {};
+      try{ for(var k in nearStateCache) delete nearStateCache[k]; }catch(e){}
+      try{ localStorage.removeItem(TOP_CACHE_KEY); }catch(e){}
+      try{ if(window.AmplifyRefreshCarStations) window.AmplifyRefreshCarStations(); }catch(e){}
+    }
+    function openMenu(){
+      menu.hidden = false; btn.setAttribute('aria-expanded', 'true');
+      find.value = ''; filterList();
+      // Chosen languages first, so they're easy to find again.
+      var opts = Array.prototype.slice.call(list.children);
+      opts.sort(function(a, b){
+        var sa = langFilter.langs.indexOf(a.dataset.lang) >= 0, sb = langFilter.langs.indexOf(b.dataset.lang) >= 0;
+        return sa !== sb ? (sa ? -1 : 1) : langName(a.dataset.lang).localeCompare(langName(b.dataset.lang));
+      }).forEach(function(o){ list.appendChild(o); });
+      list.scrollTop = 0;
+    }
+    function closeMenu(){
+      if(menu.hidden) return;
+      menu.hidden = true; btn.setAttribute('aria-expanded', 'false');
+      if(changed){ changed = false; apply(); }
+    }
+    function filterList(){
+      var q = find.value.trim().toLowerCase();
+      Array.prototype.forEach.call(list.children, function(o){ o.hidden = !!q && langName(o.dataset.lang).toLowerCase().indexOf(q) < 0; });
+    }
+    btn.addEventListener('click', function(e){ e.stopPropagation(); if(menu.hidden) openMenu(); else closeMenu(); });
+    menu.addEventListener('click', function(e){ e.stopPropagation(); });
+    find.addEventListener('input', filterList);
+    document.getElementById('langPickClear').addEventListener('click', function(){ if(langFilter.langs.length){ langFilter.langs = []; changed = true; sync(); } });
+    document.getElementById('langPickDone').addEventListener('click', closeMenu);
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !menu.hidden){ e.stopPropagation(); closeMenu(); btn.focus(); } }, true);
+    modeSel.addEventListener('change', function(){
+      langFilter.mode = modeSel.value; sync(); apply();
+      if(langFilter.mode !== 'all' && !langFilter.langs.length) openMenu();
+    });
+    unkSel.addEventListener('change', function(){ langFilter.unknown = unkSel.value; apply(); });
+    window.__langPick = { open: openMenu, close: closeMenu, sync: sync };
+    sync();
   })();
   resultLimitSelect.value = String(resultLimit);
   resultLimitSelect.addEventListener('change', function(){
@@ -30450,26 +30644,11 @@
     return scored.slice(0, 4).map(function(x){ return x.g; });
   }
   var genreStationCache = {};
-  // Build 433 (Mark): the Disney genre leaves out Spanish-language stations (Radio Disney's
-  // Latin American stations and the like). The directory's language field is often empty, so the
-  // country, Mexican call signs and Spanish words in the name or tags count too.
-  var SPANISH_COUNTRIES = { ar:1, bo:1, cl:1, co:1, cr:1, cu:1, do:1, ec:1, es:1, gq:1, gt:1, hn:1, mx:1, ni:1, pa:1, pe:1, pr:1, py:1, sv:1, uy:1, ve:1 };
-  var SPANISH_LANG_RE = /\b(spanish|espa(n|ñ)ol|castellano|es)\b/i;
-  var SPANISH_NAME_RE = /(\bespa(n|ñ)ol|\blatin[oa]s?\b|\blatinoam[eé]rica|\bm[eé]xico\b|\bargentina\b|\bchile\b|\bcolombia\b|\bper[uú]\b|\buruguay\b|\bparaguay\b|\becuador\b|\bbolivia\b|\bguatemala\b|\bcosta rica\b|\bpanam[aá]\b|\bvenezuela\b|\bhonduras\b|\bnicaragua\b|\bel salvador\b|\brep[uú]blica dominicana\b|\bespa(n|ñ)a\b|\ben vivo\b|\bm[uú]sica\b|\bcanciones\b|\binfantil(es)?\b|\bni(n|ñ)os\b|\bemisora\b|\bla radio\b|\b(?:XH|XE)[A-Z]{2,4}\b)/i;
-  function isSpanishStation(s){
-    if(!s) return false;
-    if(SPANISH_LANG_RE.test(String(s.language || '')) || /(^|,)\s*es\s*(,|$)/i.test(String(s.languagecodes || ''))) return true;
-    if(SPANISH_COUNTRIES[String(s.countrycode || '').toLowerCase()]) return true;
-    return SPANISH_NAME_RE.test([s.name, s.tags].join(' '));
-  }
-  function genreStationFilter(tag){
-    return String(tag).toLowerCase() === 'disney' ? function(s){ return !isSpanishStation(s); } : function(){ return true; };
-  }
   function genreStations(tag){
     if(genreStationCache[tag]) return Promise.resolve(genreStationCache[tag]);
     return apiFetch('/json/stations/search?tag=' + encodeURIComponent(tag.toLowerCase()) + '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true')
       .then(function(data){
-        var list = dedupeByStreamUrl((data || []).filter(genreStationFilter(tag)).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        var list = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
         if(list.length) genreStationCache[tag] = list;
         return list;
       });
@@ -43567,8 +43746,10 @@
         return res.json();
       }).catch(function(){ return tryNext(); });
     }
-    return tryNext();
+    // Build 437: every station list from the directory passes the language filter (Settings > Radio).
+    return tryNext().then(function(data){ return /\/json\/stations/.test(path) ? filterStationsByLanguage(data) : data; });
   }
+
 
   // Some stations in the Radio-Browser directory market themselves with "Exclusively"
   // right in the name (e.g. "XYZ Radio - Exclusively Yours"). Strips that word wherever
@@ -45981,7 +46162,7 @@
       .then(function(lists){
         var data = [].concat.apply([], lists.map(function(l){ return l || []; }));
         if(genrePage !== g || activeGenre !== tag) return;
-        g.allStations = dedupeByStreamUrl((data || []).filter(genreStationFilter(tag)).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
+        g.allStations = dedupeByStreamUrl((data || []).map(stationToCardData).filter(function(s){ return !isBlacklisted(s); }));
         g.stations = applyGenrePrefs(tag, g.allStations);
         if(g.allStations.length) genreStationCache[tag] = g.allStations;
         g.pending = false;
@@ -49400,6 +49581,8 @@
     }
     window.AmplifyPublishCarMenu = publishCarCatalog;
     window.AmplifyScheduleCarMenu = scheduleCarCatalog;
+    // Build 437: the language filter changed, so the car's station lists are fetched again.
+    window.AmplifyRefreshCarStations = function(){ carNet.at = 0; carNet.top = null; carNet.forYou = {}; scheduleCarCatalog(); };
 
     // Anything that changes a list the car shows re-sends the menu shortly after.
     var _saveFavorites = saveFavorites;
