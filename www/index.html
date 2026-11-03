@@ -7023,6 +7023,11 @@
   /* ---------- Build 403 (Mark): Genres browse grid and the genre page ---------- */
   .gb-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   .gb-head{ grid-column:1/-1; margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); line-height:1.25; }
+  /* Build 432 (Mark): Edit sits on the Browse categories line as a word button, no pencil. */
+  .gb-head.gb-head-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .gb-head .gb-edit{ flex:0 0 auto; }
+  .tile-grid > .gb-head-edit{ margin:6px 0 calc(6px - var(--lib-rg, 0px)) !important; }
+  .clear-search-btn.text-only .btn-text{ display:inline !important; margin-left:0 !important; }
   .gb-head[hidden], .gb-top[hidden], .gb-card[hidden], .gb-none[hidden]{ display:none !important; }
   .gb-top{ grid-column:1/-1; display:flex; align-items:stretch; gap:12px; overflow-x:auto; overflow-y:hidden; margin:0 calc(-1 * var(--main-pad)) 26px; padding:0 var(--main-pad);
     scroll-snap-type:x proximity; scroll-padding-left:var(--main-pad); scrollbar-width:none; overscroll-behavior-x:contain; }
@@ -25815,17 +25820,19 @@
     var b = videoReorderHeaderBtnEl;
     if(videoTab === 'channels' && !videoChannelsEditing){
       // Build 409 (Mark): the guide's menu button reads "Edit" (Add Channels is its first item).
-      b.innerHTML = '<i class="fa-solid fa-pen"></i><span class="btn-text">Edit</span>';
+      b.innerHTML = '<span class="btn-text">Edit</span>';   // build 432: no pencil
       b.title = 'Edit';
       b.classList.remove('dots-btn');
       b.classList.add('show-label');
       b.setAttribute('aria-haspopup', 'true');
     } else {
-      updateReorderHeaderBtn(b, videoChannelsEditing, 'Edit');
+      b.innerHTML = '<span class="btn-text">' + (videoChannelsEditing ? 'Done' : 'Edit') + '</span>';   // build 432: words, no pencil
+      b.title = videoChannelsEditing ? 'Done' : 'Edit';
       b.classList.remove('dots-btn');
       b.classList.toggle('show-label', videoTab === 'channels');
       b.removeAttribute('aria-haspopup');
     }
+    b.classList.add('text-only');
     b.setAttribute('aria-label', b.title);
   }
   function openGuideMenu(){
@@ -30120,8 +30127,24 @@
   }
 
   // Same split as renderStationsGrid(), for Genres. Build 403: rearranging keeps this list.
+  // Build 432: the Genres page's Edit / Done, a word button on the Browse categories line.
+  function genresEditBtn(label){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'clear-search-btn show-label text-only gb-edit';
+    b.innerHTML = '<span class="btn-text">' + label + '</span>';
+    b.title = label; b.setAttribute('aria-label', label);
+    b.addEventListener('click', function(e){ e.stopPropagation(); setGenresEditing(!genresEditing); });
+    return b;
+  }
   function renderGenresRows(){
     resetStationsGrid();
+    if(onGenresHomeView){
+      var head = document.createElement('h2'); head.className = 'gb-head gb-head-row gb-head-edit';
+      var t = document.createElement('span'); t.textContent = 'Browse categories'; head.appendChild(t);
+      head.appendChild(genresEditBtn('Done'));
+      stationsGrid.appendChild(head);
+    }
     genreOrder.forEach(function(g){
       stationsGrid.appendChild(buildEntityTile({
         key: 'genre-' + g,
@@ -30296,7 +30319,14 @@
       });
       stationsGrid.appendChild(topHead); stationsGrid.appendChild(topRow);
     }
-    var allHead = document.createElement('h2'); allHead.className = 'gb-head'; allHead.textContent = 'Browse categories';
+    var allHead = document.createElement('h2'); allHead.className = 'gb-head';
+    var allHeadText = allHead;
+    if(!inSearch && genreOrder.length){
+      allHead.classList.add('gb-head-row');
+      allHeadText = document.createElement('span'); allHead.appendChild(allHeadText);
+      allHead.appendChild(genresEditBtn('Edit'));
+    }
+    allHeadText.textContent = 'Browse categories';
     var grid = document.createElement('div'); grid.className = 'gb-grid';
     var cards = genreOrder.map(function(g){
       var look = genreLook(g), card = document.createElement('button');
@@ -30313,7 +30343,8 @@
       var q = input.value.trim().toLowerCase(), shown = 0;
       cards.forEach(function(c){ var on = !q || c.dataset.genre.toLowerCase().indexOf(q) !== -1; c.hidden = !on; if(on) shown++; });
       if(topHead){ topHead.hidden = !!q; topRow.hidden = !!q; }
-      allHead.textContent = q ? 'Genres' : 'Browse categories';
+      allHeadText.textContent = q ? 'Genres' : 'Browse categories';
+      var eb = allHead.querySelector('.gb-edit'); if(eb) eb.hidden = !!q;
       none.hidden = !(q && !shown);
       if(q && !shown) none.textContent = 'No genre called \u201c' + input.value.trim() + '\u201d. Press Enter to find stations for it.';
     }
@@ -30542,9 +30573,7 @@
     albumPlayBtn.style.display = 'none';
     libraryShuffleBtn.style.display = 'none';
     setResultCount(null);
-    genresReorderHeaderBtn.style.display = genreOrder.length ? '' : 'none';
-    updateReorderHeaderBtn(genresReorderHeaderBtn, genresEditing);
-    genresReorderHeaderBtn.classList.toggle('editing', genresEditing);
+    genresReorderHeaderBtn.style.display = 'none';   // build 432: Edit is on the Browse categories line
     renderGenresGrid();
   }
 
