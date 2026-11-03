@@ -7168,6 +7168,14 @@
   .tile-grid.mv-grid > .grid-section-label, .tile-grid.mv-grid > .mv-artists-head{ margin-top:10px !important; margin-bottom:-8px !important; }
   .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .artist-videos{ margin-top:0 !important; margin-bottom:0 !important; }
   #sectionHeadingRow .section-heading-right.tb-pending{ visibility:hidden; }
+  /* Build 465: rotating the phone (or the keyboard opening) on a long Library list made the
+     browser lay out every one of thousands of rows at the new width before it could draw
+     anything, so the page sat at the old size with white beside it. Rows and covers off the
+     screen are now skipped until they scroll near; each keeps its last measured size, so the
+     page height and scroll position stay put. The clip margin keeps shadows from being cut. */
+  #stationsGrid > .tile{ content-visibility:auto; contain-intrinsic-block-size:auto 240px; overflow-clip-margin:24px; }
+  #stationsGrid.grid-artists > .tile{ contain-intrinsic-block-size:auto 72px; }
+  #stationsGrid.grid-songs > .tile{ contain-intrinsic-block-size:auto 80px; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -17479,7 +17487,31 @@
     if(albumHeroArt.dataset.albumKey === akey && document.body.classList.contains('album-open')) renderStationArt(albumHeroArt, src);
   }
 
+  // Build 465: a tile's picture is drawn when the tile first comes near the screen, not when the
+  // list is built. Opening Artists, Albums or Songs used to read and decode the art for every
+  // one of thousands of tiles at once, which kept the page too busy to redraw (rotating the
+  // phone left it drawn at the old size). A box already on the page draws straight away.
+  var lazyArtIO = null;
+  function deferArt(container, draw){
+    if(!container || container.isConnected || !window.IntersectionObserver) return false;
+    if(!lazyArtIO){
+      lazyArtIO = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(!e.isIntersecting) return;
+          lazyArtIO.unobserve(e.target);
+          var fn = e.target._lazyArt;
+          e.target._lazyArt = null;
+          if(fn) fn();
+        });
+      }, { rootMargin: '600px 300px' });
+    }
+    container._lazyArt = draw;
+    lazyArtIO.observe(container);
+    return true;
+  }
   function renderStationArt(container, station){
+    if(deferArt(container, function(){ renderStationArt(container, station); })) return;
+    if(container && container._lazyArt){ container._lazyArt = null; if(lazyArtIO) lazyArtIO.unobserve(container); }
     // Build 416: a re-render while the same song cover is already showing must not blank the
     // box (that was the flashing between song and station cover).
     if(container === playerIcon || container === npArt){
@@ -37242,6 +37274,12 @@
   }
 
   function renderArtistArt(container, entry){
+    if(container && !container.isConnected && entry){
+      container._artistEntry = entry;
+      if(container.dataset) container.dataset.artistArt = entry.key;
+      if(deferArt(container, function(){ renderArtistArt(container, container._artistEntry || entry); })) return;
+    }
+    if(container && container._lazyArt){ container._lazyArt = null; if(lazyArtIO) lazyArtIO.unobserve(container); }
     container.innerHTML = '';
     if(container.classList) container.classList.remove('art-radio');
     // Every box showing an artist's picture is marked, so a portrait arriving later (or a
@@ -37314,7 +37352,7 @@
     Object.keys(artistArtResolved).forEach(function(k){ if(!artistArtResolved[k]) delete artistArtResolved[k]; });
     document.querySelectorAll('.tile[data-entity="artist"]').forEach(function(el){
       var art = el.querySelector('.tile-art');
-      if(!art || art.querySelector('img')) return;
+      if(!art || art.querySelector('img') || art._lazyArt) return;
       var key = String(el.dataset.key || '').replace(/^artist:/, '');
       if(!key) return;
       var name = el.querySelector('.tile-name');
@@ -37325,7 +37363,7 @@
       if(open) renderArtistArt(artistHeroArt, open);
     }
     document.querySelectorAll('[data-artist-art]').forEach(function(box){
-      if(box.querySelector('img') || !box.isConnected) return;
+      if(box.querySelector('img') || !box.isConnected || box._lazyArt) return;
       renderArtistArt(box, findArtistEntry(box.dataset.artistArt) || box._artistEntry);
     });
   }
@@ -37336,11 +37374,13 @@
     document.querySelectorAll('.tile[data-entity="artist"]').forEach(function(el){
       if(el.dataset.key !== key) return;
       var art = el.querySelector('.tile-art');
+      if(art && art._lazyArt){ art._artistEntry = entry; done.push(art); return; }
       if(art){ renderArtistArt(art, entry); done.push(art); }
     });
     if(activeArtistKey === entry.key){ renderArtistArt(artistHeroArt, entry); done.push(artistHeroArt); }
     document.querySelectorAll('[data-artist-art]').forEach(function(box){
       if(box.dataset.artistArt !== entry.key || done.indexOf(box) >= 0) return;
+      if(box._lazyArt) return;
       renderArtistArt(box, box._artistEntry || entry);
       if(box._radio) box.classList.add('art-radio');
     });
@@ -50763,8 +50803,29 @@
       }
       return next();
     }
+    // What the car's library is made from; when none of it has changed there is nothing to rebuild.
+    var CAR_LIB_INPUT_KEY = 'amp.carLibInput.v1';
+    function carLibInputSig(){
+      var custom = 0;
+      try{ custom = Object.keys(loadCustomArtMap()).length; }catch(e){}
+      var resolved = 0;
+      Object.keys(artistArtResolved).forEach(function(k){ if(artistArtResolved[k]) resolved++; });
+      // The songs' own names, artists and albums, so a retag counts as a change.
+      var h1 = 0x811c9dc5, h2 = 0x01000193;
+      function mix(str){
+        str = String(str || '');
+        for(var i = 0; i < str.length; i++){ var c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 + c, 2246822519) >>> 0; }
+        h1 = Math.imul(h1 ^ 10, 16777619) >>> 0;
+      }
+      libraryTracks.forEach(function(t){ mix(t.localId); mix(t.name); mix(t.artist); mix(t.album); mix(t.albumArtist); mix(t.artSig); });
+      return libraryTracks.length + '|' + blacklist.length + '|' + (artistStations || []).length + '|' + h1.toString(16) + h2.toString(16)
+        + '|' + custom + '|' + resolved + '|' + libArtistRadioOn();
+    }
     function publishCarLibrary(){
       if(carLibBusy || !libraryTracks) return;
+      var inSig = carLibInputSig(), sentSig = '';
+      try{ sentSig = localStorage.getItem(CAR_LIB_INPUT_KEY) || ''; }catch(e){}
+      if(inSig === sentSig && localStorage.getItem(CAR_LIB_SIG_KEY)){ uploadCarArt(); return; }
       carLibBusy = true;
       window.__amplifyDoing = 'car library';
       carArtistArtMap()['catch'](function(){ return {}; }).then(function(artistArt){
@@ -50773,10 +50834,10 @@
         if(json === carLibLast) return;
         var sig = carLibSig(json), sent = '';
         try{ sent = localStorage.getItem(CAR_LIB_SIG_KEY) || ''; }catch(e){}
-        if(sig === sent){ carLibLast = json; return uploadCarArt(); }
+        if(sig === sent){ carLibLast = json; try{ localStorage.setItem(CAR_LIB_INPUT_KEY, inSig); }catch(e){} return uploadCarArt(); }
         return sendCarLibrary(json).then(function(){
           carLibLast = json;
-          try{ localStorage.setItem(CAR_LIB_SIG_KEY, sig); }catch(e){}
+          try{ localStorage.setItem(CAR_LIB_SIG_KEY, sig); localStorage.setItem(CAR_LIB_INPUT_KEY, inSig); }catch(e){}
           return uploadCarArt();
         });
       })['catch'](function(err){ console.warn('Car library not saved', err); }).then(function(){ carLibBusy = false; });
