@@ -40,14 +40,14 @@ async def main():
         await pg.evaluate("document.getElementById('stationsGrid').innerHTML = ''; __t.ev('searchByName(\"funny\")')"); await pg.wait_for_timeout(3500)
         await pg.evaluate("document.getElementById('noticeOverlay').classList.remove('open'); __t.ev('searchState.tab = \"archive\"; applySearchResults()')"); await pg.wait_for_timeout(600)
         names = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.archive-result-row .song-row-title'), function(e){ return e.textContent; })")
-        pages = [urllib.parse.parse_qs(urllib.parse.urlparse(u).query)['page'][0] for u in asked['search']]
+        pages = [urllib.parse.parse_qs(urllib.parse.urlparse(u).query)['page'][0] for u in asked['search'] if 'audio_bookspoetry' not in urllib.parse.unquote(u)]   # build 444: Search's Audiobooks tab asks too
         check(pages == ['1', '2'], f'page 1 was all unplayable, so page 2 was asked for {pages}')
         check(len(names) == 27 and 'Funny Video 031' not in names and 'Funny Video 030' in names and not any(n.endswith(('000', '029')) for n in names), f'only playable items: page 2 less its three locked ones {len(names)} {names[:3]}')
         check('Funny Video 040' in names, 'an item that couldn’t be checked is kept')
         more = await pg.evaluate("!!document.querySelector('.ia-more')")
         check(more, 'More Results still offered (90 found)')
         await pg.click('.ia-more'); await pg.wait_for_timeout(1500)
-        pages = [urllib.parse.parse_qs(urllib.parse.urlparse(u).query)['page'][0] for u in asked['search']]
+        pages = [urllib.parse.parse_qs(urllib.parse.urlparse(u).query)['page'][0] for u in asked['search'] if 'audio_bookspoetry' not in urllib.parse.unquote(u)]   # build 444: Search's Audiobooks tab asks too
         n2 = await pg.evaluate("[document.querySelectorAll('.archive-result-row').length, !!document.querySelector('.ia-more')]")
         check(pages[-1] == '3' and n2 == [57, False], f'More Results goes on from the page reached (3): 27 + 30, and that’s all {pages} {n2}')
         # the answers are kept: the same search again asks archive.org's search, not each item
