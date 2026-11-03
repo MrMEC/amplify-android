@@ -7168,14 +7168,6 @@
   .tile-grid.mv-grid > .grid-section-label, .tile-grid.mv-grid > .mv-artists-head{ margin-top:10px !important; margin-bottom:-8px !important; }
   .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .artist-videos{ margin-top:0 !important; margin-bottom:0 !important; }
   #sectionHeadingRow .section-heading-right.tb-pending{ visibility:hidden; }
-  /* Build 465: rotating the phone (or the keyboard opening) on a long Library list made the
-     browser lay out every one of thousands of rows at the new width before it could draw
-     anything, so the page sat at the old size with white beside it. Rows and covers off the
-     screen are now skipped until they scroll near; each keeps its last measured size, so the
-     page height and scroll position stay put. The clip margin keeps shadows from being cut. */
-  #stationsGrid > .tile{ content-visibility:auto; contain-intrinsic-block-size:auto 240px; overflow-clip-margin:24px; }
-  #stationsGrid.grid-artists > .tile{ contain-intrinsic-block-size:auto 72px; }
-  #stationsGrid.grid-songs > .tile{ contain-intrinsic-block-size:auto 80px; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
