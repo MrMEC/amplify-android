@@ -135,7 +135,11 @@ async def main():
         check(any(a.startswith('Now 50 /') for a in on_artist), 'artist page shows the compilation: %r' % on_artist)
 
         # Android Auto: one album, listed under each of its artists.
-        await pg.evaluate("__t.renderLibraryList()"); await pg.wait_for_timeout(4000)
+        # Build 463: the car's copy is sent once the app has finished opening (about 20 s in).
+        await pg.evaluate("__t.renderLibraryList()")
+        for _ in range(30):
+            await pg.wait_for_timeout(1000)
+            if await pg.evaluate("!!window.__car"): break
         car = await pg.evaluate("window.__car ? (typeof window.__car === 'string' ? window.__car : JSON.stringify(window.__car)) : ''")
         check(bool(car), 'car library published')
         if car:
