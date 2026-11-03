@@ -7126,6 +7126,11 @@
   .gb-find{ grid-column:1/-1; margin:0 0 22px !important; }
   /* Build 405: rows of a long list off screen aren't laid out until they come near. */
   #stationsGrid.grid-songs > .song-row, #stationsGrid.grid-songs > .song-letter{ content-visibility:auto; contain-intrinsic-size:auto var(--song-row-h, 72px); }
+  /* Build 439 (Mark: Cover Flow took ~30s to open on 1,874 artists): turning the phone made the browser lay out
+     every artist row and album cover at the new width before the turn was even reported. Rows off screen now
+     skip layout, as the Songs list already does. */
+  #stationsGrid.grid-artists > .tile[data-entity="artist"]{ content-visibility:auto; contain-intrinsic-block-size:auto 70px; }
+  #stationsGrid > .tile[data-entity="album"]{ content-visibility:auto; contain-intrinsic-block-size:auto 220px; }
   #stationsGrid.grid-songs > .song-letter{ contain-intrinsic-size:auto var(--song-letter-h, 36px); }
   /* Build 405 (Mark): Library tabs, and Favorite Artists as a sideways row on the Artists tab. */
   .tile-grid > .lib-tabs{ grid-column:1/-1; margin-bottom:calc(12px - var(--lib-rg, 0px)) !important; }
@@ -20365,7 +20370,7 @@
         if(!thumbPause) thumbPause = setTimeout(function(){ thumbPause = 0; pumpThumbs(); }, 120);
         return;
       }
-      while(thumbBusy < 3 && thumbWaiting.length){
+      while(thumbBusy < 5 && thumbWaiting.length){   // build 439: 5 at a time (was 3), so the first screen of covers fills sooner
         // Jobs for covers a fast scroll has already carried away are dropped unseen.
         thumbWaiting = thumbWaiting.filter(function(jb){
           var ix = albumIndex[jb.al.key];
