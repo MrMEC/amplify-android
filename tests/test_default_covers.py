@@ -78,7 +78,11 @@ async def main():
         # genre -> look
         got = await pg.evaluate("""()=>{ var o={}; [['pop','x'],['chill,lounge','x'],['jazz','x'],['classic rock','x'],['news,talk','x'],['smooth jazz','x'],['soft rock','x'],['top 40','x']].forEach(function(a){ o[a[0]] = window.__cv.spec('k-'+a[0], {name:'Z', tags:a[0]}).style; }); return o; }""")
         print(got)
-        check(got['pop'] == 'synth' and got['chill,lounge'] == 'aurora' and got['jazz'] == 'vinyl' and got['classic rock'] == 'rock' and got['news,talk'] == 'bauhaus', 'genres pick their looks')
+        # build 436: each genre picks from its own family of looks
+        fam = {'pop': ['synth','equalizer','cassette','sunburst'], 'chill,lounge': ['aurora','waves','mountains'], 'jazz': ['vinyl','mic','radio'], 'classic rock': ['rock','speaker','checker'], 'news,talk': ['bauhaus','mic','radio']}
+        check(all(got[k] in v for k, v in fam.items()), f'genres pick their looks {got}')
+        spread = await pg.evaluate("""()=>{ var o={}; ['rock','pop','jazz','chill','news'].forEach(function(g){ var c={}; for(var i=0;i<40;i++) c[window.__cv.spec('s'+i+g,{name:'S'+i,tags:g}).style]=1; o[g]=Object.keys(c).length; }); var all={}; for(var i=0;i<200;i++) all[window.__cv.spec('n'+i,{name:'S'+i,tags:''}).style]=1; o.all=Object.keys(all).length; return o; }""")
+        check(spread['rock'] == 3 and spread['pop'] == 4 and spread['jazz'] == 3 and spread['chill'] == 3 and spread['news'] == 3 and spread['all'] == 15, f'build 436: every genre shows its whole family, untagged stations all 15 looks {spread}')
         check(got['smooth jazz'] == 'vinyl' and got['soft rock'] == 'rock' and got['top 40'] == 'synth', 'overlaps resolve sensibly')
         lab = await pg.evaluate("()=>['KJAM 92.5','Q104.3 Classic Rock','Smooth Jazz 24/7','The Beat','Rock FM','NPR News Now','93.3 The Fox','Kiss FM'].map(window.__cv.label)")
         print(lab)

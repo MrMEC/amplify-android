@@ -7093,7 +7093,7 @@
   .gp-row::-webkit-scrollbar{ display:none; }
   .gp-row > .tile{ flex:0 0 var(--w-cover); width:var(--w-cover); min-width:0; scroll-snap-align:start; }
   .gp-songs{ grid-column:1/-1; display:flex; flex-direction:column; margin:0 0 8px; }
-  .gp-more{ grid-column:1/-1; justify-self:start; margin:0 0 28px; height:38px; padding:0 16px; border-radius:var(--r-pill, 999px); border:1px solid var(--border);
+  .gp-more{ grid-column:1/-1; justify-self:center; margin:0 0 28px; height:38px; padding:0 16px; border-radius:var(--r-pill, 999px); border:1px solid var(--border);
     background:none; color:var(--text); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; }
   /* Build 404 (Mark): a word never breaks across lines anywhere; titles and names wrap only between
      words, and one whose longest word doesn't fit is shrunk until it does (the word-fit script). */
@@ -16369,14 +16369,19 @@
   // the seed otherwise, so the same station always wears the same cover. Station covers also
   // carry their call letters / initials. The art is an SVG data address: crisp at any size,
   // nothing to download, nothing to cache.
+  // Build 436 (Mark: covers too repetitive): each genre picks from a family of looks, not just one.
   var COVER_GENRES = [
-    ['vinyl', /jazz|blues|\bsoul|swing|bebop|bossa|motown|funk|r&b|rnb|oldies|standards/i],
-    ['aurora', /chill|lounge|ambient|downtempo|relax|easy.?listening|new.?age|smooth|spa\b|meditat|sleep|lo-?fi|calm/i],
-    ['rock', /\brock|metal|punk|grunge|alternative|indie|hardcore|emo\b|garage/i],
-    ['synth', /\bpop\b|top.?40|\bhits\b|dance|disco|synth|electro|edm|house|techno|trance|80s|90s|charts|hot ac|adult contemporary|retro|wave/i],
-    ['bauhaus', /news|talk|sport|classical|public|npr|opera|orchestra|information|christian|gospel|world|folk|country/i]
+    [['confetti', 'sunburst', 'cassette'], /\bkids?\b|children|disney|family|cartoon/i],
+    [['vinyl', 'mic', 'radio'], /jazz|blues|\bsoul|swing|bebop|bossa|motown|funk|r&b|rnb|oldies|standards/i],
+    [['aurora', 'waves', 'mountains'], /chill|lounge|ambient|downtempo|relax|easy.?listening|new.?age|smooth|spa\b|meditat|sleep|lo-?fi|calm/i],
+    [['rock', 'speaker', 'checker'], /\brock|metal|punk|grunge|alternative|indie|hardcore|emo\b|garage|ska\b/i],
+    [['speaker', 'equalizer', 'cassette'], /hip.?hop|rap\b|urban|trap\b|reggae|dancehall/i],
+    [['synth', 'equalizer', 'cassette', 'sunburst'], /\bpop\b|top.?40|\bhits\b|dance|disco|synth|electro|edm|house|techno|trance|80s|90s|charts|hot ac|adult contemporary|retro|wave/i],
+    [['mountains', 'sunburst', 'radio'], /country|folk|americana|bluegrass|western/i],
+    [['bauhaus', 'mic', 'radio'], /news|talk|sport|public|npr|information|christian|gospel|religio/i],
+    [['bauhaus', 'waves', 'mountains'], /classical|opera|orchestra|world|instrumental/i]
   ];
-  var COVER_STYLES = ['synth', 'aurora', 'bauhaus', 'vinyl', 'rock'];
+  var COVER_STYLES = ['synth', 'aurora', 'bauhaus', 'vinyl', 'rock', 'equalizer', 'waves', 'cassette', 'speaker', 'mic', 'sunburst', 'checker', 'mountains', 'radio', 'confetti'];
   var COVER_PALETTES = {
     synth: [
       { bg:'#1d0b3a', sun:'#ff5e7e', ground:'#2a0f55', grid:'#ff2fd0', hz:'#00e5ff' },
@@ -16407,16 +16412,81 @@
       { bg:'#1b1b3a', stripe:'#ff2e63', bolt:'#08d9d6' },
       { bg:'#0d0d0d', stripe:'#ff7a00', bolt:'#ffffff' },
       { bg:'#20123a', stripe:'#b5179e', bolt:'#f9c80e' }
+    ],
+    // Build 436: ten more looks.
+    equalizer: [
+      { bg:'#14112b', bg2:'#3a1c71', bars:['#ff4f81', '#ffb000', '#2de2e6'] },
+      { bg:'#04213a', bg2:'#0d4f6e', bars:['#3ff5c4', '#ffe14d', '#ff7aa8'] },
+      { bg:'#2a0b16', bg2:'#6a1035', bars:['#ffcf56', '#ff6f59', '#ffffff'] },
+      { bg:'#0b2410', bg2:'#185a2e', bars:['#b6ff3b', '#5ef1ff', '#ffd23f'] }
+    ],
+    waves: [
+      { bg:'#0b1d3a', c:['#1f6fb2', '#3fa7d6', '#7fd8f0', '#d6f6ff'] },
+      { bg:'#2b1140', c:['#6b2fa3', '#a65bd8', '#e09ff2', '#ffe0f7'] },
+      { bg:'#0d2b26', c:['#147a64', '#2fb38f', '#79e0b8', '#d8ffe9'] },
+      { bg:'#3a1406', c:['#a63c0a', '#e2703a', '#f6b26b', '#ffe8c7'] }
+    ],
+    cassette: [
+      { bg:'#ffb703', body:'#22223b', label:'#f2e9e4', accent:'#e63946' },
+      { bg:'#06d6a0', body:'#073b4c', label:'#fffcf2', accent:'#ef476f' },
+      { bg:'#ff70a6', body:'#2b2d42', label:'#fff3b0', accent:'#3a86ff' },
+      { bg:'#8ecae6', body:'#3d405b', label:'#f4f1de', accent:'#e07a5f' }
+    ],
+    speaker: [
+      { bg:'#1c1c1c', ring:'#c0c0c0', cone:'#0d0d0d', accent:'#ff3d3d' },
+      { bg:'#2d1b4e', ring:'#ffcc00', cone:'#140a26', accent:'#ff5e9c' },
+      { bg:'#0f3d3e', ring:'#e9e9e9', cone:'#062324', accent:'#ffb347' },
+      { bg:'#3b0d0d', ring:'#f4a261', cone:'#1a0505', accent:'#e9c46a' }
+    ],
+    mic: [
+      { bg:'#1d3557', mic:'#e9ecef', grill:'#6c757d', accent:'#f4a261' },
+      { bg:'#5f0f40', mic:'#fb8b24', grill:'#9a031e', accent:'#e36414' },
+      { bg:'#283618', mic:'#fefae0', grill:'#606c38', accent:'#dda15e' },
+      { bg:'#14213d', mic:'#fca311', grill:'#7a5200', accent:'#e5e5e5' }
+    ],
+    sunburst: [
+      { bg:'#ff8c42', ray:'#ffd166', center:'#7b2cbf' },
+      { bg:'#ef476f', ray:'#ff8fab', center:'#1b263b' },
+      { bg:'#118ab2', ray:'#4cc9f0', center:'#073b4c' },
+      { bg:'#2a9d8f', ray:'#8ed1c4', center:'#e76f51' }
+    ],
+    checker: [
+      { bg:'#101010', a:'#ffffff', b:'#101010', accent:'#ff006e' },
+      { bg:'#1b1f3b', a:'#ffd60a', b:'#1b1f3b', accent:'#00f5d4' },
+      { bg:'#3c096c', a:'#ff9e00', b:'#3c096c', accent:'#ffffff' },
+      { bg:'#0b3d2e', a:'#e9ff70', b:'#0b3d2e', accent:'#ff6b6b' }
+    ],
+    mountains: [
+      { sky:'#ff9a76', sky2:'#ffd3a5', moon:'#fff4e0', m:['#a0526b', '#6a2c51', '#2d1436'] },
+      { sky:'#0f2027', sky2:'#2c5364', moon:'#f1faee', m:['#457b9d', '#1d3557', '#0b1626'] },
+      { sky:'#a1c4fd', sky2:'#c2e9fb', moon:'#ffffff', m:['#7fb685', '#426b4a', '#1f3b25'] },
+      { sky:'#3a1c71', sky2:'#d76d77', moon:'#ffaf7b', m:['#7a2e63', '#4a1942', '#200a24'] }
+    ],
+    radio: [
+      { bg:'#f4a261', body:'#6b4226', dial:'#fef3c7', knob:'#2b1a0f' },
+      { bg:'#2ec4b6', body:'#e71d36', dial:'#fdfffc', knob:'#011627' },
+      { bg:'#cdb4db', body:'#3d405b', dial:'#f4f1de', knob:'#e07a5f' },
+      { bg:'#264653', body:'#e9c46a', dial:'#fffbea', knob:'#9c3d1a' }
+    ],
+    confetti: [
+      { bg:'#3a0ca3', c:['#ff006e', '#ffbe0b', '#3a86ff', '#8ac926'] },
+      { bg:'#ff595e', c:['#ffca3a', '#8ac926', '#1982c4', '#ffffff'] },
+      { bg:'#023e8a', c:['#ffd60a', '#ff70a6', '#70d6ff', '#e9ff70'] },
+      { bg:'#2b2d42', c:['#ef233c', '#ffd166', '#06d6a0', '#8ecae6'] }
     ]
   };
   var COVER_VIVID = {                    // the one colour each look is built around (band, ring)
     synth: function(p){ return p.sun; }, aurora: function(p){ return p.c[1]; },
-    bauhaus: function(p){ return p.a; }, vinyl: function(p){ return p.bg; }, rock: function(p){ return p.stripe; }
+    bauhaus: function(p){ return p.a; }, vinyl: function(p){ return p.bg; }, rock: function(p){ return p.stripe; },
+    equalizer: function(p){ return p.bars[0]; }, waves: function(p){ return p.c[1]; }, cassette: function(p){ return p.accent; },
+    speaker: function(p){ return p.accent; }, mic: function(p){ return p.bg; }, sunburst: function(p){ return p.bg; },
+    checker: function(p){ return p.accent; }, mountains: function(p){ return p.m[0]; }, radio: function(p){ return p.body; },
+    confetti: function(p){ return p.c[0]; }
   };
   function coverStyleFor(hintText, rand){
     var t = String(hintText || '');
     if(t){
-      for(var i = 0; i < COVER_GENRES.length; i++) if(COVER_GENRES[i][1].test(t)) return COVER_GENRES[i][0];
+      for(var i = 0; i < COVER_GENRES.length; i++) if(COVER_GENRES[i][1].test(t)){ var fam = COVER_GENRES[i][0]; return fam[Math.floor(rand() * fam.length)]; }
     }
     return COVER_STYLES[Math.floor(rand() * COVER_STYLES.length)];
   }
@@ -16492,6 +16562,125 @@
         + '<polygon points="0,' + (120 + tilt) + ' 0,' + (108 + tilt) + ' 140,' + (64 - tilt) + ' 140,' + (76 - tilt) + '" fill="' + p.stripe + '"/>'
         + '<polygon points="84,10 46,70 68,70 56,112 100,56 78,56" fill="' + p.bolt + '" stroke="' + p.bg + '" stroke-width="3" stroke-linejoin="round"/>'
         + coverText(label, 70, 127, '#ffffff', p.bg);
+    },
+    // ---- Build 436: ten more looks ----
+    equalizer: function(p, rand, label){
+      var s = '<defs><linearGradient id="eqg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + p.bg2 + '"/><stop offset="1" stop-color="' + p.bg + '"/></linearGradient></defs>'
+        + '<rect width="140" height="140" fill="url(#eqg)"/>';
+      for(var i = 0; i < 9; i++){
+        var h = 22 + Math.floor(rand() * 62), x = 9 + i * 14;
+        s += '<rect x="' + x + '" y="' + (132 - h) + '" width="10" height="' + h + '" rx="3" fill="' + p.bars[i % 3] + '"/>';
+        s += '<rect x="' + x + '" y="' + (126 - h) + '" width="10" height="3" rx="1.5" fill="' + p.bars[(i + 1) % 3] + '"/>';
+      }
+      return s + coverText(label, 70, 30, '#ffffff', p.bg);
+    },
+    waves: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>';
+      for(var i = 0; i < 4; i++){
+        var y = 62 + i * 19, a = 9 + Math.floor(rand() * 8), ph = Math.floor(rand() * 30);
+        s += '<path d="M-' + ph + ' ' + y + ' q17.5 -' + a + ' 35 0 t35 0 t35 0 t35 0 t35 0 t35 0 V140 H-' + ph + ' Z" fill="' + p.c[i] + '"/>';
+      }
+      return s + coverText(label, 70, 38, '#ffffff', p.bg);
+    },
+    cassette: function(p, rand, label){
+      var tilt = Math.floor(rand() * 10) - 5;
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>'
+        + '<g transform="rotate(' + tilt + ' 70 70)">'
+        + '<rect x="12" y="30" width="116" height="80" rx="9" fill="' + p.body + '"/>'
+        + '<rect x="22" y="38" width="96" height="34" rx="4" fill="' + p.label + '"/>'
+        + '<rect x="22" y="66" width="96" height="6" fill="' + p.accent + '"/>'
+        + '<rect x="40" y="78" width="60" height="20" rx="10" fill="' + p.label + '" fill-opacity="0.18"/>'
+        + '<circle cx="50" cy="88" r="9" fill="' + p.label + '"/><circle cx="50" cy="88" r="4" fill="' + p.body + '"/>'
+        + '<circle cx="90" cy="88" r="9" fill="' + p.label + '"/><circle cx="90" cy="88" r="4" fill="' + p.body + '"/>'
+        + '<path d="M34 110 L42 100 H98 L106 110 Z" fill="' + p.label + '" fill-opacity="0.25"/>'
+        + coverText(label, 70, 62, p.body, '') + '</g>';
+      return s;
+    },
+    speaker: function(p, rand, label){
+      var cy = 82, s = '<rect width="140" height="140" fill="' + p.bg + '"/>'
+        + '<rect x="14" y="36" width="112" height="98" rx="10" fill="' + p.cone + '" fill-opacity="0.55"/>'
+        + '<circle cx="70" cy="' + cy + '" r="44" fill="' + p.ring + '"/>'
+        + '<circle cx="70" cy="' + cy + '" r="38" fill="' + p.cone + '"/>'
+        + '<circle cx="70" cy="' + cy + '" r="28" fill="none" stroke="' + p.ring + '" stroke-opacity="0.35" stroke-width="2"/>'
+        + '<circle cx="70" cy="' + cy + '" r="18" fill="none" stroke="' + p.ring + '" stroke-opacity="0.25" stroke-width="2"/>'
+        + '<circle cx="70" cy="' + cy + '" r="11" fill="' + p.accent + '"/>';
+      [[22, 44], [118, 44], [22, 126], [118, 126]].forEach(function(c){ s += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="2.5" fill="' + p.ring + '"/>'; });
+      return s + coverText(label, 70, 26, '#ffffff', p.bg);
+    },
+    mic: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>';
+      [26, 40, 54].forEach(function(r, i){
+        s += '<path d="M' + (70 - r) + ' ' + (50 - r * 0.7) + ' A' + r + ' ' + r + ' 0 0 0 ' + (70 - r) + ' ' + (50 + r * 0.7) + '" fill="none" stroke="' + p.accent + '" stroke-width="3" stroke-linecap="round" stroke-opacity="' + (1 - i * 0.25) + '" transform="translate(-6 0)"/>';
+        s += '<path d="M' + (70 + r) + ' ' + (50 - r * 0.7) + ' A' + r + ' ' + r + ' 0 0 1 ' + (70 + r) + ' ' + (50 + r * 0.7) + '" fill="none" stroke="' + p.accent + '" stroke-width="3" stroke-linecap="round" stroke-opacity="' + (1 - i * 0.25) + '" transform="translate(6 0)"/>';
+      });
+      s += '<rect x="54" y="16" width="32" height="54" rx="16" fill="' + p.mic + '"/>';
+      for(var y = 26; y <= 58; y += 8) s += '<line x1="58" y1="' + y + '" x2="82" y2="' + y + '" stroke="' + p.grill + '" stroke-width="2"/>';
+      s += '<path d="M46 56 V60 A24 24 0 0 0 94 60 V56" fill="none" stroke="' + p.mic + '" stroke-width="4" stroke-linecap="round"/>'
+        + '<line x1="70" y1="84" x2="70" y2="98" stroke="' + p.mic + '" stroke-width="4"/>'
+        + '<rect x="54" y="96" width="32" height="5" rx="2.5" fill="' + p.mic + '"/>';
+      return s + coverText(label, 70, 128, '#ffffff', p.bg);
+    },
+    sunburst: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>', n = 16, off = rand() * Math.PI / n;
+      for(var i = 0; i < n; i += 2){
+        var a1 = off + i * 2 * Math.PI / n, a2 = off + (i + 1) * 2 * Math.PI / n;
+        s += '<polygon points="70,70 ' + (70 + 140 * Math.cos(a1)).toFixed(1) + ',' + (70 + 140 * Math.sin(a1)).toFixed(1) + ' ' + (70 + 140 * Math.cos(a2)).toFixed(1) + ',' + (70 + 140 * Math.sin(a2)).toFixed(1) + '" fill="' + p.ray + '"/>';
+      }
+      s += '<circle cx="70" cy="70" r="48" fill="' + p.center + '"/><circle cx="70" cy="70" r="42" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>';
+      // the circle is narrower than the cover, so the letters are drawn a little smaller
+      return s + '<g transform="translate(70 70) scale(0.8) translate(-70 -70)">' + coverText(label, 70, 77, '#ffffff', '') + '</g>';
+    },
+    checker: function(p, rand, label){
+      var tilt = -14 + Math.floor(rand() * 8), s = '<rect width="140" height="140" fill="' + p.bg + '"/>';
+      s += '<circle cx="' + (100 + Math.floor(rand() * 16)) + '" cy="30" r="20" fill="' + p.accent + '"/>';
+      var g = '';
+      for(var col = 0; col < 16; col++){
+        var x = -42 + col * 14;
+        for(var r = 0; r < 3; r++){
+          var on = (col + r) % 2 === 0;
+          g += '<rect x="' + x + '" y="' + (52 + r * 14) + '" width="14" height="14" fill="' + (on ? p.a : p.b) + '"/>';
+        }
+      }
+      s += '<g transform="rotate(' + tilt + ' 70 73)">' + g + '<rect x="-40" y="50" width="220" height="2" fill="' + p.a + '"/><rect x="-40" y="94" width="220" height="2" fill="' + p.a + '"/></g>';
+      return s + coverText(label, 70, 126, '#ffffff', p.bg);
+    },
+    mountains: function(p, rand, label){
+      var mx = 30 + Math.floor(rand() * 80);
+      var s = '<defs><linearGradient id="mtg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + p.sky + '"/><stop offset="1" stop-color="' + p.sky2 + '"/></linearGradient></defs>'
+        + '<rect width="140" height="140" fill="url(#mtg)"/><circle cx="' + mx + '" cy="36" r="16" fill="' + p.moon + '"/>';
+      var peaks = [[0, 70], [1, 86], [2, 100]];
+      peaks.forEach(function(k){
+        var base = k[1], pts = '0,140 0,' + (base + 14);
+        for(var x = 0; x <= 140; x += 35){ pts += ' ' + (x + 17) + ',' + (base - 10 - Math.floor(rand() * 22)) + ' ' + Math.min(140, x + 35) + ',' + (base + Math.floor(rand() * 8)); }
+        s += '<polygon points="' + pts + ' 140,140" fill="' + p.m[k[0]] + '"/>';
+      });
+      return s + coverText(label, 70, 129, '#ffffff', '');
+    },
+    radio: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>'
+        + '<line x1="96" y1="34" x2="' + (112 + Math.floor(rand() * 12)) + '" y2="8" stroke="' + p.knob + '" stroke-width="3" stroke-linecap="round"/>'
+        + '<rect x="14" y="32" width="112" height="72" rx="12" fill="' + p.body + '"/>'
+        + '<circle cx="44" cy="68" r="22" fill="' + p.knob + '" fill-opacity="0.35"/>';
+      for(var y = 52; y <= 84; y += 6) s += '<line x1="28" y1="' + y + '" x2="60" y2="' + y + '" stroke="' + p.dial + '" stroke-opacity="0.55" stroke-width="2"/>';
+      s += '<rect x="72" y="46" width="44" height="22" rx="4" fill="' + p.dial + '"/>';
+      for(var x = 76; x <= 112; x += 6) s += '<line x1="' + x + '" y1="49" x2="' + x + '" y2="' + (x % 12 === 4 ? 56 : 53) + '" stroke="' + p.knob + '" stroke-width="1.2"/>';
+      var nx = 78 + Math.floor(rand() * 32);
+      s += '<line x1="' + nx + '" y1="48" x2="' + nx + '" y2="66" stroke="#e63946" stroke-width="2"/>'
+        + '<circle cx="82" cy="86" r="7" fill="' + p.knob + '"/><circle cx="106" cy="86" r="7" fill="' + p.knob + '"/>'
+        + '<rect x="24" y="104" width="10" height="6" rx="2" fill="' + p.knob + '"/><rect x="106" y="104" width="10" height="6" rx="2" fill="' + p.knob + '"/>';
+      return s + coverText(label, 70, 130, '#ffffff', p.knob);
+    },
+    confetti: function(p, rand, label){
+      var s = '<rect width="140" height="140" fill="' + p.bg + '"/>';
+      for(var i = 0; i < 22; i++){
+        var x = Math.floor(rand() * 140), y = Math.floor(rand() * 140), c = p.c[i % 4], k = i % 4, rot = Math.floor(rand() * 180);
+        if(k === 0) s += '<circle cx="' + x + '" cy="' + y + '" r="' + (3 + Math.floor(rand() * 4)) + '" fill="' + c + '"/>';
+        else if(k === 1) s += '<rect x="' + (x - 6) + '" y="' + (y - 2) + '" width="12" height="4" rx="2" fill="' + c + '" transform="rotate(' + rot + ' ' + x + ' ' + y + ')"/>';
+        else if(k === 2) s += '<polygon points="' + x + ',' + (y - 6) + ' ' + (x + 6) + ',' + (y + 5) + ' ' + (x - 6) + ',' + (y + 5) + '" fill="' + c + '" transform="rotate(' + rot + ' ' + x + ' ' + y + ')"/>';
+        else s += '<path d="M' + (x - 8) + ' ' + y + ' q4 -6 8 0 t8 0" fill="none" stroke="' + c + '" stroke-width="2.5" stroke-linecap="round" transform="rotate(' + rot + ' ' + x + ' ' + y + ')"/>';
+      }
+      if(label) s += '<rect x="' + (70 - Math.max(30, label.length * 7 + 14)) + '" y="56" width="' + Math.max(60, label.length * 14 + 28) + '" height="28" rx="14" fill="' + p.bg + '"/>' + coverText(label, 70, 77, '#ffffff', '');
+      return s;
     }
   };
   var coverSpecCache = {};
@@ -46046,15 +46235,6 @@
       g.stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); tile._genreSt = st; moreGrid.appendChild(tile); });
       stationsGrid.appendChild(moreGrid);
     }
-    var gp = genrePrefs[String(g.tag).toLowerCase()];
-    var hiddenNow = gp && g.allStations ? g.allStations.filter(function(st){ return (gp.hidden || []).indexOf(favKey(st)) >= 0; }).length : 0;
-    if(hiddenNow){
-      var restore = document.createElement('button');
-      restore.type = 'button'; restore.className = 'gp-more';
-      restore.textContent = 'Restore ' + hiddenNow + ' removed station' + (hiddenNow === 1 ? '' : 's');
-      restore.addEventListener('click', function(){ genreRestoreStations(g); });
-      stationsGrid.appendChild(restore);
-    }
     if(g.podcasts && g.podcasts.length){
       head('Podcasts');
       var prow = document.createElement('div');
@@ -46066,17 +46246,25 @@
       head('Movies');
       var mrow = document.createElement('div');
       mrow.className = 'gp-row';
-      (g.allMovies ? g.movies : g.movies.slice(0, 10)).forEach(function(m){ mrow.appendChild(buildMovieTile(m)); });
+      g.movies.forEach(function(m){ mrow.appendChild(buildMovieTile(m)); });   // build 436: a sideways row shows them all
       stationsGrid.appendChild(mrow);
-      if(g.movies.length > 10) stationsGrid.appendChild(genreMoreLink(g, 'allMovies'));
     }
     if(g.shows && g.shows.length){
       head('TV shows');
       var srow = document.createElement('div');
       srow.className = 'gp-row';
-      (g.allShows ? g.shows : g.shows.slice(0, 10)).forEach(function(sh){ srow.appendChild(buildShowTile(sh)); });
+      g.shows.forEach(function(sh){ srow.appendChild(buildShowTile(sh)); });
       stationsGrid.appendChild(srow);
-      if(g.shows.length > 10) stationsGrid.appendChild(genreMoreLink(g, 'allShows'));
+    }
+    // Build 436 (Mark): Restore sits at the bottom of the page.
+    var gp = genrePrefs[String(g.tag).toLowerCase()];
+    var hiddenNow = gp && g.allStations ? g.allStations.filter(function(st){ return (gp.hidden || []).indexOf(favKey(st)) >= 0; }).length : 0;
+    if(hiddenNow){
+      var restore = document.createElement('button');
+      restore.type = 'button'; restore.className = 'gp-more';
+      restore.textContent = 'Restore ' + hiddenNow + ' removed station' + (hiddenNow === 1 ? '' : 's');
+      restore.addEventListener('click', function(){ genreRestoreStations(g); });
+      stationsGrid.appendChild(restore);
     }
     if(g.pending){
       var spin = document.createElement('div');
