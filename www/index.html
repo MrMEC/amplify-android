@@ -13891,7 +13891,8 @@
       npEpDesc.style.display = text ? '' : 'none';
     }
     if(!npEpDesc) return;
-    if(!station || !isPodcastTrack(station) || isNpChannel(station) || isArchiveVideo(station)){ show(''); return; }
+    // Build 455 (Mark): no "About This Episode" for an audiobook's section.
+    if(!station || !isPodcastTrack(station) || isNpChannel(station) || isArchiveVideo(station) || isAudiobookGuid(station.guid)){ show(''); return; }
     var text = episodeDescText(station.description);
     show(text);
     if(station.collectionId == null) return;
@@ -49540,6 +49541,12 @@
     var o = { kicker: '', title: '', line: '', desc: '' };
     if(entry){
       o.kicker = 'Artist'; o.title = entry.name; o.desc = heroArtistBio(entry);
+    } else if(isPodcastTrack(item) && isAudiobookGuid(item.guid)){
+      // Build 455 (Mark): a book is an Audiobook, not a Podcast; its section under the title, its
+      // author under that (the "Internet Archive · year" note is no description of a book).
+      o.kicker = 'Audiobook';
+      o.title = item.collectionName || item.name || '';
+      o.line = [item.collectionName ? item.name : '', item.artistName].filter(Boolean).join(' · ');
     } else if(isPodcastTrack(item)){
       o.kicker = 'Podcast';
       o.title = item.collectionName || item.artistName || item.name || '';
