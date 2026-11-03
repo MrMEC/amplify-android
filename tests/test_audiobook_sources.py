@@ -20,6 +20,7 @@ GB_BOOKS = {
 }
 gb_asked = []
 gb_down = {'on': False}
+gb_delay = {'s': 1.5}   # Gutendex is slow live
 ia_down = {'on': False}
 
 async def run(B, theme):
@@ -43,6 +44,7 @@ async def run(B, theme):
     async def gutendex(r):
         if gb_down['on']: await r.abort(); return
         gb_asked.append(r.request.url)
+        await asyncio.sleep(gb_delay['s'])
         qs = urllib.parse.parse_qs(urllib.parse.urlparse(r.request.url).query)
         term = qs.get('search', [''])[0].lower(); pg_ = int(qs.get('page', ['1'])[0])
         res = []; nxt = None
@@ -79,8 +81,15 @@ async def run(B, theme):
     await pg.evaluate("__t.ev('openLibTab(\"audiobooks\")')"); await pg.wait_for_timeout(1500)
 
     # ---- the find box reaches both libraries ----
-    await pg.fill('#abFindInput', 'twain'); await pg.wait_for_timeout(2000)
+    await pg.fill('#abFindInput', 'twain'); await pg.wait_for_timeout(1000)
     r = await pg.evaluate(STATE)
+    late = await pg.evaluate("!!document.querySelector('#stationsGrid .ab-late')")
+    check(len(r['rows']) == 30 and late and not r['more'], f'{T} archive.org\'s books show at once while Gutenberg is still answering, a spinner at the foot ({len(r["rows"])} rows, spinner {late}, more {r["more"]})')
+    await pg.screenshot(path=f'{SHOTS}/absrc-find-early-{theme}.png')
+    await pg.wait_for_timeout(1800)
+    r = await pg.evaluate(STATE)
+    late = await pg.evaluate("!!document.querySelector('#stationsGrid .ab-late')")
+    check(not late, f'{T} the spinner goes once Gutenberg answers')
     qs = urllib.parse.unquote(asked['search'][-1])
     check('collection:(audio_bookspoetry)' in qs and 'collection:(librivoxaudio)' in qs, f'{T} the find box searches archive.org\'s Audio Books & Poetry collection, LibriVox included')
     check(gb_asked and 'mime_type=audio' in gb_asked[-1] and 'search=twain' in gb_asked[-1], f'{T} and Project Gutenberg\'s audiobooks {gb_asked[-1:]}')
@@ -90,7 +99,7 @@ async def run(B, theme):
     await pg.screenshot(path=f'{SHOTS}/absrc-find-{theme}.png')
     await pg.evaluate("window.scrollTo(0, 99999)"); await pg.wait_for_timeout(400)
     await pg.screenshot(path=f'{SHOTS}/absrc-find-end-{theme}.png'); await pg.evaluate("window.scrollTo(0, 0)")
-    await pg.evaluate("document.querySelector('.ia-more').click()"); await pg.wait_for_timeout(1800)
+    await pg.evaluate("document.querySelector('.ia-more').click()"); await pg.wait_for_timeout(2800)
     r = await pg.evaluate(STATE)
     check(len(r['rows']) == 43 and r['rows'][-1] == 'Roughing It' and not r['more'], f'{T} More Results brings the rest of both ({len(r["rows"])}) {r["rows"][-2:]}')
     check('page=2' in gb_asked[-1], f'{T} Gutenberg\'s second page was asked for')
@@ -138,7 +147,7 @@ async def run(B, theme):
 
     # ---- a Gutenberg row's More menu ----
     await pg.evaluate("__t.ev('openLibTab(\"audiobooks\")')"); await pg.wait_for_timeout(1000)
-    await pg.fill('#abFindInput', 'pauper'); await pg.wait_for_timeout(2000)
+    await pg.fill('#abFindInput', 'pauper'); await pg.wait_for_timeout(3000)
     r = await pg.evaluate(STATE)
     check(r['rows'] == ['The Prince and the Pauper (dramatic reading)', 'The Prince and the Pauper'], f'{T} a different recording of the same book is still listed {r["rows"]}')
     await pg.evaluate("document.querySelectorAll('.song-row .ia-more-btn')[1].click()"); await pg.wait_for_timeout(400)
@@ -159,7 +168,11 @@ async def run(B, theme):
     check(r['tiles'][:2] == ['The Prince and the Pauper (dramatic reading)', 'Life on the Mississippi'], f'{T} and is in Continue Listening {r["tiles"][:3]}')
 
     # ---- main Search: an Audiobooks tab ----
-    await pg.evaluate("document.getElementById('stationsGrid').innerHTML = ''; __t.ev('searchByName(\"twain\")')"); await pg.wait_for_timeout(3000)
+    await pg.evaluate("document.getElementById('stationsGrid').innerHTML = ''; __t.ev('searchByName(\"twain\")')"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).find(function(b){ return b.dataset.group === 'audiobooks'; }).click()"); await pg.wait_for_timeout(200)
+    early = await pg.evaluate("[document.querySelectorAll('#stationsGrid .song-row').length, !!document.querySelector('#stationsGrid .ab-late')]")
+    check(early == [30, True], f'{T} Search\'s tab too: archive.org\'s books at once, Gutenberg\'s on the way {early}')
+    await pg.wait_for_timeout(2500)
     tabs = await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).map(function(b){ return b.textContent; })")
     ab = [t for t in tabs if t.startswith('Audiobooks')]
     check(ab == ['Audiobooks (32)'], f'{T} Search has an Audiobooks tab with its count {tabs}')
@@ -168,7 +181,7 @@ async def run(B, theme):
     r = await pg.evaluate(STATE)
     check(len(r['rows']) == 32 and r['rows'][30] == 'The Prince and the Pauper' and r['more'], f'{T} the tab lists the same books, with More Results ({len(r["rows"])})')
     await pg.screenshot(path=f'{SHOTS}/absrc-search-tab-{theme}.png')
-    await pg.evaluate("document.querySelector('.ia-more').click()"); await pg.wait_for_timeout(1800)
+    await pg.evaluate("document.querySelector('.ia-more').click()"); await pg.wait_for_timeout(2800)
     r = await pg.evaluate(STATE)
     tabs = await pg.evaluate("Array.from(document.querySelectorAll('#searchTabs .home-tab')).map(function(b){ return b.textContent; })")
     check(len(r['rows']) == 43 and 'Audiobooks (43)' in tabs, f'{T} More Results there too ({len(r["rows"])}) {[t for t in tabs if "Audio" in t]}')
@@ -180,14 +193,25 @@ async def run(B, theme):
     top = await ev(pg, "topSearchResults().map(function(r){ return r.kind; })")
     check('audiobooks' not in top, f'{T} Top Results is not made of audiobooks {top}')
 
+    # ---- a very slow Gutendex: archive.org's books still at once; Gutenberg given up after 12 s ----
+    gb_delay['s'] = 20
+    await pg.evaluate("__t.ev('openLibTab(\"audiobooks\")')"); await pg.wait_for_timeout(800)
+    await pg.fill('#abFindInput', 'twain'); await pg.wait_for_timeout(1000)
+    r = await pg.evaluate(STATE)
+    check(len(r['rows']) == 30, f'{T} a very slow Gutenberg doesn\'t hold up archive.org\'s books ({len(r["rows"])})')
+    await pg.wait_for_timeout(12500)
+    r = await pg.evaluate(STATE)
+    late = await pg.evaluate("!!document.querySelector('#stationsGrid .ab-late')")
+    check(len(r['rows']) == 30 and not late and r['more'], f'{T} after 12 s it stops waiting for Gutenberg; More Results for archive.org\'s next page (spinner {late}, more {r["more"]})')
+    gb_delay['s'] = 1.5
     # ---- one library down leaves the other's books ----
     gb_down['on'] = True
     await pg.evaluate("__t.ev('openLibTab(\"audiobooks\")')"); await pg.wait_for_timeout(1000)
-    await pg.fill('#abFindInput', 'twain'); await pg.wait_for_timeout(2200)
+    await pg.fill('#abFindInput', 'twain mark'); await pg.wait_for_timeout(2200)
     r = await pg.evaluate(STATE)
     check(len(r['rows']) == 30, f'{T} Gutenberg down: archive.org\'s books still listed ({len(r["rows"])})')
     ia_down['on'] = True
-    await pg.fill('#abFindInput', 'twain mark'); await pg.wait_for_timeout(2200)
+    await pg.fill('#abFindInput', 'mark twain'); await pg.wait_for_timeout(2200)
     r = await pg.evaluate(STATE)
     stt = await pg.evaluate("document.getElementById('statusLineText').textContent")
     check('No audiobooks match' in r['empty'] and 'Could not reach' in stt, f'{T} both down: says so {r["empty"]!r} {stt!r}')
