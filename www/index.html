@@ -22339,6 +22339,7 @@
     podcastRefreshHeaderBtn.style.display = (podcastTab !== 'popular' && podcastSubs.length) ? '' : 'none';
     podcastRefreshHeaderBtn.onclick = function(){ backfillPodcastShowMeta('manual'); };
 
+    setResultCount(null);
     if(podcastTab === 'popular'){
       renderPodcastsPopular();
       return;
@@ -22354,6 +22355,7 @@
     }
 
     if(!podcastSubs.length){
+      setResultCount(null);
       stationsGrid.innerHTML = '<div class="empty-state">'
         + (podcastTab === 'following'
           ? 'You aren’t following any podcasts yet. Check the Popular tab to find some, or tap Add above to search by name.'
@@ -22362,6 +22364,8 @@
       return;
     }
 
+    // Build 453 (Mark): the count Library's tabs have, here too -- the shows you follow.
+    setResultCount(podcastSubs.length, 'show', podcastTab === 'following' ? null : countShowsInRows);
     if(podcastTab === 'following'){
       // Broken into letters, same as the Songs library view (.song-letter, azLetterFor) --
       // the heading over each run is the alphabet rail's own boundaries made visible on the
@@ -22409,6 +22413,7 @@
         stationsGrid.innerHTML = '<div class="empty-state">Nothing to continue. Episodes you start listening to show up here.</div>';
         return;
       }
+      setResultCount(inProgress.length, 'episode');
       stationsGrid.classList.add('grid-songs');
       inProgress.forEach(function(rec){
         var ep = podcastTrackFromProgress(rec);
@@ -22448,6 +22453,7 @@
         + '” yet. Open a followed show and use its Categories button to add it here.</div>';
       return;
     }
+    setResultCount(subs.length, 'show', countShowsInRows);
     renderPodcastsFollowingByDate(subs, 'Episode info for this category’s shows is still loading…');
   }
 
@@ -22500,6 +22506,7 @@
       stationsGrid.innerHTML = '<div class="empty-state">Could not load popular podcasts.</div>';
       return;
     }
+    setResultCount(list.length, 'show');
     list.forEach(function(show){
       stationsGrid.appendChild(buildPopularShowTile(show));
     });
@@ -32736,11 +32743,41 @@
   }
   // The noun defaults to "station" so every existing call site reads the same as before;
   // the library views pass "artist", "album", "song" or "item" instead.
-  function setResultCount(n, noun){
+  // Build 453 (Mark): while the page's filter box narrows the list, the count says how many are
+  // listed, not the page's whole total. countShown(rows) counts the visible rows in the page's own
+  // terms (Latest's episode rows count as shows); by default each item once (by its key).
+  var resultCountState = null;
+  function paintResultCount(n, noun){
     if(typeof n !== 'number'){ resultCount.style.display = 'none'; return; }
     resultCount.style.display = '';
     var word = noun || 'station';
     resultCount.textContent = n + ' ' + (n === 1 ? word : word + 's');
+  }
+  function setResultCount(n, noun, countShown){
+    resultCountState = typeof n === 'number' ? { n: n, noun: noun, countShown: countShown || null } : null;
+    paintResultCount(n, noun);
+    if(window.__secFilter && window.__secFilter.recount) window.__secFilter.recount();
+  }
+  function countDistinctRows(rows){
+    var seen = {}, n = 0;
+    rows.forEach(function(el){ var k = (el.dataset && el.dataset.key) || el._sfText || el.textContent; if(!seen[k]){ seen[k] = 1; n++; } });
+    return n;
+  }
+  // rows: the rows the filter leaves showing, or null when nothing is typed.
+  function resultCountForFilter(rows){
+    var st = resultCountState;
+    if(!st) return;
+    if(!rows){ paintResultCount(st.n, st.noun); return; }
+    paintResultCount(st.countShown ? st.countShown(rows) : countDistinctRows(rows), st.noun);
+  }
+  // Latest and a group list episodes; their count is of shows.
+  function countShowsInRows(rows){
+    var seen = {}, n = 0;
+    rows.forEach(function(el){
+      var ep = el._ctxItem, k = ep && (ep.collectionId || ep.collectionName);
+      if(k && !seen[k]){ seen[k] = 1; n++; }
+    });
+    return n;
   }
   // Saves the search currently on screen as a "For You" entry. The query is filled in and
   // only the label is left blank, since that's the one thing the app can't infer.
@@ -51100,7 +51137,7 @@
     var ITEM_SEL = '.tile, .song-row, .row-item, .cw-row, .vep-row';
     var REMEMBER_MS = 10 * 60 * 1000;
     var remembered = {};
-    var curKey = null, query = '', tokens = [], raf = 0;
+    var curKey = null, query = '', tokens = [], raf = 0, shownRows = [];
 
     function norm(s){
       s = String(s || '').toLowerCase();
@@ -51236,11 +51273,13 @@
       if(curKey === 'music'){
         var n = mvResults();
         if(n !== false){
+          shownRows = Array.prototype.slice.call(stationsGrid.querySelectorAll('.sf-mv-res'));
           if(azRail) azRail.style.display = 'none';
           return { total: 1, shown: n };
         }
       }
       var total = 0, shown = 0;
+      shownRows = [];
       var head = null, headOn = false;
       function closeHead(){ if(head) show(head, headOn || !tokens.length); }
       Array.prototype.forEach.call(stationsGrid.children, function(k){
@@ -51251,14 +51290,14 @@
         if(k.classList.contains('mv-top') || k.classList.contains('shuffle-all-row')){ show(k, !tokens.length); return; }
         if(k.classList.contains('epg')){
           Array.prototype.forEach.call(k.querySelectorAll('.epg-row'), function(r){
-            var ok = matches(r); total++; if(ok) shown++; show(r, ok);
+            var ok = matches(r); total++; if(ok){ shown++; shownRows.push(r); } show(r, ok);
           });
           return;
         }
         if(k.classList.contains('artist-videos')){
           var any = false;
           Array.prototype.forEach.call(k.children, function(v){
-            var ok = matches(v); total++; if(ok){ shown++; any = true; } show(v, ok);
+            var ok = matches(v); total++; if(ok){ shown++; any = true; shownRows.push(v); } show(v, ok);
           });
           show(k, any || !tokens.length);
           if(any) headOn = true;
@@ -51266,7 +51305,7 @@
         }
         if(k.matches(ITEM_SEL)){
           var ok2 = matches(k); total++;
-          if(ok2){ shown++; headOn = true; }
+          if(ok2){ shown++; headOn = true; shownRows.push(k); }
           show(k, ok2);
         }
       });
@@ -51307,6 +51346,7 @@
         return;
       }
       clearBtn.hidden = !input.value;
+      resultCountForFilter(tokens.length ? shownRows : null);
       var none = tokens.length && !res.shown;
       emptyNote.hidden = !none;
       if(none) emptyNote.textContent = 'No ' + LABELS[curKey] + ' match “' + query.trim() + '”.';
@@ -51324,7 +51364,7 @@
       new MutationObserver(schedule).observe(stationsGrid, { childList: true });
       new MutationObserver(schedule).observe(stationsHeading, { childList: true, characterData: true, subtree: true });
     }
-    window.__secFilter = { sync: sync, input: input, bar: bar };
+    window.__secFilter = { sync: sync, input: input, bar: bar, recount: function(){ if(curKey && tokens.length) schedule(); } };
     schedule();
   })();
 
