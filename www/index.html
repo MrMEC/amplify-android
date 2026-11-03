@@ -15762,7 +15762,7 @@
     }
     // Build 442: an audiobook's cover is the book's, like an album's: one picture for all its sections.
     if(isPodcastTrack(st) && isAudiobookGuid(st.guid)){
-      var abId = String(st.guid).slice(3).split('/')[0];
+      var abId = abIdFromGuid(st.guid);
       openArtUrlDialogFor({
         key: 'audiobook:' + abId,
         clearAlso: favKey(st),
@@ -17133,7 +17133,7 @@
         if(k.indexOf('artist:') === 0){ var e = findArtistEntry(k.slice(7)); if(e) refreshArtistArt(e); return; }
         if(k.indexOf('album:') === 0){ refreshAlbumArt(k.slice(6)); return; }
         if(k.indexOf('audiobook:') === 0){ refreshAudiobookArt(k.slice(10)); return; }
-        if(k.indexOf('podcast:ia:') === 0 && isAudiobookGuid(k.slice(8))){ refreshAudiobookArt(k.slice(11).split('/')[0]); }
+        if(k.indexOf('podcast:') === 0 && isAudiobookGuid(k.slice(8))){ refreshAudiobookArt(abIdFromGuid(k.slice(8))); }
         document.querySelectorAll('[data-key]').forEach(function(el){
           if(el.dataset.key !== k || !el._ctxItem) return;
           var art = el.querySelector('.tile-art, .row-thumb');
@@ -17457,7 +17457,7 @@
   function customArtFor(track){
     // Build 442: an audiobook's cover belongs to the book, so every section shows it.
     if(track && track.type === 'podcast' && isAudiobookGuid(track.guid)){
-      var bookArt = abBookArt(String(track.guid).slice(3).split('/')[0]);
+      var bookArt = abBookArt(abIdFromGuid(track.guid));
       if(bookArt) return bookArt;
     }
     var own = getCustomArtUrl(favKey(track));
@@ -31029,8 +31029,44 @@
     'Humor': '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>'
   };
   var AB_BOOK_ICON = '<path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/>';
-  // A recording's guid is "ia:<identifier>/<file>"; LibriVox identifiers end in _librivox.
-  function isAudiobookGuid(g){ return /^ia:[^\/]*_librivox\//.test(String(g || '')); }
+  // Build 443: the find box (and Search's Audiobooks tab) reach wider: all of archive.org's Audio Books
+  // & Poetry collection (LibriVox is part of it) and Project Gutenberg's audiobooks. Browsing stays on
+  // LibriVox, whose catalogue is the tidy one.
+  var AB_FIND_BASE = 'mediatype:(audio) AND ((collection:(librivoxaudio) AND (language:eng OR language:English))'
+    + ' OR (collection:(audio_bookspoetry) AND NOT collection:(librivoxaudio)))';
+  // A recording's guid is "ia:<identifier>/<file>" (LibriVox identifiers end in _librivox; other
+  // archive.org books are remembered once played) or, from Project Gutenberg, "gb:<number>/<file>".
+  // A book's own id is its archive.org identifier, or "gutenberg-<number>".
+  function abKnownMap(){
+    if(abKnownMem) return abKnownMem;
+    try{ abKnownMem = JSON.parse(localStorage.getItem('amplifyAudiobookIds') || '{}') || {}; }catch(e){ abKnownMem = {}; }
+    return abKnownMem;
+  }
+  var abKnownMem = null;
+  function abRemember(item){
+    if(!item || item.source === 'gutenberg' || /_librivox$/.test(item.id)) return;
+    var m = abKnownMap();
+    if(m[item.id]) return;
+    m[item.id] = Date.now();
+    var ks = Object.keys(m);
+    if(ks.length > 600) ks.sort(function(a, b){ return m[a] - m[b]; }).slice(0, ks.length - 600).forEach(function(k){ delete m[k]; });
+    try{ localStorage.setItem('amplifyAudiobookIds', JSON.stringify(m)); }catch(e){}
+  }
+  function abIdFromGuid(g){
+    g = String(g || '');
+    var m = /^gb:(\d+)\//.exec(g);
+    if(m) return 'gutenberg-' + m[1];
+    return /^ia:/.test(g) ? g.slice(3).split('/')[0] : '';
+  }
+  function abGuidPrefix(id){ var m = /^gutenberg-(\d+)$/.exec(String(id)); return m ? 'gb:' + m[1] + '/' : 'ia:' + id + '/'; }
+  function isAudiobookGuid(g){
+    g = String(g || '');
+    if(/^gb:\d+\//.test(g) || /^ia:[^\/]*_librivox\//.test(g)) return true;
+    return /^ia:[^\/]+\//.test(g) && !!abKnownMap()[g.slice(3).split('/')[0]];
+  }
+  function abIsGutenberg(id){ return /^gutenberg-\d+$/.test(String(id)); }
+  // The picture a book has before anyone picks one.
+  function abDefaultArt(id){ return abIsGutenberg(id) ? gbCoverUrl(String(id).slice(10)) : archiveArtUrl(id); }
   function abLength(sec){
     sec = Math.round(Number(sec) || 0);
     if(sec <= 0) return '';
@@ -31061,7 +31097,7 @@
     var words = String(term || '').replace(/[^A-Za-z0-9À-￿\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
     if(!words.length) return '';
     var w = words.join(' AND ');
-    return AB_BASE + ' AND (title:(' + w + ') OR creator:(' + w + '))';
+    return AB_FIND_BASE + ' AND (title:(' + w + ') OR creator:(' + w + '))';
   }
   function abCategoryQuery(subject){ return AB_BASE + ' AND subject:(' + subject + ')'; }
   // The cover chosen for a book (Book Cover in Now Playing's menu), else one chosen before covers
@@ -31069,22 +31105,23 @@
   function abBookArt(id){
     var own = getCustomArtUrl('audiobook:' + id);
     if(own) return own;
-    var m = loadCustomArtMap(), pre = 'podcast:ia:' + id + '/';
+    var m = loadCustomArtMap(), pre = 'podcast:' + abGuidPrefix(id);
     for(var k in m){ if(k.indexOf(pre) === 0 && m[k]) return m[k]; }
     return null;
   }
   function abArt(art, item){
+    art.innerHTML = '';   // drawn again when a cover arrives: never two pictures in one box
     applyPlaceholderArt(art, 'audiobook:' + item.id);
     var custom = abBookArt(item.id);
     if(custom){
       var cimg = document.createElement('img');
       cimg.alt = ''; cimg.referrerPolicy = 'no-referrer';
       art.appendChild(cimg);
-      setCustomCoverImg(cimg, custom, function(){ cimg.remove(); art.appendChild(vImg(archiveArtUrl(item.id))); },
+      setCustomCoverImg(cimg, custom, function(){ cimg.remove(); art.appendChild(vImg(abDefaultArt(item.id))); },
         function(){ if(art.isConnected) abArt(art, item); });
       return;
     }
-    art.appendChild(vImg(archiveArtUrl(item.id)));
+    art.appendChild(vImg(abDefaultArt(item.id)));
     // A cover saved on the phone can arrive after the page is drawn.
     whenCustomArtLoaded(function(){ if(art.isConnected && abBookArt(item.id)) abArt(art, item); });
   }
@@ -31094,25 +31131,40 @@
       var art = el.querySelector('.tile-art');
       if(art){ art.innerHTML = ''; abArt(art, { id: id }); }
     });
-    try{ if(currentStation && isAudiobookGuid(currentStation.guid) && String(currentStation.guid).slice(3).split('/')[0] === id) refreshStationArt(currentStation); }catch(e){}
+    try{ if(currentStation && isAudiobookGuid(currentStation.guid) && abIdFromGuid(currentStation.guid) === id) refreshStationArt(currentStation); }catch(e){}
   }
-  function abSub(item){ return [item.creator, abLength(item.secs)].filter(Boolean).join(' · '); }
+  function abSub(item){ return [item.creator, abLength(item.secs), abIsGutenberg(item.id) ? 'Project Gutenberg' : ''].filter(Boolean).join(' · '); }
   // Tapping a book plays it from where it was left: the section last played (its own saved
   // position picks up inside it), or the first. Its sections are Up Next, so the book plays on.
   function abLastGuid(id){
     for(var i = 0; i < recentStations.length; i++){
       var r = recentStations[i];
-      if(r && r.type === 'podcast' && String(r.guid || '').indexOf('ia:' + id + '/') === 0) return r.guid;
+      if(r && r.type === 'podcast' && String(r.guid || '').indexOf(abGuidPrefix(id)) === 0) return r.guid;
     }
     return null;
   }
+  // A book's sections, in order, whichever library it comes from. An empty list carries .meta
+  // (archive.org's answer) so the usual "nothing playable" notice can say why.
+  function abPlayables(item){
+    if(abIsGutenberg(item.id)) return gbPlayables(item);
+    return extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
+      var list = archivePlayables(meta, item);
+      list.meta = meta;
+      return list;
+    });
+  }
+  function abNothing(list, item){
+    if(abIsGutenberg(item.id)) setStatus('Project Gutenberg has no playable audio for \u201c' + item.title + '\u201d.', true);
+    else archiveNothingNotice(list.meta, item);
+  }
+  function abSourceName(item){ return abIsGutenberg(item.id) ? 'Project Gutenberg' : 'the Internet Archive'; }
   function playAudiobook(item, el){
     archiveNpResults = null;
     if(el) el.classList.add('loading');
-    extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
+    abRemember(item);
+    abPlayables(item).then(function(list){
       if(el) el.classList.remove('loading');
-      var list = archivePlayables(meta, item);
-      if(!list.length){ archiveNothingNotice(meta, item); return; }
+      if(!list.length){ abNothing(list, item); return; }
       var start = list[0], last = abLastGuid(item.id);
       if(last) for(var i = 0; i < list.length; i++){ if(list[i].guid === last){ start = list[i]; break; } }
       if(list.length > 1) setQueue(list, start, item.title); else clearQueue();
@@ -31120,7 +31172,7 @@
       openNowPlaying(start, true);
     })['catch'](function(){
       if(el) el.classList.remove('loading');
-      setStatus('Could not reach the Internet Archive.', true);
+      setStatus('Could not reach ' + abSourceName(item) + '.', true);
     });
   }
   function buildAudiobookTile(item){
@@ -31163,8 +31215,8 @@
     var seen = {}, out = [];
     recentStations.forEach(function(r){
       if(!r || r.type !== 'podcast' || !isAudiobookGuid(r.guid)) return;
-      var id = String(r.guid).slice(3).split('/')[0];
-      if(seen[id]) return;
+      var id = abIdFromGuid(r.guid);
+      if(!id || seen[id]) return;
       seen[id] = 1;
       out.push({ id: id, title: r.collectionName || r.name, creator: r.artistName || '', secs: 0, section: r.name });
     });
@@ -31172,22 +31224,146 @@
   }
   function abSpinner(){ var d = document.createElement('div'); d.className = 'loading-state ab-loading'; d.innerHTML = '<div class="spinner"></div>'; return d; }
   // Rows for a list of books, with More Results while there are more; used by the find box and a category.
-  function abAppendList(items, q, onMoreDone){
+  function abAppendList(items, pager){
     items.forEach(function(it){ stationsGrid.appendChild(buildAudiobookRow(it)); });
-    function more(total, page){
-      if(total <= page * AB_PAGE) return;
-      var btn = archiveMoreButton(function(){
-        return abQuery(q, page + 1).then(function(next){
-          btn.remove();
-          if(!stationsGrid.isConnected) return;
-          abAppendList(next, q);
-        });
+    if(!pager || !pager.hasMore()) return;
+    var btn = archiveMoreButton(function(){
+      return pager.next().then(function(next){
+        btn.remove();
+        if(!stationsGrid.isConnected) return;
+        abAppendList(next, pager);
       });
-      btn.classList.add('ab-more');
-      btn.style.gridColumn = '1 / -1';
-      stationsGrid.appendChild(btn);
+    });
+    btn.classList.add('ab-more');
+    btn.style.gridColumn = '1 / -1';
+    stationsGrid.appendChild(btn);
+  }
+  // Pages of books for a list: next() gives the next page (the first, the first time), hasMore()
+  // whether there is one. A category is archive.org alone.
+  function abArchivePager(q){
+    var page = 0, more = true;
+    return {
+      hasMore: function(){ return more; },
+      next: function(){
+        return abQuery(q, ++page).then(function(items){
+          more = items.length > 0 && items.total > page * AB_PAGE;
+          return items;
+        });
+      }
+    };
+  }
+  // The find box and Search's Audiobooks tab: archive.org's books, then Project Gutenberg's, a
+  // page of each at a time. Gutenberg's audio is partly LibriVox's own recordings, so one already
+  // listed from archive.org (same title and author) is not listed twice. Either library can be
+  // down without taking the other's books with it; .failed says both were.
+  function abNorm(s){ return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\b(the|a|an)\b/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function abFinder(term){
+    var words = String(term || '').trim(), aq = abSearchQuery(words);
+    var s = { ia: 0, iaMore: !!aq, gb: 0, gbMore: !!words, seen: {}, ids: {} };
+    function key(it){ var c = abNorm(it.creator).split(' '); return abNorm(it.title) + '|' + (c[c.length - 1] || ''); }
+    function within(p, ms){ return Promise.race([p, new Promise(function(r, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); }
+    return {
+      hasMore: function(){ return s.iaMore || s.gbMore; },
+      next: function(){
+        var bad = 0, asked = 0;
+        var ia = s.iaMore ? (asked++, abQuery(aq, ++s.ia).then(function(items){
+          s.iaMore = items.length > 0 && items.total > s.ia * AB_PAGE;
+          items.forEach(function(it){ it.audiobook = true; });
+          return items;
+        }, function(){ s.iaMore = false; bad++; return []; })) : Promise.resolve([]);
+        var gb = s.gbMore ? (asked++, within(gbQuery(words, ++s.gb), 15000).then(function(items){
+          s.gbMore = items.length > 0 && items.more;
+          return items;
+        }, function(){ s.gbMore = false; bad++; return []; })) : Promise.resolve([]);
+        return Promise.all([ia, gb]).then(function(r){
+          var out = [];
+          r[0].forEach(function(it){ if(s.ids[it.id]) return; s.ids[it.id] = 1; s.seen[key(it)] = 1; out.push(it); });
+          r[1].forEach(function(it){ var k = key(it); if(s.ids[it.id] || s.seen[k]) return; s.ids[it.id] = 1; s.seen[k] = 1; out.push(it); });
+          out.failed = asked > 0 && bad === asked;
+          return out;
+        });
+      }
+    };
+  }
+
+  // ---- Project Gutenberg (build 443) ----
+  // Gutendex (gutendex.com, no key) lists Gutenberg's books; mime_type=audio keeps the audiobooks.
+  // A book's own page on gutenberg.org links each part as an MP3 (newer books: /files/N/mp3/N-01.mp3;
+  // older ones keep a folder of them, linked from the page or from /files/N/). Asked through the
+  // phone's own web requests, as archive.org is.
+  var GB_API = 'https://gutendex.com/books/';
+  var GB_SITE = 'https://www.gutenberg.org';
+  function gbCoverUrl(n){ return GB_SITE + '/cache/epub/' + n + '/pg' + n + '.cover.medium.jpg'; }
+  function gbAuthor(p){
+    var n = String((p && p.name) || '').replace(/\s*\([^)]*\)/g, '').trim();
+    var m = /^([^,]+),\s*(.+)$/.exec(n);
+    return (m ? m[2] + ' ' + m[1] : n).replace(/\s+/g, ' ').trim();
+  }
+  function gbQuery(term, page){
+    var url = GB_API + '?mime_type=audio' + (term ? '&search=' + encodeURIComponent(term) : '') + (page > 1 ? '&page=' + page : '');
+    return extJson(url, { 'Accept': 'application/json' }).then(function(d){
+      var items = ((d && d.results) || []).filter(function(b){ return b && b.id && b.title; }).map(function(b){
+        return { id: 'gutenberg-' + b.id, gbId: String(b.id), source: 'gutenberg',
+          title: String(b.title).replace(/\s*[\r\n]+\s*/g, ' ').trim(),
+          creator: (b.authors || []).map(gbAuthor).filter(Boolean).slice(0, 2).join(', '),
+          year: '', video: false, secs: 0, formats: b.formats || {} };
+      });
+      items.total = Number(d && d.count) || items.length;
+      items.more = !!(d && d.next);
+      items.page = page || 1;
+      return items;
+    });
+  }
+  function extText(url){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    if(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && H && typeof H.request === 'function'){
+      return Promise.resolve(H.request({ url: url, method: 'GET', responseType: 'text', connectTimeout: 12000, readTimeout: 20000, headers: { 'Accept': 'text/html,*/*' } })).then(function(r){
+        if(!r || Number(r.status) < 200 || Number(r.status) >= 300) throw new Error('HTTP ' + (r && r.status));
+        return typeof r.data === 'string' ? r.data : String(r.data || '');
+      });
     }
-    more(items.total, items.page);
+    return fetch(url, { mode: 'cors' }).then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+  }
+  function gbLinks(html, base, re){
+    var out = [], seen = {}, rx = /href\s*=\s*["']([^"'#?]+)["']/gi, m;
+    while((m = rx.exec(html))){
+      if(!re.test(m[1])) continue;
+      var u = '';
+      try{ u = new URL(m[1], base).href.replace(/^http:/, 'https:'); }catch(e){}
+      if(u && !seen[u]){ seen[u] = 1; out.push(u); }
+    }
+    return out;
+  }
+  // The MP3s a page links to, or the ones in the MP3 folder it links to.
+  function gbMp3sFrom(url){
+    return extText(url).then(function(html){
+      var mp3 = gbLinks(html, url, /\.mp3$/i);
+      if(mp3.length) return mp3;
+      var dir = gbLinks(html, url, /mp3\/?$/i)[0];
+      if(!dir) return [];
+      if(!/\/$/.test(dir)) dir += '/';
+      return extText(dir).then(function(h){ return gbLinks(h, dir, /\.mp3$/i); });
+    })['catch'](function(){ return []; });
+  }
+  function gbPlayables(item){
+    var n = item.gbId || String(item.id).slice(10);
+    return gbMp3sFrom(GB_SITE + '/ebooks/' + n).then(function(urls){
+      return urls.length ? urls : gbMp3sFrom(GB_SITE + '/files/' + n + '/');
+    }).then(function(urls){
+      if(!urls.length){
+        var f = item.formats || {}, one = f['audio/mpeg'] || '';
+        if(!one) Object.keys(f).some(function(k){ if(/^audio\//.test(k) && !/mpegurl|x-scpls/i.test(k)){ one = f[k]; return true; } return false; });
+        if(one) urls = [String(one).replace(/^http:/, 'https:')];
+      }
+      urls.sort(function(a, b){ return a.localeCompare(b, undefined, { numeric: true }); });
+      return urls.map(function(u, i){
+        var file = u.split('/').pop();
+        try{ file = decodeURIComponent(file); }catch(e){}
+        return { type: 'podcast', guid: 'gb:' + n + '/' + file, collectionId: '', collectionName: item.title, artistName: item.creator,
+          name: urls.length > 1 ? 'Part ' + (i + 1) : item.title, favicon: gbCoverUrl(n), releaseDate: '', duration: 0,
+          episodeUrl: u, description: 'Project Gutenberg', isVideo: false };
+      });
+    });
   }
   function renderAudiobooksGrid(){
     resetStationsGrid();
@@ -31252,17 +31428,18 @@
       document.body.classList.remove('genres-open');
       stationsGrid.classList.add('grid-songs');
       var sp = abSpinner(); sp.style.gridColumn = '1 / -1'; stationsGrid.appendChild(sp);
-      var aq = abSearchQuery(q);
-      (aq ? abQuery(aq, 1) : Promise.resolve([])).then(function(items){
+      var pager = abFinder(q);
+      pager.next().then(function(items){
         if(my !== token) return;
         sp.remove();
         if(!items.length){
           var e = document.createElement('div'); e.className = 'empty-state'; e.style.gridColumn = '1 / -1';
           e.textContent = 'No audiobooks match “' + q + '”.';
           stationsGrid.appendChild(e);
+          if(items.failed) setStatus('Could not reach the Internet Archive or Project Gutenberg.', true);
           return;
         }
-        abAppendList(items, aq);
+        abAppendList(items, pager);
       })['catch'](function(){
         if(my !== token) return;
         sp.remove();
@@ -31310,8 +31487,8 @@
     resetStationsGrid();
     stationsGrid.classList.add('grid-songs');
     var sp = abSpinner(); sp.style.gridColumn = '1 / -1'; stationsGrid.appendChild(sp);
-    var q = abCategoryQuery(subject);
-    abQuery(q, 1).then(function(items){
+    var pager = abArchivePager(abCategoryQuery(subject));
+    pager.next().then(function(items){
       if(!sp.isConnected) return;
       sp.remove();
       if(!items.length){
@@ -31320,7 +31497,7 @@
         stationsGrid.appendChild(e);
         return;
       }
-      abAppendList(items, q);
+      abAppendList(items, pager);
     })['catch'](function(){
       if(!sp.isConnected) return;
       sp.remove();
@@ -45386,6 +45563,17 @@
   document.addEventListener('click', function(e){ if(iaMenu && !iaMenu.contains(e.target) && !(e.target.closest && e.target.closest('.ia-more-btn'))) closeArchiveRowMenu(); });
   window.addEventListener('scroll', closeArchiveRowMenu, { passive: true });
   function archiveQueueItem(item, atFront){
+    // Build 443: a book from the find box or Search's Audiobooks tab, which may be Gutenberg's.
+    if(item.source === 'gutenberg' || item.audiobook){
+      abRemember(item);
+      setStatus('Getting \u201c' + item.title + '\u201d\u2026', false, true);
+      abPlayables(item).then(function(list){
+        if(!list.length){ abNothing(list, item); return; }
+        var lbl = list.length > 1 ? item.title : null;
+        if(atFront) queuePlayNext(list, lbl); else queueAddToEnd(list, lbl);
+      })['catch'](function(){ setStatus('Could not reach ' + abSourceName(item) + '.', true); });
+      return;
+    }
     setStatus('Getting \u201c' + item.title + '\u201d from archive.org\u2026', false, true);
     extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
       var list = archivePlayables(meta, item);
@@ -45412,7 +45600,7 @@
     }
     add('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h10M4 11h10M4 16h6"/><path class="fill" d="M15 13.5v6l5-3z"/></svg><span>Play Next</span>', function(){ archiveQueueItem(item, true); }, 'iaMenuNext');
     add('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h10"/><path d="M18 13v8M14 17h8"/></svg><span>Add to Queue</span>', function(){ archiveQueueItem(item, false); }, 'iaMenuQueue');
-    if(archiveDlPlugin()){
+    if(archiveDlPlugin() && item.source !== 'gutenberg'){
       var st = archiveDl[item.id];
       var lbl = st && st.state === 'working' ? 'Downloading\u2026 ' + (st.pct || 0) + '%' : st && st.state === 'done' ? 'Downloaded' : 'Download';
       add('<svg class="menu-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg><span>' + lbl + '</span>', function(){ downloadArchiveItem(item); }, 'iaMenuDl');
@@ -45474,6 +45662,7 @@
     { id: 'songs', label: 'Songs', noun: 'song' },
     { id: 'musicVideos', label: 'Music Videos', noun: 'music video' },
     { id: 'podcasts', label: 'Podcasts', noun: 'show' },
+    { id: 'audiobooks', label: 'Audiobooks', noun: 'audiobook' },
     { id: 'videos', label: 'Movies & TV', noun: 'video' },
     { id: 'archive', label: 'Archive', noun: 'Internet Archive item' },
     { id: 'channels', label: 'Channels', noun: 'channel' },
@@ -45644,13 +45833,14 @@
   function searchGroupHasContent(id){
     if(id === 'top'){
       return !!searchState && (searchState.pending || searchState.podcastsPending ||
-        SEARCH_GROUPS.some(function(g){ return g.id !== 'top' && g.id !== 'archive' && (searchState[g.id] || []).length; }));
+        SEARCH_GROUPS.some(function(g){ return g.id !== 'top' && g.id !== 'archive' && g.id !== 'audiobooks' && (searchState[g.id] || []).length; }));
     }
     // While the directory call is in flight the Stations tab is offered anyway, so the
     // grouping does not visibly rearrange itself the moment results land.
     if(id === 'stations' && searchState && searchState.pending) return true;
     if(id === 'podcasts' && searchState && searchState.podcastsPending) return true;
     if(id === 'archive' && searchState && searchState.archivePending) return true;
+    if(id === 'audiobooks' && searchState && searchState.audiobooksPending) return true;
     return searchGroupItems(id).length > 0;
   }
 
@@ -45674,10 +45864,12 @@
       videos: searchVideos(q),
       musicVideos: searchMusicVideos(q),
       archive: [],
+      audiobooks: [],
       tab: prevTab,
       pending: true,
       podcastsPending: true,
-      archivePending: sourceOn('archive')
+      archivePending: sourceOn('archive'),
+      audiobooksPending: sourceOn('audiobooks') && !!plainSearchText(q).trim()
     };
     lastSearch = searchState;
     var st = searchState;
@@ -45708,6 +45900,23 @@
       if(searchState === st) applySearchResults();
     });
   }
+  // Build 443: the Audiobooks page's own search (archive.org's audiobooks, then Gutenberg's), as a tab.
+  function abPhraseOk(pq){ return function(it){ return !pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases }); }; }
+  function searchAudiobooksFor(st, remoteQ, pq){
+    if(!String(remoteQ || '').trim()){ st.audiobooksPending = false; return; }
+    st.audiobooksPending = true;
+    st.abPager = abFinder(remoteQ);
+    st.abPager.next().then(function(items){
+      if(lastSearch !== st) return;
+      st.audiobooks = items.filter(abPhraseOk(pq));
+      st.audiobooksPending = false;
+      if(searchState === st) applySearchResults();
+    })['catch'](function(){
+      if(lastSearch !== st) return;
+      st.audiobooksPending = false;
+      if(searchState === st) applySearchResults();
+    });
+  }
   function askDirectories(q, st){
     // The two remote directories know nothing about quotes, so they get the words alone and
     // the quoted phrases are enforced here, on what comes back.
@@ -45717,6 +45926,7 @@
     function stale(){ return lastSearch !== st; }
 
     if(sourceOn('archive')) searchArchiveFor(st, remoteQ, pq);
+    if(sourceOn('audiobooks')) searchAudiobooksFor(st, remoteQ, pq);
 
     itunesSearchPodcasts(remoteQ, 15).then(function(results){
       if(stale()) return;
@@ -45818,7 +46028,7 @@
     var items = searchGroupItems(group.id);
     resetStationsGrid();
     // Build 386 (Mark): on these tabs a title may take two lines before it's cut short.
-    stationsGrid.classList.toggle('search-2line', ['top', 'songs', 'musicVideos', 'videos', 'archive', 'channels', 'playlists'].indexOf(group.id) !== -1);
+    stationsGrid.classList.toggle('search-2line', ['top', 'songs', 'musicVideos', 'videos', 'archive', 'audiobooks', 'channels', 'playlists'].indexOf(group.id) !== -1);
 
     if(group.id === 'top'){
       if(!items.length){
@@ -45854,6 +46064,11 @@
         applySearchResults();
       }));
     }
+    if(group.id === 'audiobooks' && !items.length && searchState.audiobooksPending){
+      stationsGrid.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+      setResultCount(null);
+      return;
+    }
     if(group.id === 'archive' && !items.length && searchState.archivePending){
       stationsGrid.insertAdjacentHTML('beforeend', '<div class="loading-state"><div class="spinner"></div></div>');
       setResultCount(null);
@@ -45866,7 +46081,7 @@
       return;
     }
 
-    if(group.id === 'videos' || group.id === 'musicVideos' || group.id === 'archive') stationsGrid.classList.add('grid-songs');
+    if(group.id === 'videos' || group.id === 'musicVideos' || group.id === 'archive' || group.id === 'audiobooks') stationsGrid.classList.add('grid-songs');
     // Save as Custom Station sits on the Stations tab, centred above the results (build 119).
     if(group.id === 'stations'){
       var bar = document.createElement('div');
@@ -45909,6 +46124,8 @@
         chList.appendChild(buildChannelRow(item, { saved: !!findVideoChannel(item.url), search: true }));
       } else if(group.id === 'archive'){
         stationsGrid.appendChild(buildArchiveResultRow(item));
+      } else if(group.id === 'audiobooks'){
+        stationsGrid.appendChild(buildAudiobookRow(item));
       } else if(group.id === 'videos'){
         stationsGrid.appendChild(buildVideoResultRow(item, false));
       } else if(group.id === 'musicVideos'){
@@ -45960,10 +46177,23 @@
         });
       }));
     }
+    if(group.id === 'audiobooks' && searchState.abPager && searchState.abPager.hasMore()){
+      var sa = searchState;
+      stationsGrid.appendChild(archiveMoreButton(function(){
+        return sa.abPager.next().then(function(more){
+          sa.audiobooks = (sa.audiobooks || []).concat(more.filter(abPhraseOk(parseSearchQuery(sa.q || ''))));
+          if(searchState !== sa) return;
+          var y = window.scrollY;
+          applySearchResults();
+          window.scrollTo(0, y);
+        });
+      }));
+    }
     // Still counting up while the directory answers, so no total is claimed yet.
     if(group.id === 'stations' && searchState.pending) setResultCount(null);
     else if(group.id === 'podcasts' && searchState.podcastsPending) setResultCount(null);
     else if(group.id === 'archive' && searchState.archivePending) setResultCount(null);
+    else if(group.id === 'audiobooks' && searchState.audiobooksPending) setResultCount(null);
     else setResultCount(items.length, group.noun);
   }
 
