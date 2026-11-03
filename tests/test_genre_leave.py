@@ -6,7 +6,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = '/tmp/claude-0/t/srv-g
 shutil.rmtree(ROOT, ignore_errors=True); os.makedirs(ROOT); os.makedirs(SHOTS, exist_ok=True)
 html = subprocess.check_output(['git', 'show', 'HEAD:www/index.html'], cwd=HERE).decode() if (len(sys.argv) > 1 and sys.argv[1] == 'base') else open(os.path.join(HERE, '..', 'www', 'index.html')).read()
 mark = '  function searchByTag(tag){'
-html = html.replace(mark, """  window.__gl = { open: function(t){ searchByTag(t); }, lib: function(){ openMyLibraryHome(); },
+html = html.replace(mark, """  window.__gl = { stale: function(){ activeGenre = 'Disney'; activeLibrarySection = 'artists'; renderArtistsView(); }, open: function(t){ searchByTag(t); }, lib: function(){ openMyLibraryHome(); },
     stub: function(){ apiFetch = function(){ return Promise.resolve([]); }; window.__late = null; itunesSearchPodcasts = function(){ return new Promise(function(r){ window.__late = function(){ r([{ collectionId: 1, collectionName: 'Disney Pod', artistName: 'Disney', artworkUrl600: '' }]); }; }); }; },
     late: function(){ window.__late && window.__late(); } };
 """ + mark, 1)
@@ -22,10 +22,25 @@ async def main():
         await pg.route('**/*', lambda r: r.continue_() if r.request.url.startswith('http://127.0.0.1') else r.abort())
         await pg.goto('http://127.0.0.1:8844/index.html'); await pg.wait_for_timeout(2500)
         await pg.evaluate("window.__gl.stub(); window.__gl.open('Disney')"); await pg.wait_for_timeout(500)
-        await pg.evaluate("window.__gl.lib()"); await pg.wait_for_timeout(800)
+        await pg.tap('.mobile-nav-btn[data-nav="library"]'); await pg.wait_for_timeout(800)
         await pg.evaluate("window.__gl.late()"); await pg.wait_for_timeout(800)
+        # a second route: Search -> Genres -> a genre, then the Library button
+        await pg.evaluate("window.__gl.open('Disney')"); await pg.wait_for_timeout(300)
+        await pg.tap('.mobile-nav-btn[data-nav="home"]'); await pg.wait_for_timeout(500)
+        await pg.tap('.mobile-nav-btn[data-nav="library"]'); await pg.wait_for_timeout(1000)
+        # a stale activeGenre must not hide the tabs
+        await pg.evaluate("window.__gl.stale()"); await pg.wait_for_timeout(500)
+        stale = await pg.evaluate("!!document.querySelector('.lib-tabs')")
+        # Genres is the last tab, and opens the Genres page under Library
+        tabs = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.lib-tabs .home-tab'), b=>b.textContent)")
+        await pg.evaluate("document.querySelector('.lib-tabs [data-libtab=genres]').click()"); await pg.wait_for_timeout(800)
+        g = await pg.evaluate("({ tabs: !!document.querySelector('.lib-tabs'), active: (document.querySelector('.lib-tabs .active')||{}).textContent, cards: document.querySelectorAll('[data-genre]').length })")
+        await pg.screenshot(path=f'{SHOTS}/lib-genres-tab.png')
+        nav = await pg.evaluate("(document.querySelector('.mobile-nav-btn.active, .mobile-nav-btn[aria-current]')||{}).dataset ? document.querySelector('.mobile-nav-btn.active, .mobile-nav-btn[aria-current]').dataset.nav : ''")
+        print(('PASS' if stale and tabs == ['Artists','Albums','Songs','Playlists','Genres'] and g['tabs'] and g['active'] == 'Genres' else 'FAIL'), 'stale genre state keeps tabs; Genres is the last tab and opens', stale, tabs, g, nav)
         st = await pg.evaluate("({ tabs: !!document.querySelector('.lib-tabs'), on: document.body.classList.contains('lib-tabs-on'), genre: document.body.classList.contains('genre-open'), gp: !!document.querySelector('.gp-hero') })")
         await pg.screenshot(path=f'{SHOTS}/genre-leave.png')
+        st = await pg.evaluate("({ tabs: !!document.querySelector('.lib-tabs'), on: document.body.classList.contains('lib-tabs-on'), genre: document.body.classList.contains('genre-open'), gp: !!document.querySelector('.gp-hero') })") if False else st
         ok = st['tabs'] and st['on'] and not st['genre'] and not st['gp'] and not errs
         print(('PASS' if ok else 'FAIL'), 'the Library keeps its tabs after a late genre result', st, errs[:1])
         await b.close(); raise SystemExit(0 if ok else 1)

@@ -30258,6 +30258,7 @@
   function openGenre(g){ pushView(); searchInput.value = ''; searchByTag(g); }
   // Build 410 (Mark): Search's empty page is this same browse content, without the filter box.
   var genreFromSearch = false;
+  var genreNavSec = 'library';
   function renderGenresGrid(inSearch){
     inSearch = inSearch === true;
     if(genresEditing && !inSearch){ renderGenresRows(); return; }
@@ -30332,7 +30333,7 @@
 
   // ---------- Build 405 (Mark): Library tabs ----------
   var LIB_TAB_KEY = 'radioPlayerLibTab';
-  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists']];   // build 410: Genres moved to Search
+  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres']];   // build 430: Genres is back as the last tab (Search keeps its own Genres browse)
   var libRootNav = false;
   function libLastTab(){
     var t = null; try{ t = localStorage.getItem(LIB_TAB_KEY); }catch(e){}
@@ -30354,8 +30355,10 @@
     } finally { libRootNav = false; }
   }
   function libTabNow(){
-    if(activeArtistKey || activeAlbumKey || activeHomeSection || activeGenre) return null;
+    // a stale activeGenre (left over from a genre page that is no longer on screen) must not hide the tabs
+    if(activeArtistKey || activeAlbumKey || activeHomeSection || (activeGenre && document.body.classList.contains('genre-open'))) return null;
     if(onPlaylistsHomeView) return 'playlists';
+    if(onGenresHomeView) return 'genres';
     if(activeLibrarySection === 'artists' || activeLibrarySection === 'albums' || activeLibrarySection === 'songs') return activeLibrarySection;
     return null;
   }
@@ -45663,6 +45666,7 @@
     // A genre's station list is Genres' own category, so its back button always returns
     // there -- same fixed-destination treatment as the other sections' items above, rather
     // than a history-based one.
+    genreNavSec = genreFromSearch ? 'search' : 'library';
     if(genreFromSearch){ genreFromSearch = false; setDetailBackToHistory(function(){ searchInput.value = ''; if(searchSheetInput) searchSheetInput.value = ''; searchByName('', true); }, 'Search'); }
     else setDetailBackToHistory(function(){ openGenresHome(); }, 'Genres');
     hideArtistHero();
@@ -46223,7 +46227,8 @@
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView || document.body.classList.contains('lc-page-open')) return 'video';
-    if(onGenresHomeView || activeGenre) return 'search';   // build 410: Genres live on Search
+    if(onGenresHomeView) return 'library';       // build 430: the Genres tab is under Library
+    if(activeGenre) return genreNavSec;          // a genre page belongs to where it was opened from
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || activeStationPlaylistId) return 'library';
     // For You (and its searches) lives on Home now.
