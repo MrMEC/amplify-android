@@ -18,10 +18,12 @@ assert _src.count(_mark) == 1
 open(root + '/index.html', 'w').write(_src.replace(_mark, _mark + HOOK))
 M = root + '/Music'; os.makedirs(M)
 N_SONGS = 48
+NATO = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima', 'Mike', 'November',
+        'Oscar', 'Papa', 'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor', 'Whiskey', 'Xray']
 for i in range(N_SONGS):
-    a = 'Artist %02d' % (i // 2)
+    a = NATO[i // 2]
     subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', f'sine=frequency={300 + i * 7}:duration=1', '-c:a', 'libmp3lame', '-b:a', '32k',
-                    '-metadata', f'title=Song {i:02d}', '-metadata', f'artist={a}', '-metadata', f'album=Album {i // 2:02d}',
+                    '-metadata', f'title={NATO[(i * 7) % 24]} Song {i:02d}', '-metadata', f'artist={a}', '-metadata', f'album={a} Album',
                     '-metadata', 'genre=Rock', f'{M}/{i:02d}.mp3'], check=True)
 class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -85,9 +87,15 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
         check(False, f'{T} {name}: page long enough to scroll ({maxy})'); return
     await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(350)
     top0 = await pg.evaluate(MEASURE, sel2)
+    jumps = []
     for y in range(100, need + 1, 100):
         await pg.evaluate("(y)=>window.scrollTo(0, y)", y); await pg.wait_for_timeout(60)
+        got = await pg.evaluate("Math.round(scrollY)")
+        if abs(got - y) > 2: jumps.append((y, got))
     await pg.wait_for_timeout(450)
+    check(not jumps, f'{T} {name}: the page scrolls where it is asked, no jumps {jumps[:3]}')
+    max2 = await pg.evaluate("document.documentElement.scrollHeight - innerHeight")
+    check(max2 - maxy <= 4, f'{T} {name}: the page does not grow while scrolling ({maxy} -> {max2})')   # long lists may settle a little shorter as rows are drawn
     down = await pg.evaluate(MEASURE, sel2)
     await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-down.png')
     await pg.evaluate("(y)=>window.scrollTo(0, y)", need - 60); await pg.wait_for_timeout(450)
@@ -127,6 +135,14 @@ async def run(b, scheme):
     for tab in ['artists', 'albums', 'songs', 'playlists']:
         await pg.evaluate("(t)=>document.querySelector('#stationsGrid > .lib-tabs [data-libtab='+t+']').click()", tab); await pg.wait_for_timeout(1200)
         await scroll_check(pg, T, 'library-' + tab, need=900 if tab != 'playlists' else 600)
+    for tab in ['artists', 'songs']:
+        await pg.evaluate("(t)=>document.querySelector('#stationsGrid > .lib-tabs [data-libtab='+t+']').click()", tab); await pg.wait_for_timeout(1200)
+        await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
+        await pg.evaluate("__t.ev(\"azScrollToLetter('K')\")"); await pg.wait_for_timeout(2600)
+        az = await pg.evaluate("""()=>{ var t = document.querySelector('#stationsGrid > .lib-tabs').getBoundingClientRect(), el = __t.ev("azTargets['K']");
+          var r = el.getBoundingClientRect(); return { tabsBottom: Math.round(t.bottom), letterTop: Math.round(r.top), text: (el.textContent||'').trim().slice(0, 20), y: Math.round(scrollY) }; }""")
+        await pg.screenshot(path=f'{shots}/sticky-{T[1:-1]}-az-{tab}.png')
+        check(az['y'] > 300 and az['tabsBottom'] < az['letterTop'] <= az['tabsBottom'] + 24, f'{T} {tab}: A-Z jump to K lands just below the tabs, not under them {az}')
     await pg.evaluate("document.querySelector('#stationsGrid > .lib-tabs [data-libtab=genres]').click()"); await pg.wait_for_timeout(1200)
     await scroll_check(pg, T, 'library-genres', need=300)
     # ---- Podcasts (Latest: date headings stick under the tabs)

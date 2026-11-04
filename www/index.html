@@ -6505,9 +6505,11 @@
     body.hdr-autohide.hdr-hidden #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs,
     body.hdr-autohide.hdr-hidden #podcastTabs{ top:0; }
     #stationsGrid > .watch-tabs ~ .epg > .epg-head,
-    #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading{ top:calc(60px + var(--stab-h, 34px)); }
+    #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
+    #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(60px + var(--stab-h, 34px)); }
     body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs ~ .epg > .epg-head,
-    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }
+    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
+    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
@@ -40444,12 +40446,15 @@
   // The fixed header floats over the top of the list, so scrolling an element to y=0 would
   // park it underneath one.
   function azHeaderOffset(){
-    var bar = document.querySelector('.sidebar-top');
+    var bar = document.querySelector('.sidebar-top'), off = 10, base = 0;
     if(bar && getComputedStyle(bar).position === 'fixed'){
       var r = bar.getBoundingClientRect();
-      if(r.height > 0) return r.bottom + 8;
+      if(r.height > 0){ off = r.bottom + 8; base = Math.max(0, r.bottom); }
     }
-    return 10;
+    // Build 473: below the sticky tab row (Library, Watch), so the letter is not hidden under it.
+    var t = stationsGrid.querySelector(':scope > .lib-tabs, :scope > .watch-tabs');
+    if(t && t.offsetHeight && getComputedStyle(t).position === 'sticky') off = Math.max(off, base + t.offsetHeight + 8);
+    return off;
   }
 
   function azScrollToLetter(letter){
@@ -51492,7 +51497,11 @@
         bar.style.removeProperty('margin-top'); bar.style.removeProperty('margin-bottom');
         var pv = bar.previousElementSibling;
         if(pv && pv.id === 'podcastTabs' && bar.offsetParent){
+          // Build 473: the tabs are sticky now -- measured where they sit in the page, not where
+          // they are stuck on the screen (that read as a huge gap and grew the page while scrolling).
+          var pvPos = pv.style.position; pv.style.position = 'static';
           var gapA = bar.getBoundingClientRect().top - pv.getBoundingClientRect().bottom;
+          pv.style.position = pvPos;
           var mt = parseFloat(getComputedStyle(bar).marginTop) || 0;
           bar.style.setProperty('margin-top', (mt + 12 - gapA) + 'px', 'important');
           var nx = bar.nextElementSibling; while(nx && !nx.offsetParent) nx = nx.nextElementSibling;
