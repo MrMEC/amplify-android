@@ -195,7 +195,9 @@ async def run(p, theme, width, big):
     await pg.evaluate("window.scrollBy(0, 240)"); await pg.wait_for_timeout(600)
     sk = await pg.evaluate("""(()=>{ var h=document.querySelector('#stationsGrid .epg-head').getBoundingClientRect(), hdr=document.querySelector('.app-header, header'); var hb=hdr?hdr.getBoundingClientRect().bottom:0;
       var first=document.querySelector('#stationsGrid > .epg').getBoundingClientRect(); var tb=document.querySelector('#stationsGrid .video-tabs').getBoundingClientRect(); window.__dbg=[tb.top, document.querySelector('#stationsGrid .epg-row').getBoundingClientRect().top]; return { top: Math.round(h.top), hdr: Math.round(hb), firstTop: Math.round(first.top), y: Math.round(scrollY) }; })()""")
-    check(sk['firstTop'] < sk['top'] and (abs(sk['top']) <= 1 or abs(sk['top'] - sk['hdr']) <= 1), f'{T} the time row sticks at the top while the rows scroll under it {sk}')
+    # build 473 (Mark): the Watch tabs are sticky; the time row sticks right under them (6px backdrop)
+    tbb = await pg.evaluate("Math.round(document.querySelector('#stationsGrid > .watch-tabs').getBoundingClientRect().bottom)")
+    check(sk['firstTop'] < sk['top'] and abs(sk['top'] - (tbb + 6)) <= 1, f'{T} the time row sticks right under the sticky tabs while the rows scroll under it {sk} tabs bottom {tbb}')
     await pg.evaluate("document.querySelector('#stationsGrid .epg-scroll').scrollLeft = 300"); await pg.wait_for_timeout(300)
     sl = await pg.evaluate("document.querySelector('#stationsGrid .epg-head-track').scrollLeft")
     check(abs(sl - 300) <= 1, f'{T} the times follow the grid sideways ({sl})')
