@@ -72,6 +72,10 @@ MEASURE = """(sel2)=>{ var t = document.querySelector('#stationsGrid > .lib-tabs
     hidden: document.body.classList.contains('hdr-hidden'), bg: getComputedStyle(t).backgroundColor, pos: getComputedStyle(t).position, stuck: t.classList.contains('stab-stuck'),
     left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, sw: document.documentElement.scrollWidth };
   var hdr = document.querySelector('.sidebar-top'); o.hdrBottom = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : null;
+  var L = document.getElementById('hdrPageLabel'), lr = L.getBoundingClientRect(), H = document.getElementById('stationsHeading'), hr = H.getBoundingClientRect();
+  var tr = function(e){ var g = document.createRange(); g.selectNodeContents(e); var b = g.getBoundingClientRect(); return { left: Math.round(b.left), top: Math.round(b.top), w: Math.round(b.width) }; };
+  o.lab = { op: getComputedStyle(L).opacity, text: L.textContent, fs: getComputedStyle(L).fontSize, color: getComputedStyle(L).color, box: tr(L), bottom: Math.round(lr.bottom) };
+  o.head = { text: H.textContent.trim(), fs: getComputedStyle(H).fontSize, color: getComputedStyle(H).color, box: tr(H) };
   // what is visible right under the tab row (the topmost thing, at the middle of the screen width)
   var x = innerWidth / 2, below = document.elementFromPoint(x, r.bottom + 2);
   var above = document.elementFromPoint(40, Math.max(1, r.top - 20)); o.aboveIsTabs = !!(above && (above === t || t.contains(above)));
@@ -88,6 +92,7 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
         check(False, f'{T} {name}: page long enough to scroll ({maxy})'); return
     await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(350)
     top0 = await pg.evaluate(MEASURE, sel2)
+    await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-rest.png')
     for y in (20, 50):
         await pg.evaluate("(y)=>window.scrollTo(0, y)", y); await pg.wait_for_timeout(350)
         await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-y{y}.png')
@@ -109,8 +114,14 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
     print(T, name, 'start', top0, '\n   down', down, '\n   up', up)
     check(down and down['hidden'] and abs(down['top'] - 8) <= 1 and down['stuck'], f'{T} {name}: scrolled down, header away -> tabs 8px from the top of the screen, with their backdrop ({down and down["top"]}, {down and down["stuck"]})')
     check(not top0['stuck'], f'{T} {name}: at rest no backdrop (the heading above stays visible)')
+    check(top0['lab']['op'] == '0', f'{T} {name}: at rest the header label is hidden (the heading itself shows) {top0["lab"]["op"]}')
+    check(down['lab']['bottom'] <= 0, f'{T} {name}: header away -> the label goes with it {down["lab"]["bottom"]}')
     check(up and not up['hidden'] and up['stuck'] and abs(up['top'] - up['hdrBottom']) <= 2 if up and up['hdrBottom'] is not None else False,
           f'{T} {name}: header back -> tabs right under it ({up and up["top"]} vs header {up and up["hdrBottom"]})')
+    L, H = up['lab'], top0['head']
+    check(L['op'] == '1' and L['text'] == H['text'] and H['text'] in ('Library', 'Podcasts', 'Watch'), f'{T} {name}: header back -> "{H["text"]}" fades in top left ({L["op"]}, {L["text"]!r})')
+    check(abs(L['box']['left'] - H['box']['left']) <= 1 and abs(L['box']['top'] - H['box']['top']) <= 1 and L['fs'] == H['fs'] and L['color'] == H['color'] and abs(L['box']['w'] - H['box']['w']) <= 1,
+          f'{T} {name}: exactly where, and as, the heading sits at the top of the page {L["box"]} {L["fs"]} vs {H["box"]} {H["fs"]}')
     check(up and up['bg'] not in ('rgba(0, 0, 0, 0)', 'transparent'), f'{T} {name}: tabs on the page colour so rows pass cleanly under ({up and up["bg"]})')
     check(up and up['left'] <= 0 and up['right'] >= up['vw'] and up['sw'] <= up['vw'], f'{T} {name}: edge to edge, no sideways scroll')
     if sel2:
