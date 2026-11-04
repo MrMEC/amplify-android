@@ -47131,7 +47131,9 @@
   function saveGenrePrefs(){ try{ localStorage.setItem(GENRE_PREF_KEY, JSON.stringify(genrePrefs)); }catch(e){} }
   function genrePref(tag){ var k = String(tag).toLowerCase(); return genrePrefs[k] || (genrePrefs[k] = { order: [], hidden: [] }); }
   // which: 'radio' for the Artist radio row (build 449), kept apart from the stations' own order.
-  function genrePrefKeys(which){ return which === 'radio' ? ['radioOrder', 'radioHidden'] : ['order', 'hidden']; }
+  // 'park' for the Disney page's Park radio row (build 468), kept apart in the same way.
+  function genrePrefKeys(which){ return which === 'radio' ? ['radioOrder', 'radioHidden'] : which === 'park' ? ['parkOrder', 'parkHidden'] : ['order', 'hidden']; }
+  function genreShown(g, which){ return which === 'radio' ? (g.radioShown || []) : which === 'park' ? (g.parkShown || []) : (g.stationsShown || g.stations); }
   function applyGenrePrefs(tag, list, which){
     var p = genrePrefs[String(tag).toLowerCase()];
     if(!p) return list;
@@ -47148,7 +47150,7 @@
     var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y);
   }
   function genreMoveStation(g, st, how, which){
-    var keys = (which === 'radio' ? (g.radioShown || []) : (g.stationsShown || g.stations)).map(favKey), k = favKey(st), i = keys.indexOf(k);
+    var keys = genreShown(g, which).map(favKey), k = favKey(st), i = keys.indexOf(k);
     if(i < 0) return;
     if(how === 'top'){ keys.splice(i, 1); keys.unshift(k); }
     else if(how === 'up' && i > 0){ keys[i] = keys[i - 1]; keys[i - 1] = k; }
@@ -47169,6 +47171,7 @@
   function genreRestoreStations(g){
     genrePref(g.tag).hidden = [];
     genrePref(g.tag).radioHidden = [];
+    genrePref(g.tag).parkHidden = [];
     saveGenrePrefs();
     genreRefresh(g);
   }
@@ -47180,7 +47183,7 @@
     var g = genrePage, st = tile && tile._genreSt, which = tile && tile._genreWhich;
     if(!g || !st) return;
     closeGenreStMenu();
-    var keys = (which === 'radio' ? (g.radioShown || []) : (g.stationsShown || g.stations)).map(favKey), i = keys.indexOf(favKey(st));
+    var keys = genreShown(g, which).map(favKey), i = keys.indexOf(favKey(st));
     if(i < 0) return;
     var m = document.createElement('div');
     m.className = 'np-menu row-menu open';
@@ -47280,8 +47283,11 @@
     if(radioOn) (g.allArtistRadio || []).forEach(function(st){ inRadio[st.urlToResolve] = 1; });
     var radio = g.radioShown = radioOn ? (g.artistRadio || []).filter(function(st){ return !isBlacklisted(st); }) : [];
     // Build 452: the listener's own park radio has its row, so it is not repeated among the stations.
-    var park = g.parkShown = g.tag.toLowerCase() === 'disney' ? parkRadioStations() : [];
-    park.forEach(function(st){ inRadio[st.urlToResolve] = 1; });
+    // Build 468: long-press reorders or removes them like every other station row; one removed
+    // from Park radio stays out of the station lists too.
+    var allPark = g.allPark = g.tag.toLowerCase() === 'disney' ? parkRadioStations() : [];
+    allPark.forEach(function(st){ inRadio[st.urlToResolve] = 1; });
+    var park = g.parkShown = applyGenrePrefs(g.tag, allPark, 'park');
     var stations = g.stationsShown = g.stations.filter(function(st){ return !inRadio[st.urlToResolve]; });
     var hero = document.createElement('div');
     hero.className = 'gp-hero';
@@ -47347,7 +47353,7 @@
       head('Park radio');
       var krow = document.createElement('div');
       krow.className = 'gp-row gp-park-radio';
-      park.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); krow.appendChild(t); });
+      park.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'park'; krow.appendChild(t); });
       krow._ctxList = park;
       stationsGrid.appendChild(krow);
     }
@@ -47416,6 +47422,7 @@
     var gp = genrePrefs[String(g.tag).toLowerCase()];
     var hiddenNow = gp && g.allStations ? g.allStations.filter(function(st){ return (gp.hidden || []).indexOf(favKey(st)) >= 0; }).length : 0;
     if(gp && g.allArtistRadio && libArtistRadioOn()) hiddenNow += g.allArtistRadio.filter(function(st){ return (gp.radioHidden || []).indexOf(favKey(st)) >= 0; }).length;
+    if(gp && g.allPark) hiddenNow += g.allPark.filter(function(st){ return (gp.parkHidden || []).indexOf(favKey(st)) >= 0; }).length;
     if(hiddenNow){
       var restore = document.createElement('button');
       restore.type = 'button'; restore.className = 'gp-more';
@@ -47428,7 +47435,7 @@
       spin.className = 'loading-state genre-loading';
       spin.innerHTML = '<div class="spinner"></div>';
       stationsGrid.appendChild(spin);
-    } else if(!stations.length && !radio.length && !songs.length && !(g.podcasts && g.podcasts.length) && !(g.movies && g.movies.length) && !(g.shows && g.shows.length)){
+    } else if(!stations.length && !radio.length && !park.length && !songs.length && !(g.podcasts && g.podcasts.length) && !(g.movies && g.movies.length) && !(g.shows && g.shows.length)){
       var empty = document.createElement('div');
       empty.className = 'empty-state';
       empty.textContent = 'No songs or stations found for ' + g.tag + '.';
