@@ -69,11 +69,12 @@ MEASURE = """(sel2)=>{ var t = document.querySelector('#stationsGrid > .lib-tabs
     (document.getElementById('podcastTabs').offsetParent ? document.getElementById('podcastTabs') : null);
   if(!t) return null;
   var r = t.getBoundingClientRect(), o = { top: Math.round(r.top), bottom: Math.round(r.bottom), y: Math.round(scrollY),
-    hidden: document.body.classList.contains('hdr-hidden'), bg: getComputedStyle(t).backgroundColor, pos: getComputedStyle(t).position,
+    hidden: document.body.classList.contains('hdr-hidden'), bg: getComputedStyle(t).backgroundColor, pos: getComputedStyle(t).position, stuck: t.classList.contains('stab-stuck'),
     left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, sw: document.documentElement.scrollWidth };
   var hdr = document.querySelector('.sidebar-top'); o.hdrBottom = hdr ? Math.round(hdr.getBoundingClientRect().bottom) : null;
   // what is visible right under the tab row (the topmost thing, at the middle of the screen width)
   var x = innerWidth / 2, below = document.elementFromPoint(x, r.bottom + 2);
+  var above = document.elementFromPoint(40, Math.max(1, r.top - 20)); o.aboveIsTabs = !!(above && (above === t || t.contains(above)));
   o.belowCls = below ? (below.className && below.className.baseVal === undefined ? String(below.className) : '') : '';
   if(sel2){
     var els = Array.prototype.filter.call(document.querySelectorAll(sel2), function(e){ var b = e.getBoundingClientRect(); return b.height && b.bottom > r.bottom - 1 && b.top < r.bottom + 400; });
@@ -87,6 +88,10 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
         check(False, f'{T} {name}: page long enough to scroll ({maxy})'); return
     await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(350)
     top0 = await pg.evaluate(MEASURE, sel2)
+    for y in (20, 50):
+        await pg.evaluate("(y)=>window.scrollTo(0, y)", y); await pg.wait_for_timeout(350)
+        await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-y{y}.png')
+    await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(350)
     jumps = []
     for y in range(100, need + 1, 100):
         await pg.evaluate("(y)=>window.scrollTo(0, y)", y); await pg.wait_for_timeout(60)
@@ -102,16 +107,18 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
     up = await pg.evaluate(MEASURE, sel2)
     await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-up.png')
     print(T, name, 'start', top0, '\n   down', down, '\n   up', up)
-    check(down and down['hidden'] and abs(down['top']) <= 1, f'{T} {name}: scrolled down, header away -> tabs at the top of the screen ({down and down["top"]})')
-    check(up and not up['hidden'] and abs(up['top'] - up['hdrBottom']) <= 2 if up and up['hdrBottom'] is not None else False,
+    check(down and down['hidden'] and abs(down['top'] - 8) <= 1 and down['stuck'], f'{T} {name}: scrolled down, header away -> tabs 8px from the top of the screen, with their backdrop ({down and down["top"]}, {down and down["stuck"]})')
+    check(not top0['stuck'], f'{T} {name}: at rest no backdrop (the heading above stays visible)')
+    check(up and not up['hidden'] and up['stuck'] and abs(up['top'] - up['hdrBottom']) <= 2 if up and up['hdrBottom'] is not None else False,
           f'{T} {name}: header back -> tabs right under it ({up and up["top"]} vs header {up and up["hdrBottom"]})')
     check(up and up['bg'] not in ('rgba(0, 0, 0, 0)', 'transparent'), f'{T} {name}: tabs on the page colour so rows pass cleanly under ({up and up["bg"]})')
     check(up and up['left'] <= 0 and up['right'] >= up['vw'] and up['sw'] <= up['vw'], f'{T} {name}: edge to edge, no sideways scroll')
     if sel2:
-        check(down.get('second') and abs(down['second']['top'] - down['bottom']) <= 2, f'{T} {name}: {sel2} sticks right under the tabs (header away) {down.get("second")} vs {down["bottom"]}')
-        check(up.get('second') and abs(up['second']['top'] - up['bottom']) <= 2, f'{T} {name}: {sel2} sticks right under the tabs (header back) {up.get("second")} vs {up["bottom"]}')
+        check(down.get('second') and abs(down['second']['top'] - down['bottom'] - 6) <= 2, f'{T} {name}: {sel2} sticks right under the tabs (header away) {down.get("second")} vs {down["bottom"]}')
+        check(up.get('second') and abs(up['second']['top'] - up['bottom'] - 6) <= 2, f'{T} {name}: {sel2} sticks right under the tabs (header back) {up.get("second")} vs {up["bottom"]}')
     await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(400)
     back = await pg.evaluate(MEASURE, sel2)
+    check(back and not back['stuck'], f'{T} {name}: back at the top, the backdrop is gone')
     check(back and abs(back['top'] - top0['top']) <= 1, f'{T} {name}: back at the top, the tabs sit where they always did ({top0["top"]} -> {back and back["top"]})')
 
 async def run(b, scheme):
@@ -142,15 +149,15 @@ async def run(b, scheme):
         az = await pg.evaluate("""()=>{ var t = document.querySelector('#stationsGrid > .lib-tabs').getBoundingClientRect(), el = __t.ev("azTargets['K']");
           var r = el.getBoundingClientRect(); return { tabsBottom: Math.round(t.bottom), letterTop: Math.round(r.top), text: (el.textContent||'').trim().slice(0, 20), y: Math.round(scrollY) }; }""")
         await pg.screenshot(path=f'{shots}/sticky-{T[1:-1]}-az-{tab}.png')
-        check(az['y'] > 300 and az['tabsBottom'] < az['letterTop'] <= az['tabsBottom'] + 24, f'{T} {tab}: A-Z jump to K lands just below the tabs, not under them {az}')
+        check(az['y'] > 300 and az['tabsBottom'] + 6 <= az['letterTop'] <= az['tabsBottom'] + 24, f'{T} {tab}: A-Z jump to K lands just below the tabs, not under them {az}')
     await pg.evaluate("document.querySelector('#stationsGrid > .lib-tabs [data-libtab=genres]').click()"); await pg.wait_for_timeout(1200)
     await scroll_check(pg, T, 'library-genres', need=300)
     # ---- Podcasts (Latest: date headings stick under the tabs)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=podcasts]').click()"); await pg.wait_for_timeout(1500)
     await pg.evaluate("(()=>{ var b = Array.prototype.filter.call(document.querySelectorAll('#podcastTabs .home-tab'), x => /Latest/.test(x.textContent))[0]; if(b) b.click(); })()"); await pg.wait_for_timeout(1200)
     await scroll_check(pg, T, 'podcasts-latest', sel2='#stationsGrid > .podcast-date-heading', need=1200)
-    await pg.evaluate("(()=>{ var b = Array.prototype.filter.call(document.querySelectorAll('#podcastTabs .home-tab'), x => /Following/.test(x.textContent))[0]; if(b) b.click(); })()"); await pg.wait_for_timeout(1200)
-    await scroll_check(pg, T, 'podcasts-following', need=900)
+    await pg.evaluate("(()=>{ var b = Array.prototype.filter.call(document.querySelectorAll('#podcastTabs .home-tab'), x => /A-Z|Following/.test(x.textContent))[0]; if(b) b.click(); })()"); await pg.wait_for_timeout(1200)
+    await scroll_check(pg, T, 'podcasts-az', need=900)
     # ---- Watch
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
     async def vtab(v):

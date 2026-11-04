@@ -6498,18 +6498,26 @@
        slides away (like Search's tabs). Podcasts' date headings and Live TV's time bar stick
        right under the tabs. Nothing about their size or spacing changes; --stab-h is the tab
        row's height, set when the row is drawn (syncStickyTabs). */
+    /* Once stuck (.stab-stuck, see syncStickyTabs) the row gets a backdrop on the page colour: it
+       fills the space above it (behind the menu button) and 6px below, so rows never show around
+       the tabs. Drawn as shadows -- the row scrolls sideways, which would clip anything inside it --
+       so its size and spacing on the page stay exactly as they were. */
     #stationsGrid > .lib-tabs, #stationsGrid > .watch-tabs, #podcastTabs{
       position:sticky; top:60px; z-index:20; background:var(--main-bg);
-      transition:top .28s cubic-bezier(.4,0,.2,1);
+      box-shadow:0 -30px 0 transparent, 0 -45px 0 transparent, 0 -60px 0 transparent, 0 6px 0 transparent;
+      transition:top .28s cubic-bezier(.4,0,.2,1), box-shadow .18s ease;
+    }
+    #stationsGrid > .lib-tabs.stab-stuck, #stationsGrid > .watch-tabs.stab-stuck, #podcastTabs.stab-stuck{
+      box-shadow:0 -30px 0 var(--main-bg), 0 -45px 0 var(--main-bg), 0 -60px 0 var(--main-bg), 0 6px 0 var(--main-bg);
     }
     body.hdr-autohide.hdr-hidden #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs,
-    body.hdr-autohide.hdr-hidden #podcastTabs{ top:0; }
+    body.hdr-autohide.hdr-hidden #podcastTabs{ top:8px; }
     #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
-    #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(60px + var(--stab-h, 34px)); }
+    #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(66px + var(--stab-h, 34px)); }
     body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
-    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }
+    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(14px + var(--stab-h, 34px)); }
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
@@ -28675,8 +28683,22 @@
   }
   // Build 473: the height of the sticky tab row, so what sticks under it (Podcasts' dates, Live
   // TV's times) sits right below it at any text size. One read when the row is drawn.
+  // It also watches whether the row is stuck (above its resting place under the header), which
+  // turns on its backdrop: an observer, so nothing runs while scrolling.
+  var stabObserver = null;
   function syncStickyTabs(row){
-    try{ var h = row && row.offsetHeight; if(h) document.documentElement.style.setProperty('--stab-h', h + 'px'); }catch(e){}
+    try{
+      var h = row && row.offsetHeight;
+      if(!h) return;
+      document.documentElement.style.setProperty('--stab-h', h + 'px');
+      if(!('IntersectionObserver' in window)) return;
+      if(!stabObserver) stabObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){ en.target.classList.toggle('stab-stuck', en.boundingClientRect.height > 0 && en.boundingClientRect.top < 60.5); });
+      }, { rootMargin: '-61px 0px 0px 0px', threshold: [0, 0.25, 0.5, 0.75, 0.99, 1] });
+      stabObserver.disconnect();
+      row.classList.toggle('stab-stuck', row.getBoundingClientRect().top < 61);
+      stabObserver.observe(row);
+    }catch(e){}
   }
   // A tab row that scrolls sideways shows its open tab whole (build 180).
   function revealActiveTab(row){
@@ -40451,9 +40473,10 @@
       var r = bar.getBoundingClientRect();
       if(r.height > 0){ off = r.bottom + 8; base = Math.max(0, r.bottom); }
     }
-    // Build 473: below the sticky tab row (Library, Watch), so the letter is not hidden under it.
+    // Build 473: below the sticky tab row (Library, Watch) and its 6px backdrop, so the letter is not
+    // hidden under it. The row sits under the header, or 8px from the top once the header is away.
     var t = stationsGrid.querySelector(':scope > .lib-tabs, :scope > .watch-tabs');
-    if(t && t.offsetHeight && getComputedStyle(t).position === 'sticky') off = Math.max(off, base + t.offsetHeight + 8);
+    if(t && t.offsetHeight && getComputedStyle(t).position === 'sticky') off = Math.max(off, (base > 0 ? base : 8) + t.offsetHeight + 6 + 8);
     return off;
   }
 
