@@ -6493,6 +6493,21 @@
     /* Things that stay at the top while their list scrolls now stick to the top of the
        screen itself: there is no header bar for them to sit under. */
     .tile-grid > .podcast-date-heading, .tile-grid > .epg > .epg-head{ top:0; }
+    /* Build 473 (Mark): the tabs of Library, Podcasts and Watch stay at the top while the page
+       scrolls -- under the menu button while the header shows, at the top of the screen once it
+       slides away (like Search's tabs). Podcasts' date headings and Live TV's time bar stick
+       right under the tabs. Nothing about their size or spacing changes; --stab-h is the tab
+       row's height, set when the row is drawn (syncStickyTabs). */
+    #stationsGrid > .lib-tabs, #stationsGrid > .watch-tabs, #podcastTabs{
+      position:sticky; top:60px; z-index:20; background:var(--main-bg);
+      transition:top .28s cubic-bezier(.4,0,.2,1);
+    }
+    body.hdr-autohide.hdr-hidden #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs,
+    body.hdr-autohide.hdr-hidden #podcastTabs{ top:0; }
+    #stationsGrid > .watch-tabs ~ .epg > .epg-head,
+    #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading{ top:calc(60px + var(--stab-h, 34px)); }
+    body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs ~ .epg > .epg-head,
+    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
@@ -22352,6 +22367,7 @@
       podcastTabs.appendChild(btn);
     });
     revealActiveTab(podcastTabs);
+    syncStickyTabs(podcastTabs);
   }
 
   // Builds whichever tab is active, shared by openPodcastsHome() and the tab row's own click
@@ -28653,6 +28669,12 @@
     });
     stationsGrid.appendChild(tabs);
     revealActiveTab(tabs);
+    syncStickyTabs(tabs);
+  }
+  // Build 473: the height of the sticky tab row, so what sticks under it (Podcasts' dates, Live
+  // TV's times) sits right below it at any text size. One read when the row is drawn.
+  function syncStickyTabs(row){
+    try{ var h = row && row.offsetHeight; if(h) document.documentElement.style.setProperty('--stab-h', h + 'px'); }catch(e){}
   }
   // A tab row that scrolls sideways shows its open tab whole (build 180).
   function revealActiveTab(row){
@@ -30883,6 +30905,7 @@
       bar.appendChild(b);
     });
     stationsGrid.insertBefore(bar, stationsGrid.firstChild);
+    syncStickyTabs(bar);
     // Every tab gets the same space under the tabs and the filter, whatever its grid's own row gap.
     stationsGrid.style.setProperty('--lib-rg', (parseFloat(getComputedStyle(stationsGrid).rowGap) || 0) + 'px');
     ensureToolbar();
