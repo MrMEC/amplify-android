@@ -63,7 +63,7 @@ async def main():
               top: Array.prototype.map.call(document.querySelectorAll('.gp-row:not(.gp-park-radio) .tile-name'), x => x.textContent),
               noX: document.documentElement.scrollWidth <= window.innerWidth })""")
             await pg.screenshot(path=f'{SHOTS}/park-{scheme}.png')
-            check(info['heads'][0] == 'Park radio', f"{scheme}: Park radio is the first section {info['heads']}")
+            check(info['heads'][:2] == ['Top stations', 'Park radio'], f"{scheme}: Park radio sits right below Top stations {info['heads']}")
             check(info['park'] == ['DMagicWorld', 'Sorcerer Radio', "Sorcerer Radio: Loop'd", 'DParkRadio Main'], f"{scheme}: park stations only, no duplicates {info['park']}")
             check('Smooth Jazz' not in info['park'] and 'Chill FM' not in info['park'], f'{scheme}: other stations stay out')
             check(info['noX'], f'{scheme}: no sideways page scroll')

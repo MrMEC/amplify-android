@@ -47349,14 +47349,6 @@
     }
     function head(text){ var h = document.createElement('h2'); h.className = 'gp-head grid-section-label'; h.textContent = text; stationsGrid.appendChild(h); }
     var TOP = 10;
-    if(park.length){
-      head('Park radio');
-      var krow = document.createElement('div');
-      krow.className = 'gp-row gp-park-radio';
-      park.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'park'; krow.appendChild(t); });
-      krow._ctxList = park;
-      stationsGrid.appendChild(krow);
-    }
     if(stations.length){
       head('Top stations');
       var row = document.createElement('div');
@@ -47364,6 +47356,15 @@
       stations.slice(0, TOP).forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; row.appendChild(t); });
       row._ctxList = stations.slice(0, TOP);
       stationsGrid.appendChild(row);
+    }
+    // Build 470 (Mark): Park radio sits right below Top stations.
+    if(park.length){
+      head('Park radio');
+      var krow = document.createElement('div');
+      krow.className = 'gp-row gp-park-radio';
+      park.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'park'; krow.appendChild(t); });
+      krow._ctxList = park;
+      stationsGrid.appendChild(krow);
     }
     // Build 447: artist radio.
     if(radio.length){
