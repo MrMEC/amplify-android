@@ -51149,6 +51149,29 @@
         lists.recentStations = compact(recentStations.filter(function(s){ return !isLocalTrack(s); })
           .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : isPlaylistRadio(s) ? carPlaylistRadio(s) : isCustomStation(s) ? carCustomStation(s) : carStation(s); }));
         lists.topStations = compact((carNet.top || []).map(carStation));
+        // Build 494 (Mark: covers set in the Disney genre never reached the car): the genre lists the
+        // car looks up itself (a tag search, keyed by the directory's station id) take the phone's
+        // own pictures for stations from this map -- by station key and by stream address, so a
+        // station kept as a stream of your own still finds the directory's copy of it.
+        var stationArt = {};
+        try{
+          var cmap = loadCustomArtMap();
+          Object.keys(cmap).forEach(function(k){
+            if(/^(local|artist|album|livech|playlistart|foryouart|video|podcast|vshow|opened|artistradio|plex|pluto|ia|mix)\b/i.test(k)) return;
+            var a = carImage(k, cmap[k]);
+            if(a) stationArt[k] = a;
+          });
+          [].concat(favorites || [], recentStations || [], parkRadioStations(), (stationPlaylists || []).reduce(function(all, pl){ return all.concat(pl.stations || []); }, []))
+            .forEach(function(st){
+              if(!st || trackType(st) !== 'stream') return;
+              var a = carCustomArt(favKey(st));
+              if(!a) return;
+              [st.urlToResolve, st.url, streamUrlFor(st)].forEach(function(u){ if(u) stationArt[String(u)] = a; });
+            });
+        }catch(e){}
+        // Build 494: the Disney genre's Park radio row (in the phone's order, without the ones taken
+        // out), and every genre's station order and removals, so the car's genre pages match.
+        try{ lists.parkRadio = compact(applyGenrePrefs('disney', parkRadioStations(), 'park').map(carStation)); }catch(e){ lists.parkRadio = []; }
         lists['continue'] = compact((r[1] || []).map(function(rec){ return carEpisode(podcastTrackFromProgress(rec), prog); }));
         // Build 493 (Mark): the car's Listen > Continue Listening is everything played, newest first --
         // songs, stations and episodes not yet finished (Recent Songs folded into it). Episodes part-way
@@ -51186,6 +51209,8 @@
           genres: genreOrder.slice(),
           blacklist: blacklist.slice(),
           apiHosts: API_HOSTS.slice(),
+          stationArt: stationArt,
+          genrePrefs: genrePrefs,
           lists: lists
         };
       });

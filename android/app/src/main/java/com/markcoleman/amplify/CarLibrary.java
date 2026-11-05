@@ -276,7 +276,7 @@ final class CarLibrary {
         "tab:library",
         new String[] {"lib:artists", "lib:albums", "lib:songs", "lib:playlists", "lib:genres"});
     linkedHashMap2.put(
-        "tab:stations", new String[] {"st:top", "home:nearme", "st:foryou", "st:recent"});
+        "tab:stations", new String[] {"st:foryou", "st:recent", "home:nearme", "st:top"});
     linkedHashMap3.put("home:favorites", "favorites");
     linkedHashMap3.put("home:topartists", "topArtists");
     linkedHashMap3.put("home:madeforyou", "madeForYou");
@@ -1016,11 +1016,74 @@ final class CarLibrary {
         }
       }
     }
-    Iterator<JSONObject> it = stationSearch("tag", str.toLowerCase(Locale.ROOT), 60).iterator();
-    while (it.hasNext()) {
-      arrayList.add(withGroup(it.next(), "Stations"));
+    // Build 494 (Mark): the genre's stations in the order set on the phone's genre page, without
+    // the ones taken out there; the Disney genre also lists Park radio (after the stations, as on
+    // the phone), and a park station isn't repeated among the others.
+    String tag = str.toLowerCase(Locale.ROOT).trim();
+    List<JSONObject> park = Collections.emptyList();
+    JSONObject prefs = null;
+    synchronized (this) {
+      JSONObject gp = this.catalog.optJSONObject("genrePrefs");
+      if (gp != null) prefs = gp.optJSONObject(tag);
+      if ("disney".equals(tag)) park = arrayOf(catalogLists(), "parkRadio");
+    }
+    Set<String> parkUrls = new HashSet<>();
+    for (JSONObject p : park) parkUrls.add(p.optString("url"));
+    List<JSONObject> stations = new ArrayList<>();
+    for (JSONObject st : stationSearch("tag", tag, 60)) {
+      if (!parkUrls.contains(st.optString("url"))) stations.add(st);
+    }
+    for (JSONObject st : applyGenrePrefs(stations, prefs)) {
+      arrayList.add(withGroup(st, "Stations"));
+    }
+    for (JSONObject p : park) {
+      arrayList.add(withGroup(p, "Park radio"));
     }
     return arrayList;
+  }
+
+  /** The phone's genre-page order ("order": keys first, in that order) and removals ("hidden"). */
+  private static List<JSONObject> applyGenrePrefs(List<JSONObject> list, JSONObject prefs) {
+    if (prefs == null) return list;
+    Set<String> hidden = new HashSet<>();
+    JSONArray h = prefs.optJSONArray("hidden");
+    if (h != null) for (int i = 0; i < h.length(); i++) hidden.add(h.optString(i));
+    LinkedHashMap<String, JSONObject> byKey = new LinkedHashMap<>();
+    for (JSONObject st : list) {
+      String k = st.optString("k");
+      if (!hidden.contains(k) && !byKey.containsKey(k)) byKey.put(k, st);
+    }
+    List<JSONObject> out = new ArrayList<>();
+    Set<String> used = new HashSet<>();
+    JSONArray o = prefs.optJSONArray("order");
+    if (o != null) {
+      for (int i = 0; i < o.length(); i++) {
+        String k = o.optString(i);
+        JSONObject st = byKey.get(k);
+        if (st != null && used.add(k)) out.add(st);
+      }
+    }
+    for (Map.Entry<String, JSONObject> e : byKey.entrySet()) {
+      if (used.add(e.getKey())) out.add(e.getValue());
+    }
+    return out;
+  }
+
+  /**
+   * Build 494 (Mark): a station's picture as the phone shows it -- the cover set on the phone wins
+   * (looked up by station key, then by stream address), then the item's own art.
+   */
+  private String stationArtFor(JSONObject j) {
+    JSONObject m;
+    synchronized (this) {
+      m = this.catalog.optJSONObject("stationArt");
+    }
+    if (m != null) {
+      String a = m.optString(j.optString("k"), "");
+      if (a.isEmpty()) a = m.optString(j.optString("url"), "");
+      if (!a.isEmpty()) return a;
+    }
+    return j.optString("art");
   }
 
   private MediaItem toBrowseItem(String str, int i, JSONObject jSONObject) throws JSONException {
@@ -1123,7 +1186,9 @@ final class CarLibrary {
                     .setTitle(jSONObject.optString("title", zEquals ? "Episode" : "Station"))
                     .setArtist(emptyToNull(jSONObject.optString("sub")))
                     .setStation(zEquals ? null : jSONObject.optString("title"))
-                    .setArtworkUri(ArtProvider.uriFor(jSONObject.optString("art")))
+                    .setArtworkUri(
+                        ArtProvider.uriFor(
+                            zEquals ? jSONObject.optString("art") : stationArtFor(jSONObject)))
                     .setIsPlayable(true)
                     .setIsBrowsable(false)
                     .setMediaType(Integer.valueOf(zEquals ? 3 : 4))
