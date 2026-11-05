@@ -1172,6 +1172,18 @@
     .tile-grid > .podcast-date-heading + .podcast-date-row{ margin-top:-14px; }
     .tile-grid > .podcast-date-row + .podcast-date-row{ margin-top:-12px; }
   }
+  /* Build 479 (Mark): 5px more between the rows on every Podcasts tab -- episode rows (Latest,
+     your categories, Continue) and the rows of show covers (A-Z, Popular). The A-Z letters keep
+     their own spacing: the 5px added to the grid's gap is taken back around them. */
+  .tile-grid > .podcast-date-row + .podcast-date-row{ margin-top:-25px; }
+  #stationsGrid > .pc-continue-row + .pc-continue-row{ margin-top:5px; }
+  #stationsGrid.pc-shows-grid{ row-gap:45px; }
+  #stationsGrid.pc-shows-grid > .song-letter{ margin-top:17px; margin-bottom:1px; }
+  #stationsGrid.pc-shows-grid > .song-letter:first-child{ margin-top:2px; }
+  @media (max-width: 900px){
+    .tile-grid > .podcast-date-row + .podcast-date-row{ margin-top:-7px; }
+    #stationsGrid.pc-shows-grid{ row-gap:29px; }
+  }
   /* The Podcasts page's Continue Listening section (renderPodcastsGrid): a handful of
      in-progress episodes read better as a sideways row to skim through than as another block
      of the grid to scroll past, so it's a flex row of its own rather than more grid tiles --
@@ -6605,6 +6617,9 @@
       display:flex; font-style:normal; width:36px; height:36px; border-radius:50%; overflow:hidden; flex-shrink:0; align-items:center; justify-content:center;
       background:color-mix(in srgb, var(--accent) 28%, var(--panel-2)); color:var(--text); font-size:15px; font-weight:800; line-height:1;
       box-shadow:0 1px 4px rgba(0,0,0,.35);
+      /* Build 479 (Mark): a thin ring in the theme's primary colour, inside the 36px so the
+         picture keeps its size and its place on the right margin. */
+      box-sizing:border-box; border:2px solid var(--accent);
     }
     .hb-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
     .hb-avatar svg{ width:58%; height:58%; }
@@ -10022,6 +10037,7 @@
     stationsGrid.innerHTML = '';
     stationsGrid.classList.remove('grid-songs');
     stationsGrid.classList.remove('grid-album');
+    stationsGrid.classList.remove('pc-shows-grid');   // build 479
     stationsGrid.classList.remove('guide-grid');
     stationsGrid.classList.remove('mv-grid');
     stationsGrid.classList.remove('grid-artists');
@@ -12329,7 +12345,7 @@
       name = stripExclusively(fav.name || '');
       renderStationArt(art, fav);
       b.onclick = function(){ closeDrawer(); playEntity(fav); };
-      if(currentStation && favKey(currentStation) === favKey(fav)) b.classList.add('playing');
+      if(isOnAirItem(fav)) b.classList.add('playing');
     }
     b.title = name;
     b.setAttribute('aria-label', name);
@@ -18019,7 +18035,7 @@
       pendingPlay = null;
       recordArtistPlay(item);
       // A station keeps counting while it plays on (anything over carries to the next one).
-      if(wasStation && currentStation && favKey(currentStation) === favKey(item)){
+      if(wasStation && isOnAirItem(item)){
         pendingPlay = { item: item, key: favKey(item), need: STATION_PLAY_EVERY_S, heard: 0, t: now, station: true };
         if(extra >= STATION_PLAY_EVERY_S){ pendingPlay.heard = extra; playCountTick(); }
         else pendingPlay.heard = extra;
@@ -19109,7 +19125,7 @@
     attemptInProgress = true;
     updatePlayerMeta(item, 'Loading…');
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
-      el.classList.toggle('playing', el.dataset.key === favKey(item));
+      el.classList.toggle('playing', isOnAirKey(el.dataset.key, item));
     });
     function stillWanted(){ return currentStation === item; }
     function attempt(fresh){
@@ -19732,7 +19748,7 @@
     row.className = 'tile song-row mfy-row near-row';
     row.dataset.key = favKey(st);
     row._ctxItem = st;
-    if(currentStation && favKey(currentStation) === favKey(st)) row.classList.add('playing');
+    if(isOnAirItem(st)) row.classList.add('playing');
     var art = document.createElement('div');
     art.className = 'tile-art song-row-art';
     renderStationArt(art, st);
@@ -20140,7 +20156,7 @@
       t.textContent = stripExclusively(x.item.name || '');
       row.dataset.key = favKey(x.item);
       row._ctxItem = x.item;
-      if(currentStation && favKey(currentStation) === favKey(x.item)) row.classList.add('playing');
+      if(isOnAirItem(x.item)) row.classList.add('playing');
       row.addEventListener('click', function(){ playEntity(x.item); });
     }
     body.appendChild(t); body.appendChild(s2);
@@ -21416,7 +21432,7 @@
     mine.forEach(function(ch){
       var st = channelToStation(ch);
       var t = buildEntityTile({ key: favKey(st), entity: 'channel-home', name: ch.name, artFrom: st, onClick: function(){ playChannel(ch); } });
-      if(currentStation && favKey(currentStation) === favKey(st)) t.classList.add('playing');
+      if(isOnAirItem(st)) t.classList.add('playing');
       channelsHomeGrid.appendChild(t);
     });
     channelsHomeSection.dataset.empty = mine.length ? '' : '1';
@@ -22431,6 +22447,7 @@
     // Build 453 (Mark): the count Library's tabs have, here too -- the shows you follow.
     setResultCount(podcastSubs.length, 'show', podcastTab === 'following' ? null : countShowsInRows);
     if(podcastTab === 'following'){
+      stationsGrid.classList.add('pc-shows-grid');   // build 479: 5px more between rows
       // Broken into letters, same as the Songs library view (.song-letter, azLetterFor) --
       // the heading over each run is the alphabet rail's own boundaries made visible on the
       // page, so scanning by eye and jumping with the rail agree with each other.
@@ -22571,6 +22588,7 @@
       return;
     }
     setResultCount(list.length, 'show');
+    stationsGrid.classList.add('pc-shows-grid');   // build 479: 5px more between rows
     list.forEach(function(show){
       stationsGrid.appendChild(buildPopularShowTile(show));
     });
@@ -23483,7 +23501,7 @@
       onClick: function(){ playChannel(ch); }
     });
     tile.classList.add('ch-item');
-    if(currentStation && favKey(currentStation) === favKey(st)) tile.classList.add('playing');
+    if(isOnAirItem(st)) tile.classList.add('playing');
     var sub = tile.querySelector('.tile-sub');
     if(sub && ch.dead) sub.classList.add('ch-dead');
     // Build 240: what's on now and next, for a channel that publishes a schedule.
@@ -24763,7 +24781,7 @@
     row.dataset.chUrl = ch.url;
     if(src) row.dataset.guideKey = src.key;
     var st = channelToStation(ch);
-    var playing = !!(currentStation && favKey(currentStation) === favKey(st));
+    var playing = !!(isOnAirItem(st));
     // the channel: its logo (or name), a heart if it's a favourite
     var cell = document.createElement('button');
     cell.type = 'button';
@@ -25060,7 +25078,7 @@
     desc.hidden = !it.d;
     // Watch Now: what's on now, on a channel that isn't already the one playing.
     var st = channelToStation(ch);
-    var playingIt = !!(currentStation && favKey(currentStation) === favKey(st));
+    var playingIt = !!(isOnAirItem(st));
     document.getElementById('epgInfoWatch').hidden = !(onNow && !playingIt);
     epgInfoOverlay.classList.add('open');
     epgInfoOverlay.querySelector('.epg-info-panel').scrollTop = 0;
@@ -25339,7 +25357,7 @@
     card.className = 'guide-card';
     card.dataset.guideKey = src.key;
     var st = channelToStation(ch);
-    if(currentStation && favKey(currentStation) === favKey(st)) card.classList.add('playing');
+    if(isOnAirItem(st)) card.classList.add('playing');
     var head = document.createElement('button');
     head.type = 'button';
     head.className = 'guide-head';
@@ -28772,7 +28790,7 @@
       renderStationArt(art, cst);
       title = e.ch.name;
       sub = channelRowName(e.ch) || 'Channel';
-      if(currentStation && favKey(currentStation) === favKey(cst)) row.classList.add('playing');
+      if(isOnAirItem(cst)) row.classList.add('playing');
       row.addEventListener('click', function(){ playChannel(e.ch); });
     } else if(e.kind === 'chart'){
       // A Top 100 song watched as a music video: its video still, plays the way the chart does.
@@ -29530,7 +29548,7 @@
     var row = document.createElement('div');
     row.className = 'vep-row mv-row';
     row.dataset.key = favKey(v);
-    if(currentStation && favKey(currentStation) === favKey(v)) row.classList.add('playing');
+    if(isOnAirItem(v)) row.classList.add('playing');
     var th = document.createElement('div');
     th.className = 'vep-thumb';
     row.appendChild(th);
@@ -29810,7 +29828,7 @@
     attemptInProgress = true;
     updatePlayerMeta(t, 'Loading…');
     document.querySelectorAll('.tile, .row-item, .vep-row').forEach(function(el){
-      el.classList.toggle('playing', el.dataset.key === favKey(t));
+      el.classList.toggle('playing', isOnAirKey(el.dataset.key, t));
     });
     function stillWanted(){ return currentStation === t; }
     cancelNextUp();
@@ -35954,7 +35972,7 @@
     attemptInProgress = true;
     updatePlayerMeta(track, 'Loading…');
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
-      el.classList.toggle('playing', el.dataset.key === favKey(track));
+      el.classList.toggle('playing', isOnAirKey(el.dataset.key, track));
     });
 
     // Build 223: a file opened from another app plays from the copy the phone made of it.
@@ -41028,6 +41046,7 @@
     var rec = artistRadioRecord(entry);
     var order = shuffled(songs);
     setQueue(order, order[0], rec.name);
+    setPlayCtx(rec);
     radioCtx = { key: rec.artistKey, label: rec.name };
     recordRecent(rec);
     playStation(order[0]);
@@ -41043,6 +41062,7 @@
     var rec = playlistRadioRecord(pl);
     var order = shuffled(items);
     setQueue(order, order[0], rec.name);
+    setPlayCtx(rec);
     radioCtx = { key: pl.id, label: rec.name, kind: 'playlist' };
     recordRecent(rec);
     playStation(order[0]);
@@ -41072,6 +41092,7 @@
       if(!list.length){ setStatus(cs.label + ' has no stations to play right now.', true); return; }
       var order = shuffled(list);
       setQueue(order, order[0], cs.label);
+      setPlayCtx(customStationRecord(cs));
       radioCtx = null;
       recordRecent(customStationRecord(cs));
       playStation(order[0]);
@@ -41142,6 +41163,17 @@
   function isQueueCurrent(t){
     return !!t && queueIndex >= 0 && !!playQueue[queueIndex] && favKey(playQueue[queueIndex]) === favKey(t);
   }
+  // Build 479 (Mark): a favourite that plays something from inside it -- a playlist's radio, a
+  // custom station, an artist's radio -- counts as playing for as long as its line-up is on, so
+  // its card gets the playing border like a station's. playCtx is the favourite that started the
+  // queue; it lapses as soon as anything else is played (the queue and its label change).
+  var playCtx = null;
+  function setPlayCtx(rec){ playCtx = rec ? { key: favKey(rec), label: queueLabel } : null; }
+  function playCtxKey(){
+    return (playCtx && currentStation && queueLabel === playCtx.label && isQueueCurrent(currentStation)) ? playCtx.key : null;
+  }
+  function isOnAirKey(key, item){ return !!key && !!item && (key === favKey(item) || key === playCtxKey()); }
+  function isOnAirItem(x){ return !!currentStation && !!x && isOnAirKey(favKey(x), currentStation); }
 
   function queueHasNext(){ return queueIndex >= 0 && queueIndex < playQueue.length - 1; }
   function queueHasPrev(){ return queueIndex > 0; }
@@ -46811,7 +46843,7 @@
     row._paint();
     if(r.src === 'local'){
       row.dataset.key = favKey(v);
-      if(currentStation && favKey(currentStation) === favKey(v)) row.classList.add('playing');
+      if(isOnAirItem(v)) row.classList.add('playing');
       row.addEventListener('click', function(){ playMusicVideo(v, r.list); });
     } else {
       row.dataset.vid = v.id;
@@ -46899,7 +46931,7 @@
       row._ctxItem = item;
       open = function(){ playEntity(item); };
     }
-    if(playable && currentStation && favKey(currentStation) === favKey(playable)) row.classList.add('playing');
+    if(playable && isOnAirItem(playable)) row.classList.add('playing');
     row.appendChild(art);
     var body = document.createElement('div');
     body.className = 'song-row-body';
@@ -47852,7 +47884,7 @@
     row.className = 'tile song-row';
     row.dataset.key = favKey(track);
     row._ctxItem = track;
-    var playing = !!(currentStation && favKey(currentStation) === favKey(track));
+    var playing = !!(isOnAirItem(track));
     if(playing) row.classList.add('playing');
 
     if(o.number){
@@ -47991,7 +48023,7 @@
     row._ctxItem = ep;
     // Build 327: the show's name counts in the Podcasts filter, not just the episode's.
     row.dataset.sfExtra = [ep.collectionName, ep.artistName].filter(Boolean).join(' ');
-    if(currentStation && favKey(currentStation) === favKey(ep)) row.classList.add('playing');
+    if(isOnAirItem(ep)) row.classList.add('playing');
 
     var art = document.createElement('div');
     art.className = 'tile-art song-row-art';
@@ -48051,7 +48083,7 @@
     tile.className = 'tile station-tile';   // build 355: names at Home's size everywhere
     tile.dataset.key = favKey(station);
     tile._ctxItem = station;
-    if(currentStation && favKey(currentStation) === favKey(station)) tile.classList.add('playing');
+    if(isOnAirItem(station)) tile.classList.add('playing');
 
     var art = document.createElement('div');
     art.className = 'tile-art';
@@ -48111,7 +48143,7 @@
     row.className = 'row-item';
     row.dataset.key = favKey(station);
     row._ctxItem = station;
-    if(currentStation && favKey(currentStation) === favKey(station)) row.classList.add('playing');
+    if(isOnAirItem(station)) row.classList.add('playing');
 
     if(draggableMode){
       var handle = document.createElement('div');
@@ -49162,7 +49194,7 @@
       updatePlayerMeta(station, 'Connecting…');
     }
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
-      el.classList.toggle('playing', el.dataset.key === favKey(station));
+      el.classList.toggle('playing', isOnAirKey(el.dataset.key, station));
     });
 
     if(station.stationuuid && !isReconnect){
@@ -49314,7 +49346,7 @@
     attemptInProgress = true;
     updatePlayerMeta(episode, 'Loading…');
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
-      el.classList.toggle('playing', el.dataset.key === favKey(episode));
+      el.classList.toggle('playing', isOnAirKey(el.dataset.key, episode));
     });
 
     var url = episode.episodeUrl;
@@ -50056,7 +50088,7 @@
     var first = track && indexOfTrack(songs, track) !== -1 ? track : songs[0];
     var order = [first].concat(shuffled(songs.filter(function(t){ return favKey(t) !== favKey(first); })));
     setQueue(order, first, heroShuffleLabel(entry));
-    if(currentStation && favKey(currentStation) === favKey(first) && audio.getAttribute('src')){
+    if(isOnAirItem(first) && audio.getAttribute('src')){
       if(!uiIsPlaying) togglePlayPause();
       syncNpHeroPlay();
       return;
@@ -50068,7 +50100,7 @@
   // Tapping a station's slide plays it; tapping the one already playing leaves it playing.
   function heroPlayStation(slide){
     var item = slide._item;
-    if(currentStation && favKey(currentStation) === favKey(item)){
+    if(isOnAirItem(item)){
       if(!uiIsPlaying) togglePlayPause();
       return;
     }
@@ -50092,7 +50124,7 @@
     if(!item) return;
     if(slideIsPlaying(slide)){ togglePlayPause(); return; }
     if(slide._entry){ playHeroArtistShuffle(slide._entry, item); return; }
-    if(currentStation && favKey(currentStation) === favKey(item)){ togglePlayPause(); return; }
+    if(isOnAirItem(item)){ togglePlayPause(); return; }
     // A Top 100 song plays the way the chart plays it: its video, else its preview.
     if(isChartSong(item)){ openChartSong([item], 0, 'Top 100', slide.querySelector('.nph-art')); return; }
     startNpTarget(item);
@@ -51101,7 +51133,7 @@
       updatePlayerMeta(track, subtitleFor(track));
       setPlayingUI(!!ev.playWhenReady);
       document.querySelectorAll('.tile, .row-item').forEach(function(el){
-        el.classList.toggle('playing', el.dataset.key === favKey(track));
+        el.classList.toggle('playing', isOnAirKey(el.dataset.key, track));
       });
       syncNpStepVisibility();
       updateStepButtons();

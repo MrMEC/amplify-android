@@ -72,6 +72,15 @@ async def main():
             check(await pg.evaluate('__k.count()') == 11, f'{T} nothing was taken out of favourites')
             await pg.evaluate("document.getElementById('favoritesSection').scrollIntoView({block:'start'}); window.scrollBy(0, -70)"); await pg.wait_for_timeout(500)
             await pg.screenshot(path=f'{shots}/home-favs-kinds-{theme}.png')
+            # build 479: tapping a playlist's radio or an artist's radio puts the playing border on its card
+            for nm in ['Road Trip', info['artist'] + ' Radio']:
+                await pg.evaluate("(n)=>Array.from(document.querySelectorAll('#favoritesGrid .tile')).filter(t => (t.querySelector('.tile-name')||{}).textContent === n)[0].click()", nm)
+                await pg.wait_for_timeout(1200)
+                st = await pg.evaluate("(n)=>{ var t = Array.from(document.querySelectorAll('#favoritesGrid .tile')).filter(t => (t.querySelector('.tile-name')||{}).textContent === n)[0]; return { on: t.classList.contains('playing'), border: getComputedStyle(t, '::after').backgroundImage.slice(0, 30), }; }", nm)
+                ok_skip = await pg.evaluate("(()=>{ try{ return currentStation ? currentStation.name : null; }catch(e){ return 'n/a'; } })()")
+                check(st['on'], f'{T} tapping {nm!r} on Home gives its card the playing border {st}')
+                await pg.evaluate("try{ closeNowPlaying(); }catch(e){}"); await pg.wait_for_timeout(300)
+            await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(300)
             # the Favorites page still has everything
             await pg.evaluate('__k.page()'); await pg.wait_for_timeout(900)
             names = await pg.evaluate('__k.pageNames()')
