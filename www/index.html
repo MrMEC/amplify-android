@@ -52242,7 +52242,9 @@
       // The A to Z rail points at rows that may be hidden now: it steps aside while filtering.
       if(azRail){
         if(tokens.length) azRail.style.display = 'none';
-        else if(azRail.children.length) azRail.style.display = '';
+        // Build 490 (Mark): only a page that has a rail now (A-Z picked) gets it back -- the letters of
+        // an earlier A-Z page stay hidden on Recent, Added and Release.
+        else if(azRail.children.length && azTargets && Object.keys(azTargets).length) azRail.style.display = '';
       }
       return { total: total, shown: shown };
     }

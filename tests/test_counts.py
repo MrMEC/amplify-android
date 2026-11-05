@@ -35,29 +35,15 @@ async def run2(vw, vh, scheme):
         await pg.wait_for_timeout(1500)
         await pg.evaluate("document.getElementById('importPanelClose') && document.getElementById('importPanelClose').click()")
 
-        # ---- Library: the count follows the filter ----
-        await pg.evaluate("__t.sec('artists')"); await pg.wait_for_timeout(1200)
-        total = await pg.evaluate(COUNT)
-        check(total == '4 artists', f'[{tag}] Artists: the total {total!r}')
-        await typ(pg, 'bo')
-        c = await pg.evaluate(COUNT)
-        check(c == '1 artist', f'[{tag}] Artists filtered to Bob: "1 artist" {c!r}')
-        await pg.screenshot(path=f'{shots}/count-{tag.replace(" ", "-")}-artists-filtered.png')
-        await typ(pg, 'zzzz')
-        check(await pg.evaluate(COUNT) == '0 artists', f'[{tag}] nothing matches: "0 artists"')
-        await pg.click('#secFilter .sf-clear'); await pg.wait_for_timeout(300)
-        check(await pg.evaluate(COUNT) == total, f'[{tag}] clearing brings the total back')
-        await pg.evaluate("__t.sec('songs')"); await pg.wait_for_timeout(1200)
-        check(await pg.evaluate(COUNT) == '6 songs', f'[{tag}] Songs: the total')
-        await typ(pg, 'carl')
-        c = await pg.evaluate(COUNT)
-        check(c == '2 songs', f'[{tag}] Songs filtered by artist: "2 songs" {c!r}')
-        await pg.click('#secFilter .sf-clear'); await pg.wait_for_timeout(300)
-        await pg.evaluate("__t.sec('albums')"); await pg.wait_for_timeout(1200)
-        await typ(pg, 'bob')
-        c = await pg.evaluate(COUNT)
-        check(c == '1 album', f'[{tag}] Albums filtered: "1 album" {c!r}')
-        await pg.click('#secFilter .sf-clear'); await pg.wait_for_timeout(300)
+        # ---- Library (build 489): no count on Artists, Albums and Songs -- the sort menu is in its place,
+        # filtered or not ----
+        SORT = "(()=>{ var b = document.getElementById('libSortBtn'); return b && b.offsetParent ? b.querySelector('.lib-sort-cur').textContent : null; })()"
+        for sec, q in (('artists', 'bo'), ('songs', 'carl'), ('albums', 'bob')):
+            await pg.evaluate(f"__t.sec('{sec}')"); await pg.wait_for_timeout(1200)
+            check(await pg.evaluate(COUNT) is None and await pg.evaluate(SORT) == 'A-Z', f'[{tag}] {sec}: the sort menu, no count {await pg.evaluate(SORT)!r}')
+            await typ(pg, q)
+            check(await pg.evaluate(COUNT) is None and await pg.evaluate(SORT) == 'A-Z', f'[{tag}] {sec} filtered: still no count')
+            await pg.click('#secFilter .sf-clear'); await pg.wait_for_timeout(300)
 
         # ---- Podcasts ----
         await pg.evaluate("__t.pods()"); await pg.wait_for_timeout(800)

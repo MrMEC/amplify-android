@@ -106,7 +106,7 @@ async def run(b, scheme, w, h):
     check(r['heading'] == 'Library' and not r['back'], f'{T} headed Library, no back button')
     check(r['favRow'] == ['Ann', 'Bob'] and r['favRowScroll'] == 'auto' and r['allHead'] and r['gridArtists'] == 3, f'{T} Favorite Artists as a sideways row above All Artists {r["favRow"]} {r["gridArtists"]}')
     check(r['filterAfter'], f'{T} the filter box sits right under the tabs')
-    check(r['rightHidden'] and r['toolbar'] and r['toolbar']['count'] == '3 artists' and 'libraryShuffleBtn' in r['toolbar']['btns'] and r['toolbar']['afterFilter'] and r['toolbar']['gap'] == 10, f'{T} build 406: the count and buttons sit under the filter, not in the header {r["toolbar"]}')
+    check(r['rightHidden'] and r['toolbar'] and r['toolbar']['btns'][0] == 'libSortBtn' and 'libraryShuffleBtn' in r['toolbar']['btns'] and r['toolbar']['afterFilter'] and r['toolbar']['gap'] == 10, f'{T} build 406/489: the sort menu and buttons sit under the filter, not in the header {r["toolbar"]}')
     check(r['headW'][0] <= r['headW'][1] + 1, f'{T} "Library" shows whole at the top {r["headW"]}')
     check(r['favStars'] == 0, f'{T} build 408: no stars on the Favorite Artists row')
     await pg.evaluate("document.querySelector('.fav-artists-edit').click()"); await pg.wait_for_timeout(500)
