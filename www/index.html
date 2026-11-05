@@ -23370,7 +23370,8 @@
     videoAddHeaderBtnEl.lastElementChild.textContent = videoTab === 'channels' ? 'Add' : 'Add Folder';
     if(videoTab !== 'channels') syncVideoMenuBtn();
     videoAddHeaderBtnEl.setAttribute('aria-label', videoAddHeaderBtnEl.title);
-    videoAddHeaderBtnEl.style.display = videoTab === 'channels' ? 'none' : '';   // build 409: Add Channels is in Live TV's Edit menu
+    // build 409: Add Channels is in Live TV's Edit menu. Build 482 (Mark): nothing to add on Continue either.
+    videoAddHeaderBtnEl.style.display = (videoTab === 'channels' || videoTab === 'continue') ? 'none' : '';
     if(mvPlayHdr){ mvPlayHdr.style.display = 'none'; mvShuffleHdr.style.display = 'none'; }
     if(videoTab === 'channels') renderChannelsTab();
     else if(videoTab === 'continue') renderVideoContinueTab();

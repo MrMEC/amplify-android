@@ -253,6 +253,8 @@ final class CarLibrary {
     linkedHashMap.put("pod:latest", "Latest");
     linkedHashMap.put("pod:az", "A-Z");
     linkedHashMap.put("pod:popular", "Popular");
+    // Build 482 (Mark): episodes part-way through, last in the Podcasts menu (same list as Home's).
+    linkedHashMap.put("pod:continue", "Continue Listening");
     linkedHashMap2.put(
         "root", new String[] {"tab:home", "tab:library", "tab:stations", "tab:podcasts"});
     linkedHashMap2.put(
@@ -285,6 +287,7 @@ final class CarLibrary {
     linkedHashMap3.put("pod:latest", "podLatest");
     linkedHashMap3.put("pod:az", "shows");
     linkedHashMap3.put("pod:popular", "popular");
+    linkedHashMap3.put("pod:continue", "continue");
     linkedHashMap4.put("tab:home", "ic_car_home");
     linkedHashMap4.put("tab:library", "ic_car_library");
     linkedHashMap4.put("tab:stations", "ic_car_stations");
@@ -443,6 +446,7 @@ final class CarLibrary {
           }
           arrayList.add(node("pod:az"));
           arrayList.add(node("pod:popular"));
+          arrayList.add(node("pod:continue"));
           return arrayList;
         case "lib:artists":
           synchronized (this) {
@@ -601,6 +605,7 @@ final class CarLibrary {
       case "st:recent":
         return "Stations you play will show up here.";
       case "home:continue":
+      case "pod:continue":
         return "Nothing in progress.";
       default:
         return str.startsWith("show:")
