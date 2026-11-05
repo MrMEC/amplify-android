@@ -199,6 +199,8 @@ async def run(b, scheme, w, h):
         await pg.screenshot(path=f'{shots}/libtabs-songs-big-{scheme}-{w}.png')
     # build 431: one artist that fails to draw must not take the tabs with it
     await pg.evaluate("__t.ev(\"window.__bt = buildArtistTile; buildArtistTile = function(e){ if(e.name === 'Bob') throw new Error('bad artist'); return window.__bt(e); }; 0\")")
+    # build 484: tiles from the last visit are reused, so empty that store for Bob's tile to be built (and fail)
+    await pg.evaluate("__t.ev('artistTileCache = {}; 0')")
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(600)
     await pg.evaluate("__t.ev(\"openLibTab('artists'); 0\")"); await pg.wait_for_timeout(1000)
     r = await pg.evaluate(LT)
