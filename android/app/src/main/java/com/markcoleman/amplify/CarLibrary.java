@@ -265,10 +265,9 @@ final class CarLibrary {
     linkedHashMap2.put(
         "tab:home",
         new String[] {
+          // Build 493 (Mark): Recent Songs is folded into Continue Listening; no Latest Podcasts here.
           "home:topartists",
           "home:continue",
-          "home:recentsongs",
-          "home:latest",
           "tab:stations",
           "home:mixes",
           "home:madeforyou"
@@ -281,7 +280,9 @@ final class CarLibrary {
     linkedHashMap3.put("home:favorites", "favorites");
     linkedHashMap3.put("home:topartists", "topArtists");
     linkedHashMap3.put("home:madeforyou", "madeForYou");
-    linkedHashMap3.put("home:continue", "continue");
+    // Build 493: songs, stations and unfinished episodes in the order played (Podcasts' own
+    // Continue Listening stays episodes only).
+    linkedHashMap3.put("home:continue", "recentPlays");
     linkedHashMap3.put("home:recentsongs", "recentSongs");
     linkedHashMap3.put("home:latest", "podLatest");
     linkedHashMap3.put("home:topstations", "topStations");
@@ -295,7 +296,6 @@ final class CarLibrary {
     linkedHashMap4.put("tab:favorites", "ic_car_favorites");
     linkedHashMap4.put("tab:home", "ic_car_listen");
     linkedHashMap4.put("tab:library", "ic_car_library");
-    linkedHashMap4.put("tab:stations", "ic_car_stations");
     linkedHashMap4.put("tab:podcasts", "ic_car_podcasts");
     linkedHashMap4.put("home:favorites", "ic_car_favorites");
     messageSeq = 0;
@@ -640,6 +640,7 @@ final class CarLibrary {
       case "st:recent":
         return "Stations you play will show up here.";
       case "home:continue":
+        return "Songs, stations and episodes you play will show up here.";
       case "pod:continue":
         return "Nothing in progress.";
       default:

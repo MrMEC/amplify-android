@@ -51150,6 +51150,22 @@
           .slice(0, RECENT_LIMIT).map(function(s){ return isArtistRadio(s) ? carRadio(s) : isPlaylistRadio(s) ? carPlaylistRadio(s) : isCustomStation(s) ? carCustomStation(s) : carStation(s); }));
         lists.topStations = compact((carNet.top || []).map(carStation));
         lists['continue'] = compact((r[1] || []).map(function(rec){ return carEpisode(podcastTrackFromProgress(rec), prog); }));
+        // Build 493 (Mark): the car's Listen > Continue Listening is everything played, newest first --
+        // songs, stations and episodes not yet finished (Recent Songs folded into it). Episodes part-way
+        // through that have dropped off the recent list follow at the end.
+        var seenEp = {};
+        lists.recentPlays = compact(recentStations.map(function(st){
+          if(isPodcastTrack(st)){
+            var pr = prog[st.guid];
+            if(pr && pr.completed) return null;
+            seenEp[st.guid] = true;
+            return carEpisode(st, prog);
+          }
+          if(isLocalTrack(st)) return carSong(st);
+          return isArtistRadio(st) ? carRadio(st) : isPlaylistRadio(st) ? carPlaylistRadio(st) : isCustomStation(st) ? carCustomStation(st) : carStation(st);
+        }).concat((r[1] || []).filter(function(rec){ return rec && !seenEp[rec.guid]; }).map(function(rec){
+          return carEpisode(podcastTrackFromProgress(rec), prog);
+        })));
         lists.podLatest = latestOf(podcastSubs, prog);
         podcastCategories.forEach(function(cat){
           lists['cat:' + cat.id] = latestOf(podcastSubs.filter(function(sub){ return isShowInPodcastCategory(cat, sub.collectionId); }), prog);
