@@ -79,6 +79,10 @@ final class CarLibrary {
   private static final String STYLE_GROUP = "android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT";
   private static final int STYLE_LIST = 1;
   private static final String STYLE_PLAYABLE = "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT";
+  // Build 491: per-item list/grid choice, so one list can hold cover tiles and plain rows.
+  private static final String STYLE_SINGLE = "android.media.browse.CONTENT_STYLE_SINGLE_ITEM_HINT";
+  /** Build 491 (Mark): how many favorites' covers lead the Home tab. */
+  private static final int HOME_FAVS = 5;
   private static final String STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED";
   private static final Map<String, String> TITLES;
   private static int messageSeq;
@@ -292,6 +296,7 @@ final class CarLibrary {
     linkedHashMap4.put("tab:library", "ic_car_library");
     linkedHashMap4.put("tab:stations", "ic_car_stations");
     linkedHashMap4.put("tab:podcasts", "ic_car_podcasts");
+    linkedHashMap4.put("home:favorites", "ic_car_favorites");
     messageSeq = 0;
   }
 
@@ -384,6 +389,54 @@ final class CarLibrary {
     return null;
   }
 
+  /**
+   * Build 491 (Mark): the Home tab leads with the covers of the first favorites (in the phone's
+   * Home order) as grid tiles under "Favorites", then an "All favorites" tile that opens the whole
+   * list; everything Home had before follows as rows under "Browse". Playing a cover plays it from
+   * the Favorites list, the same as from inside the folder.
+   */
+  private List<MediaItem> homeChildren() throws JSONException {
+    ArrayList<MediaItem> out = new ArrayList<>();
+    List<JSONObject> favs = listItems("home:favorites");
+    int total = 0;
+    for (int k = 0; k < favs.size(); k++) {
+      MediaItem m = toBrowseItem("home:favorites", k, favs.get(k));
+      if (m == null) continue;
+      if (total < HOME_FAVS) out.add(styled(m, "Favorites", STYLE_GRID));
+      total++;
+    }
+    if (total > HOME_FAVS) {
+      out.add(
+          styled(
+              folder(
+                  "home:favorites",
+                  "All favorites",
+                  total + " favorites",
+                  iconUri("home:favorites"),
+                  null),
+              "Favorites",
+              STYLE_GRID));
+    }
+    for (String id : FIXED.get("tab:home")) {
+      // With covers showing, the tiles above stand in for the Favorites row.
+      if ("home:favorites".equals(id) && total > 0) continue;
+      // Build 310: Stations Near Me shows only while the phone has sent stations for it.
+      if ("home:nearme".equals(id) && arrayOf(catalogLists(), "nearMe").isEmpty()) continue;
+      MediaItem m = node(id);
+      if (m != null) out.add(styled(m, total > 0 ? "Browse" : null, STYLE_LIST));
+    }
+    return out;
+  }
+
+  /** A copy of the item with a group heading (null keeps its own) and its own list/grid style. */
+  private static MediaItem styled(MediaItem m, String group, int style) {
+    Bundle b = new Bundle();
+    if (m.mediaMetadata.extras != null) b.putAll(m.mediaMetadata.extras);
+    if (group != null) b.putString(STYLE_GROUP, group);
+    b.putInt(STYLE_SINGLE, style);
+    return m.buildUpon().setMediaMetadata(m.mediaMetadata.buildUpon().setExtras(b).build()).build();
+  }
+
   void setRootLimit(int i) {
     if (i > 0) {
       this.rootLimit = i;
@@ -395,6 +448,9 @@ final class CarLibrary {
   }
 
   List<MediaItem> children(String str) throws JSONException {
+    if ("tab:home".equals(str)) {
+      return homeChildren();
+    }
     ArrayList arrayList = new ArrayList();
     String[] strArr = FIXED.get(str);
     int i = 0;
