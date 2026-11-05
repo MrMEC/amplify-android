@@ -7182,6 +7182,14 @@
   .gb-find{ grid-column:1/-1; margin:0 0 22px !important; }
   /* Build 405: rows of a long list off screen aren't laid out until they come near. */
   #stationsGrid.grid-songs > .song-row, #stationsGrid.grid-songs > .song-letter{ content-visibility:auto; contain-intrinsic-size:auto var(--song-row-h, 72px); }
+  /* Build 489 (Mark: tapping Filter songs froze the app): the Songs list comes in blocks of 50 rows.
+     A block off screen is skipped as one piece, and its covers and title fitting wait on the block,
+     so the phone tracks a few hundred blocks instead of every row, title and cover of 20,000 songs
+     each time the keyboard resizes the page. Same rows, same 4px apart. */
+  #stationsGrid.grid-songs > .song-block{ grid-column:1/-1; display:grid; grid-template-columns:minmax(0, 1fr); row-gap:inherit; column-gap:inherit; min-width:0;
+    content-visibility:auto; contain-intrinsic-block-size:auto 3800px; }
+  #stationsGrid.grid-songs > .song-block.sf-hide{ display:none; }
+  #stationsGrid > .song-block:first-child > .song-letter:first-child{ margin-top:2px; }
   /* Build 439 (Mark: Cover Flow took ~30s to open on 1,874 artists): turning the phone made the browser lay out
      every artist row and album cover at the new width before the turn was even reported. Rows off screen now
      skip layout, as the Songs list already does. */
@@ -10822,14 +10830,28 @@
       while(el.scrollWidth > el.clientWidth + 1 && fs > min){ fs = fs * 0.93; el.style.setProperty('font-size', fs.toFixed(2) + 'px', 'important'); }
       el.dataset.wfit = '1';
     }
+    // Build 489: titles in a Songs block are fitted together when the block comes near, one watched
+    // element per 50 rows instead of two per row.
     var io = new IntersectionObserver(function(entries){
-      entries.forEach(function(e){ if(e.isIntersecting){ io.unobserve(e.target); fit(e.target); } });
+      entries.forEach(function(e){
+        if(!e.isIntersecting) return;
+        var el = e.target;
+        io.unobserve(el);
+        if(el.classList.contains('song-block')){ el._wfWatched = false; Array.prototype.forEach.call(el.querySelectorAll(SEL), fit); }
+        else fit(el);
+      });
     }, { rootMargin: '200px 0px' });
     var pending = [], timer = 0;
+    function see(el){
+      var b = el.parentElement && el.closest('.song-block');
+      if(b){ if(!b._wfWatched){ b._wfWatched = true; io.observe(b); } return; }
+      io.observe(el);
+    }
     function watch(root){
       if(!root || root.nodeType !== 1) return;
-      if(root.matches(SEL)) io.observe(root);
-      if(root.firstElementChild) Array.prototype.forEach.call(root.querySelectorAll(SEL), function(el){ io.observe(el); });
+      if(root.classList.contains('song-block')){ if(!root._wfWatched){ root._wfWatched = true; io.observe(root); } return; }
+      if(root.matches(SEL)) see(root);
+      if(root.firstElementChild) Array.prototype.forEach.call(root.querySelectorAll(SEL), see);
     }
     new MutationObserver(function(muts){
       for(var j = 0; j < muts.length; j++){
@@ -17691,9 +17713,17 @@
   // one of thousands of tiles at once, which kept the page too busy to redraw (rotating the
   // phone left it drawn at the old size). A box already on the page draws straight away.
   var lazyArtIO = null;
+  // Build 489: while a Songs block is being built, its rows' covers are collected here and drawn
+  // together when the block comes near the screen (one watched element instead of fifty).
+  var artGroup = null;
+  function deferArtGroup(block, list){
+    if(!window.IntersectionObserver){ list.forEach(function(c){ var fn = c._lazyArt; c._lazyArt = null; if(fn) fn(); }); return; }
+    deferArt(null, null);   // makes sure the watcher exists
+    block._lazyArt = function(){ list.forEach(function(c){ var fn = c._lazyArt; c._lazyArt = null; if(fn) fn(); }); };
+    lazyArtIO.observe(block);
+  }
   function deferArt(container, draw){
-    if(!container || container.isConnected || !window.IntersectionObserver) return false;
-    if(!lazyArtIO){
+    if(!lazyArtIO && window.IntersectionObserver){
       lazyArtIO = new IntersectionObserver(function(entries){
         entries.forEach(function(e){
           if(!e.isIntersecting) return;
@@ -17704,6 +17734,8 @@
         });
       }, { rootMargin: '600px 300px' });
     }
+    if(!container || container.isConnected || !window.IntersectionObserver) return false;
+    if(artGroup){ container._lazyArt = draw; artGroup.push(container); return true; }
     container._lazyArt = draw;
     lazyArtIO.observe(container);
     return true;
@@ -42795,10 +42827,28 @@
     stationsGrid._ctxList = tracks;
     stationsGrid._ctxLabel = 'Songs';
     // Build 407 (Mark): no Shuffle All row here; the Shuffle button under the filter does it.
-    var job = songsRender = {}, i = 0, letter = null, heads = {};
+    var job = songsRender = {}, i = 0, letter = null, heads = {}, rowH = 72, headH = 36;
+    // Build 489: rows go into blocks of 50 (see .song-block); each block's covers are drawn when the
+    // block comes near the screen, one watcher for the lot.
+    var BLOCK = 50;
+    function closeBlock(b, n, h){
+      if(!b) return;
+      b.style.containIntrinsicBlockSize = 'auto ' + Math.round(n * rowH + h * (headH + 28) + (n + h) * 4) + 'px';
+      var arts = artGroup; artGroup = null;
+      if(arts && arts.length) deferArtGroup(b, arts);
+    }
     function step(n){
       var frag = document.createDocumentFragment(), end = Math.min(tracks.length, i + n);
+      var block = null, inBlock = 0, headsIn = 0;
       for(; i < end; i++){
+        if(!block || inBlock >= BLOCK){
+          closeBlock(block, inBlock, headsIn);
+          block = document.createElement('div');
+          block.className = 'song-block';
+          frag.appendChild(block);
+          inBlock = 0; headsIn = 0;
+          artGroup = [];
+        }
         var t = tracks[i], first = azLetterFor(t.name);
         if(first !== letter){
           letter = first;
@@ -42807,19 +42857,23 @@
           head.dataset.letter = first;
           head.textContent = first;
           heads[first] = head;
-          frag.appendChild(head);
+          block.appendChild(head);
+          headsIn++;
         }
-        frag.appendChild(buildTile(t));
+        try{ block.appendChild(buildTile(t)); }catch(e){ artGroup = null; throw e; }
+        inBlock++;
       }
+      closeBlock(block, inBlock, headsIn);
+      artGroup = null;
       stationsGrid.appendChild(frag);
     }
     job.flush = function(){ if(songsRender === job && i < tracks.length) step(tracks.length); };
     step(40);
     // Off-screen rows are sized like the real ones, so the page is the right length before they draw.
-    var sample = stationsGrid.querySelector(':scope > .song-row:not(.shuffle-all-row)');
-    if(sample){ var sh = sample.getBoundingClientRect().height; if(sh > 20) stationsGrid.style.setProperty('--song-row-h', Math.round(sh) + 'px'); }
-    var sampleHead = stationsGrid.querySelector(':scope > .song-letter');
-    if(sampleHead){ var hh = sampleHead.getBoundingClientRect().height; if(hh > 8) stationsGrid.style.setProperty('--song-letter-h', Math.round(hh) + 'px'); }
+    var sample = stationsGrid.querySelector(':scope > .song-block > .song-row:not(.shuffle-all-row)');
+    if(sample){ var sh = sample.getBoundingClientRect().height; if(sh > 20) rowH = sh; }
+    var sampleHead = stationsGrid.querySelector(':scope > .song-block > .song-letter');
+    if(sampleHead){ var hh = sampleHead.getBoundingClientRect().height; if(hh > 8) headH = hh; }
     (function next(){
       if(songsRender !== job || i >= tracks.length) return;
       setTimeout(function(){ if(songsRender !== job) return; step(200); next(); }, 16);
@@ -49420,6 +49474,7 @@
     ctxClick = null;
     if(!c || Date.now() - c.at > 1500 || !c.el._ctxItem || favKey(c.el._ctxItem) !== favKey(item)) return null;
     var el = c.el, box = el.parentElement;
+    if(box && box.classList.contains('song-block')) box = box.parentElement;   // build 489: the Songs list's blocks
     if(!box || box._ctxNone || !el.isConnected) return null;
     var list, label;
     if(box._ctxList){
@@ -51955,7 +52010,10 @@
       shownRows = [];
       var head = null, headOn = false;
       function closeHead(){ if(head) show(head, headOn || !tokens.length); }
-      Array.prototype.forEach.call(stationsGrid.children, function(k){
+      var blocks = [];
+      function each(k){
+        // Build 489: the Songs list's blocks of rows -- their rows are filtered as if laid straight in the grid.
+        if(k.classList && k.classList.contains('song-block')){ blocks.push(k); Array.prototype.forEach.call(k.children, each); return; }
         if(k === bar) return;
         var cn = k.className || '';
         if(typeof cn !== 'string') return;
@@ -51984,8 +52042,15 @@
           if(ok2){ shown++; headOn = true; shownRows.push(k); }
           show(k, ok2);
         }
-      });
+      }
+      Array.prototype.forEach.call(stationsGrid.children, each);
       closeHead();
+      // A block with nothing left showing steps aside too (or its 4px gap would stay).
+      blocks.forEach(function(b){
+        var any = !tokens.length;
+        for(var c = b.firstElementChild; !any && c; c = c.nextElementSibling){ if(!c.classList.contains('sf-hide')) any = true; }
+        show(b, any);
+      });
       // The A to Z rail points at rows that may be hidden now: it steps aside while filtering.
       if(azRail){
         if(tokens.length) azRail.style.display = 'none';
