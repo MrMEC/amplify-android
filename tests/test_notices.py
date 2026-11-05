@@ -193,11 +193,12 @@ async def run(p, scheme):
     await pg.evaluate('__t.openNp()'); await pg.wait_for_timeout(700)
     await pg.evaluate("document.getElementById('npMenuBtn').click()"); await pg.wait_for_timeout(200)
     await pg.evaluate("document.getElementById('npCopyBtn').click()"); await pg.wait_for_timeout(500)
-    n = await notice()
+    # Build 480: for a radio station the item is "Edit stream URL" and opens its dialog (Copy is
+    # inside it, with a tick on the button); other streams keep the "copied" notice.
     menu = await pg.evaluate("document.getElementById('npMenu').classList.contains('open')")
-    check(n['open'] and n['kind'] == 'done' and n['msg'] == 'Stream URL copied.' and not menu, f'{T} copying says so in a notice and closes the menu {n}')
-    await pg.screenshot(path=f'{shots}/notice-copied-{scheme}.png')
-    await pg.evaluate("document.querySelector('#noticeActions button').click()"); await pg.wait_for_timeout(200)
+    dlg = await pg.evaluate("document.getElementById('streamUrlOverlay').classList.contains('open')")
+    check(dlg and not menu, f'{T} on a radio station the menu item opens the Edit stream URL dialog and closes the menu')
+    await pg.evaluate("document.getElementById('streamUrlCloseBtn').click()"); await pg.wait_for_timeout(200)
     await pg.evaluate('__t.closeNp()'); await pg.wait_for_timeout(400)
 
     # ---- the library can't be read: a notice with a title and Retry, once ----
