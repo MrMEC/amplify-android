@@ -7215,6 +7215,12 @@
   .tile-grid > .page-toolbar{ grid-column:1/-1; margin:0 0 calc(14px - var(--lib-rg, 0px)) !important; }
   .page-toolbar > .section-heading-right{ flex:1 1 auto; min-width:0; margin:0 !important; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
   .page-toolbar #resultCount{ margin-right:auto; font-size:13px; font-weight:600; color:var(--text-dim); white-space:nowrap; }
+  /* Build 489 (Mark): the sort menu in the count's place on Artists, Albums and Songs. */
+  .page-toolbar #libSortBtn{ margin-right:auto; }
+  .clear-search-btn.lib-sort-btn{ gap:6px; padding:7px 10px 7px 12px; text-transform:none; letter-spacing:0; font-size:13px; font-weight:600; color:var(--text); }
+  .lib-sort-btn .hdr-svg{ width:14px; height:14px; stroke:var(--text-dim); }
+  .lib-sort-btn .lib-sort-chev{ width:13px; height:13px; fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .ch-sort-menu.lib-sort-menu{ min-width:150px; }
   /* Build 407 (Mark): the A-Z rail stays out of sight until the page is scrolled, fades in, and fades
      out again a moment after scrolling (or a drag along it) stops. */
   .az-rail{ opacity:0; pointer-events:none; transition:opacity .25s ease; }
@@ -7608,6 +7614,10 @@
         <input type="text" class="section-heading-input" id="stationsHeadingInput" style="display:none;">
         <div class="section-heading-right">
           <span class="result-count" id="resultCount" style="display:none;"></span>
+          <!-- Build 489 (Mark): on Artists, Albums and Songs the count gives way to a sort menu. -->
+          <button type="button" class="clear-search-btn lib-sort-btn" id="libSortBtn" style="display:none;" aria-haspopup="menu" aria-expanded="false">
+            <svg class="hdr-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h4"/><path d="M18 5v14M15 16l3 3 3-3"/></svg><span class="lib-sort-cur">Recent</span><svg class="lib-sort-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+          </button>
           <button type="button" class="clear-search-btn" id="albumPlayBtn" style="display:none;" title="Play this album in order">
             <i class="fa-solid fa-play"></i><span class="btn-text">Play</span>
           </button>
@@ -10074,7 +10084,8 @@
     if(typeof songsRender !== 'undefined') songsRender = null;   // build 405
     if(typeof artistsRender !== 'undefined') artistsRender = null;   // build 484
     if(typeof mvPlayHdr !== 'undefined' && mvPlayHdr){ mvPlayHdr.style.display = 'none'; mvShuffleHdr.style.display = 'none'; }   // build 409
-    stationsGrid._ctxList = null; stationsGrid._ctxLabel = null;
+    stationsGrid._ctxList = null; stationsGrid._ctxLabel = null; stationsGrid._ctxSorted = false;
+    if(typeof hideLibSort === 'function') hideLibSort();   // build 489
     var allArtists = document.getElementById('allArtistsLink');
     if(allArtists) allArtists.style.display = 'none';
     sectionHeadingRow.classList.remove('has-side-link');
@@ -21051,12 +21062,30 @@
     var order = 'album';
     function load(){
       albums = buildAlbumIndex().filter(function(a){ return a.tracks.length; });
+      // Build 489: in the order the Albums (or Artists) page is sorted by.
+      var P = libPlayedMaps();
       if(order === 'artist'){
+        var amode = libSortMode('artists');
+        var rank = null, within = null;
+        if(amode !== 'az'){
+          rank = {};
+          sortLibraryPage('artists', libraryArtistIndex(), P).forEach(function(e, n){ rank[e.key] = n; });
+          within = libMeasure('albums', amode, P);
+          albums.forEach(function(a){ a._cfv = within(a) || 0; });
+        }
         albums.sort(function(a, b){
+          if(rank){
+            var ra = rank[artistMatchKey(a.artist)], rb = rank[artistMatchKey(b.artist)];
+            ra = ra === undefined ? Infinity : ra; rb = rb === undefined ? Infinity : rb;
+            if(ra !== rb) return ra < rb ? -1 : 1;
+          }
           var aa = alphaSortKey(a.artist), ba = alphaSortKey(b.artist);
           if(aa !== ba) return alphaCompare(aa, ba);
+          if(within && a._cfv !== b._cfv) return b._cfv - a._cfv;
           return alphaCompare(alphaSortKey(a.album), alphaSortKey(b.album));
         });
+      } else {
+        albums = sortLibraryPage('albums', albums, P);
       }
       albumIndex = {};
       albums.forEach(function(a, n){ albumIndex[a.key] = n; });
@@ -21075,7 +21104,7 @@
       if(!artistKey) return -1;
       var i;
       for(i = 0; i < albums.length; i++) if(artistMatchKey(albums[i].artist) === artistKey) return i;
-      if(artistName){
+      if(artistName && libSortMode('artists') === 'az'){
         var nk = alphaSortKey(artistName);
         for(i = 0; i < albums.length; i++) if(alphaCompare(alphaSortKey(albums[i].artist), nk) >= 0) return i;
         return albums.length - 1;
@@ -33091,11 +33120,150 @@
   // terms (Latest's episode rows count as shows); by default each item once (by its key).
   var resultCountState = null;
   function paintResultCount(n, noun){
-    if(typeof n !== 'number'){ resultCount.style.display = 'none'; return; }
+    if(typeof n !== 'number' || libSortPage){ resultCount.style.display = 'none'; return; }
     resultCount.style.display = '';
     var word = noun || 'station';
     resultCount.textContent = n + ' ' + (n === 1 ? word : word + 's');
   }
+  // ---------- Build 489 (Mark): sorting Artists, Albums and Songs ----------
+  // A menu where the count was: Recent (last played, the default), A-Z, Added (to the library)
+  // and Release (the song's or album's date). Each page keeps its own choice, saved for good
+  // (and in backups). Cover Flow runs in the same order as the page it was turned to from.
+  var LIB_SORT_KEY = 'radioPlayerLibSort';
+  var LIB_SORT_OPTS = [['recent', 'Recent'], ['az', 'A-Z'], ['added', 'Added'], ['release', 'Release']];
+  var libSortBy = (function(){
+    var v = null;
+    try{ v = JSON.parse(localStorage.getItem(LIB_SORT_KEY) || 'null'); }catch(e){}
+    if(!v || typeof v !== 'object') v = {};
+    ['artists', 'albums', 'songs'].forEach(function(pg){
+      if(!LIB_SORT_OPTS.some(function(o){ return o[0] === v[pg]; })) v[pg] = 'recent';
+    });
+    return v;
+  })();
+  var libSortPage = null, libSortMenu = null;
+  var libSortBtn = document.getElementById('libSortBtn');
+  function libSortMode(pg){ return libSortBy[pg] || 'recent'; }
+  function libSortLabel(mode){
+    for(var i = 0; i < LIB_SORT_OPTS.length; i++) if(LIB_SORT_OPTS[i][0] === mode) return LIB_SORT_OPTS[i][1];
+    return '';
+  }
+  function showLibSort(pg){
+    libSortPage = pg;
+    resultCount.style.display = 'none';
+    libSortBtn.querySelector('.lib-sort-cur').textContent = libSortLabel(libSortMode(pg));
+    libSortBtn.setAttribute('aria-label', 'Sort ' + pg + ': ' + libSortLabel(libSortMode(pg)));
+    libSortBtn.style.display = '';
+  }
+  function hideLibSort(){
+    libSortPage = null;
+    closeLibSortMenu();
+    if(libSortBtn) libSortBtn.style.display = 'none';
+  }
+  function closeLibSortMenu(){
+    if(libSortMenu){ libSortMenu.remove(); libSortMenu = null; }
+    if(libSortBtn) libSortBtn.setAttribute('aria-expanded', 'false');
+  }
+  function setLibSort(pg, mode){
+    libSortBy[pg] = mode;
+    try{ localStorage.setItem(LIB_SORT_KEY, JSON.stringify(libSortBy)); }catch(e){}
+  }
+  libSortBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(libSortMenu){ closeLibSortMenu(); return; }
+    var pg = libSortPage;
+    if(!pg) return;
+    var cur = libSortMode(pg);
+    var m = document.createElement('div');
+    m.className = 'ch-sort-menu lib-sort-menu';
+    m.setAttribute('role', 'menu');
+    LIB_SORT_OPTS.forEach(function(o){
+      var it = document.createElement('button');
+      it.type = 'button';
+      var on = cur === o[0];
+      it.className = 'np-menu-item' + (on ? ' on' : '');
+      it.setAttribute('role', 'menuitemradio');
+      it.setAttribute('aria-checked', on ? 'true' : 'false');
+      it.dataset.sort = o[0];
+      it.innerHTML = '<span class="ch-sort-check" aria-hidden="true">' + (on ? '<i class="fa-solid fa-check"></i>' : '') + '</span><span></span>';
+      it.lastChild.textContent = o[1];
+      it.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        closeLibSortMenu();
+        if(libSortMode(pg) === o[0]) return;
+        setLibSort(pg, o[0]);
+        if(libSortPage !== pg) return;
+        // A new order starts from the top of the list.
+        window.scrollTo(0, 0);
+        if(pg === 'songs') renderSongsView();
+        else if(pg === 'albums') renderAlbumsView();
+        else renderArtistsView();
+        try{ if(libTabNow() && !stationsGrid.querySelector(':scope > .lib-tabs')) addLibTabs(); }catch(err){ noteAppError(err); }
+      });
+      m.appendChild(it);
+    });
+    document.body.appendChild(m);
+    var r = libSortBtn.getBoundingClientRect();
+    m.style.top = Math.round(r.bottom + 6) + 'px';
+    m.style.left = Math.max(8, Math.round(r.left)) + 'px';
+    libSortMenu = m;
+    libSortBtn.setAttribute('aria-expanded', 'true');
+  });
+  document.addEventListener('click', function(e){
+    if(libSortMenu && !libSortMenu.contains(e.target)) closeLibSortMenu();
+  });
+  window.addEventListener('scroll', closeLibSortMenu, { passive: true });
+
+  // What each order goes by. Played dates are the ones Amplify already keeps for Hear It Again,
+  // Top Artists and Recently Played albums. Added: the day the song came into Amplify (songs
+  // added before build 489 go by their file's date). Release: the song's year (or full date) tag.
+  function trackAddedAt(t){ return (t && (t.addedAt || t.lastModified)) || 0; }
+  function trackReleaseAt(t){
+    var m = /(\d{4})(?:[-\/.](\d{1,2})(?:[-\/.](\d{1,2}))?)?/.exec(String((t && t.year) || ''));
+    if(!m) return 0;
+    var y = +m[1];
+    if(y < 1000 || y > 2999) return 0;
+    return y * 10000 + (m[2] ? Math.min(12, +m[2]) : 0) * 100 + (m[3] ? Math.min(31, +m[3]) : 0);
+  }
+  function libPlayedMaps(){
+    var P = { songs: {}, albums: {}, artists: {} };
+    try{ P.songs = loadSongPlays() || {}; }catch(e){}
+    try{ P.albums = loadAlbumPlayed() || {}; }catch(e){}
+    try{ P.artists = loadArtistPlays() || {}; }catch(e){}
+    return P;
+  }
+  function trackPlayedAt(t, P){ var r = P.songs[favKey(t)]; return (r && r[1]) || 0; }
+  function tracksMax(tracks, fn){
+    var m = 0;
+    for(var i = 0; i < tracks.length; i++){ var v = fn(tracks[i]); if(v > m) m = v; }
+    return m;
+  }
+  // Newest first by the chosen measure; anything without one (never played, no date) follows,
+  // in the page's A-Z order. A-Z itself leaves the list as it came (already alphabetical).
+  function libSortList(list, mode, measure){
+    if(mode === 'az' || !list.length) return list;
+    var dec = list.map(function(x, i){ return { x: x, v: measure(x) || 0, i: i }; });
+    dec.sort(function(a, b){ return (b.v - a.v) || (a.i - b.i); });
+    return dec.map(function(d){ return d.x; });
+  }
+  function libMeasure(kind, mode, P){
+    P = P || libPlayedMaps();
+    if(kind === 'songs'){
+      if(mode === 'recent') return function(t){ return trackPlayedAt(t, P); };
+      if(mode === 'added') return trackAddedAt;
+      return trackReleaseAt;
+    }
+    if(kind === 'albums'){
+      if(mode === 'recent') return function(a){ return Math.max(P.albums[a.key] || 0, tracksMax(a.tracks, function(t){ return trackPlayedAt(t, P); })); };
+      if(mode === 'added') return function(a){ return tracksMax(a.tracks, trackAddedAt); };
+      return function(a){ return tracksMax(a.tracks, trackReleaseAt); };
+    }
+    // artists: an artist's newest of anything (a play of their radio counts as played too)
+    if(mode === 'recent') return function(e){ return Math.max((P.artists[e.key] || {}).last || 0, tracksMax(e.tracks || [], function(t){ return trackPlayedAt(t, P); })); };
+    if(mode === 'added') return function(e){ return tracksMax(e.tracks || [], trackAddedAt); };
+    return function(e){ return tracksMax(e.tracks || [], trackReleaseAt); };
+  }
+  function sortLibraryPage(kind, list, P){ var mode = libSortMode(kind); return libSortList(list, mode, mode === 'az' ? null : libMeasure(kind, mode, P)); }
+
   function setResultCount(n, noun, countShown){
     resultCountState = typeof n === 'number' ? { n: n, noun: noun, countShown: countShown || null } : null;
     paintResultCount(n, noun);
@@ -35806,6 +35974,7 @@
           var artFile = embedded ? null : (folderArtIndex ? folderArtFor(folderArtIndex, relPathOf(file)) : null);
           var record = buildTrackRecord(file, tags, duration, artFile, contentKey);
           if(libraryById[record.localId]) return { skipped: true };
+          record.addedAt = Date.now();   // build 489: for Sort > Added
           if(record.metaKey && (libraryByMeta[record.metaKey] || reserved.meta[record.metaKey])){
             return { skipped: true };
           }
@@ -38812,6 +38981,9 @@
       return;
     }
 
+    // Build 489: in the order picked in the sort menu (the A-Z rail only for A-Z).
+    entries = sortLibraryPage('artists', entries);
+    showLibSort('artists');
     // Build 304: three across on a phone.
     stationsGrid.classList.add('grid-artists');
     // Build 484 (Mark: going back from an artist to Artists was slow):
@@ -38876,7 +39048,7 @@
     })();
     // The rail from the list itself; a letter not drawn yet draws the rest when it is chosen.
     var proxies = {};
-    buildAzRail(entries.map(function(e){
+    if(libSortMode('artists') === 'az') buildAzRail(entries.map(function(e){
       var L = azLetterFor(e.name);
       if(!proxies[L]) proxies[L] = { getBoundingClientRect: function(){ job.flush(); var t = tileFor[e.key]; return t ? t.getBoundingClientRect() : { top: 0 }; } };
       return { el: proxies[L], label: e.name };
@@ -40605,8 +40777,11 @@
       setResultCount(0, 'album');
       return;
     }
+    // Build 489: in the order picked in the sort menu (the A-Z rail only for A-Z).
+    albums = sortLibraryPage('albums', albums);
+    showLibSort('albums');
     albums.forEach(function(al){ stationsGrid.appendChild(buildAlbumTile(al)); });
-    buildAzRail(azItemsFromGrid(".tile[data-entity='album']", '.tile-name'));
+    if(libSortMode('albums') === 'az') buildAzRail(azItemsFromGrid(".tile[data-entity='album']", '.tile-name'));
     setResultCount(albums.length, 'album');
   }
 
@@ -42824,8 +42999,20 @@
     // name of -- and an alphabet rail over an unsorted list would send you nowhere.
     stationsGrid.classList.add('grid-songs');
     tracks.sort(byNameAsc);
+    // Build 489: in the order picked in the sort menu. Letter headings and the A-Z rail go with
+    // A-Z; Release is headed by year; Recent and Added run as one list.
+    var sortMode = libSortMode('songs');
+    tracks = sortLibraryPage('songs', tracks);
+    showLibSort('songs');
     stationsGrid._ctxList = tracks;
     stationsGrid._ctxLabel = 'Songs';
+    // Playing on from a song follows the list as sorted (A-Z keeps the library's own running order).
+    stationsGrid._ctxSorted = sortMode !== 'az';
+    function headFor(t){
+      if(sortMode === 'az') return azLetterFor(t.name);
+      if(sortMode === 'release'){ var r = trackReleaseAt(t); return r ? String(Math.floor(r / 10000)) : 'No year'; }
+      return null;
+    }
     // Build 407 (Mark): no Shuffle All row here; the Shuffle button under the filter does it.
     var job = songsRender = {}, i = 0, letter = null, heads = {}, rowH = 72, headH = 36;
     // Build 489: rows go into blocks of 50 (see .song-block); each block's covers are drawn when the
@@ -42849,8 +43036,8 @@
           inBlock = 0; headsIn = 0;
           artGroup = [];
         }
-        var t = tracks[i], first = azLetterFor(t.name);
-        if(first !== letter){
+        var t = tracks[i], first = headFor(t);
+        if(first !== null && first !== letter){
           letter = first;
           var head = document.createElement('div');
           head.className = 'song-letter';
@@ -42879,6 +43066,7 @@
       setTimeout(function(){ if(songsRender !== job) return; step(200); next(); }, 16);
     })();
     setResultCount(tracks.length, 'song');
+    if(sortMode !== 'az') return;
     // The rail from the list itself; a letter not drawn yet draws the rest when it is chosen.
     var proxies = {};
     buildAzRail(tracks.map(function(t){
@@ -49503,7 +49691,7 @@
     // Browsing the library itself (Songs, an artist's or album's own lists): a song keeps
     // playing on through the library in its order, as it always has.
     var allSongs = list.every(isLocalTrack);
-    if(allSongs && box === stationsGrid && activeLibrarySection && !activeArtistKey) return null;
+    if(allSongs && box === stationsGrid && activeLibrarySection && !activeArtistKey && !box._ctxSorted) return null;
     return { list: list, label: label };
   }
 
