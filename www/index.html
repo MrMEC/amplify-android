@@ -8042,7 +8042,7 @@
                     <i class="fa-solid fa-magnifying-glass"></i><span>Find better cover</span>
                   </button>
                   <button type="button" class="np-menu-item" id="npCopyBtn" role="menuitem">
-                    <i class="fa-regular fa-copy" id="npCopyIcon"></i><span id="npCopyLabel">Copy stream URL</span>
+                    <i class="fa-regular fa-copy" id="npCopyIcon"></i><svg class="menu-svg" id="npEditUrlIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" style="display:none;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span id="npCopyLabel">Copy stream URL</span>
                   </button>
                   <button type="button" class="np-menu-item danger" id="npDeleteBtn" role="menuitem">
                     <i class="fa-solid fa-trash"></i><span id="npDeleteLabel">Delete</span>
@@ -15517,7 +15517,8 @@
     // else with a stream keeps plain Copy.
     var editUrl = isFindableStation(st);
     npCopyLabel.textContent = editUrl ? 'Edit stream URL' : 'Copy stream URL';
-    npCopyIcon.className = editUrl ? 'fa-solid fa-link' : 'fa-regular fa-copy';
+    npCopyIcon.style.display = editUrl ? 'none' : '';
+    document.getElementById('npEditUrlIcon').style.display = editUrl ? '' : 'none';
     npDeleteLabel.textContent = local ? 'Remove from library' : 'Delete this stream';
     npDeleteBtn.title = npDeleteLabel.textContent;
     npDeleteBtn.setAttribute('aria-label', npDeleteBtn.title);
