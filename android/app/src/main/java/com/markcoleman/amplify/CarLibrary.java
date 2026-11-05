@@ -79,10 +79,8 @@ final class CarLibrary {
   private static final String STYLE_GROUP = "android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT";
   private static final int STYLE_LIST = 1;
   private static final String STYLE_PLAYABLE = "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT";
-  // Build 491: per-item list/grid choice, so one list can hold cover tiles and plain rows.
+  // Build 491: per-item list/grid choice (the Favorites tab's covers are grid tiles).
   private static final String STYLE_SINGLE = "android.media.browse.CONTENT_STYLE_SINGLE_ITEM_HINT";
-  /** Build 491 (Mark): how many favorites' covers lead the Home tab. */
-  private static final int HOME_FAVS = 5;
   private static final String STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED";
   private static final Map<String, String> TITLES;
   private static int messageSeq;
@@ -232,7 +230,10 @@ final class CarLibrary {
     LIST_OF = linkedHashMap3;
     LinkedHashMap linkedHashMap4 = new LinkedHashMap();
     ICONS = linkedHashMap4;
-    linkedHashMap.put("tab:home", "Home");
+    // Build 492 (Mark): the four tabs are Favorites, Listen, Library and Podcasts. Listen keeps
+    // Home's node id; Stations became a folder inside it.
+    linkedHashMap.put("tab:favorites", "Favorites");
+    linkedHashMap.put("tab:home", "Listen");
     linkedHashMap.put("tab:library", "Library");
     linkedHashMap.put("tab:stations", "Stations");
     linkedHashMap.put("tab:podcasts", "Podcasts");
@@ -260,24 +261,23 @@ final class CarLibrary {
     // Build 482 (Mark): episodes part-way through, last in the Podcasts menu (same list as Home's).
     linkedHashMap.put("pod:continue", "Continue Listening");
     linkedHashMap2.put(
-        "root", new String[] {"tab:home", "tab:library", "tab:stations", "tab:podcasts"});
+        "root", new String[] {"tab:favorites", "tab:home", "tab:library", "tab:podcasts"});
     linkedHashMap2.put(
         "tab:home",
         new String[] {
-          "home:favorites",
           "home:topartists",
           "home:continue",
           "home:recentsongs",
           "home:latest",
+          "tab:stations",
           "home:mixes",
-          "home:madeforyou",
-          "home:topstations",
-          "home:nearme"
+          "home:madeforyou"
         });
     linkedHashMap2.put(
         "tab:library",
         new String[] {"lib:artists", "lib:albums", "lib:songs", "lib:playlists", "lib:genres"});
-    linkedHashMap2.put("tab:stations", new String[] {"st:foryou", "st:recent", "st:top"});
+    linkedHashMap2.put(
+        "tab:stations", new String[] {"st:top", "home:nearme", "st:foryou", "st:recent"});
     linkedHashMap3.put("home:favorites", "favorites");
     linkedHashMap3.put("home:topartists", "topArtists");
     linkedHashMap3.put("home:madeforyou", "madeForYou");
@@ -292,7 +292,8 @@ final class CarLibrary {
     linkedHashMap3.put("pod:az", "shows");
     linkedHashMap3.put("pod:popular", "popular");
     linkedHashMap3.put("pod:continue", "continue");
-    linkedHashMap4.put("tab:home", "ic_car_home");
+    linkedHashMap4.put("tab:favorites", "ic_car_favorites");
+    linkedHashMap4.put("tab:home", "ic_car_listen");
     linkedHashMap4.put("tab:library", "ic_car_library");
     linkedHashMap4.put("tab:stations", "ic_car_stations");
     linkedHashMap4.put("tab:podcasts", "ic_car_podcasts");
@@ -390,40 +391,18 @@ final class CarLibrary {
   }
 
   /**
-   * Build 491 (Mark): the Home tab leads with the covers of the first favorites (in the phone's
-   * Home order) as grid tiles under "Favorites", then an "All favorites" tile that opens the whole
-   * list; everything Home had before follows as rows under "Browse". Playing a cover plays it from
-   * the Favorites list, the same as from inside the folder.
+   * Build 492 (Mark): the Favorites tab is every favorite as a grid of covers, in the phone's Home
+   * order. Items keep the Favorites list's ids, so playing one plays on through the favorites.
    */
-  private List<MediaItem> homeChildren() throws JSONException {
+  private List<MediaItem> favoritesGrid() throws JSONException {
     ArrayList<MediaItem> out = new ArrayList<>();
     List<JSONObject> favs = listItems("home:favorites");
-    int total = 0;
     for (int k = 0; k < favs.size(); k++) {
       MediaItem m = toBrowseItem("home:favorites", k, favs.get(k));
-      if (m == null) continue;
-      if (total < HOME_FAVS) out.add(styled(m, "Favorites", STYLE_GRID));
-      total++;
+      if (m != null) out.add(styled(m, null, STYLE_GRID));
     }
-    if (total > HOME_FAVS) {
-      out.add(
-          styled(
-              folder(
-                  "home:favorites",
-                  "All favorites",
-                  total + " favorites",
-                  iconUri("home:favorites"),
-                  null),
-              "Favorites",
-              STYLE_GRID));
-    }
-    for (String id : FIXED.get("tab:home")) {
-      // With covers showing, the tiles above stand in for the Favorites row.
-      if ("home:favorites".equals(id) && total > 0) continue;
-      // Build 310: Stations Near Me shows only while the phone has sent stations for it.
-      if ("home:nearme".equals(id) && arrayOf(catalogLists(), "nearMe").isEmpty()) continue;
-      MediaItem m = node(id);
-      if (m != null) out.add(styled(m, total > 0 ? "Browse" : null, STYLE_LIST));
+    if (out.isEmpty()) {
+      out.add(message(emptyMessage("home:favorites")));
     }
     return out;
   }
@@ -448,8 +427,8 @@ final class CarLibrary {
   }
 
   List<MediaItem> children(String str) throws JSONException {
-    if ("tab:home".equals(str)) {
-      return homeChildren();
+    if ("tab:favorites".equals(str)) {
+      return favoritesGrid();
     }
     ArrayList arrayList = new ArrayList();
     String[] strArr = FIXED.get(str);
