@@ -10058,8 +10058,15 @@
   // spacing survives into whatever view is drawn next.
   function resetStationsGrid(){
     document.body.classList.remove('genre-open', 'genres-open', 'lib-tabs-on');   // build 403/406
+    // Build 484 (Mark): the page's name in the header goes with the page. The observer can't be
+    // relied on for this -- a row removed while it sat above the header line (header slid
+    // away) never reports leaving, so "Library" stayed over the artist page. A page with tabs
+    // turns it back on as it draws them (syncStickyTabs).
+    document.body.classList.remove('stab-on');
+    if(typeof stabObserver !== 'undefined' && stabObserver) stabObserver.disconnect();
     stationsGrid.classList.remove('search-browse');
     if(typeof songsRender !== 'undefined') songsRender = null;   // build 405
+    if(typeof artistsRender !== 'undefined') artistsRender = null;   // build 484
     if(typeof mvPlayHdr !== 'undefined' && mvPlayHdr){ mvPlayHdr.style.display = 'none'; mvShuffleHdr.style.display = 'none'; }   // build 409
     stationsGrid._ctxList = null; stationsGrid._ctxLabel = null;
     var allArtists = document.getElementById('allArtistsLink');
@@ -28858,21 +28865,32 @@
   // TV's times) sits right below it at any text size. One read when the row is drawn.
   // It also watches whether the row is stuck (above its resting place under the header), which
   // turns on its backdrop: an observer, so nothing runs while scrolling.
-  var stabObserver = null;
+  // Build 484 (Mark: going back to Artists was slow): measured on the next frame, not while the
+  // page is being drawn -- reading the row's size straight after 1,900 artist rows went in made
+  // the browser lay the whole list out mid-render, and again after the rest of the page was
+  // added (about a third of the time going back). The observer reports whether it is stuck as
+  // soon as it starts watching, so nothing is read here for that either.
+  var stabObserver = null, stabPendingRow = null, stabRaf = 0, stabLastH = 0;
   function syncStickyTabs(row){
-    try{
-      var h = row && row.offsetHeight;
-      if(!h) return;
-      document.documentElement.style.setProperty('--stab-h', h + 'px');
-      if(!('IntersectionObserver' in window)) return;
-      if(!stabObserver) stabObserver = new IntersectionObserver(function(entries){
-        entries.forEach(function(en){ stabSetStuck(en.target, en.boundingClientRect.height > 0 && en.boundingClientRect.top < 60.5); });
-      }, { rootMargin: '-61px 0px 0px 0px', threshold: [0, 0.25, 0.5, 0.75, 0.99, 1] });
-      stabObserver.disconnect();
-      stabCopyHeading();
-      stabSetStuck(row, row.getBoundingClientRect().top < 61);
-      stabObserver.observe(row);
-    }catch(e){}
+    stabPendingRow = row;
+    if(stabRaf) return;
+    stabRaf = requestAnimationFrame(function(){
+      stabRaf = 0;
+      var r = stabPendingRow; stabPendingRow = null;
+      try{
+        if(!r || !r.isConnected) return;
+        var h = r.offsetHeight;
+        if(!h) return;
+        if(h !== stabLastH){ stabLastH = h; document.documentElement.style.setProperty('--stab-h', h + 'px'); }
+        if(!('IntersectionObserver' in window)) return;
+        if(!stabObserver) stabObserver = new IntersectionObserver(function(entries){
+          entries.forEach(function(en){ stabSetStuck(en.target, en.boundingClientRect.height > 0 && en.boundingClientRect.top < 60.5); });
+        }, { rootMargin: '-61px 0px 0px 0px', threshold: [0, 0.25, 0.5, 0.75, 0.99, 1] });
+        stabObserver.disconnect();
+        stabCopyHeading();
+        stabObserver.observe(r);
+      }catch(e){}
+    });
   }
   // Build 476: the stuck row also shows the page's name in the header (body.stab-on). The label
   // copies the heading's text, font and resting place when the row is drawn, so it reads as the
@@ -28895,6 +28913,20 @@
       ['fontSize', 'fontWeight', 'fontFamily', 'letterSpacing', 'lineHeight', 'color', 'textTransform'].forEach(function(k){ st[k] = cs[k]; });
       hdrPageLabel.textContent = (stationsHeading.textContent || '').trim();
     }catch(e){}
+  }
+  // Build 484: a grid's row gap, remembered by its classes and the screen width. Reading it off
+  // the grid straight after 1,900 tiles went in worked out every tile's styles mid-render (a
+  // big part of going back to Artists); the gap only depends on those, so it is read once.
+  var gridGapMemo = {};
+  // The width is kept from resize events: reading window.innerWidth itself lays the page out.
+  var gridGapVw = window.innerWidth, gridGapVh = window.innerHeight;
+  window.addEventListener('resize', function(){ gridGapVw = window.innerWidth; gridGapVh = window.innerHeight; });
+  function gridGapVwH(){ return gridGapVh; }
+  function gridRowGapFor(cls){
+    // The density setting (Settings > Appearance) scales grid gaps, so it is part of the key.
+    var key = cls + '|' + gridGapVw + '|' + (document.documentElement.style.getPropertyValue('--dens-sp') || '1');
+    if(!Object.prototype.hasOwnProperty.call(gridGapMemo, key)) gridGapMemo[key] = parseFloat(getComputedStyle(stationsGrid).rowGap) || 0;
+    return gridGapMemo[key];
   }
   // A tab row that scrolls sideways shows its open tab whole (build 180).
   function revealActiveTab(row){
@@ -31127,11 +31159,17 @@
     stationsGrid.insertBefore(bar, stationsGrid.firstChild);
     syncStickyTabs(bar);
     // Every tab gets the same space under the tabs and the filter, whatever its grid's own row gap.
-    stationsGrid.style.setProperty('--lib-rg', (parseFloat(getComputedStyle(stationsGrid).rowGap) || 0) + 'px');
+    // Build 484: the gap comes from the grid's class, so it is read from a stand-in -- reading it
+    // off the grid straight after 1,900 tiles went in worked out every tile's styles mid-render.
+    stationsGrid.style.setProperty('--lib-rg', gridRowGapFor(stationsGrid.className) + 'px');
     ensureToolbar();
-    // The active tab in view when the row scrolls.
-    var on = bar.querySelector('.active');
-    if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
+    // The active tab in view when the row scrolls. Build 484: on the next frame (still before
+    // anything is drawn) -- read now, its position laid out the whole page mid-render.
+    requestAnimationFrame(function(){
+      if(!bar.isConnected) return;
+      var on = bar.querySelector('.active');
+      if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
+    });
     if(id === 'playlists' || id === 'genres' || id === 'audiobooks') hideAzRail();   // build 407: no A-Z on these two
     if(id === 'playlists') setResultCount(stationPlaylists.length, 'playlist');
     if(id === 'artists' || id === 'albums' || id === 'songs'){
@@ -37508,6 +37546,13 @@
     return artistArtPending[key];
   }
 
+  // Build 484: what an Artists tile shows, so a kept tile is reused only while it is still right.
+  var artistTileCache = {}, artistsRender = null;
+  function artistTileSig(e){
+    var k = artistArtKey(e.key);
+    var resolved = Object.prototype.hasOwnProperty.call(artistArtResolved, e.key) ? String(artistArtResolved[e.key]) : '?';
+    return [e.name, (e.tracks || []).length, (e.stations || []).length, getCustomArtUrl(k) || '', resolved].join('|');
+  }
   function renderArtistArt(container, entry){
     if(container && !container.isConnected && entry){
       container._artistEntry = entry;
@@ -38088,6 +38133,7 @@
     return top ? top.label : '';
   }
 
+  var navRestoreY = 0;
   function goBack(fallback){
     var prev = viewHistory.pop();
     if(!prev){
@@ -38095,7 +38141,8 @@
       return;
     }
     navReplaying = true;
-    try{ prev.open(); } finally { navReplaying = false; }
+    navRestoreY = prev.scroll || 0;   // build 484: a page drawn in batches draws down to here first
+    try{ prev.open(); } finally { navReplaying = false; navRestoreY = 0; }
     // The views reset the scroll on the way in, so putting it back has to wait for them.
     var y = prev.scroll || 0;
     if(y) requestAnimationFrame(function(){ window.scrollTo(0, y); });
@@ -38172,8 +38219,17 @@
     if(section === 'artists'){
       stationsHeading.textContent = 'Artists';
       // Library artists paint immediately; the channels merge in when the directory answers.
+      // Build 484: only when they actually arrived -- once loaded, the answer comes straight back
+      // with the same list, and redrawing anyway drew the whole page twice on every visit (and,
+      // drawn in batches now, pulled a page put back by Back up to the top).
+      var stationsBefore = artistStations;
       loadArtistStations().then(function(){
-        if(activeLibrarySection === 'artists' && !activeArtistKey) renderArtistsView();
+        if(activeLibrarySection === 'artists' && !activeArtistKey && artistStations !== stationsBefore){
+          var y = window.scrollY;
+          navRestoreY = y;
+          try{ renderArtistsView(); } finally { navRestoreY = 0; }
+          if(y) window.scrollTo(0, y);
+        }
         renderLibraryList();
       });
     } else if(section === 'albums'){
@@ -38721,14 +38777,80 @@
 
     // Build 304: three across on a phone.
     stationsGrid.classList.add('grid-artists');
-    entries.forEach(function(e){ try{ stationsGrid.appendChild(buildArtistTile(e)); }catch(err){ noteAppError(err); } });   // build 431: one bad artist can't stop the list
-    buildAzRail(azItemsFromGrid(".tile[data-entity='artist']", '.tile-name'));
+    // Build 484 (Mark: going back from an artist to Artists was slow):
+    // - The tiles built last time are put back rather than built again (building 1,900 was the
+    //   biggest part of going back). A tile is reused only while everything it shows is the
+    //   same (name, songs, stations, cover); anything else is built fresh.
+    // - As on Songs (build 405), the tiles needed now go in at once and the rest follow in
+    //   batches between frames: down to where the page is being put back to (Back), plus a
+    //   screen, so it returns to the same place; the A-Z rail knows every letter from the
+    //   start and the filter draws the rest first (songsFlush).
+    var reuse = artistTileCache, next = {}, tileFor = {}, i = 0;
+    var job = artistsRender = {};
+    function one(e){
+      var sig = artistTileSig(e), hit = reuse[e.key], t;
+      if(hit && hit.sig === sig && !hit.el.isConnected){
+        t = hit.el;
+        t.classList.remove('sf-hide', 'playing');
+      } else {
+        t = buildArtistTile(e);
+      }
+      next[e.key] = { sig: sig, el: t };
+      tileFor[e.key] = t;
+      return t;
+    }
+    function step(n){
+      var frag = document.createDocumentFragment(), end = Math.min(entries.length, i + n);
+      for(; i < end; i++){
+        try{ frag.appendChild(one(entries[i])); }catch(err){ noteAppError(err); }   // build 431: one bad artist can't stop the list
+      }
+      // Ahead of the spinner shown while artist radio is still loading.
+      stationsGrid.insertBefore(frag, job.tail && job.tail.parentNode === stationsGrid ? job.tail : null);
+      if(i >= entries.length && artistsRender === job){ artistTileCache = next; job.done = true; }
+    }
+    job.flush = function(){ if(artistsRender === job && i < entries.length) step(entries.length); };
+    step(60);
+    var restoreY = navRestoreY || 0;
+    if(restoreY > 0 && i < entries.length){
+      // Enough for the place being returned to (plus a screen and a half for what goes in above).
+      // Worked out from the first batch's rows -- one look at the page, not one per batch.
+      var want = restoreY + (gridGapVwH() * 1.5);
+      var tiles = stationsGrid.querySelectorAll(":scope > .tile[data-entity='artist']");
+      var first = tiles[0], lastT = tiles[tiles.length - 1];
+      if(first && lastT){
+        var fr = first.getBoundingClientRect(), lr = lastT.getBoundingClientRect(), sy = window.scrollY;
+        if(lr.bottom + sy < want){
+          var cols = 0;
+          for(var c = 0; c < tiles.length && Math.abs(tiles[c].getBoundingClientRect().top - fr.top) < 2; c++) cols++;
+          cols = Math.max(1, cols);
+          var rows = Math.max(1, Math.ceil(tiles.length / cols));
+          var rowH = Math.max(40, (lr.bottom - fr.top) / rows);
+          var need = Math.ceil((want - (fr.top + sy)) / rowH) * cols + cols * 2;
+          if(need > i) step(need - i);
+          // One more look in case the estimate fell short (taller rows further down).
+          var l2 = stationsGrid.lastElementChild;
+          if(i < entries.length && l2 && l2.getBoundingClientRect().bottom + window.scrollY < want) step(entries.length - i);
+        }
+      }
+    }
+    (function more(){
+      if(artistsRender !== job || i >= entries.length) return;
+      setTimeout(function(){ if(artistsRender !== job) return; step(200); more(); }, 16);
+    })();
+    // The rail from the list itself; a letter not drawn yet draws the rest when it is chosen.
+    var proxies = {};
+    buildAzRail(entries.map(function(e){
+      var L = azLetterFor(e.name);
+      if(!proxies[L]) proxies[L] = { getBoundingClientRect: function(){ job.flush(); var t = tileFor[e.key]; return t ? t.getBoundingClientRect() : { top: 0 }; } };
+      return { el: proxies[L], label: e.name };
+    }));
 
     if(pending){
       var spin = document.createElement('div');
       spin.className = 'loading-state';
       spin.innerHTML = '<div class="spinner"></div>';
       stationsGrid.appendChild(spin);
+      job.tail = spin;
       setResultCount(null);
     } else {
       setResultCount(entries.length, 'artist');
@@ -42647,7 +42769,10 @@
   // still queues the whole list, the A-Z rail knows every letter from the start (a jump draws
   // up to there first), and the filter box draws the rest before it filters.
   var songsRender = null;
-  function songsFlush(){ if(songsRender && songsRender.flush) songsRender.flush(); }
+  function songsFlush(){
+    if(songsRender && songsRender.flush) songsRender.flush();
+    if(typeof artistsRender !== 'undefined' && artistsRender && artistsRender.flush) artistsRender.flush();   // build 484
+  }
   function renderSongsView(){
     resetStationsGrid();
     var tracks = libraryTracks.filter(function(t){ return !isBlacklisted(t); });
@@ -51752,12 +51877,15 @@
         }
         return;
       }
-      if(!bar.offsetParent) return;
+      // Build 484: shown or not is read from styles, not layout (offsetParent laid the whole page
+      // out -- 1,900 artists -- just to know that). The margins below only need styles anyway.
+      var shown = function(el){ return el.isConnected && getComputedStyle(el).display !== 'none'; };
+      if(!shown(bar) || !shown(stationsGrid)) return;
       var rg = parseFloat(getComputedStyle(stationsGrid).rowGap) || 0;
       var prev = bar.previousElementSibling, prevMb = prev ? (parseFloat(getComputedStyle(prev).marginBottom) || 0) : 0;
       bar.style.setProperty('margin-top', (12 - rg - prevMb) + 'px', 'important');
       var next = bar.nextElementSibling;
-      while(next && !next.offsetParent) next = next.nextElementSibling;
+      while(next && !shown(next)) next = next.nextElementSibling;
       var nextMt = next ? (parseFloat(getComputedStyle(next).marginTop) || 0) : 0;
       bar.style.setProperty('margin-bottom', ((next && next.classList.contains('page-toolbar') ? 10 : 18) - rg - nextMt) + 'px', 'important');
     }
