@@ -4092,11 +4092,10 @@
   /* Build 345 (Mark): in Add Channels a name and its description each get up to four lines. */
   #stationsGrid:has(> .ch-tools) .ch-row :is(.ch-name, .ch-sub){ white-space:normal; display:-webkit-box; -webkit-line-clamp:4; line-clamp:4;
     -webkit-box-orient:vertical; overflow:hidden; text-overflow:clip; overflow-wrap:anywhere; }
-  /* ...and no mini Now Playing while typing anywhere in Add Channels (its tabs, the custom
-     channel sheet, the New Channel editor). */
-  body.kb-open:has(#stationsGrid > .ch-tools) .player-bar,
-  body.kb-open:has(.ia-sheet) .player-bar,
-  body.kb-open.lc-page-open .player-bar{ display:none !important; }
+  /* ...and no mini Now Playing while typing anywhere in Add Channels: covered by the global
+     body.kb-open .player-bar rule (build 404). Build 485 removed the :has() versions here -- with
+     the class on <body>, each toggle made the browser search the whole page (thousands of
+     songs) for a match, which froze the Songs filter box when tapped. */
   .ia-combine{ margin-right:-4px; }
   .ia-custom-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 0 4px; }
   .ia-custom-tools .settings-select{ flex:0 0 auto; width:auto; min-width:0; }
@@ -4910,8 +4909,8 @@
     body.kb-open .mobile-nav{ display:none; }
     /* Build 330: nor the black fade that sits behind the tab bar and mini player, which with both gone is just a dark smear over the list. */
     body.kb-open .mobile-scroll-fade{ display:none !important; }
-    /* Build 329: and the mini Now Playing too, while a section filter box is the field being typed in. */
-    body.kb-open:has(.sec-filter input:focus) .player-bar{ display:none !important; }
+    /* Build 329's :has() rule for the mini Now Playing is gone (build 485): the global
+       body.kb-open .player-bar rule (build 404) already hides it for every input. */
     body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:var(--search-sheet-h); }
 
     /* Content clears the tab bar plus the player bar above it. */
@@ -7201,7 +7200,6 @@
   .lib-fav-row::-webkit-scrollbar{ display:none; }
   .lib-fav-row > .tile{ flex:0 0 var(--w-artist); width:var(--w-artist); min-width:0; scroll-snap-align:start; }
   .tile-grid.grid-artists > .lib-fav-block{ grid-column:1/-1; }
-  body.sf-filtering .lib-fav-block{ display:none; }
   /* Build 406 (Mark): on the Library tabs the count and the page's buttons sit under the filter, so the
      "Library" heading has the top to itself. The header's own copies stay hidden there. */
   .page-toolbar{ display:flex; align-items:center; min-height:40px; margin:0 0 14px; }
@@ -10844,8 +10842,15 @@
     }).observe(document.body, { childList: true, subtree: true, characterData: true });
     function refitAll(){ watch(document.body); }
     window.__wordFitAll = refitAll;
-    var rt = 0;
-    window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(refitAll, 200); });
+    var rt = 0, fitW = window.innerWidth;
+    // Build 485: only when the width changes. Fitting depends on width alone, and the keyboard
+    // coming up (a height change) re-scanned every title on the page -- thousands on Songs.
+    window.addEventListener('resize', function(){
+      var w = window.innerWidth;
+      if(w === fitW) return;
+      fitW = w;
+      clearTimeout(rt); rt = setTimeout(refitAll, 200);
+    });
     document.addEventListener('change', function(e){ if(e.target && /^(font|sz-|shape)/.test(e.target.id || '')) setTimeout(refitAll, 150); }, true);
     document.addEventListener('input', function(e){ if(e.target && /^(fontSizeRange|sz-)/.test(e.target.id || '')){ clearTimeout(rt); rt = setTimeout(refitAll, 250); } }, true);
     if(document.fonts && document.fonts.ready) document.fonts.ready.then(refitAll);
@@ -51956,6 +51961,9 @@
         if(typeof cn !== 'string') return;
         if(HEAD_RE.test(cn)){ closeHead(); head = k; headOn = false; return; }
         if(k.classList.contains('mv-top') || k.classList.contains('shuffle-all-row')){ show(k, !tokens.length); return; }
+        // Build 485 (Mark): Favorite Artists (its row and the "All Artists" label under it) steps
+        // aside while filtering, so only the matching artists show.
+        if(k.classList.contains('lib-fav-block')){ show(k, !tokens.length); return; }
         if(k.classList.contains('epg')){
           Array.prototype.forEach.call(k.querySelectorAll('.epg-row'), function(r){
             var ok = matches(r); total++; if(ok){ shown++; shownRows.push(r); } show(r, ok);
