@@ -2618,9 +2618,11 @@
      scales to the height and throws away the sides, which is why the covers came out zoomed
      in with their edges cut off. Matching the box to the artwork's own shape means the left
      and right edges land exactly on the edges of the screen with nothing lost. */
-  /* Build 150: an artist's Radio wears a small radio badge in the corner of its picture. */
+  /* Build 150: an artist's Radio wears a small radio badge in the corner of its picture.
+     Build 480: drawn as ::before -- ::after is the playing ring, and sharing it squeezed the ring
+     into the badge's 30px box (top left) and hid the badge while the radio played. */
   .art-radio{ position:relative; }
-  .art-radio::after{
+  .art-radio::before{
     content:''; position:absolute; right:6%; bottom:6%; width:26%; height:26%; max-width:30px; max-height:30px; min-width:16px; min-height:16px;
     border-radius:50%; background-color:rgba(0,0,0,.6); pointer-events:none; z-index:2;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='2' fill='white'/%3E%3Cpath d='M16.24 7.76a6 6 0 0 1 0 8.48M7.76 16.24a6 6 0 0 1 0-8.48M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14'/%3E%3C/svg%3E");
@@ -4147,6 +4149,11 @@
   }
   .art-url-trash-btn:hover:not(:disabled){ color:var(--danger); border-color:var(--danger); }
   .art-url-trash-btn:disabled{ opacity:.35; cursor:default; }
+  /* Build 480: the stream URL dialog's Copy button -- the trash button's square, not its red. */
+  .surl-copy-btn:hover:not(:disabled){ color:var(--accent); border-color:var(--accent); }
+  .surl-copy-btn.copied{ color:var(--accent); border-color:var(--accent); }
+  .art-url-save-btn:disabled{ opacity:.45; cursor:default; filter:none; }
+  #streamUrlInput{ min-width:0; }
   .art-url-actions{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:16px; }
   .art-url-save-btn{
     background:var(--accent); color:var(--accent-text); border:none; border-radius:8px; padding:9px 16px;
@@ -8035,7 +8042,7 @@
                     <i class="fa-solid fa-magnifying-glass"></i><span>Find better cover</span>
                   </button>
                   <button type="button" class="np-menu-item" id="npCopyBtn" role="menuitem">
-                    <i class="fa-regular fa-copy"></i><span>Copy stream URL</span>
+                    <i class="fa-regular fa-copy" id="npCopyIcon"></i><span id="npCopyLabel">Copy stream URL</span>
                   </button>
                   <button type="button" class="np-menu-item danger" id="npDeleteBtn" role="menuitem">
                     <i class="fa-solid fa-trash"></i><span id="npDeleteLabel">Delete</span>
@@ -9096,6 +9103,31 @@
         <i class="fa-solid fa-trash"></i>
       </button>
       <button class="art-url-save-btn" id="playlistSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Build 480 (Mark): a radio station's stream URL, from Now Playing's More menu. Same shape as
+     the playlist dialog; the URL row is the cover dialog's (input + square button). -->
+<div class="settings-overlay" id="streamUrlOverlay" role="dialog" aria-modal="true" aria-labelledby="streamUrlTitle">
+  <div class="settings-panel" id="streamUrlPanel">
+    <div class="settings-header">
+      <h2 id="streamUrlTitle">Edit Stream URL</h2>
+      <button class="settings-close" id="streamUrlCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="art-url-body">
+      <div class="cs-field">
+        <label for="streamUrlInput" id="streamUrlStation">Stream URL</label>
+        <div class="art-url-input-row">
+          <input type="url" class="art-url-input" id="streamUrlInput" placeholder="https://" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+          <button type="button" class="art-url-trash-btn surl-copy-btn" id="streamUrlCopyBtn" title="Copy" aria-label="Copy the URL">
+            <i class="fa-regular fa-copy"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="art-url-actions">
+      <button class="art-url-save-btn" id="streamUrlSaveBtn">Save</button>
     </div>
   </div>
 </div>
@@ -10263,6 +10295,11 @@
   var moreLikeOverlay = document.getElementById('moreLikeOverlay');
   var moreLikeTags = document.getElementById('moreLikeTags');
   var npCopyBtn = document.getElementById('npCopyBtn');
+  var npCopyLabel = document.getElementById('npCopyLabel'), npCopyIcon = document.getElementById('npCopyIcon');
+  // Build 480: edited stream URLs, by station key (see applyStreamEdit). Read here, early, as
+  // directory stations are turned into cards (stationToCardData) from the first load on.
+  var STREAM_EDITS_KEY = 'radioPlayerStreamEdits';
+  var streamEdits = (function(){ try{ return JSON.parse(localStorage.getItem(STREAM_EDITS_KEY) || '{}') || {}; }catch(e){ return {}; } })();
   var npPlaylistBtn = document.getElementById('npPlaylistBtn');
   var npDeleteBtn = document.getElementById('npDeleteBtn');
   var npRelated = document.getElementById('npRelated');
@@ -15476,6 +15513,11 @@
     // a track you no longer want is still the useful action in that slot.
     var local = isLocalTrack(st);
     npCopyBtn.style.display = local ? 'none' : '';
+    // Build 480: a radio station's stream URL can be edited (the dialog copies it too); anything
+    // else with a stream keeps plain Copy.
+    var editUrl = isFindableStation(st);
+    npCopyLabel.textContent = editUrl ? 'Edit stream URL' : 'Copy stream URL';
+    npCopyIcon.className = editUrl ? 'fa-solid fa-link' : 'fa-regular fa-copy';
     npDeleteLabel.textContent = local ? 'Remove from library' : 'Delete this stream';
     npDeleteBtn.title = npDeleteLabel.textContent;
     npDeleteBtn.setAttribute('aria-label', npDeleteBtn.title);
@@ -15538,9 +15580,105 @@
     if(typeof closeNpMenu === 'function') closeNpMenu();
     showNotice({ message: 'Stream URL copied.', kind: 'done' });
   }
+  function copyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text).then(function(){ return true; })['catch'](function(){ return legacyCopyText(text); });
+    }
+    return Promise.resolve(legacyCopyText(text));
+  }
+
+  // ---------- Build 480: edit a radio station's stream URL ----------
+  // Saved in every copy of the station the app keeps (favourites, recents, playlists, the queue)
+  // and in a map by station key, so a directory station shows the edited URL wherever it turns
+  // up again (search, genres, Home) and in the car. Its key never changes: one without a
+  // directory id keeps its old URL as streamKey.
+  function streamEditFor(key){ return (key && streamEdits && Object.prototype.hasOwnProperty.call(streamEdits, key)) ? streamEdits[key] : null; }
+  function streamUrlFor(st){ return (st && streamEditFor(favKey(st))) || (st && st.urlToResolve); }
+  function applyStreamEdit(st, url){
+    var key = favKey(st);
+    function fix(c){
+      if(!c || typeof c !== 'object' || favKey(c) !== key) return;
+      if(!c.stationuuid && !c.streamKey) c.streamKey = key;
+      c.urlToResolve = url;
+      if(c.url) c.url = url;
+      if(c.url_resolved) c.url_resolved = url;
+    }
+    fix(st);
+    favorites.forEach(fix);
+    recentStations.forEach(fix);
+    stationPlaylists.forEach(function(p){ (p.stations || []).forEach(fix); });
+    playQueue.forEach(fix);
+    upNext.forEach(fix);
+    fix(currentStation); fix(npStation);
+    if(lastCustomSearchResults && lastCustomSearchResults.stations) lastCustomSearchResults.stations.forEach(fix);
+    streamEdits[key] = url;
+    try{ localStorage.setItem(STREAM_EDITS_KEY, JSON.stringify(streamEdits)); }catch(e){}
+    saveFavorites(); saveRecent(); saveStationPlaylists();
+  }
+  var streamUrlOverlay = document.getElementById('streamUrlOverlay');
+  var streamUrlInput = document.getElementById('streamUrlInput');
+  var streamUrlSaveBtn = document.getElementById('streamUrlSaveBtn');
+  var streamUrlCopyBtn = document.getElementById('streamUrlCopyBtn');
+  var streamUrlStation = null, streamUrlCopiedTimer = null;
+  function syncStreamUrlSave(){
+    var v = streamUrlInput.value.trim();
+    // Nothing typed: nothing to save (and Save says so by being off).
+    streamUrlSaveBtn.disabled = !v || !streamUrlStation || v === streamUrlFor(streamUrlStation);
+    streamUrlCopyBtn.disabled = !v;
+  }
+  function openStreamUrlDialog(st){
+    streamUrlStation = st;
+    document.getElementById('streamUrlStation').textContent = 'Stream URL for ' + stripExclusively(st.name || 'this station');
+    streamUrlInput.value = streamUrlFor(st) || '';
+    streamUrlCopyBtn.classList.remove('copied');
+    syncStreamUrlSave();
+    streamUrlOverlay.classList.add('open');
+    // Not focused: on a phone that would raise the keyboard when all you may want is to copy.
+  }
+  function closeStreamUrlDialog(){
+    streamUrlOverlay.classList.remove('open');
+    streamUrlStation = null;
+    try{ streamUrlInput.blur(); }catch(e){}
+  }
+  streamUrlInput.addEventListener('input', syncStreamUrlSave);
+  streamUrlInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); if(!streamUrlSaveBtn.disabled) streamUrlSaveBtn.click(); } });
+  document.getElementById('streamUrlCloseBtn').addEventListener('click', closeStreamUrlDialog);
+  streamUrlOverlay.addEventListener('click', function(e){ if(e.target === streamUrlOverlay) closeStreamUrlDialog(); });
+  streamUrlCopyBtn.addEventListener('click', function(){
+    var v = streamUrlInput.value.trim();
+    if(!v) return;
+    copyText(v).then(function(ok){
+      if(!ok) return;
+      var ico = streamUrlCopyBtn.querySelector('i');
+      streamUrlCopyBtn.classList.add('copied');
+      if(ico) ico.className = 'fa-solid fa-check';
+      streamUrlCopyBtn.setAttribute('aria-label', 'Copied');
+      clearTimeout(streamUrlCopiedTimer);
+      streamUrlCopiedTimer = setTimeout(function(){
+        streamUrlCopyBtn.classList.remove('copied');
+        if(ico) ico.className = 'fa-regular fa-copy';
+        streamUrlCopyBtn.setAttribute('aria-label', 'Copy the URL');
+      }, 1600);
+    });
+  });
+  streamUrlSaveBtn.addEventListener('click', function(){
+    var st = streamUrlStation, v = streamUrlInput.value.trim();
+    if(!st || !v) return;   // never saves an empty URL
+    var wasOnAir = !!(currentStation && favKey(currentStation) === favKey(st));
+    applyStreamEdit(st, v);
+    closeStreamUrlDialog();
+    // The one on air switches to the new address straight away.
+    if(wasOnAir) playStation(currentStation);
+  });
+
   npCopyBtn.addEventListener('click', function(){
     var st = npTarget();
     if(!st || !st.urlToResolve) return;
+    if(isFindableStation(st)){
+      if(typeof closeNpMenu === 'function') closeNpMenu();
+      openStreamUrlDialog(st);
+      return;
+    }
     var url = st.urlToResolve;
     if(navigator.clipboard && navigator.clipboard.writeText){
       navigator.clipboard.writeText(url).then(showCopiedTip).catch(function(){
@@ -16446,7 +16584,9 @@
     if(s && s.type === 'artistRadio') return 'artistradio:' + (s.artistKey || '');
     if(s && s.type === 'playlistRadio') return 'playlistradio:' + (s.playlistId || '');
     if(s && s.type === 'chartsong') return 'song:' + (s.songKey || songKeyOf(s.artist, s.name));
-    return s.stationuuid || s.urlToResolve || s.name;
+    // Build 480: a station whose stream URL was edited keeps the key it had (streamKey), so its
+    // cover, plays, favourite and place in playlists stay with it.
+    return s.stationuuid || s.streamKey || s.urlToResolve || s.name;
   }
   // The favourite record for an album. Kept to the same three-field shape as the artist one
   // so favourites, the backup file and the sidebar all handle it with no extra code path.
@@ -44736,6 +44876,11 @@
     return /^\s*the united arab emirates\s*$/i.test(v) ? 'Amplify Radio' : v;
   }
   function stationToCardData(s){
+    var edited = s && s.stationuuid ? streamEditFor(s.stationuuid) : null;
+    if(edited) return Object.assign(stationToCardDataRaw(s), { urlToResolve: edited });
+    return stationToCardDataRaw(s);
+  }
+  function stationToCardDataRaw(s){
     return {
       name: stripExclusively(s.name) || 'Untitled station',
       urlToResolve: s.url_resolved || s.url,
@@ -49212,7 +49357,7 @@
     }
     startStream();
     function startStream(){
-    var url = liveStreamUrl(station.urlToResolve);
+    var url = liveStreamUrl(streamUrlFor(station));
     var canFallback = looksLikePlaylist(url);
     function stillWanted(){ return currentStation === station; }
     function fail(urlTried, err){
@@ -50457,7 +50602,7 @@
       var sub = String(s.tags || '').split(',').slice(0, 3).join(', ') || displayCountry(s.country) || '';
       // place: the location line the phone's Now Playing shows under a station, which the
       // car's Now Playing card repeats (sub stays the genre tags the car's lists show).
-      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: liveStreamUrl(s.urlToResolve) };
+      return { t: 'station', k: favKey(s), title: s.name || 'Station', sub: sub, place: npStationDetails(s), art: carStationArt(s), url: liveStreamUrl(streamUrlFor(s)) };
     }
     // ---- pictures: the car shows the same art as the phone ----
     // Custom cover art the user set wins, then the logo the page looked up for a station
