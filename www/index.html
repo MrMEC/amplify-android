@@ -14329,6 +14329,7 @@
   }
   function enterVideoFull(lockLandscape){
     if(!npVideoOn || npVideoFull) return;
+    try{ videoViewLog.push(new Date().toLocaleTimeString() + ' full screen enter win ' + window.innerWidth + 'x' + window.innerHeight); if(videoViewLog.length > 24) videoViewLog.shift(); }catch(e){}
     npVideoFull = true; npVideoFullLocked = !!lockLandscape;
     document.body.classList.add('np-video-full');
     npVideoFullBtn.setAttribute('aria-label', 'Exit full screen');
@@ -14346,6 +14347,7 @@
   }
   function exitVideoFull(){
     if(!npVideoFull) return;
+    try{ videoViewLog.push(new Date().toLocaleTimeString() + ' full screen exit win ' + window.innerWidth + 'x' + window.innerHeight); if(videoViewLog.length > 24) videoViewLog.shift(); }catch(e){}
     npVideoFull = false;
     // Leaving by hand while the phone is on its side: don't jump straight back in.
     if(window.innerWidth > window.innerHeight) npVideoNoAutoFull = true;
@@ -14783,6 +14785,7 @@
   if(videoPlugin){
     videoPlugin.addListener('videoctl', function(ev){
       var a = ev && ev.action;
+      try{ videoViewLog.push(new Date().toLocaleTimeString() + ' control ' + a + ' (full ' + npVideoFull + ', win ' + window.innerWidth + 'x' + window.innerHeight + ')'); if(videoViewLog.length > 24) videoViewLog.shift(); }catch(e){}
       if(a === 'play' || a === 'pause'){
         if((a === 'pause') === vctlPlaying()) npPlayBtn.click();
       } else if(a === 'seek'){

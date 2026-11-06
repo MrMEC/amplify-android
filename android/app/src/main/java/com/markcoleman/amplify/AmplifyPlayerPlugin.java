@@ -2813,8 +2813,12 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   @PluginMethod
   public void setVideoUi(PluginCall call) {
-    boolean fullscreen = Boolean.TRUE.equals(call.getBoolean("fullscreen", false));
-    boolean landscape = Boolean.TRUE.equals(call.getBoolean("landscape", false));
+    // Build 502: a Chromebook runs the app in a window. Hiding the system bars or locking the
+    // turn there makes ChromeOS reshape the window, which undid the switch to full screen; the
+    // page's own full screen fills the window by itself.
+    boolean chromeOs = onChromeOs();
+    boolean fullscreen = Boolean.TRUE.equals(call.getBoolean("fullscreen", false)) && !chromeOs;
+    boolean landscape = Boolean.TRUE.equals(call.getBoolean("landscape", false)) && !chromeOs;
     boolean awake = Boolean.TRUE.equals(call.getBoolean("awake", false));
     Activity activity = getActivity();
     if (activity == null) {
