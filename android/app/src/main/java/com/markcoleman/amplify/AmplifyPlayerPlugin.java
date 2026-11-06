@@ -715,8 +715,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
       o.put("id", currentId);
       // Not a network code (2xxx): the page mustn't keep retrying what the Chromecast refused.
       o.put("code", 4005);
-      o.put("name", "Chromecast couldn't play it" + (failNote != null ? " (" + failNote + ")" : ""));
-      o.put("message", "The Chromecast couldn't play this" + (failNote != null ? " (" + failNote + ")" : ""));
+      // Build 495: or the Roku.
+      String kind = cast.kindName();
+      o.put("name", kind + " couldn't play it" + (failNote != null ? " (" + failNote + ")" : ""));
+      o.put("message", "The " + kind + " couldn't play this" + (failNote != null ? " (" + failNote + ")" : ""));
       o.put("cast", true);
       notifyListeners("error", o);
       return;

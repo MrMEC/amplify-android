@@ -133,9 +133,42 @@ final class CastBridge {
 
   private final MediaRouter.Callback discoveryCb = new MediaRouter.Callback() {};
 
+  // ---- Build 495 (Mark): Rokus too. While one is picked, everything below goes to it. ----
+  private final RokuCast roku;
+
+  private boolean rokuOn() {
+    return roku.connected();
+  }
+
+  /** "Roku" or "Chromecast", for messages. */
+  String kindName() {
+    return rokuOn() ? "Roku" : "Chromecast";
+  }
+
+  private final RokuCast.Owner rokuOwner =
+      new RokuCast.Owner() {
+        @Override public void onRokuDevices() { safe("rokuDevices", CastBridge.this.listener::onCastChanged); }
+        @Override public void onRokuSessionStarted() { safe("rokuStarted", () -> { loading = false; CastBridge.this.listener.onCastSessionStarted(); CastBridge.this.listener.onCastChanged(); }); }
+        @Override public void onRokuSessionEnded(long positionMs, boolean wasPlaying) {
+          safe("rokuEnded", () -> { loading = false; CastBridge.this.listener.onCastSessionEnded(positionMs, wasPlaying); CastBridge.this.listener.onCastChanged(); });
+        }
+        @Override public void onRokuStatus() {
+          safe("rokuStatus", () -> {
+            int ps = CastBridge.this.roku.playerState();
+            if (ps == MediaStatus.PLAYER_STATE_PLAYING) { wantPlay = true; loading = false; }
+            else if (ps == MediaStatus.PLAYER_STATE_PAUSED) { wantPlay = false; loading = false; }
+            else if (ps == MediaStatus.PLAYER_STATE_IDLE && CastBridge.this.roku.idleReason() != MediaStatus.IDLE_REASON_NONE) loading = false;
+            lastPos = CastBridge.this.roku.position();
+            lastPlaying = ps == MediaStatus.PLAYER_STATE_PLAYING;
+            CastBridge.this.listener.onCastStatus();
+          });
+        }
+      };
+
   CastBridge(Context context, Listener l) {
     app = context.getApplicationContext();
     listener = l;
+    roku = new RokuCast(app, rokuOwner);
     try {
       ctx = CastContext.getSharedInstance(app);
       ctx.addCastStateListener(stateCb);
@@ -152,7 +185,7 @@ final class CastBridge {
     }
   }
 
-  boolean supported() { return ctx != null; }
+  boolean supported() { return true; }   // build 495: a Roku needs no Google Play services
 
   /** Build 196: an error in a Cast callback is recorded, never allowed to close the app. */
   private void safe(String where, Runnable r) {
@@ -165,6 +198,7 @@ final class CastBridge {
 
   /** Looks for devices while the app is in front (the Cast button shows when there are some). */
   void setDiscovery(boolean on) {
+    roku.setDiscovery(on);
     if (router == null || selector == null || on == discovering) return;
     discovering = on;
     try {
@@ -175,6 +209,7 @@ final class CastBridge {
   }
 
   boolean devicesAvailable() {
+    if (roku.hasDevices() || rokuOn()) return true;
     if (ctx == null) return false;
     if (castState != CastState.NO_DEVICES_AVAILABLE) return true;
     try {
@@ -188,14 +223,16 @@ final class CastBridge {
     return false;
   }
 
-  boolean connecting() { return castState == CastState.CONNECTING; }
+  boolean connecting() { return !rokuOn() && ctx != null && castState == CastState.CONNECTING; }
 
   boolean connected() {
+    if (rokuOn()) return true;
     CastSession s = session();
     return s != null && s.isConnected() && client != null;
   }
 
   @Nullable String deviceName() {
+    if (rokuOn()) return roku.deviceName();
     CastSession s = session();
     try {
       return s != null && s.getCastDevice() != null ? s.getCastDevice().getFriendlyName() : null;
@@ -232,6 +269,21 @@ final class CastBridge {
 
   /** The device picker, or (while casting) the device's own panel with Stop casting. */
   void showPicker(Activity activity) {
+    // Build 495: with a Roku about, one list holds the Chromecasts and the Rokus.
+    if (rokuOn()) {
+      new android.app.AlertDialog.Builder(activity)
+          .setTitle(roku.deviceName())
+          .setMessage("Casting to this Roku")
+          .setPositiveButton("Stop casting", (dlg, w) -> safe("rokuStop", () -> roku.end(true)))
+          .setNegativeButton("Close", null)
+          .show();
+      return;
+    }
+    boolean castBusy = ctx != null && (connected() || connecting());
+    if (!castBusy && roku.hasDevices()) {
+      showMixedPicker(activity);
+      return;
+    }
     if (ctx == null || selector == null) return;
     if (connected() || connecting()) {
       MediaRouteControllerDialog d = new MediaRouteControllerDialog(activity);
@@ -243,7 +295,39 @@ final class CastBridge {
     }
   }
 
+  /** Build 495: Chromecasts (from the media router) and Rokus in one list. */
+  private void showMixedPicker(Activity activity) {
+    final java.util.List<String> names = new java.util.ArrayList<>();
+    final java.util.List<Object> picks = new java.util.ArrayList<>();
+    try {
+      if (router != null && selector != null) {
+        for (MediaRouter.RouteInfo r : router.getRoutes()) {
+          if (!r.isDefaultOrBluetooth() && r.isEnabled() && r.matchesSelector(selector)) {
+            names.add(r.getName() + " (Chromecast)");
+            picks.add(r);
+          }
+        }
+      }
+    } catch (Throwable ignored) {
+    }
+    for (RokuCast.Device d : roku.devices()) {
+      names.add(d.name + " (Roku)");
+      picks.add(d);
+    }
+    if (picks.isEmpty()) return;
+    new android.app.AlertDialog.Builder(activity)
+        .setTitle("Cast to")
+        .setItems(names.toArray(new String[0]), (dlg, which) -> safe("pick", () -> {
+          Object o = picks.get(which);
+          if (o instanceof RokuCast.Device) roku.connect((RokuCast.Device) o);
+          else if (o instanceof MediaRouter.RouteInfo && router != null) router.selectRoute((MediaRouter.RouteInfo) o);
+        }))
+        .setNegativeButton("Cancel", null)
+        .show();
+  }
+
   void endSession() {
+    if (rokuOn()) { roku.end(true); return; }
     if (ctx == null) return;
     try { ctx.getSessionManager().endCurrentSession(true); } catch (Throwable ignored) {}
   }
@@ -363,6 +447,15 @@ final class CastBridge {
   }
 
   void load(String url, boolean live, String title, String artist, @Nullable String artUrl, long startMs, boolean play, boolean video, @Nullable String mimeOverride) {
+    if (rokuOn()) {
+      // Play on Roku always starts at the beginning (ECP has no seek).
+      wantPlay = play;
+      loading = true;
+      lastPos = 0L;
+      lastUrl = url;
+      roku.load(url, live, title, artist, artUrl, play, video, mimeOverride);
+      return;
+    }
     RemoteMediaClient c = client;
     if (c == null) return;
     String mime = mimeOverride != null ? mimeOverride : mimeFor(url);
@@ -427,17 +520,22 @@ final class CastBridge {
     CrashLog.note(app, "cast media", new RuntimeException(why + " [" + mimeFor(lastUrl == null ? "" : lastUrl) + "] " + (lastUrl == null ? "" : lastUrl)));
     listener.onCastStatus();
   }
-  @Nullable String takeFailNote() { String n = failNote; failNote = null; return n; }
+  @Nullable String takeFailNote() {
+    if (rokuOn()) return roku.takeFailNote();
+    String n = failNote; failNote = null; return n;
+  }
 
-  void play() { RemoteMediaClient c = client; if (c != null) { wantPlay = true; try { c.play(); } catch (Throwable ignored) {} } }
-  void pause() { RemoteMediaClient c = client; if (c != null) { wantPlay = false; try { c.pause(); } catch (Throwable ignored) {} } }
-  void stopMedia() { RemoteMediaClient c = client; if (c != null) { wantPlay = false; loading = false; try { c.stop(); } catch (Throwable ignored) {} } }
+  void play() { if (rokuOn()) { wantPlay = true; roku.play(); return; } RemoteMediaClient c = client; if (c != null) { wantPlay = true; try { c.play(); } catch (Throwable ignored) {} } }
+  void pause() { if (rokuOn()) { wantPlay = false; roku.pause(); return; } RemoteMediaClient c = client; if (c != null) { wantPlay = false; try { c.pause(); } catch (Throwable ignored) {} } }
+  void stopMedia() { if (rokuOn()) { wantPlay = false; loading = false; roku.stopMedia(); return; } RemoteMediaClient c = client; if (c != null) { wantPlay = false; loading = false; try { c.stop(); } catch (Throwable ignored) {} } }
   void seek(long ms) {
+    if (rokuOn()) return;   // ECP can't seek
     RemoteMediaClient c = client;
     if (c == null) return;
     try { c.seek(new MediaSeekOptions.Builder().setPosition(Math.max(0L, ms)).build()); } catch (Throwable ignored) {}
   }
   void setVolume(double v) {
+    if (rokuOn()) return;   // the Roku's own remote sets its volume
     RemoteMediaClient c = client;
     if (c == null) return;
     try { c.setStreamVolume(Math.max(0d, Math.min(1d, v))); } catch (Throwable ignored) {}
@@ -445,16 +543,19 @@ final class CastBridge {
 
   // ---- what the Chromecast is doing ----
   long position() {
+    if (rokuOn()) return roku.position();
     RemoteMediaClient c = client;
     if (c == null) return lastPos;
     try { return Math.max(0L, c.getApproximateStreamPosition()); } catch (Throwable t) { return lastPos; }
   }
   long duration() {
+    if (rokuOn()) return roku.duration();
     RemoteMediaClient c = client;
     if (c == null) return -1L;
     try { long d = c.getStreamDuration(); return d > 0 ? d : -1L; } catch (Throwable t) { return -1L; }
   }
   boolean live() {
+    if (rokuOn()) return roku.live();
     RemoteMediaClient c = client;
     if (c == null) return false;
     try {
@@ -465,11 +566,13 @@ final class CastBridge {
     }
   }
   int playerState() {
+    if (rokuOn()) return roku.playerState();
     RemoteMediaClient c = client;
     if (c == null) return MediaStatus.PLAYER_STATE_UNKNOWN;
     try { return c.getPlayerState(); } catch (Throwable t) { return MediaStatus.PLAYER_STATE_UNKNOWN; }
   }
   int idleReason() {
+    if (rokuOn()) return roku.idleReason();
     RemoteMediaClient c = client;
     if (c == null) return MediaStatus.IDLE_REASON_NONE;
     try { return c.getIdleReason(); } catch (Throwable t) { return MediaStatus.IDLE_REASON_NONE; }
