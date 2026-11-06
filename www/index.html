@@ -14438,7 +14438,15 @@
     var key = JSON.stringify(msg);
     if(key === videoLastSent) return;
     videoLastSent = key;
-    videoViewLog.push(new Date().toLocaleTimeString() + ' ' + (videoMiniOn ? 'mini ' : 'np ') + (show ? key : 'hide' + (videoBlockedBy ? ' (covered by ' + videoBlockedBy + ')' : '')));
+    var dbg = '';
+    if(show){
+      try{
+        var vr = npVideo.getBoundingClientRect(), wr2 = npVideoWrap.getBoundingClientRect(), cs = getComputedStyle(npVideo);
+        dbg = ' [video ' + [vr.left, vr.top, vr.width, vr.height].map(Math.round).join(',') + ' wrap ' + [wr2.left, wr2.top, wr2.width, wr2.height].map(Math.round).join(',') +
+          ' css ' + cs.width + 'x' + cs.height + ' ' + cs.display + ' win ' + window.innerWidth + 'x' + window.innerHeight + (document.body.classList.contains('np-video-full') ? ' full' : '') + ']';
+      }catch(e){}
+    }
+    videoViewLog.push(new Date().toLocaleTimeString() + ' ' + (videoMiniOn ? 'mini ' : 'np ') + (show ? key : 'hide' + (videoBlockedBy ? ' (covered by ' + videoBlockedBy + ')' : '')) + dbg);
     if(videoViewLog.length > 24) videoViewLog.shift();
     videoBlockedBy = '';
     videoPlugin.setVideoView(msg).then(function(r){
@@ -14474,6 +14482,13 @@
     if(!streamVideoShowing() && !mini){ videoWhyNot(); sendVideoView(false); return; }
     if(streamVideo.w > 0 && streamVideo.h > 0) npVideo.style.aspectRatio = streamVideo.w + ' / ' + streamVideo.h;
     var r = (mini ? videoMiniBox : npVideo).getBoundingClientRect();
+    // Full screen: the box is the whole window (the wrap is fixed to it). Taken from the wrap,
+    // since a WebView that sizes the <video> inside it differently (a Chromebook window) left
+    // the picture in a small box in the corner while the page showed it full size.
+    if(!mini && document.body.classList.contains('np-video-full')){
+      var wr = npVideoWrap.getBoundingClientRect();
+      if(wr.width > r.width + 2 || wr.height > r.height + 2) r = wr;
+    }
     // While Now Playing is still sliding away over it, the floating window counts as clear:
     // hiding the picture for that moment and bringing it back is what showed as a black box.
     var clear = mini && npClosing() ? (r.width > 2 && r.height > 2) : mini ? videoMiniClear(r) : videoBoxClear(r, npVideoWrap);
