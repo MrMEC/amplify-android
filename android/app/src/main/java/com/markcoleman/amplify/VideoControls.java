@@ -68,6 +68,7 @@ final class VideoControls extends FrameLayout {
         @Override
         public void run() {
           if (seeking || !playing) return; // paused: they stay up
+          if (passThrough) return; // the page hides them (build 503)
           setShown(false);
         }
       };
@@ -276,6 +277,28 @@ final class VideoControls extends FrameLayout {
 
   private int px(float v) {
     return Math.round(v * dp);
+  }
+
+  // Build 503: on a Chromebook taps on these native buttons were delivered to the wrong one
+  // (every tap arrived as Play/Pause). There the controls only draw: every touch goes through to
+  // the page underneath, whose own copy of the same controls sits in exactly the same place, and
+  // these show and hide as the page's do (showFromPage).
+  private boolean passThrough;
+
+  void setPassThrough(boolean on) {
+    passThrough = on;
+  }
+
+  @Override
+  public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+    if (passThrough) return false;
+    return super.dispatchTouchEvent(ev);
+  }
+
+  /** Build 503: the page's controls were shown or hidden (pass-through mode only). */
+  void showFromPage(boolean show) {
+    if (!passThrough || show == shown) return;
+    setShown(show);
   }
 
   /** Whether the box shows controls at all (not on the floating window). */

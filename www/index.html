@@ -14638,12 +14638,14 @@
       vctlTimer = 0;
       if(vctlDragging || !vctlPlaying()) return;   // re-armed when playing starts again
       vctl.classList.remove('show');
+      vctlPushNative();
     }, VCTL_HIDE_MS);
   }
   function vctlShow(show){
     clearTimeout(vctlTimer); vctlTimer = 0;
     vctl.classList.toggle('show', !!show);
     if(show) vctlArm();
+    vctlPushNative();
   }
   function vctlTimes(){
     var cur = npIsCurrent(), st = npTarget();
@@ -14707,10 +14709,11 @@
     var stp = vctlSteps();
     var msg = { enabled: on, playing: vctlPlaying(), live: !npSeekApplies(), full: !!npVideoFull,
       pos: Math.round(t.pos * 10) / 10, dur: Math.round(t.dur * 10) / 10, accent: vctlAccent,
-      steps: stp.on, hasPrev: stp.prev, hasNext: stp.next, quiet: vctlQuiet() };
+      steps: stp.on, hasPrev: stp.prev, hasNext: stp.next, quiet: vctlQuiet(),
+      shown: vctl.classList.contains('show') };
     // The phone counts the time along by itself; the position is sent again only when it moves
     // on by a couple of seconds or jumps (so a timeupdate a few times a second isn't a message each).
-    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext, msg.quiet].join('|');
+    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext, msg.quiet, msg.shown].join('|');
     if(key === vctlNativeKey) return;
     vctlNativeKey = key;
     videoPlugin.setVideoControls(msg)['catch'](function(){});

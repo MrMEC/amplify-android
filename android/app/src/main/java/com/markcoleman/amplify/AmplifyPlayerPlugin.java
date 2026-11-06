@@ -2877,6 +2877,8 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean hasNext = Boolean.TRUE.equals(call.getBoolean("hasNext", false));
     // Build 316: a video following on from the last one: don't show the controls as it starts.
     final boolean quiet = Boolean.TRUE.equals(call.getBoolean("quiet", false));
+    // Build 503: whether the page's own controls are showing (a Chromebook draws to match).
+    final Boolean shownOnPage = call.getBoolean("shown", null);
     main.post(
         () -> {
           ctlQuiet = quiet;
@@ -2894,6 +2896,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             video.setQuiet(quiet);
             video.setControls(enabled, playing, pos, dur, live, full, ctlAccent);
             video.setSteps(steps, hasPrev, hasNext);
+            if (shownOnPage != null) video.showControlsFromPage(shownOnPage);
           }
           call.resolve();
         });

@@ -364,6 +364,22 @@ public final class VideoOverlay {
     if (controls != null) controls.setQuiet(q);
   }
 
+  /** Build 503: the page's own controls showing or not (Chromebook: these follow them). */
+  void showControlsFromPage(boolean show) {
+    if (controls != null) controls.showFromPage(show);
+  }
+
+  /** A Chromebook (Android apps run in a ChromeOS window). */
+  static boolean onChromeOs(android.content.Context c) {
+    try {
+      android.content.pm.PackageManager pm = c.getPackageManager();
+      return pm.hasSystemFeature("org.chromium.arc")
+          || pm.hasSystemFeature("org.chromium.arc.device_management");
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   /** Build 303: Previous / Next on the picture while the video is part of a queue. */
   void setSteps(boolean show, boolean hasPrev, boolean hasNext) {
     ctlSteps = show;
@@ -394,11 +410,12 @@ public final class VideoOverlay {
     box = new FrameLayout(activity);
     box.setBackgroundColor(Color.BLACK);
     box.setKeepScreenOn(true);
-    box.setClickable(true);
+    final boolean passThrough = onChromeOs(activity);
+    box.setClickable(!passThrough);
     box.setContentDescription("Video. Tap for controls.");
     // With the controls on (Now Playing), a tap shows or hides them; on the floating window
     // (no controls) a tap goes to the page as before.
-    box.setOnClickListener(
+    if (!passThrough) box.setOnClickListener(
         v -> {
           if (controls != null && controls.isActive()) controls.tapped();
           else listener.onTap();
@@ -407,7 +424,7 @@ public final class VideoOverlay {
     // drag does: it moves the floating window). Screen coordinates, so the box moving under
     // the finger doesn't change the distance.
     final int slop = android.view.ViewConfiguration.get(activity).getScaledTouchSlop();
-    box.setOnTouchListener(
+    if (!passThrough) box.setOnTouchListener(
         new View.OnTouchListener() {
           float x0, y0, span0;
           boolean dragging, pinching, spent;
@@ -512,6 +529,7 @@ public final class VideoOverlay {
     cp.bottomMargin = pad * 2;
     box.addView(captions, cp);
     controls = new VideoControls(activity, (action, value) -> listener.onControl(action, value));
+    controls.setPassThrough(passThrough);
     box.addView(
         controls,
         new FrameLayout.LayoutParams(
