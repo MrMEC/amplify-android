@@ -280,16 +280,39 @@ final class RokuCast {
     dur = -1L;
     live = isLive;
     sawMedia = false;
-    final String launch = d.base + "/launch/" + PLAY_ON_ROKU + "?" + q;
+    final String query = "?" + q;
     CrashLog.info(app, "roku load " + kind[0] + "/" + kind[1] + (isLive ? " live" : "") + " " + url);
     io.execute(() -> {
-      int code = post(launch);
-      if (code >= 400 || code < 0) {
+      // Build 504: Roku turned Play on Roku off for other apps in OS 11.5, and a Roku without it
+      // answers 404. Ask the Roku first so the log says what it is and the message says why.
+      String info = null;
+      try { info = get(d.base + "/query/device-info"); } catch (Throwable ignored) {}
+      String has = tag(info, "has-play-on-roku");
+      CrashLog.info(app, "roku " + tag(info, "model-name") + " OS " + tag(info, "software-version") + "." + tag(info, "software-build")
+          + " has-play-on-roku=" + has);
+      final String noPlayOnRoku = "this Roku no longer takes casts from apps (Roku turned off Play on Roku for other apps in OS 11.5)";
+      if ("false".equalsIgnoreCase(has)) {
         main.post(() -> {
           if (gen != loadGen || current != d) return;
-          fail(code == 403
+          fail(noPlayOnRoku);
+        });
+        return;
+      }
+      // /input is the route Roku documents for Play on Roku; /launch is the fallback.
+      int code = post(d.base + "/input/" + PLAY_ON_ROKU + query);
+      if (code == 404) {
+        CrashLog.info(app, "roku /input/" + PLAY_ON_ROKU + " answered 404, trying /launch");
+        code = post(d.base + "/launch/" + PLAY_ON_ROKU + query);
+      }
+      final int result = code;
+      if (result >= 400 || result < 0) {
+        main.post(() -> {
+          if (gen != loadGen || current != d) return;
+          fail(result == 403
               ? "the Roku turned it away: on the Roku, set Settings > System > Advanced system settings > Control by mobile apps to Enabled"
-              : "the Roku didn't answer (" + (code < 0 ? "no connection" : "error " + code) + ")");
+              : result == 404
+                  ? noPlayOnRoku
+                  : "the Roku didn't answer (" + (result < 0 ? "no connection" : "error " + result) + ")");
         });
       }
     });
