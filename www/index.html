@@ -14439,16 +14439,39 @@
     if(key === videoLastSent) return;
     videoLastSent = key;
     videoViewLog.push(new Date().toLocaleTimeString() + ' ' + (videoMiniOn ? 'mini ' : 'np ') + (show ? key : 'hide' + (videoBlockedBy ? ' (covered by ' + videoBlockedBy + ')' : '')));
-    if(videoViewLog.length > 8) videoViewLog.shift();
+    if(videoViewLog.length > 24) videoViewLog.shift();
     videoBlockedBy = '';
     videoPlugin.setVideoView(msg).then(function(r){
       if(r && typeof r === 'object' && 'visible' in r) videoViewReply = JSON.stringify(r);
     })['catch'](function(){});
   }
+  // Why the picture is not up while Now Playing holds a stream's video (shown in Check storage).
+  // Logged once per change, so a box that stays hidden on a window the phone never sees can be
+  // traced to the condition that fails.
+  var videoWhyLast = '';
+  function videoWhyNot(){
+    try{
+      if(!npVideoOn && nowPlayingScreen.style.display !== 'flex') return;
+      var why = [];
+      if(!npVideoOn) why.push('npVideoOn');
+      if(!npVideoStream) why.push('npVideoStream');
+      if(!streamVideo.has) why.push('streamVideo.has');
+      if(document.hidden && !pipActive) why.push('document.hidden');
+      if(nowPlayingScreen.style.display !== 'flex') why.push('display=' + nowPlayingScreen.style.display);
+      if(npClosing()) why.push('closing');
+      if(!npStation) why.push('noNpStation');
+      else if(!streamVideoCapable(npStation)) why.push('notCapable(' + (videoPlugin ? 'plugin' : 'noPlugin') + ',live=' + isLiveStream(npStation) + ',same=' + (!!currentStation && favKey(npStation) === favKey(currentStation)) + ')');
+      var key = why.join(',');
+      if(!key || key === videoWhyLast) return;
+      videoWhyLast = key;
+      videoViewLog.push(new Date().toLocaleTimeString() + ' np not showing: ' + key + ' win ' + window.innerWidth + 'x' + window.innerHeight);
+      if(videoViewLog.length > 24) videoViewLog.shift();
+    }catch(e){}
+  }
   function videoFrame(){
     videoRaf = 0;
     var mini = !streamVideoShowing() && npVideoStream && videoMiniOn && (!document.hidden || pipActive);
-    if(!streamVideoShowing() && !mini){ sendVideoView(false); return; }
+    if(!streamVideoShowing() && !mini){ videoWhyNot(); sendVideoView(false); return; }
     if(streamVideo.w > 0 && streamVideo.h > 0) npVideo.style.aspectRatio = streamVideo.w + ' / ' + streamVideo.h;
     var r = (mini ? videoMiniBox : npVideo).getBoundingClientRect();
     // While Now Playing is still sliding away over it, the floating window counts as clear:
