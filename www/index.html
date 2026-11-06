@@ -5192,6 +5192,12 @@
     margin:0 0 4px; padding:12px 14px; border:1px solid var(--border); border-radius:10px;
     background:var(--panel-2); font-size:12.5px; line-height:1.7; color:var(--text-dim);
   }
+  /* Long unbroken text (a JSON line, a URL) wraps inside the box instead of running past it. */
+  .settings-diagnostics{ box-sizing:border-box; min-width:0; max-width:100%; overflow-wrap:anywhere; word-break:break-word; }
+  .settings-diagnostics *{ max-width:100%; overflow-wrap:anywhere; word-break:break-word; }
+  .diag-actions{ display:flex; gap:8px; align-items:stretch; min-width:0; }
+  #settingsPanel .diag-actions .settings-wide-btn{ flex:1 1 auto; width:auto; min-width:0; }
+  #settingsPanel .diag-actions .diag-copy-btn{ flex:none; width:auto; gap:8px; }
   .settings-diagnostics b{ color:var(--text); font-weight:600; }
   .settings-diagnostics .diag-bad{ color:#e5534b; font-weight:600; }
   /* Matches the buttons either side of it in the panel. */
@@ -8750,7 +8756,7 @@
           <span class="settings-label">Build</span>
           <code class="build-stamp" id="buildStamp"></code>
         </div>
-        <button type="button" class="settings-data-btn settings-wide-btn" id="diagnosticsBtn"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>Check storage</button>
+        <div class="diag-actions"><button type="button" class="settings-data-btn settings-wide-btn" id="diagnosticsBtn" aria-expanded="false" aria-controls="diagnostics"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5"/><path d="M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg>Check storage</button><button type="button" class="settings-data-btn diag-copy-btn" id="diagnosticsCopyBtn" aria-label="Copy the Check storage details"><svg class="settings-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span id="diagnosticsCopyLabel">Copy</span></button></div>
       </div>
       <div class="settings-diagnostics" id="diagnostics" style="display:none;"></div>
     </section>
@@ -11463,16 +11469,15 @@
     var capD = window.Capacitor, PD = capD && capD.isNativePlatform && capD.isNativePlatform() && capD.Plugins && capD.Plugins.AmplifyPlayer;
     if(PD && typeof PD.castLog === 'function' && !renderDiagnostics._fresh){
       renderDiagnostics._fresh = true;
-      PD.castLog().then(function(r){ if(r && typeof r.caught === 'string') nativeCaught = r.caught; })['catch'](function(){})
-        .then(function(){ renderDiagnostics(); renderDiagnostics._fresh = false; });
-      return;
+      return PD.castLog().then(function(r){ if(r && typeof r.caught === 'string') nativeCaught = r.caught; })['catch'](function(){})
+        .then(function(){ var done = renderDiagnostics(); renderDiagnostics._fresh = false; return done; });
     }
     diagnosticsEl.style.display = '';
     diagnosticsEl.innerHTML = 'Checking…';
     var lsOk = storageProbe();
     var customCount = Object.keys(loadCustomArtMap()).length;
     var artCount = Object.keys(loadArtCache()).length;
-    Promise.all([
+    return Promise.all([
       countStore(LIB_STORE_TRACKS),
       countStore(LIB_STORE_ART),
       countStore(LIB_STORE_ARTIST_PHOTO)
@@ -11563,7 +11568,7 @@
           + 'file.</div>' : '');
       // What the car side holds (the phone app on Android only).
       if(window.__amplifyCarDebug){
-        window.__amplifyCarDebug().then(function(t){
+        return window.__amplifyCarDebug().then(function(t){
           var el = document.getElementById('carDiag');
           if(el && t) el.innerHTML = '<div style="margin-top:8px"><b>Android Auto</b></div>'
             + t.split('\n').map(function(l){ return '<div>' + escapeHtml(l) + '</div>'; }).join('');
@@ -11573,7 +11578,52 @@
       diagnosticsEl.textContent = 'Storage could not be read on this device.';
     });
   }
-  if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', renderDiagnostics);
+  // The button opens the details and closes them again.
+  function diagnosticsOpen(){ return !!diagnosticsEl && diagnosticsEl.style.display !== 'none'; }
+  function setDiagnosticsOpen(on){
+    if(diagnosticsBtn) diagnosticsBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if(!on) diagnosticsEl.style.display = 'none';
+  }
+  if(diagnosticsBtn) diagnosticsBtn.addEventListener('click', function(){
+    if(diagnosticsOpen()){ setDiagnosticsOpen(false); return; }
+    setDiagnosticsOpen(true);
+    renderDiagnostics();
+  });
+  // Copy: the details as plain text, freshly read, to paste for troubleshooting. Opens the
+  // section so what was copied is on screen.
+  var diagCopyBtn = document.getElementById('diagnosticsCopyBtn');
+  var diagCopyLabel = document.getElementById('diagnosticsCopyLabel');
+  function diagCopyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text).then(function(){ return true; }, function(){ return diagLegacyCopy(text); });
+    }
+    return Promise.resolve(diagLegacyCopy(text));
+  }
+  function diagLegacyCopy(text){
+    try{
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      var ok = document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    }catch(e){ return false; }
+  }
+  function diagCopyDone(ok){
+    if(!diagCopyLabel) return;
+    diagCopyLabel.textContent = ok ? 'Copied' : 'Could not copy';
+    clearTimeout(diagCopyDone._t);
+    diagCopyDone._t = setTimeout(function(){ diagCopyLabel.textContent = 'Copy'; }, 1800);
+  }
+  if(diagCopyBtn) diagCopyBtn.addEventListener('click', function(){
+    setDiagnosticsOpen(true);
+    Promise.resolve(renderDiagnostics()).then(function(){
+      var body = (diagnosticsEl.innerText || diagnosticsEl.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+      var text = 'Amplify Check storage \u00b7 ' + new Date().toLocaleString() + '\n' + body;
+      return diagCopyText(text);
+    }).then(diagCopyDone, function(){ diagCopyDone(false); });
+  });
 
   // Build 349 (Mark): Settings is a full-screen page, sorted into categories. It opens on the
   // list of categories (or straight on one, e.g. Sources from Watch's Plex row); a category's

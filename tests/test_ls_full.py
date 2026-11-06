@@ -66,7 +66,7 @@ async def main():
 
         # Check storage shows how full it is
         await pg.evaluate("(()=>{ var b=document.getElementById('diagnosticsBtn'); b.click(); })()"); await pg.wait_for_timeout(1500)
-        txt = await pg.evaluate("document.getElementById('diagnosticsBtn').parentElement.parentElement.textContent")
+        txt = await pg.evaluate("document.getElementById('diagnostics').textContent")
         check('Settings storage used' in txt, 'Check storage shows how much settings storage is used')
         check(not errs, f'no page errors {errs[:3]}')
         await b.close()
