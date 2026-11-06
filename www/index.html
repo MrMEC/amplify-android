@@ -14817,6 +14817,8 @@
     setInterval(syncPip, 1000);
     pipPlugin.addListener('pip', function(ev){
       var active = !!(ev && ev.active);
+      // Kept in Check storage's video log: a window that shrinks on its own shows up here.
+      try{ videoViewLog.push(new Date().toLocaleTimeString() + ' picture-in-picture ' + (active ? 'on' : 'off') + ' win ' + window.innerWidth + 'x' + window.innerHeight); if(videoViewLog.length > 24) videoViewLog.shift(); }catch(e){}
       if(active === pipActive) return;
       pipActive = active;
       document.body.classList.toggle('in-pip', active);

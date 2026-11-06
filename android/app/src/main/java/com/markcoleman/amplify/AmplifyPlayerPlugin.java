@@ -2742,6 +2742,22 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     return pipAllowed;
   }
 
+  /**
+   * Build 500: on a Chromebook the Android app already lives in a floating window, and the
+   * system shrank it into a 288x162 picture-in-picture window as Now Playing went full screen,
+   * leaving the video drawn into that tiny window and hidden. There the page never asks for
+   * picture-in-picture, and Android is told not to enter it by itself.
+   */
+  private boolean onChromeOs() {
+    try {
+      android.content.pm.PackageManager pm = getContext().getPackageManager();
+      return pm.hasSystemFeature("org.chromium.arc")
+          || pm.hasSystemFeature("org.chromium.arc.device_management");
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
   @Nullable
   PictureInPictureParams pipParams() {
     if (Build.VERSION.SDK_INT < 26) return null;
@@ -2766,7 +2782,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
 
   @PluginMethod
   public void setPip(PluginCall call) {
-    pipAllowed = Boolean.TRUE.equals(call.getBoolean("allowed", false));
+    pipAllowed = Boolean.TRUE.equals(call.getBoolean("allowed", false)) && !onChromeOs();
     Integer w = call.getInt("width"), h = call.getInt("height");
     if (w != null && h != null && w > 0 && h > 0) {
       pipW = w;
