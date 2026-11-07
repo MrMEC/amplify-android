@@ -7175,7 +7175,23 @@
   .zen-snd{ border:0; background:none; padding:4px 0 2px; display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; }
   .zen-snd-ic{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.92); }
   .zen-snd-ic .zen-svg{ width:24px; height:24px; stroke-width:1.4; }
-  .zen-snd.on .zen-snd-ic{ background:var(--zt); }
+  .zen-snd.on .zen-snd-ic{ background:var(--np-vivid, var(--zt)); color:var(--np-on-vivid, #fff); }
+  body.zen-open .mobile-nav-btn.active, body.zen-open.np-open .mobile-nav-btn.active{ color:var(--text-dim) !important; }
+  /* Top-right: cast + profile picture, like Now Playing */
+  .zen-top-r{ position:absolute; z-index:6; right:12px; top:calc(env(safe-area-inset-top, 0px) + 14px); display:flex; align-items:center; gap:6px; }
+  .zen-cast{ display:none; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; padding:0; cursor:pointer;
+    background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); color:var(--np-vivid, #fff);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  body.cast-avail .zen-cast{ display:flex; }
+  body.cast-on .zen-cast{ color:var(--accent); }
+  .zen-cast svg{ width:20px; height:20px; fill:currentColor; display:block; }
+  .zen-cast .zc-on{ display:none; } body.cast-on .zen-cast .zc-on{ display:block; } body.cast-on .zen-cast .zc-off{ display:none; }
+  .zen-avatar{ width:44px; height:44px; padding:0; border:0; background:none; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .zen-avatar .za-in{ display:flex; width:36px; height:36px; border-radius:50%; overflow:hidden; box-sizing:border-box; border:2px solid var(--accent);
+    align-items:center; justify-content:center; font-style:normal; font-size:15px; font-weight:800; line-height:1; color:var(--text);
+    background:color-mix(in srgb, var(--accent) 28%, var(--panel-2)); box-shadow:0 1px 4px rgba(0,0,0,.35); }
+  .zen-avatar .za-in img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .zen-avatar .za-in svg{ width:58%; height:58%; }
   .zen-snd-nm{ font-size:12px; line-height:1.25; text-align:center; color:#fff; overflow-wrap:normal; word-break:normal; hyphens:none; }
   .zen-snd-add .zen-snd-ic{ border:1.5px dashed rgba(255,255,255,.5); }
   /* sheets over the screen */
@@ -32488,6 +32504,10 @@
     zenEl.className = 'zen-screen'; zenEl.id = 'zenScreen'; zenEl.setAttribute('role', 'dialog'); zenEl.setAttribute('aria-label', 'Zen');
     zenEl.innerHTML = '<div class="zen-bg" id="zenBg"></div>'
       + '<button type="button" class="zen-back" id="zenClose" aria-label="Close Zen">' + zenSvg('down') + '</button>'
+      + '<div class="zen-top-r"><button type="button" class="zen-cast" id="zenCast" aria-label="Cast">'
+      + '<svg class="zc-off" viewBox="0 0 24 24"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>'
+      + '<svg class="zc-on" viewBox="0 0 24 24"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm18-7H5v1.63c3.96 1.28 7.09 4.41 8.37 8.37H19V7zM1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg></button>'
+      + '<button type="button" class="zen-avatar" id="zenAvatar" aria-label="Menu"><i class="za-in" id="zenAvatarIn"></i></button></div>'
       + '<div class="zen-main" id="zenMain"><h2 class="zen-title" id="zenTitle">Zen</h2><div class="zen-sub" id="zenSub"></div>'
       + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button>'
       + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
@@ -32499,6 +32519,10 @@
     document.body.appendChild(zenEl);
     zenAttachSwipe(zenEl);
     zenEl.querySelector('#zenClose').addEventListener('click', zenClose);
+    zenEl.querySelector('#zenCast').addEventListener('click', function(){ var b = document.getElementById('castBtn'); if(b) b.click(); });
+    zenEl.querySelector('#zenAvatar').addEventListener('click', function(){
+      zenClose(); var h = document.getElementById('hamburgerBtn'); if(h) setTimeout(function(){ h.click(); }, 60);
+    });
     zenEl.querySelector('#zenPlayBtn').addEventListener('click', zenToggle);
     zenEl.querySelector('#zenMore').addEventListener('click', function(){ zenPresetMenu(zenCur && zenPreset(zenCur) ? zenCur : null); });
     function mixToggle(){ zenMixOpen = !zenMixOpen; zenSyncUi(); }
@@ -32569,6 +32593,10 @@
     zenRefreshLists(true);
     try{ zenBarSync(); }catch(e){}
     if(!zenEl || !zenOpen) return;
+    try{
+      var src = document.getElementById('hbAvatar'), dst = zenEl.querySelector('#zenAvatarIn');
+      if(src && dst && dst.innerHTML !== src.innerHTML) dst.innerHTML = src.innerHTML;
+    }catch(e){}
     var p = zenCur ? zenPreset(zenCur) : null;
     var title = zenDirty || !p ? 'Custom mix' : p.n;
     zenEl.querySelector('#zenTitle').textContent = title;
