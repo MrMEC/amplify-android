@@ -7092,7 +7092,7 @@
   /* Build 401 (Mark): the Home carousel follows Corner radius; play buttons follow Play button shape. */
   :root{ --r-hero:22px; --r-play:999px; }
   .nph-track{ border-radius:var(--r-hero) !important; }
-  .nph-play, .np-play-btn, body.rotate-lock .np-play-btn, body.rotate-lock .now-playing-screen .np-play-btn, .album-play-pill{ border-radius:var(--r-play) !important; }
+  .nph-play, .zen-disc, .np-play-btn, body.rotate-lock .np-play-btn, body.rotate-lock .now-playing-screen .np-play-btn, .album-play-pill{ border-radius:var(--r-play) !important; }
   .shape-preview .sp-play{ display:flex; align-items:center; justify-content:center; width:48px; height:48px; flex:0 0 48px; margin-left:auto; align-self:center;
     background:var(--text); color:var(--bg); font-size:16px; border-radius:var(--r-play); }
   .shape-preview .sp-play i{ margin-left:2px; }
@@ -7114,71 +7114,69 @@
   .zen-screen button{ font-family:inherit; color:inherit; cursor:pointer; }
   .zen-svg{ width:24px; height:24px; display:block; }
   .zen-svg-sm{ width:20px; height:20px; }
-  .zen-bg{ position:absolute; inset:0; background-size:cover; background-position:center; }
+  /* Zen Now Playing: built like the normal Now Playing screen (picture at the top fading into the
+     artwork's own dark colour, the title above the controls, the list of mixes where "Next" sits). */
+  .zen-screen{ inset:auto; top:0; left:0; right:0; bottom:var(--mnav-total, 0px); background:linear-gradient(180deg, var(--np-shade, #0a0f1c) 0%, color-mix(in srgb, var(--np-shade, #0a0f1c) 55%, #000) 100%); transition:transform .4s cubic-bezier(.22,.8,.24,1), visibility 0s linear .4s, background-color .5s ease; }
+  .zen-screen.open{ transition:transform .4s cubic-bezier(.22,.8,.24,1), visibility 0s; }
+  .zen-screen.dragging, .zen-screen.open.dragging{ transition:none; }
+  body.zen-open .mobile-nav{ z-index:2300; }
+  .zen-bg{ position:absolute; left:0; right:0; top:0; height:58%; background-size:cover; background-position:center 70%; -webkit-mask-image:linear-gradient(180deg, #000 0, #000 52%, transparent 100%); mask-image:linear-gradient(180deg, #000 0, #000 52%, transparent 100%); }
   .zen-bg-in{ opacity:0; transition:opacity .6s ease; }
   .zen-bg-in.on{ opacity:1; }
-  .zen-shade{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(2,5,12,.35) 0, rgba(2,5,12,.05) 34%, rgba(2,5,12,.1) 62%, rgba(2,5,12,.7) 100%); pointer-events:none; }
-  .zen-top{ position:absolute; left:0; right:0; top:0; background:rgba(2,9,19,.93); border-radius:0 0 28px 28px; padding:calc(env(safe-area-inset-top, 0px) + 12px) 0 18px; z-index:3; }
-  .zen-top-head{ display:flex; align-items:center; gap:4px; padding:0 14px 0 22px; min-height:48px; }
-  .zen-title{ flex:1 1 auto; min-width:0; margin:0; font-size:24px; font-weight:500; line-height:1.2; color:#fff; overflow-wrap:normal; word-break:normal; }
-  .zen-iconbtn{ flex:none; width:46px; height:46px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; }
-  .zen-iconbtn:active{ background:rgba(255,255,255,.12); }
-  .zen-iconbtn .zen-svg{ width:26px; height:26px; stroke-width:1.9; }
-  .zen-presets{ display:flex; gap:16px; overflow-x:auto; overflow-y:hidden; padding:14px 22px 2px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
-  .zen-presets::-webkit-scrollbar{ display:none; }
-  .zen-pre{ flex:none; width:96px; cursor:pointer; outline:none; }
-  .zen-pre-art{ width:96px; height:96px; border-radius:14px; border:1.5px solid rgba(255,255,255,.25); background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-  .zen-pre.on .zen-pre-art{ border-color:var(--za); box-shadow:0 0 0 2px var(--za); }
-  .zen-pre-name{ margin-top:9px; font-size:13px; line-height:1.3; font-weight:500; color:rgba(255,255,255,.82); overflow-wrap:normal; word-break:normal; hyphens:none; }
-  .zen-pre.on .zen-pre-name{ color:#fff; }
-  .zen-pre-new .zen-pre-art{ background:rgba(255,255,255,.06); border-style:dashed; color:rgba(255,255,255,.8); }
-  .zen-stage{ position:absolute; left:0; right:0; top:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:52px; padding:230px 0 140px; z-index:1; }
-  .zen-play{ position:relative; width:122px; height:122px; border:0; background:none; padding:0; display:flex; align-items:center; justify-content:center; }
-  .zen-ring{ position:absolute; inset:-34px; border-radius:50%; background:rgba(255,255,255,.2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); opacity:0; visibility:hidden; transform:scale(.9); transition:opacity .35s, transform .35s, visibility 0s linear .35s; pointer-events:none; }
-  .zen-ring::after{ opacity:inherit; }
-  .zen-ring::after{ content:''; position:absolute; inset:15px; border-radius:50%; background:rgba(255,255,255,.22); }
+  .zen-back{ position:absolute; top:calc(env(safe-area-inset-top, 0px) + 16px); left:16px; z-index:4; width:40px; height:40px; padding:0; border-radius:50%; background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); color:var(--np-vivid, #fff); display:flex; align-items:center; justify-content:center; transition:color .5s ease; }
+  .zen-back .zen-svg{ width:22px; height:22px; stroke-width:2; }
+  .zen-main{ position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex; flex-direction:column; align-items:center; padding:0 18px 16px; }
+  .zen-title{ margin:0 0 6px; max-width:100%; font-size:clamp(18px, 5vw, 26px); font-weight:800; letter-spacing:-.005em; line-height:1.2; color:#fff; text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.45); overflow-wrap:anywhere; }
+  .zen-sub{ margin:0 0 20px; max-width:100%; min-height:1.3em; font-size:13.5px; color:rgba(255,255,255,.8); text-align:center; text-shadow:0 1px 10px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .zen-controls{ display:flex; align-items:center; justify-content:center; gap:30px; margin-bottom:22px; }
+  .zen-side{ flex:none; width:46px; height:46px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--np-vivid, #fff); transition:color .5s ease, background .15s ease; }
+  .zen-side:active{ background:rgba(255,255,255,.14); }
+  .zen-side .zen-svg{ width:26px; height:26px; stroke-width:1.9; }
+  .zen-play{ position:relative; flex:none; width:68px; height:68px; border:0; background:none; padding:0; display:flex; align-items:center; justify-content:center; }
+  @media (max-width: 400px){ .zen-play, .zen-disc{ width:60px; height:60px; } }
+  .zen-disc{ position:relative; width:68px; height:68px; border-radius:50%; background:var(--np-vivid, #fff); color:var(--np-on-vivid, #111); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 26px rgba(0,0,0,.35); transition:background-color .5s ease, color .5s ease, filter .15s ease, transform .15s ease; }
+  .zen-play:active .zen-disc{ filter:brightness(.94); transform:scale(.97); }
+  .zen-disc svg{ width:28px; height:28px; fill:currentColor; }
+  .zen-ring{ position:absolute; inset:-14px; border-radius:calc(var(--r-play, 999px) + 14px); background:color-mix(in srgb, var(--np-vivid, #fff) 24%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--np-vivid, #fff) 22%, transparent); opacity:0; visibility:hidden; transform:scale(.9); transition:opacity .35s, transform .35s, visibility 0s linear .35s; pointer-events:none; }
+  .zen-ring::after{ content:''; position:absolute; inset:8px; border-radius:inherit; background:color-mix(in srgb, var(--np-vivid, #fff) 22%, transparent); }
   .zen-screen.is-playing .zen-ring{ opacity:1; visibility:visible; transition-delay:0s; transform:none; animation:zenPulse 4.5s ease-in-out infinite; }
-  @keyframes zenPulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.07); opacity:.8; } }
-  .zen-disc{ position:relative; width:122px; height:122px; border-radius:50%; background:#f3f1f2; color:#10131a; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 24px rgba(0,0,0,.4); }
-  .zen-disc svg{ width:48px; height:48px; fill:currentColor; }
-  .zen-timer{ min-width:236px; height:62px; padding:0 22px; border:1.5px solid rgba(255,255,255,.85); border-radius:31px; background:rgba(2,8,18,.35); display:flex; align-items:center; justify-content:center; gap:10px; font-size:17px; font-weight:500; letter-spacing:.02em; }
-  .zen-timer .zen-svg{ width:32px; height:32px; stroke-width:1.5; opacity:.92; }
-  .zen-timer.on{ border-color:var(--za); color:var(--za); }
-  .zen-mixer{ position:absolute; left:14px; right:14px; bottom:calc(env(safe-area-inset-bottom, 0px) + 16px); border:1.5px solid var(--zl); border-radius:28px; background:rgba(3,9,19,.86); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:3; display:flex; flex-direction:column; overflow:hidden; }
-  .zen-mixer-bar{ flex:none; display:flex; align-items:center; gap:10px; padding:14px 14px 14px 18px; min-height:84px; }
-  .zen-chips{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:12px; overflow:hidden; }
-  .zen-chips-empty{ font-size:15px; color:rgba(255,255,255,.6); }
-  .zen-chip{ flex:none; width:46px; height:46px; border-radius:50%; background:var(--zt); display:flex; align-items:center; justify-content:center; }
-  .zen-chip .zen-svg{ width:26px; height:26px; }
-  .zen-mixbtn, .zen-chev{ flex:none; width:48px; height:48px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.92); }
-  .zen-mixbtn .zen-svg{ width:30px; height:30px; stroke-width:1.9; }
-  .zen-mixbtn.on{ background:var(--za); color:#1a1205; }
-  .zen-mixer-body{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 20px 24px; }
-  .zen-screen.mixer-open .zen-presets, .zen-screen.mixer-open .zen-stage{ display:none; }
-  .zen-screen.mixer-open .zen-top{ background:rgba(2,9,19,.0); padding-bottom:6px; }
-  .zen-screen.mixer-open .zen-shade{ background:rgba(2,5,12,.55); }
-  .zen-screen.mixer-open .zen-mixer{ top:calc(env(safe-area-inset-top, 0px) + 72px); background:#050813; backdrop-filter:none; -webkit-backdrop-filter:none; }
-  .zen-screen.mixer-open .zen-mixer-body{ display:block; }
-  .zen-screen.mixer-open .zen-chip:first-child{ width:60px; height:60px; }
-  .zen-mix-name{ margin:6px 0 22px; font-size:22px; font-weight:500; line-height:1.3; color:#fff; overflow-wrap:normal; word-break:normal; }
-  .zen-sliders{ display:flex; flex-direction:column; gap:14px; margin-bottom:26px; }
-  .zen-slider{ display:flex; align-items:center; gap:22px; }
-  .zen-slider-ic{ flex:none; width:36px; display:flex; justify-content:center; color:#fff; }
-  .zen-slider-ic .zen-svg{ width:34px; height:34px; stroke-width:1.4; }
-  .zen-slider input{ flex:1 1 auto; min-width:0; -webkit-appearance:none; appearance:none; height:34px; background:none; margin:0; }
+  @keyframes zenPulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.09); opacity:.8; } }
+  .zen-next{ width:100%; max-width:520px; box-sizing:border-box; padding:12px 0 12px; border-radius:18px; background:color-mix(in srgb, var(--np-vivid, #fff) 24%, transparent); border:1px solid color-mix(in srgb, var(--np-vivid, #fff) 38%, transparent); text-shadow:0 1px 3px rgba(0,0,0,.35); }
+  .zen-next-label{ padding:0 16px 8px; font-size:11.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--np-vivid, #fff); }
+  .zen-presets{ display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; padding:4px 16px 2px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .zen-presets::-webkit-scrollbar{ display:none; }
+  .zen-pre{ flex:none; width:72px; cursor:pointer; outline:none; }
+  .zen-pre-art{ width:72px; height:72px; border-radius:12px; border:1.5px solid rgba(255,255,255,.25); background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+  .zen-pre.on .zen-pre-art{ border-color:var(--np-vivid, var(--za)); box-shadow:0 0 0 2px var(--np-vivid, var(--za)); }
+  .zen-pre-name{ margin-top:7px; font-size:12px; line-height:1.3; font-weight:600; color:rgba(255,255,255,.82); overflow-wrap:normal; word-break:normal; hyphens:none; }
+  .zen-pre.on .zen-pre-name{ color:#fff; }
+  .zen-pre-new .zen-pre-art{ background:rgba(255,255,255,.08); border-style:dashed; color:rgba(255,255,255,.85); }
+  .zen-pre-new .zen-svg{ width:22px; height:22px; }
+  .zen-mixer{ position:absolute; left:0; right:0; bottom:0; top:calc(env(safe-area-inset-top, 0px) + 92px); z-index:3; display:none; flex-direction:column; overflow:hidden; border-radius:22px 22px 0 0; background:color-mix(in srgb, var(--np-shade, #0a0f1c) 86%, #000); box-shadow:0 -8px 30px rgba(0,0,0,.4); }
+  .zen-mixer-head{ flex:none; display:flex; align-items:center; gap:8px; padding:10px 8px 4px 20px; }
+  .zen-mixer-ttl{ flex:1 1 auto; min-width:0; font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .zen-mixer-body{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 18px 18px; }
+  .zen-screen.mixer-open .zen-mixer{ display:flex; }
+  .zen-screen.mixer-open .zen-main, .zen-screen.mixer-open .zen-back{ display:none; }
+  .zen-mix-name{ margin:2px 0 14px; font-size:14px; font-weight:500; line-height:1.3; color:rgba(255,255,255,.8); overflow-wrap:normal; word-break:normal; }
+  .zen-sliders{ display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+  .zen-slider{ display:flex; align-items:center; gap:14px; }
+  .zen-slider-ic{ flex:none; width:26px; display:flex; justify-content:center; color:#fff; }
+  .zen-slider-ic .zen-svg{ width:22px; height:22px; stroke-width:1.5; }
+  .zen-slider input{ flex:1 1 auto; min-width:0; -webkit-appearance:none; appearance:none; height:30px; background:none; margin:0; }
   .zen-slider input::-webkit-slider-runnable-track{ height:3px; border-radius:2px; background:linear-gradient(to right, #fff 0, #fff var(--v, 50%), rgba(255,255,255,.28) var(--v, 50%)); }
-  .zen-slider input::-webkit-slider-thumb{ -webkit-appearance:none; width:32px; height:32px; border-radius:50%; background:#fff; margin-top:-14.5px; box-shadow:0 2px 8px rgba(0,0,0,.45); }
-  .zen-tabs{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -20px 14px; padding:0 20px; }
+  .zen-slider input::-webkit-slider-thumb{ -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:#fff; margin-top:-8.5px; box-shadow:0 2px 6px rgba(0,0,0,.45); }
+  .zen-tabs{ display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:0 -18px 10px; padding:0 18px; }
   .zen-tabs::-webkit-scrollbar{ display:none; }
   .zen-tabs-wrap{ flex-wrap:wrap; margin:14px 0; padding:0; }
-  .zen-tab{ flex:none; height:42px; padding:0 20px; border:0; border-radius:21px; background:none; font-size:19px; font-weight:500; color:rgba(255,255,255,.55); }
-  .zen-tab.on{ background:var(--za); color:#1a1205; }
-  .zen-grid{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px 8px; }
-  .zen-snd{ border:0; background:none; padding:6px 2px 4px; display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; }
-  .zen-snd-ic{ width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.92); }
-  .zen-snd-ic .zen-svg{ width:34px; height:34px; stroke-width:1.3; }
+  .zen-tab{ flex:none; height:32px; padding:0 14px; border:0; border-radius:16px; background:none; font-size:14px; font-weight:600; color:rgba(255,255,255,.55); }
+  .zen-tab.on{ background:var(--np-vivid, var(--za)); color:var(--np-on-vivid, #1a1205); }
+  .zen-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px 6px; }
+  .zen-snd{ border:0; background:none; padding:4px 0 2px; display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; }
+  .zen-snd-ic{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.92); }
+  .zen-snd-ic .zen-svg{ width:24px; height:24px; stroke-width:1.4; }
   .zen-snd.on .zen-snd-ic{ background:var(--zt); }
-  .zen-snd-nm{ font-size:15px; line-height:1.3; text-align:center; color:#fff; overflow-wrap:normal; word-break:normal; hyphens:none; }
+  .zen-snd-nm{ font-size:12px; line-height:1.25; text-align:center; color:#fff; overflow-wrap:normal; word-break:normal; hyphens:none; }
   .zen-snd-add .zen-snd-ic{ border:1.5px dashed rgba(255,255,255,.5); }
   /* sheets over the screen */
   .zen-sheet-ov{ position:absolute; inset:0; z-index:6; display:none; align-items:flex-end; background:rgba(0,0,0,.55); }
@@ -32424,7 +32422,7 @@
     Object.keys(zenVoices).forEach(function(id){ var v = zenVoices[id]; if(v.src) try{ v.src.stop(now + rem + .3); }catch(e){} });
     zenTick = setInterval(function(){
       if(Date.now() >= zenTimerEnd){ zenTimerDone(); return; }
-      var tl = zenEl && zenEl.querySelector('#zenTimerLbl'); if(tl) tl.textContent = zenLeft();
+      var tl = zenEl && zenEl.querySelector('#zenSub'); if(tl) tl.textContent = zenSubText();
     }, 1000);
   }
   function zenTimerDone(){
@@ -32488,29 +32486,61 @@
     if(zenEl) return;
     zenEl = document.createElement('div');
     zenEl.className = 'zen-screen'; zenEl.id = 'zenScreen'; zenEl.setAttribute('role', 'dialog'); zenEl.setAttribute('aria-label', 'Zen');
-    zenEl.innerHTML = '<div class="zen-bg" id="zenBg"></div><div class="zen-shade"></div>'
-      + '<div class="zen-top"><div class="zen-top-head"><h2 class="zen-title" id="zenTitle">Zen</h2>'
-      + '<button type="button" class="zen-iconbtn" id="zenMore" aria-label="More">' + zenSvg('more') + '</button>'
-      + '<button type="button" class="zen-iconbtn" id="zenClose" aria-label="Close">' + zenSvg('close') + '</button></div>'
-      + '<div class="zen-presets" id="zenPresets"></div></div>'
-      + '<div class="zen-stage"><button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
-      + '<button type="button" class="zen-timer" id="zenTimerBtn" aria-label="Sleep timer">' + zenSvg('timer') + '<span id="zenTimerLbl"></span></button></div>'
-      + '<div class="zen-mixer" id="zenMixer"><div class="zen-mixer-bar"><div class="zen-chips" id="zenChips"></div>'
-      + '<button type="button" class="zen-mixbtn" id="zenMixBtn" aria-label="Mixer">' + zenSvg('mixer') + '</button>'
-      + '<button type="button" class="zen-chev" id="zenChev" aria-label="Expand">' + zenSvg('up') + '</button></div>'
-      + '<div class="zen-mixer-body" id="zenMixBody"></div></div>'
+    zenEl.innerHTML = '<div class="zen-bg" id="zenBg"></div>'
+      + '<button type="button" class="zen-back" id="zenClose" aria-label="Close Zen">' + zenSvg('down') + '</button>'
+      + '<div class="zen-main" id="zenMain"><h2 class="zen-title" id="zenTitle">Zen</h2><div class="zen-sub" id="zenSub"></div>'
+      + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button>'
+      + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
+      + '<button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button></div>'
+      + '<div class="zen-next"><div class="zen-next-label">Mixes</div><div class="zen-presets" id="zenPresets"></div></div></div>'
+      + '<div class="zen-mixer" id="zenMixer"><div class="zen-mixer-head"><span class="zen-mixer-ttl" id="zenMixTtl">Mix</span>'
+      + '<button type="button" class="zen-side" id="zenMixClose" aria-label="Close mix">' + zenSvg('down') + '</button></div><div class="zen-mixer-body" id="zenMixBody"></div></div>'
       + '<div class="zen-sheet-ov" id="zenSheetOv"><div class="zen-sheet" id="zenSheet"></div></div>';
     document.body.appendChild(zenEl);
+    zenAttachSwipe(zenEl);
     zenEl.querySelector('#zenClose').addEventListener('click', zenClose);
     zenEl.querySelector('#zenPlayBtn').addEventListener('click', zenToggle);
-    zenEl.querySelector('#zenTimerBtn').addEventListener('click', zenTimerSheet);
     zenEl.querySelector('#zenMore').addEventListener('click', function(){ zenPresetMenu(zenCur && zenPreset(zenCur) ? zenCur : null); });
     function mixToggle(){ zenMixOpen = !zenMixOpen; zenSyncUi(); }
     zenEl.querySelector('#zenMixBtn').addEventListener('click', mixToggle);
-    zenEl.querySelector('#zenChev').addEventListener('click', mixToggle);
-    zenEl.querySelector('#zenChips').addEventListener('click', function(e){ if(!zenMixOpen && e.target.closest('.zen-chip')) mixToggle(); });
+    zenEl.querySelector('#zenMixClose').addEventListener('click', mixToggle);
     zenEl.querySelector('#zenSheetOv').addEventListener('click', function(e){ if(e.target.id === 'zenSheetOv') zenSheetClose(); });
   }
+  // Swiping down closes the screen, the way it does on Now Playing: the screen follows the finger,
+  // then drops away if let go far or fast enough, and springs back otherwise.
+  function zenAttachSwipe(el){
+    var sy = 0, sx = 0, st = 0, dy = 0, mode = null, h = 0;
+    el.addEventListener('touchstart', function(e){
+      mode = null;
+      if(e.touches.length !== 1 || zenMixOpen || (e.target.closest && e.target.closest('input[type="range"], .zen-sheet-ov, .zen-mixer'))){ mode = 'ignore'; return; }
+      sy = e.touches[0].clientY; sx = e.touches[0].clientX; st = Date.now(); dy = 0;
+    }, { passive: true });
+    el.addEventListener('touchmove', function(e){
+      if(mode === 'ignore' || e.touches.length !== 1) return;
+      dy = e.touches[0].clientY - sy;
+      var dx = e.touches[0].clientX - sx;
+      if(mode === null){
+        if(Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+        if(dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.4){ mode = 'ignore'; return; }
+        mode = 'drag'; h = el.offsetHeight || window.innerHeight; el.classList.add('dragging');
+      }
+      if(e.cancelable) e.preventDefault();
+      el.style.transform = 'translateY(' + Math.max(0, dy - 12) + 'px)';
+    }, { passive: false });
+    function end(){
+      if(mode !== 'drag'){ mode = null; return; }
+      mode = null;
+      var fast = dy / Math.max(1, Date.now() - st) > 0.5 && dy > 50, far = dy > h * 0.25;
+      el.classList.remove('dragging');
+      el.style.transform = '';
+      if(fast || far) zenClose();
+    }
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+  }
+  document.addEventListener('click', function(e){
+    if(zenOpen && e.target.closest && e.target.closest('.mobile-nav-btn')) zenClose();
+  }, true);
   function zenOpenScreen(pid, autoplay){
     zenBuild();
     if(pid) zenSelect(pid, autoplay);
@@ -32561,15 +32591,50 @@
     zenEl.querySelector('#zenDisc').innerHTML = zenPlaying
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg>';
-    var tl = zenEl.querySelector('#zenTimerLbl');
-    tl.textContent = zenTimerEnd ? zenLeft() : '';
-    zenEl.querySelector('#zenTimerBtn').classList.toggle('on', !!zenTimerEnd);
-    zenEl.querySelector('#zenChev').innerHTML = zenSvg(zenMixOpen ? 'down' : 'up');
-    zenEl.querySelector('#zenMixBtn').classList.toggle('on', zenMixOpen);
-    zenChipsRender(); zenPresetsRender();
+    zenEl.querySelector('#zenSub').textContent = zenSubText();
+    zenEl.querySelector('#zenMixTtl').textContent = title;
+    zenApplyTint(p);
+    zenPresetsRender();
     if(zenMixOpen && !zenSliding) zenMixBodyRender();
   }
   var zenSliding = false;
+  function zenSubText(){
+    if(zenTimerEnd) return 'Sleep timer · ' + zenLeft();
+    var names = zenMix.map(function(m){ var s = zenSound(m.id); return s ? s.n : ''; }).filter(Boolean);
+    return names.join(' · ') || 'Pick a sound';
+  }
+  // The screen's colours come from the mix's picture, the way Now Playing takes them from a cover.
+  var zenTintCache = {};
+  function zenSceneTint(key){
+    var sc = ZEN_SCENES[key]; if(!sc || !sc.sky) return null;
+    var hex = sc.sky[Math.min(1, sc.sky.length - 1)].replace('#', '');
+    if(hex.length === 3) hex = hex.replace(/./g, '$&$&');
+    var hsl = rgbToHsl(parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16));
+    var sat = Math.min(.55, Math.max(.26, hsl[1])), l = Math.min(.26, Math.max(.14, hsl[2] * .55));
+    return 'hsl(' + Math.round(hsl[0]) + ',' + Math.round(sat * 100) + '%,' + Math.round(l * 100) + '%)';
+  }
+  function zenSetTint(colour){
+    var dv = npTintDerived(colour);
+    zenEl.style.setProperty('--np-shade', dv.shade);
+    zenEl.style.setProperty('--np-vivid', dv.vivid);
+    zenEl.style.setProperty('--np-on-vivid', dv.on);
+    document.body.style.setProperty('--zen-tint', colour || '');
+  }
+  function zenApplyTint(p){
+    var url = p ? zenArtOf(p) : zenSceneUrl('stars');
+    if(zenTintCache[url]){ zenSetTint(zenTintCache[url]); return; }
+    var a = p && zenState.art[p.id], key = null;
+    if(!a) key = p && ZEN_SCENES[p.art] ? p.art : 'stars';
+    else if(a.k === 'scene' && ZEN_SCENES[a.v]) key = a.v;
+    if(key){ zenTintCache[url] = zenSceneTint(key); zenSetTint(zenTintCache[url]); return; }
+    zenSetTint(zenSceneTint('stars'));
+    var im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = function(){
+      var c = null; try{ c = dominantColorFrom(im); }catch(e){}
+      if(c){ zenTintCache[url] = c; if(zenEl && zenBgKey === url) zenSetTint(c); }
+    };
+    im.src = url;
+  }
   function zenChipsRender(){
     var box = zenEl.querySelector('#zenChips'); box.innerHTML = '';
     if(!zenMix.length){ var e = document.createElement('span'); e.className = 'zen-chips-empty'; e.textContent = 'Pick a sound'; box.appendChild(e); return; }
@@ -32677,8 +32742,9 @@
     rows.push(['save', 'Save this mix as a preset']);
     if(p){
       rows.push(['art', 'Change artwork']);
+      rows.push(['timer', zenTimerEnd ? 'Sleep timer (' + zenLeft() + ' left)' : 'Sleep timer']);
       if(!p.built){ rows.push(['update', 'Replace “' + p.n + '” with this mix']); rows.push(['rename', 'Rename']); rows.push(['delete', 'Delete']); }
-    } else rows.push(['art', 'Change artwork']);
+    } else { rows.push(['art', 'Change artwork']); rows.push(['timer', zenTimerEnd ? 'Sleep timer (' + zenLeft() + ' left)' : 'Sleep timer']); }
     rows.push(['add', 'Add sounds']);
     rows.push(['reorder', 'Reorder presets']);
     zenSheetOpen('<div class="zen-sheet-title">' + (p ? zenEsc(p.n) : 'Custom mix') + '</div><div class="zen-list">' + rows.map(function(r){
@@ -32689,6 +32755,7 @@
           var a = b.dataset.a;
           if(a === 'save') zenSavePrompt();
           else if(a === 'art') zenArtSheet(p ? p.id : null);
+          else if(a === 'timer') zenTimerSheet();
           else if(a === 'rename') zenRenamePrompt(p);
           else if(a === 'delete') zenDelete(p);
           else if(a === 'update'){ zenUpdatePreset(p); zenSheetClose(); }
