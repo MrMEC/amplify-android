@@ -7107,6 +7107,137 @@
   #settingsPanel .set-page .settings-row > .settings-select{ flex:0 0 auto; width:auto; min-width:150px; max-width:100%; }
   /* ---------- Build 403 (Mark): Genres browse grid and the genre page ---------- */
   .gb-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  /* ---------- Zen: the mixer screen, its cards, and its sheets ---------- */
+  .zen-screen{ --za:#f0a63a; --zt:#2b88a6; --zl:rgba(255,255,255,.26); position:fixed; inset:0; z-index:2200; display:none; background:#04060c; color:#fff; overflow:hidden; font-family:inherit; -webkit-tap-highlight-color:transparent; }
+  .zen-screen.open{ display:block; }
+  .zen-screen button{ font-family:inherit; color:inherit; cursor:pointer; }
+  .zen-svg{ width:24px; height:24px; display:block; }
+  .zen-svg-sm{ width:20px; height:20px; }
+  .zen-bg{ position:absolute; inset:0; background-size:cover; background-position:center; }
+  .zen-bg-in{ opacity:0; transition:opacity .6s ease; }
+  .zen-bg-in.on{ opacity:1; }
+  .zen-shade{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(2,5,12,.35) 0, rgba(2,5,12,.05) 34%, rgba(2,5,12,.1) 62%, rgba(2,5,12,.7) 100%); pointer-events:none; }
+  .zen-top{ position:absolute; left:0; right:0; top:0; background:rgba(2,9,19,.93); border-radius:0 0 28px 28px; padding:calc(env(safe-area-inset-top, 0px) + 12px) 0 18px; z-index:3; }
+  .zen-top-head{ display:flex; align-items:center; gap:4px; padding:0 14px 0 22px; min-height:48px; }
+  .zen-title{ flex:1 1 auto; min-width:0; margin:0; font-size:24px; font-weight:500; line-height:1.2; color:#fff; overflow-wrap:normal; word-break:normal; }
+  .zen-iconbtn{ flex:none; width:46px; height:46px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .zen-iconbtn:active{ background:rgba(255,255,255,.12); }
+  .zen-iconbtn .zen-svg{ width:26px; height:26px; stroke-width:1.9; }
+  .zen-presets{ display:flex; gap:16px; overflow-x:auto; overflow-y:hidden; padding:14px 22px 2px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .zen-presets::-webkit-scrollbar{ display:none; }
+  .zen-pre{ flex:none; width:96px; cursor:pointer; outline:none; }
+  .zen-pre-art{ width:96px; height:96px; border-radius:14px; border:1.5px solid rgba(255,255,255,.25); background-size:cover; background-position:center; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+  .zen-pre.on .zen-pre-art{ border-color:var(--za); box-shadow:0 0 0 2px var(--za); }
+  .zen-pre-name{ margin-top:9px; font-size:13px; line-height:1.3; font-weight:500; color:rgba(255,255,255,.82); overflow-wrap:normal; word-break:normal; hyphens:none; }
+  .zen-pre.on .zen-pre-name{ color:#fff; }
+  .zen-pre-new .zen-pre-art{ background:rgba(255,255,255,.06); border-style:dashed; color:rgba(255,255,255,.8); }
+  .zen-stage{ position:absolute; left:0; right:0; top:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:52px; padding:230px 0 140px; z-index:1; }
+  .zen-play{ position:relative; width:122px; height:122px; border:0; background:none; padding:0; display:flex; align-items:center; justify-content:center; }
+  .zen-ring{ position:absolute; inset:-34px; border-radius:50%; background:rgba(255,255,255,.2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+  .zen-ring::after{ content:''; position:absolute; inset:15px; border-radius:50%; background:rgba(255,255,255,.22); }
+  .zen-screen.is-playing .zen-ring{ animation:zenPulse 4.5s ease-in-out infinite; }
+  @keyframes zenPulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.07); opacity:.8; } }
+  .zen-disc{ position:relative; width:122px; height:122px; border-radius:50%; background:#f3f1f2; color:#10131a; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 24px rgba(0,0,0,.4); }
+  .zen-disc svg{ width:48px; height:48px; fill:currentColor; }
+  .zen-timer{ min-width:236px; height:62px; padding:0 22px; border:1.5px solid rgba(255,255,255,.85); border-radius:31px; background:rgba(2,8,18,.35); display:flex; align-items:center; justify-content:center; gap:10px; font-size:17px; font-weight:500; letter-spacing:.02em; }
+  .zen-timer .zen-svg{ width:32px; height:32px; stroke-width:1.5; opacity:.92; }
+  .zen-timer.on{ border-color:var(--za); color:var(--za); }
+  .zen-mixer{ position:absolute; left:14px; right:14px; bottom:calc(env(safe-area-inset-bottom, 0px) + 16px); border:1.5px solid var(--zl); border-radius:28px; background:rgba(3,9,19,.86); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); z-index:3; display:flex; flex-direction:column; overflow:hidden; }
+  .zen-mixer-bar{ flex:none; display:flex; align-items:center; gap:10px; padding:14px 14px 14px 18px; min-height:84px; }
+  .zen-chips{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:12px; overflow:hidden; }
+  .zen-chips-empty{ font-size:15px; color:rgba(255,255,255,.6); }
+  .zen-chip{ flex:none; width:46px; height:46px; border-radius:50%; background:var(--zt); display:flex; align-items:center; justify-content:center; }
+  .zen-chip .zen-svg{ width:26px; height:26px; }
+  .zen-mixbtn, .zen-chev{ flex:none; width:48px; height:48px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.92); }
+  .zen-mixbtn .zen-svg{ width:30px; height:30px; stroke-width:1.9; }
+  .zen-mixbtn.on{ background:var(--za); color:#1a1205; }
+  .zen-mixer-body{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 20px 24px; }
+  .zen-screen.mixer-open .zen-presets, .zen-screen.mixer-open .zen-stage{ display:none; }
+  .zen-screen.mixer-open .zen-top{ background:rgba(2,9,19,.0); padding-bottom:6px; }
+  .zen-screen.mixer-open .zen-shade{ background:rgba(2,5,12,.55); }
+  .zen-screen.mixer-open .zen-mixer{ top:calc(env(safe-area-inset-top, 0px) + 72px); background:#050813; backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .zen-screen.mixer-open .zen-mixer-body{ display:block; }
+  .zen-screen.mixer-open .zen-chip:first-child{ width:60px; height:60px; }
+  .zen-mix-name{ margin:6px 0 22px; font-size:22px; font-weight:500; line-height:1.3; color:#fff; overflow-wrap:normal; word-break:normal; }
+  .zen-sliders{ display:flex; flex-direction:column; gap:14px; margin-bottom:26px; }
+  .zen-slider{ display:flex; align-items:center; gap:22px; }
+  .zen-slider-ic{ flex:none; width:36px; display:flex; justify-content:center; color:#fff; }
+  .zen-slider-ic .zen-svg{ width:34px; height:34px; stroke-width:1.4; }
+  .zen-slider input{ flex:1 1 auto; min-width:0; -webkit-appearance:none; appearance:none; height:34px; background:none; margin:0; }
+  .zen-slider input::-webkit-slider-runnable-track{ height:3px; border-radius:2px; background:linear-gradient(to right, #fff 0, #fff var(--v, 50%), rgba(255,255,255,.28) var(--v, 50%)); }
+  .zen-slider input::-webkit-slider-thumb{ -webkit-appearance:none; width:32px; height:32px; border-radius:50%; background:#fff; margin-top:-14.5px; box-shadow:0 2px 8px rgba(0,0,0,.45); }
+  .zen-tabs{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -20px 14px; padding:0 20px; }
+  .zen-tabs::-webkit-scrollbar{ display:none; }
+  .zen-tabs-wrap{ flex-wrap:wrap; margin:14px 0; padding:0; }
+  .zen-tab{ flex:none; height:42px; padding:0 20px; border:0; border-radius:21px; background:none; font-size:19px; font-weight:500; color:rgba(255,255,255,.55); }
+  .zen-tab.on{ background:var(--za); color:#1a1205; }
+  .zen-grid{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px 8px; }
+  .zen-snd{ border:0; background:none; padding:6px 2px 4px; display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; }
+  .zen-snd-ic{ width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.92); }
+  .zen-snd-ic .zen-svg{ width:34px; height:34px; stroke-width:1.3; }
+  .zen-snd.on .zen-snd-ic{ background:var(--zt); }
+  .zen-snd-nm{ font-size:15px; line-height:1.3; text-align:center; color:#fff; overflow-wrap:normal; word-break:normal; hyphens:none; }
+  .zen-snd-add .zen-snd-ic{ border:1.5px dashed rgba(255,255,255,.5); }
+  /* sheets over the screen */
+  .zen-sheet-ov{ position:absolute; inset:0; z-index:6; display:none; align-items:flex-end; background:rgba(0,0,0,.55); }
+  .zen-sheet-ov.open{ display:flex; }
+  .zen-sheet{ width:100%; max-height:88%; overflow-y:auto; background:#0b111c; border-radius:24px 24px 0 0; padding:22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); box-sizing:border-box; }
+  .zen-sheet-title{ font-size:20px; font-weight:600; margin:0 0 14px; line-height:1.3; overflow-wrap:normal; word-break:normal; }
+  .zen-sheet-msg{ margin:0 0 16px; font-size:15px; line-height:1.5; color:rgba(255,255,255,.82); }
+  .zen-note{ font-size:13px; color:rgba(255,255,255,.6); }
+  .zen-credit{ font-size:13px; color:rgba(255,255,255,.6); }
+  .zen-list{ display:flex; flex-direction:column; }
+  .zen-row{ border:0; border-top:1px solid rgba(255,255,255,.1); background:none; text-align:left; font-size:17px; padding:16px 2px; display:flex; align-items:center; }
+  .zen-row:first-child{ border-top:0; }
+  .zen-row:active{ background:rgba(255,255,255,.07); }
+  .zen-row.danger{ color:#ff8a7a; }
+  .zen-input{ width:100%; box-sizing:border-box; height:48px; border-radius:14px; border:1.5px solid rgba(255,255,255,.28); background:rgba(255,255,255,.06); color:#fff; font:inherit; font-size:16px; padding:0 16px; margin-bottom:6px; outline:none; }
+  .zen-input:focus{ border-color:var(--za); }
+  .zen-sheet-btns{ display:flex; gap:12px; margin-top:16px; }
+  .zen-sheet-btns .zen-btn{ flex:1 1 0; }
+  .zen-sheet-btns-col{ flex-direction:column; }
+  .zen-btn{ height:48px; padding:0 20px; border-radius:24px; border:1.5px solid rgba(255,255,255,.35); background:none; font-size:16px; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .zen-btn-main{ background:var(--za); border-color:var(--za); color:#1a1205 !important; }
+  .zen-art-grid{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+  .zen-art{ position:relative; aspect-ratio:1/1.1; border:2px solid transparent; border-radius:14px; background-size:cover; background-position:center; padding:0; overflow:hidden; display:flex; align-items:flex-end; }
+  .zen-art span{ display:block; width:100%; padding:16px 6px 6px; font-size:12px; font-weight:500; line-height:1.25; text-align:center; background:linear-gradient(transparent, rgba(0,0,0,.7)); overflow-wrap:normal; word-break:normal; }
+  .zen-art.on{ border-color:var(--za); }
+  .zen-find{ display:flex; gap:10px; align-items:flex-start; }
+  .zen-find .zen-input{ flex:1 1 auto; min-width:0; }
+  .zen-find .zen-btn{ flex:none; padding:0 18px; }
+  .zen-results{ margin:6px 0 4px; }
+  .zen-res{ display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid rgba(255,255,255,.1); }
+  .zen-res:first-child{ border-top:0; }
+  .zen-res-play{ flex:none; width:42px; height:42px; border-radius:50%; border:1.5px solid rgba(255,255,255,.4); background:none; display:flex; align-items:center; justify-content:center; }
+  .zen-res-play svg{ width:18px; height:18px; fill:currentColor; }
+  .zen-res-play.on{ background:var(--za); border-color:var(--za); color:#1a1205; }
+  .zen-res-text{ flex:1 1 auto; min-width:0; }
+  .zen-res-title{ font-size:15px; font-weight:500; line-height:1.3; overflow-wrap:anywhere; }
+  .zen-res-sub{ font-size:12.5px; line-height:1.35; color:rgba(255,255,255,.6); overflow-wrap:anywhere; }
+  .zen-res-add{ flex:none; height:38px; padding:0 16px; font-size:14px; }
+  .zen-spin{ width:34px; height:34px; margin:22px auto; border-radius:50%; border:3px solid rgba(255,255,255,.2); border-top-color:var(--za); animation:zenSpin .8s linear infinite; }
+  @keyframes zenSpin{ to{ transform:rotate(360deg); } }
+  /* cards in Library, Home and the White Noise genre */
+  .zen-hero{ position:relative; grid-column:1/-1; height:176px; border-radius:20px; overflow:hidden; margin:0 0 24px; cursor:pointer; display:flex; align-items:flex-end; color:#fff; background-color:#0b1020; }
+  .zen-hero-compact{ height:120px; margin:6px 0 22px; }
+  .zen-hero-shade{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.05) 0, rgba(0,0,0,.62) 100%); }
+  .zen-hero-text{ position:relative; padding:0 84px 16px 20px; min-width:0; }
+  .zen-hero-title{ font-size:26px; font-weight:600; line-height:1.15; }
+  .zen-hero-compact .zen-hero-title{ font-size:21px; }
+  .zen-hero-sub{ margin-top:4px; font-size:14px; line-height:1.35; color:rgba(255,255,255,.88); }
+  .zen-hero-go{ position:absolute; right:16px; bottom:16px; width:52px; height:52px; border-radius:50%; background:#f3f1f2; color:#10131a; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+  .zen-hero-go svg{ width:24px; height:24px; fill:currentColor; }
+  .zen-row-tiles .tile{ flex:none; }
+  .zen-tile-art{ border-radius:14px; }
+  .zen-cat-label{ grid-column:1/-1; margin:2px 0 10px; font-size:14px; font-weight:600; color:var(--text-dim); }
+  .zen-chipwrap{ grid-column:1/-1; display:flex; flex-wrap:wrap; gap:10px; margin:0 0 20px; }
+  .zen-sndchip{ display:inline-flex; align-items:center; gap:10px; height:44px; padding:0 18px 0 12px; border:1px solid var(--border); border-radius:22px; background:var(--panel-2); color:var(--text); font:inherit; font-size:15px; font-weight:500; cursor:pointer; }
+  .zen-sndchip-ic{ display:flex; width:24px; height:24px; color:var(--accent); }
+  .zen-sndchip-ic .zen-svg{ width:24px; height:24px; }
+  .zen-addbtn{ grid-column:1/-1; justify-self:start; display:inline-flex; align-items:center; gap:10px; height:46px; padding:0 22px; border:1.5px dashed var(--text-faint); border-radius:23px; background:none; color:var(--text); font:inherit; font-size:15px; font-weight:500; margin:6px 0 18px; cursor:pointer; }
+  .zen-fine{ grid-column:1/-1; margin:0 0 20px; font-size:12.5px; line-height:1.5; color:var(--text-faint); }
+  .zen-home-section{ display:none; margin:6px 0 12px; }
+  body.home-view .zen-home-section{ display:block; }
   .gb-head{ grid-column:1/-1; margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); line-height:1.25; }
   /* Build 432 (Mark): Edit sits on the Browse categories line as a word button, no pencil. */
   .gb-head.gb-head-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -7884,6 +8015,13 @@
       <div class="library-notice" id="libraryNotice" style="display:none;"></div>
 
       <div class="tile-grid" id="stationsGrid"></div>
+      <!-- Zen: mix rain, waves, fire and white noise; its presets, last on Home. -->
+      <div class="home-section zen-home-section" id="zenHomeSection">
+        <div class="home-section-head">
+          <h2 class="home-heading-link" id="zenHomeHeading" role="button" tabindex="0">Zen<i class="fa-solid fa-chevron-right home-heading-chevron" aria-hidden="true"></i></h2>
+        </div>
+        <div id="zenHomeGrid"></div>
+      </div>
 
       <!-- The alphabet rail. Fixed to the right edge of the list, so it stays put while the
            list runs past it. Tapping a letter jumps; pressing and dragging previews each
@@ -10477,7 +10615,7 @@
   var onGuideView = false; // Video > Live TV > TV Guide (build 240)
   var onPlaylistsHomeView = false;
   var onGenresHomeView = false;
-  var onAudiobooksView = false;   // build 440: Library > Audiobooks
+  var onAudiobooksView = false; var onZenView = false;   // build 440: Library > Audiobooks
   // Which home section's own "see all" page the centre grid is showing --
   // 'favorites' | 'recentStations' | 'recentSongs' | 'topStations' -- or null for any other
   // view. Mirrors activeLibrarySection: one flag, reset at every other view's entry point,
@@ -31295,7 +31433,7 @@
   window.addEventListener('error', function(ev){ noteAppError(ev.error || ev.message); });
   window.addEventListener('unhandledrejection', function(ev){ noteAppError(ev.reason); });
   var LIB_TAB_KEY = 'radioPlayerLibTab';
-  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres'], ['audiobooks', 'Audiobooks']];   // build 430: Genres is back as the last tab (Search keeps its own Genres browse)
+  var LIB_TABS = [['artists', 'Artists'], ['albums', 'Albums'], ['songs', 'Songs'], ['playlists', 'Playlists'], ['genres', 'Genres'], ['audiobooks', 'Audiobooks'], ['zen', 'Zen']];   // build 430: Genres is back as the last tab (Search keeps its own Genres browse)
   var libRootNav = false;
   function libLastTab(){
     var t = null; try{ t = localStorage.getItem(LIB_TAB_KEY); }catch(e){}
@@ -31316,6 +31454,7 @@
       if(id === 'playlists') openPlaylistsHome();
       else if(id === 'genres') openGenresHome();
       else if(id === 'audiobooks') openAudiobooksHome();
+      else if(id === 'zen') openZenHome();
       else runLibrarySection(id);
     } finally { libRootNav = false; }
   }
@@ -31325,6 +31464,7 @@
     if(onPlaylistsHomeView) return 'playlists';
     if(onGenresHomeView) return 'genres';
     if(onAudiobooksView) return 'audiobooks';
+    if(onZenView) return 'zen';
     if(activeLibrarySection === 'artists' || activeLibrarySection === 'albums' || activeLibrarySection === 'songs') return activeLibrarySection;
     return null;
   }
@@ -31365,7 +31505,7 @@
       var on = bar.querySelector('.active');
       if(on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
     });
-    if(id === 'playlists' || id === 'genres' || id === 'audiobooks') hideAzRail();   // build 407: no A-Z on these two
+    if(id === 'playlists' || id === 'genres' || id === 'audiobooks' || id === 'zen') hideAzRail();   // build 407: no A-Z on these two
     if(id === 'playlists') setResultCount(stationPlaylists.length, 'playlist');
     if(id === 'artists' || id === 'albums' || id === 'songs'){
       libraryAddHeaderBtn.style.display = '';
@@ -31494,6 +31634,7 @@
     renderPlaylistsGrid = after(renderPlaylistsGrid, addLibTabs);
     renderGenresGrid = after(renderGenresGrid, addLibTabs);
     renderAudiobooksGrid = after(renderAudiobooksGrid, addLibTabs);
+    renderZenGrid = after(renderZenGrid, addLibTabs);
   })();
 
   function openGenresHome(){
@@ -31916,6 +32057,897 @@
       });
     });
   }
+  // ---------- Zen (Mark): mix looping sounds, with presets and artwork ----------
+  // A mixer of looping ambient sounds (rain, waves, fire, birds, white noise) the listener
+  // blends with a slider each, saves as presets, and dresses with artwork. Every sound is a short
+  // clip played by Web Audio from a decoded buffer whose end is crossfaded into its start, so the
+  // loop has no click and no gap however long it runs. Clips are bundled in www/zen; ones the
+  // listener adds (Openverse search, or a file from the phone) are kept in IndexedDB.
+  var ZEN_KEY = 'radioPlayerZen', ZEN_PHOTOS_KEY = 'radioPlayerZenPhotos';
+  var ZEN_MAX = 5;
+  var ZEN_CATS = ['Weather', 'Water', 'Nature', 'Noise', 'Cozy'];
+  var ZEN_ICONS = {
+    rain: '<path d="M7 15a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.2A3.5 3.5 0 0 1 17 15z"/><path d="m8.5 18-1 2.5"/><path d="m12.5 18-1 2.5"/><path d="m16.5 18-1 2.5"/>',
+    drizzle: '<path d="M7 14a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.2A3.5 3.5 0 0 1 17 14z"/><path d="M9 17.5v.01"/><path d="M12.5 19v.01"/><path d="M15.5 17.5v.01"/><path d="M11 21v.01"/>',
+    roof: '<path d="M3 11 12 4l9 7"/><path d="m8 15-.8 2.2"/><path d="m12 15-.8 2.2"/><path d="m16 15-.8 2.2"/><path d="m10 19-.8 2"/><path d="m14 19-.8 2"/>',
+    thunder: '<path d="M17 14.5A4 4 0 0 0 16.5 7 5.5 5.5 0 0 0 6 8.2 3.5 3.5 0 0 0 7 15"/><path d="m12.5 11-2.5 4.5h3.5L11.5 20"/>',
+    bolt: '<path d="M13 2 4.5 13.5H12L11 22l8.5-11.5H12z"/>',
+    wind: '<path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/><path d="M3 19h6"/>',
+    waves: '<path d="M2.5 8c2.4-1.8 4.3-1.8 6.3 0s4 1.8 6.3 0 4.3-1.8 6.4 0"/><path d="M2.5 13c2.4-1.8 4.3-1.8 6.3 0s4 1.8 6.3 0 4.3-1.8 6.4 0"/><path d="M2.5 18c2.4-1.8 4.3-1.8 6.3 0s4 1.8 6.3 0 4.3-1.8 6.4 0"/>',
+    shore: '<path d="M12 3v1.8"/><path d="m5.6 6.6 1.3 1.3"/><path d="m18.4 6.6-1.3 1.3"/><path d="M8 13a4 4 0 0 1 8 0"/><path d="M2.5 16c2.4-1.5 4.3-1.5 6.3 0s4 1.5 6.3 0 4.3-1.5 6.4 0"/><path d="M2.5 20c2.4-1.5 4.3-1.5 6.3 0s4 1.5 6.3 0 4.3-1.5 6.4 0"/>',
+    gull: '<path d="M2.5 9c2.6-3.6 5.2-3.6 7.5 0 2.3-3.6 4.9-3.6 7.5 0"/><path d="M3 17c2.4-1.5 4.3-1.5 6.3 0s4 1.5 6.3 0 3.4-1.2 5.4-.2"/>',
+    stream: '<path d="M7 5c-1 1-1 2 0 3s1 2 0 3"/><path d="M12 5c-1 1-1 2 0 3s1 2 0 3"/><path d="M17 5c-1 1-1 2 0 3s1 2 0 3"/><path d="M2.5 16c2.4-1.5 4.3-1.5 6.3 0s4 1.5 6.3 0 4.3-1.5 6.4 0"/><path d="M2.5 20c2.4-1.5 4.3-1.5 6.3 0s4 1.5 6.3 0 4.3-1.5 6.4 0"/>',
+    bird: '<path d="M16 7h.01"/><path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20"/><path d="m20 7 2 .5-2 .5"/><path d="M10 18v3"/><path d="M14 17.75V21"/><path d="M7 18a6 6 0 0 0 3.84-10.61"/>',
+    feather: '<path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/>',
+    noise: '<path d="M3 10v4"/><path d="M6.5 6.5v11"/><path d="M10 3.5v17"/><path d="M13.5 8v8"/><path d="M17 5v14"/><path d="M20.5 9.5v5"/>',
+    bubbles: '<circle cx="9" cy="14.5" r="4.5"/><circle cx="17" cy="7.5" r="2.6"/><circle cx="17.5" cy="16.5" r="1.6"/>',
+    flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    note: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    timer: '<path d="M10 2h4"/><path d="M12 14V10"/><circle cx="12" cy="14" r="8"/><path d="m19 6 1.2-1.2"/>',
+    mixer: '<path d="M4 8h9"/><path d="M17 8h3"/><circle cx="15" cy="8" r="2"/><path d="M4 16h3"/><path d="M11 16h9"/><circle cx="9" cy="16" r="2"/>',
+    more: '<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>',
+    close: '<path d="M5 5l14 14"/><path d="M19 5 5 19"/>',
+    up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5-5 4 4 3-3 4 4"/>'
+  };
+  function zenSvg(name, cls){
+    return '<svg class="' + (cls || 'zen-svg') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ZEN_ICONS[name] || ZEN_ICONS.note) + '</svg>';
+  }
+  // The bundled clips (each www/zen/<id>.ogg), loudness-matched so a slider means the same on all.
+  var ZEN_BASE = [
+    { id: 'rain', n: 'Rain', c: 'Weather', i: 'rain' }, { id: 'gentle-rain', n: 'Gentle Rain', c: 'Weather', i: 'drizzle' },
+    { id: 'calm-rain', n: 'Calming Rain', c: 'Weather', i: 'drizzle' }, { id: 'roof-rain', n: 'Rain on Roof', c: 'Weather', i: 'roof' },
+    { id: 'tin-roof', n: 'Tin Roof Rain', c: 'Weather', i: 'roof' }, { id: 'rain-thunder', n: 'Rain & Thunder', c: 'Weather', i: 'thunder' },
+    { id: 'thunderstorm', n: 'Thunderstorm', c: 'Weather', i: 'bolt' }, { id: 'wind', n: 'Wind', c: 'Weather', i: 'wind' },
+    { id: 'ocean', n: 'Ocean Waves', c: 'Water', i: 'waves' }, { id: 'soft-waves', n: 'Soft Waves', c: 'Water', i: 'shore' },
+    { id: 'seagulls', n: 'Sea & Seagulls', c: 'Water', i: 'gull' }, { id: 'stream', n: 'Stream', c: 'Water', i: 'stream' },
+    { id: 'birds', n: 'Morning Birds', c: 'Nature', i: 'bird' }, { id: 'dove', n: 'Dove Call', c: 'Nature', i: 'feather' },
+    { id: 'white-noise', n: 'Deep Noise', c: 'Noise', i: 'noise' }, { id: 'underwater', n: 'Underwater', c: 'Noise', i: 'bubbles' },
+    { id: 'fireplace', n: 'Fireplace', c: 'Cozy', i: 'flame' }
+  ];
+  // Presets: name, the sounds with their volume (0-1), and the picture behind them.
+  var ZEN_PRESETS = [
+    { id: 'rainy-night', n: 'Rainy Night', art: 'rainy-night', s: [['rain', .7], ['roof-rain', .35], ['wind', .2]] },
+    { id: 'campfire', n: 'Campfire', art: 'campfire', s: [['fireplace', .85], ['wind', .2], ['birds', .12]] },
+    { id: 'seaside-dawn', n: 'Seaside Dawn', art: 'sea-dawn', s: [['ocean', .6], ['seagulls', .35], ['birds', .25]] },
+    { id: 'forest-stream', n: 'Forest Stream', art: 'forest', s: [['stream', .7], ['birds', .5], ['wind', .15]] },
+    { id: 'storm', n: 'Storm', art: 'storm', s: [['thunderstorm', .8], ['rain', .45]] },
+    { id: 'cozy-cabin', n: 'Cozy Cabin', art: 'cabin', s: [['fireplace', .6], ['tin-roof', .5], ['rain-thunder', .25]] },
+    { id: 'deep-sleep', n: 'Deep Sleep', art: 'stars', s: [['white-noise', .6], ['gentle-rain', .3]] },
+    { id: 'lighthouse', n: 'Lighthouse', art: 'lighthouse', s: [['soft-waves', .7], ['seagulls', .3], ['wind', .25]] },
+    { id: 'misty-morning', n: 'Misty Morning', art: 'mist', s: [['calm-rain', .4], ['birds', .5], ['dove', .3], ['stream', .25]] },
+    { id: 'deep-blue', n: 'Deep Blue', art: 'deep', s: [['underwater', .6], ['soft-waves', .3]] }
+  ];
+  var ZEN_ART_NAMES = { 'rainy-night': 'Rainy night', campfire: 'Campfire', 'sea-dawn': 'Sea at dawn', forest: 'Forest', storm: 'Storm', cabin: 'Cabin', stars: 'Starry night', lighthouse: 'Lighthouse', mist: 'Misty morning', deep: 'Deep blue' };
+
+  // ----- saved state -----
+  var zenState = (function(){ try{ var v = JSON.parse(localStorage.getItem(ZEN_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
+  zenState.presets = Array.isArray(zenState.presets) ? zenState.presets : [];   // the listener's own mixes
+  zenState.art = zenState.art && typeof zenState.art === 'object' ? zenState.art : {};   // preset id -> {k:'scene',v} | {k:'photo'}
+  zenState.clips = Array.isArray(zenState.clips) ? zenState.clips : [];   // added sounds {id,n,c,cr}
+  var zenPhotos = (function(){ try{ var v = JSON.parse(localStorage.getItem(ZEN_PHOTOS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
+  function zenSave(){
+    try{ localStorage.setItem(ZEN_KEY, JSON.stringify(zenState)); return true; }catch(e){ return false; }
+  }
+  function zenSavePhotos(){ try{ localStorage.setItem(ZEN_PHOTOS_KEY, JSON.stringify(zenPhotos)); return true; }catch(e){ return false; } }
+  function zenAllSounds(){
+    return ZEN_BASE.concat(zenState.clips.map(function(c){ return { id: c.id, n: c.n, c: c.c, i: 'note', user: true, cr: c.cr }; }));
+  }
+  function zenSound(id){ var a = zenAllSounds(); for(var i = 0; i < a.length; i++) if(a[i].id === id) return a[i]; return null; }
+  function zenAllPresets(){
+    return ZEN_PRESETS.map(function(p){ return { id: p.id, n: p.n, art: p.art, built: true, s: p.s.map(function(x){ return { id: x[0], v: x[1] }; }) }; })
+      .concat(zenState.presets.map(function(p){ return { id: p.id, n: p.n, art: p.art || 'stars', built: false, s: (p.s || []).map(function(x){ return { id: x.id, v: x.v }; }) }; }));
+  }
+  function zenPreset(id){ var a = zenAllPresets(); for(var i = 0; i < a.length; i++) if(a[i].id === id) return a[i]; return null; }
+
+  // ----- artwork: painted scenes, or a photo the listener chose -----
+  function zenRng(seed){
+    var s = (seed >>> 0) || 1;
+    return function(){ s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  }
+  function zenHash(str){ var h = 7; for(var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; }
+  var ZEN_SCENES = {
+    'rainy-night': { sky: ['#070c1c', '#16233f', '#2a3a5e'], moon: [.74, .17, 34, '#d7defc'], stars: 30, land: 'hills', landC: ['#101a2e', '#0a111f', '#060a13'], rain: 1, clouds: 1 },
+    campfire: { sky: ['#050816', '#1a1540', '#5a2f55'], stars: 90, land: 'trees', landC: ['#06070f'], fire: [.5, .84], moon: [.2, .14, 22, '#f3e6d0'] },
+    'sea-dawn': { sky: ['#1c2a60', '#c4607f', '#ffc893'], sun: [.5, .6, 62, '#fff0c4'], land: 'sea', seaC: ['#3a4f86', '#142348'], clouds: 1 },
+    forest: { sky: ['#14302a', '#4f8d78', '#b4d8bd'], land: 'trees', landC: ['#0e2a20', '#0a1f18'], mist: 1, rays: 1 },
+    storm: { sky: ['#06080f', '#212b40', '#4a566f'], clouds: 2, bolt: 1, land: 'sea', seaC: ['#232e45', '#090d16'], rain: 1 },
+    cabin: { sky: ['#0f0a1a', '#2b1a35', '#5d3340'], stars: 40, land: 'hills', landC: ['#1b1224', '#0f0a17'], window: [.5, .76], rain: 1 },
+    stars: { sky: ['#03040c', '#121a40', '#37407a'], stars: 160, land: 'mountains', landC: ['#0b0f26', '#05071a'], moon: [.3, .2, 26, '#e9edff'] },
+    lighthouse: { sky: ['#252352', '#b5557a', '#f5ae78'], sun: [.7, .58, 40, '#ffe3b0'], land: 'sea', seaC: ['#364a7d', '#101c3c'], house: 1 },
+    mist: { sky: ['#a9bfb8', '#7d9a94', '#516f6a'], land: 'trees', landC: ['#35524c', '#223c37'], mist: 2, birds: 1 },
+    deep: { sky: ['#020d1a', '#07496a', '#27a0b2'], rays: 2, bubbles: 1, land: 'none' }
+  };
+  var zenSceneCache = {};
+  function zenSceneUrl(k){
+    if(zenSceneCache[k]) return zenSceneCache[k];
+    var c = ZEN_SCENES[k] || ZEN_SCENES.stars, W = 600, H = 900, r = zenRng(zenHash(k)), o = [];
+    function rr(a, b){ return a + (b - a) * r(); }
+    o.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" preserveAspectRatio="xMidYMid slice">');
+    var st = c.sky.map(function(col, i){ return '<stop offset="' + (i / (c.sky.length - 1)) + '" stop-color="' + col + '"/>'; }).join('');
+    o.push('<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1">' + st + '</linearGradient>'
+      + '<filter id="b6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>'
+      + '<filter id="b24" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="24"/></filter>'
+      + '<radialGradient id="gl"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
+      + '<radialGradient id="fg"><stop offset="0" stop-color="#ffb347" stop-opacity=".95"/><stop offset=".45" stop-color="#ff6a1f" stop-opacity=".45"/><stop offset="1" stop-color="#ff3d00" stop-opacity="0"/></radialGradient>'
+      + '<linearGradient id="vg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#000" stop-opacity="0"/><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient></defs>');
+    o.push('<rect width="600" height="900" fill="url(#sk)"/>');
+    var i, x, y;
+    if(c.stars) for(i = 0; i < c.stars; i++){ x = rr(0, W); y = rr(0, H * .6); o.push('<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + rr(.5, 1.7).toFixed(2) + '" fill="#fff" opacity="' + rr(.35, 1).toFixed(2) + '"/>'); }
+    function orb(a){
+      var cx = a[0] * W, cy = a[1] * H, rad = a[2];
+      o.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + rad * 3.2 + '" fill="url(#gl)" opacity=".5"/><circle cx="' + cx + '" cy="' + cy + '" r="' + rad + '" fill="' + a[3] + '"/>');
+    }
+    if(c.moon) orb(c.moon);
+    if(c.sun) orb(c.sun);
+    if(c.rays){
+      for(i = 0; i < 5 + c.rays * 2; i++){
+        x = rr(40, 560);
+        o.push('<polygon points="' + (x - 14) + ',0 ' + (x + 14) + ',0 ' + (x + rr(-120, 120)).toFixed(0) + ',900" fill="#fff" opacity="' + (c.rays === 2 ? rr(.05, .12) : rr(.03, .07)).toFixed(3) + '" filter="url(#b6)"/>');
+      }
+    }
+    if(c.clouds){
+      for(i = 0; i < 5 * c.clouds; i++){
+        x = rr(-40, 640); y = rr(60, 340);
+        o.push('<ellipse cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" rx="' + rr(90, 190).toFixed(0) + '" ry="' + rr(22, 46).toFixed(0) + '" fill="' + (c.clouds === 2 ? '#0b0f1a' : '#9db0d8') + '" opacity="' + (c.clouds === 2 ? rr(.5, .85) : rr(.12, .22)).toFixed(2) + '" filter="url(#b24)"/>');
+      }
+    }
+    if(c.bolt) o.push('<path d="M330 110 292 300h52l-44 190 118-240h-66l50-140z" fill="#e8eeff" opacity=".9" filter="url(#b6)"/><path d="M330 110 292 300h52l-44 190 118-240h-66l50-140z" fill="#fff" opacity=".95"/>');
+    function ridge(base, amp, col, rough){
+      var d = 'M0 900 L0 ' + base, n = 14, ph = rr(0, 6.28), ph2 = rr(0, 6.28);
+      for(var k = 0; k <= n; k++){ var xx = (W / n) * k, yy = base + Math.sin(k * .7 + ph) * amp + Math.sin(k * 1.9 + ph2) * amp * rough; d += ' L' + xx.toFixed(0) + ' ' + yy.toFixed(0); }
+      o.push('<path d="' + d + ' L600 900 Z" fill="' + col + '"/>');
+    }
+    function peaks(base, amp, col){
+      var d = 'M0 900 L0 ' + base, k, xx = 0;
+      while(xx < W + 80){ var w = rr(70, 150), h = rr(amp * .5, amp); d += ' L' + (xx + w / 2).toFixed(0) + ' ' + (base - h).toFixed(0) + ' L' + (xx + w).toFixed(0) + ' ' + base; xx += w; }
+      o.push('<path d="' + d + ' L600 900 Z" fill="' + col + '"/>');
+    }
+    function pines(base, col, hmin, hmax){
+      var xx = -20;
+      while(xx < W + 30){
+        var h = rr(hmin, hmax), w = h * .34;
+        o.push('<path d="M' + xx.toFixed(0) + ' ' + base + ' L' + (xx + w / 2).toFixed(0) + ' ' + (base - h).toFixed(0) + ' L' + (xx + w).toFixed(0) + ' ' + base + ' Z" fill="' + col + '"/>');
+        xx += w * rr(.55, .85);
+      }
+      o.push('<rect x="0" y="' + base + '" width="600" height="' + (900 - base) + '" fill="' + col + '"/>');
+    }
+    if(c.land === 'hills'){ ridge(600, 22, c.landC[0], .5); ridge(690, 26, c.landC[1], .6); ridge(790, 20, c.landC[2], .4); }
+    else if(c.land === 'mountains'){ peaks(640, 230, c.landC[0]); peaks(740, 170, c.landC[1]); }
+    else if(c.land === 'trees'){
+      pines(640, c.landC.length > 1 ? c.landC[1] : c.landC[0], 120, 230);
+      if(c.mist){ o.push('<rect x="-40" y="560" width="680" height="120" fill="#e9f3ee" opacity=".35" filter="url(#b24)"/>'); }
+      pines(740, c.landC[0], 150, 300);
+    }
+    else if(c.land === 'sea'){
+      var hz = c.house ? 560 : 520;
+      o.push('<defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c.seaC[0] + '"/><stop offset="1" stop-color="' + c.seaC[1] + '"/></linearGradient></defs><rect x="0" y="' + hz + '" width="600" height="' + (900 - hz) + '" fill="url(#sea)"/>');
+      if(c.sun){ for(i = 0; i < 14; i++){ var yy2 = hz + 8 + i * 17; o.push('<rect x="' + (c.sun[0] * W - (60 - i * 3.2)).toFixed(0) + '" y="' + yy2 + '" width="' + (120 - i * 6.4).toFixed(0) + '" height="4" rx="2" fill="' + c.sun[3] + '" opacity="' + (.55 - i * .035).toFixed(2) + '"/>'); } }
+      for(i = 0; i < 22; i++){ y = hz + 20 + i * 15; x = rr(0, W); o.push('<rect x="' + x.toFixed(0) + '" y="' + y.toFixed(0) + '" width="' + rr(40, 130).toFixed(0) + '" height="2.4" rx="1.2" fill="#fff" opacity="' + rr(.06, .2).toFixed(2) + '"/>'); }
+      if(c.house){
+        o.push('<path d="M60 900 L90 640 L240 640 L270 900 Z" fill="#141a33"/><path d="M110 640 L132 420 L198 420 L220 640 Z" fill="#f4f1ea"/><path d="M120 560h92v26h-100z" fill="#c2455c"/><rect x="128" y="360" width="76" height="60" fill="#ffe9a6"/><rect x="118" y="348" width="96" height="14" fill="#2a2a44"/><path d="M166 330 l22 18h-44z" fill="#2a2a44"/>'
+          + '<path d="M204 392 L600 340 L600 450 Z" fill="#ffe9a6" opacity=".22" filter="url(#b6)"/>');
+      }
+    }
+    if(c.mist === 2 || (c.mist === 1 && c.land !== 'trees')){ for(i = 0; i < 4; i++) o.push('<rect x="-60" y="' + (420 + i * 90) + '" width="720" height="70" fill="#f4f8f6" opacity="' + rr(.12, .25).toFixed(2) + '" filter="url(#b24)"/>'); }
+    if(c.birds){ for(i = 0; i < 5; i++){ x = rr(60, 540); y = rr(120, 300); o.push('<path d="M' + x.toFixed(0) + ' ' + y.toFixed(0) + ' q10 -9 20 0 q10 -9 20 0" fill="none" stroke="#1d2e2b" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>'); } }
+    if(c.bubbles){ for(i = 0; i < 26; i++){ x = rr(20, 580); y = rr(80, 860); var rad2 = rr(3, 14); o.push('<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + rad2.toFixed(1) + '" fill="none" stroke="#bff3ff" stroke-width="1.6" opacity="' + rr(.2, .6).toFixed(2) + '"/>'); } }
+    if(c.fire){
+      var fx = c.fire[0] * W, fy = c.fire[1] * H;
+      o.push('<circle cx="' + fx + '" cy="' + fy + '" r="190" fill="url(#fg)"/>');
+      for(i = 0; i < 7; i++){ var a = (i - 3) * 13; o.push('<path d="M' + (fx + a) + ' ' + (fy + 26) + ' q-14 -34 0 -62 q4 20 18 32 q8 14 -2 30z" fill="' + ['#ffcf5a', '#ff9a2e', '#ff6a1f'][i % 3] + '" opacity=".92"/>'); }
+      o.push('<rect x="' + (fx - 58) + '" y="' + (fy + 24) + '" width="116" height="14" rx="7" fill="#2b140c"/>');
+    }
+    if(c.window){
+      var wx = c.window[0] * W, wy = c.window[1] * H;
+      o.push('<circle cx="' + wx + '" cy="' + wy + '" r="240" fill="url(#fg)" opacity=".7"/><rect x="' + (wx - 60) + '" y="' + (wy - 70) + '" width="120" height="130" rx="6" fill="#ffc46b"/><path d="M' + wx + ' ' + (wy - 70) + 'v130M' + (wx - 60) + ' ' + (wy - 5) + 'h120" stroke="#3a1f12" stroke-width="7"/>');
+    }
+    if(c.rain){ for(i = 0; i < 110; i++){ x = rr(-40, 620); y = rr(-20, 900); var len = rr(26, 70); o.push('<line x1="' + x.toFixed(0) + '" y1="' + y.toFixed(0) + '" x2="' + (x - len * .22).toFixed(0) + '" y2="' + (y + len).toFixed(0) + '" stroke="#cfe0ff" stroke-width="' + rr(.8, 1.8).toFixed(1) + '" opacity="' + rr(.12, .38).toFixed(2) + '"/>'); } }
+    o.push('<rect width="600" height="900" fill="url(#vg)"/></svg>');
+    return (zenSceneCache[k] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(o.join('')));
+  }
+  // The picture for a preset: the listener's choice, else the preset's own scene.
+  function zenArtOf(p){
+    var a = p && zenState.art[p.id];
+    if(a && a.k === 'photo' && zenPhotos[p.id]) return zenPhotos[p.id];
+    if(a && a.k === 'scene' && ZEN_SCENES[a.v]) return zenSceneUrl(a.v);
+    return zenSceneUrl(p && ZEN_SCENES[p.art] ? p.art : 'stars');
+  }
+  function zenPaint(el, p){ el.style.backgroundImage = 'url("' + zenArtOf(p) + '")'; el.style.backgroundSize = 'cover'; el.style.backgroundPosition = 'center'; }
+
+  // ----- clip storage (sounds added by the listener) -----
+  var zenDbP = null;
+  function zenDB(){
+    if(zenDbP) return zenDbP;
+    zenDbP = new Promise(function(res, rej){
+      try{
+        var r = indexedDB.open('amplify-zen', 1);
+        r.onupgradeneeded = function(){ r.result.createObjectStore('clips'); };
+        r.onsuccess = function(){ res(r.result); };
+        r.onerror = function(){ rej(r.error); };
+      }catch(e){ rej(e); }
+    });
+    return zenDbP;
+  }
+  function zenIdb(mode, fn){
+    return zenDB().then(function(db){
+      return new Promise(function(res, rej){
+        var tx = db.transaction('clips', mode), st = tx.objectStore('clips'), req = fn(st);
+        tx.oncomplete = function(){ res(req && req.result); };
+        tx.onerror = function(){ rej(tx.error); };
+        tx.onabort = function(){ rej(tx.error); };
+      });
+    });
+  }
+
+  // ----- the engine -----
+  var zenCtx = null, zenMaster = null, zenBufs = {}, zenVoices = {}, zenMix = [], zenCur = null, zenDirty = false;
+  var zenPlaying = false, zenTimerEnd = 0, zenTick = 0, zenSaveT = 0;
+  function zenAC(){
+    if(zenCtx) return zenCtx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    zenCtx = new AC();
+    var comp = zenCtx.createDynamicsCompressor();
+    comp.threshold.value = -12; comp.knee.value = 18; comp.ratio.value = 6; comp.attack.value = .01; comp.release.value = .3;
+    zenMaster = zenCtx.createGain();
+    comp.connect(zenMaster); zenMaster.connect(zenCtx.destination);
+    zenCtx._in = comp;
+    return zenCtx;
+  }
+  // The end of the clip is faded into its start, so the buffer loops with no click and no gap.
+  function zenLoopify(ctx, buf){
+    var sr = buf.sampleRate, N = buf.length, X = Math.min(Math.round(2 * sr), Math.floor(N / 4));
+    if(X < 64) return buf;
+    var L = N - X, out = ctx.createBuffer(buf.numberOfChannels, L, sr);
+    for(var ch = 0; ch < buf.numberOfChannels; ch++){
+      var a = buf.getChannelData(ch), o = out.getChannelData(ch), i;
+      for(i = 0; i < L; i++) o[i] = a[i];
+      for(i = 0; i < X; i++){ var t = i / X; o[i] = a[i] * Math.sin(t * Math.PI / 2) + a[L + i] * Math.cos(t * Math.PI / 2); }
+    }
+    return out;
+  }
+  function zenBytes(snd){
+    if(snd.user) return zenIdb('readonly', function(st){ return st.get(snd.id); }).then(function(b){ if(!b) throw new Error('missing'); return b; });
+    return fetch('zen/' + snd.id + '.ogg').then(function(r){ if(!r.ok) throw new Error('http ' + r.status); return r.arrayBuffer(); });
+  }
+  function zenDecode(ctx, bytes){
+    return new Promise(function(res, rej){
+      var p = ctx.decodeAudioData(bytes, res, rej);
+      if(p && p.then) p.then(res, rej);
+    });
+  }
+  function zenBuffer(snd){
+    if(zenBufs[snd.id]) return zenBufs[snd.id];
+    var ctx = zenAC();
+    zenBufs[snd.id] = zenBytes(snd).then(function(b){ return zenDecode(ctx, b); }).then(function(buf){ return zenLoopify(ctx, buf); });
+    zenBufs[snd.id]['catch'](function(){ delete zenBufs[snd.id]; });
+    return zenBufs[snd.id];
+  }
+  function zenGain(v){ return v * v * 1.5; }
+  function zenStartVoice(m){
+    var snd = zenSound(m.id);
+    if(!snd || zenVoices[m.id]) return;
+    var v = zenVoices[m.id] = { m: m };
+    zenBuffer(snd).then(function(buf){
+      if(zenVoices[m.id] !== v) return;
+      if(!zenPlaying){ delete zenVoices[m.id]; return; }
+      var ctx = zenCtx, src = ctx.createBufferSource(), g = ctx.createGain(), now = ctx.currentTime;
+      src.buffer = buf; src.loop = true;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(zenGain(m.v), now + 1.4);
+      src.connect(g); g._src = src; g.connect(ctx._in);
+      src.start(0, Math.random() * buf.duration);
+      if(zenTimerEnd) try{ src.stop(now + Math.max(.1, (zenTimerEnd - Date.now()) / 1000) + .3); }catch(e){}
+      v.src = src; v.g = g;
+      zenSyncUi();
+    })['catch'](function(){
+      if(zenVoices[m.id] === v) delete zenVoices[m.id];
+      zenMix = zenMix.filter(function(x){ return x.id !== m.id; });
+      zenSyncUi(); zenAlert('Could not load “' + snd.n + '”.');
+    });
+  }
+  function zenStopVoice(id, quick){
+    var v = zenVoices[id]; if(!v) return;
+    delete zenVoices[id];
+    if(!v.g) return;
+    try{
+      var now = zenCtx.currentTime, dur = quick ? .12 : .7;
+      v.g.gain.cancelScheduledValues(now);
+      v.g.gain.setValueAtTime(v.g.gain.value, now);
+      v.g.gain.linearRampToValueAtTime(0, now + dur);
+      v.src.stop(now + dur + .05);
+    }catch(e){}
+  }
+  function zenSetVol(m){
+    var v = zenVoices[m.id];
+    if(v && v.g) try{ v.g.gain.cancelScheduledValues(zenCtx.currentTime); v.g.gain.setTargetAtTime(zenGain(m.v), zenCtx.currentTime, .06); }catch(e){}
+  }
+  function zenRemember(){
+    clearTimeout(zenSaveT);
+    zenSaveT = setTimeout(function(){
+      zenState.last = { cur: zenCur, dirty: zenDirty, mix: zenMix.map(function(m){ return { id: m.id, v: Math.round(m.v * 100) / 100 }; }) };
+      zenSave();
+    }, 400);
+  }
+  function zenPlay(){
+    if(!zenMix.length) return;
+    var ctx = zenAC();
+    try{ if(typeof audio !== 'undefined' && audio && !audio.paused) audio.pause(); }catch(e){}
+    zenPlaying = true;
+    try{ ctx.resume(); }catch(e){}
+    zenMaster.gain.cancelScheduledValues(ctx.currentTime); zenMaster.gain.setValueAtTime(1, ctx.currentTime);
+    zenMix.forEach(zenStartVoice);
+    zenArmTimer(); zenSyncUi();
+  }
+  function zenPause(){
+    zenPlaying = false;
+    Object.keys(zenVoices).forEach(function(id){ zenStopVoice(id); });
+    clearInterval(zenTick); zenTick = 0;
+    setTimeout(function(){ if(!zenPlaying && zenCtx && zenCtx.state === 'running') try{ zenCtx.suspend(); }catch(e){} }, 900);
+    zenSyncUi();
+  }
+  function zenToggle(){ if(zenPlaying) zenPause(); else zenPlay(); }
+  // The sleep timer is scheduled on the audio clock, so it still ends the sound with the screen off.
+  function zenArmTimer(){
+    clearInterval(zenTick); zenTick = 0;
+    if(!zenCtx) return;
+    var now = zenCtx.currentTime;
+    zenMaster.gain.cancelScheduledValues(now); zenMaster.gain.setValueAtTime(1, now);
+    if(!zenTimerEnd || !zenPlaying) return;
+    var rem = (zenTimerEnd - Date.now()) / 1000;
+    if(rem <= .2){ zenTimerDone(); return; }
+    var fade = Math.min(12, rem);
+    zenMaster.gain.setValueAtTime(1, now + rem - fade);
+    zenMaster.gain.linearRampToValueAtTime(0, now + rem);
+    Object.keys(zenVoices).forEach(function(id){ var v = zenVoices[id]; if(v.src) try{ v.src.stop(now + rem + .3); }catch(e){} });
+    zenTick = setInterval(function(){
+      if(Date.now() >= zenTimerEnd){ zenTimerDone(); return; }
+      var tl = zenEl && zenEl.querySelector('#zenTimerLbl'); if(tl) tl.textContent = zenLeft();
+    }, 1000);
+  }
+  function zenTimerDone(){
+    zenTimerEnd = 0;
+    zenPause();
+    try{ var t = zenCtx.currentTime; zenMaster.gain.cancelScheduledValues(t); zenMaster.gain.setValueAtTime(1, t + 1); }catch(e){}
+  }
+  function zenSetTimer(min){ zenTimerEnd = min ? Date.now() + min * 60000 : 0; zenArmTimer(); zenSyncUi(); }
+  function zenLeft(){
+    var s = Math.max(0, Math.round((zenTimerEnd - Date.now()) / 1000));
+    return s >= 3600 ? Math.floor(s / 3600) + ':' + ('0' + Math.floor(s % 3600 / 60)).slice(-2) + ':' + ('0' + s % 60).slice(-2) : Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2);
+  }
+  // Mix edits
+  function zenToggleSound(id){
+    var at = -1; zenMix.forEach(function(m, i){ if(m.id === id) at = i; });
+    if(at >= 0){ zenMix.splice(at, 1); zenStopVoice(id); }
+    else {
+      if(zenMix.length >= ZEN_MAX){ zenAlert('Up to ' + ZEN_MAX + ' sounds play at once. Tap one to switch it off first.'); return; }
+      var m = { id: id, v: .6 }; zenMix.push(m);
+      if(!zenPlaying) zenPlay(); else zenStartVoice(m);
+    }
+    zenDirty = true; zenRemember(); zenSyncUi();
+  }
+  function zenSelect(pid, autoplay){
+    var p = zenPreset(pid); if(!p) return;
+    var next = p.s.filter(function(x){ return zenSound(x.id); }).map(function(x){ return { id: x.id, v: x.v }; });
+    Object.keys(zenVoices).forEach(function(id){ if(!next.some(function(m){ return m.id === id; })) zenStopVoice(id); });
+    zenMix = next; zenCur = pid; zenDirty = false;
+    zenMix.forEach(function(m){ if(zenVoices[m.id]) { zenVoices[m.id].m = m; zenSetVol(m); } });
+    if(autoplay){ if(zenPlaying) zenMix.forEach(zenStartVoice); else zenPlay(); }
+    zenRemember(); zenSyncUi();
+  }
+  // Leaves the radio or music paused when Zen starts, and Zen paused when they start.
+  try{ audio.addEventListener('play', function(){ if(zenPlaying) zenPause(); }); }catch(e){}
+
+  // ----- the screen -----
+  var zenEl = null, zenTab = 'All', zenOpen = false, zenMixOpen = false;
+  function zenEsc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function zenBuild(){
+    if(zenEl) return;
+    zenEl = document.createElement('div');
+    zenEl.className = 'zen-screen'; zenEl.id = 'zenScreen'; zenEl.setAttribute('role', 'dialog'); zenEl.setAttribute('aria-label', 'Zen');
+    zenEl.innerHTML = '<div class="zen-bg" id="zenBg"></div><div class="zen-shade"></div>'
+      + '<div class="zen-top"><div class="zen-top-head"><h2 class="zen-title" id="zenTitle">Zen</h2>'
+      + '<button type="button" class="zen-iconbtn" id="zenMore" aria-label="More">' + zenSvg('more') + '</button>'
+      + '<button type="button" class="zen-iconbtn" id="zenClose" aria-label="Close">' + zenSvg('close') + '</button></div>'
+      + '<div class="zen-presets" id="zenPresets"></div></div>'
+      + '<div class="zen-stage"><button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
+      + '<button type="button" class="zen-timer" id="zenTimerBtn" aria-label="Sleep timer">' + zenSvg('timer') + '<span id="zenTimerLbl"></span></button></div>'
+      + '<div class="zen-mixer" id="zenMixer"><div class="zen-mixer-bar"><div class="zen-chips" id="zenChips"></div>'
+      + '<button type="button" class="zen-mixbtn" id="zenMixBtn" aria-label="Mixer">' + zenSvg('mixer') + '</button>'
+      + '<button type="button" class="zen-chev" id="zenChev" aria-label="Expand">' + zenSvg('up') + '</button></div>'
+      + '<div class="zen-mixer-body" id="zenMixBody"></div></div>'
+      + '<div class="zen-sheet-ov" id="zenSheetOv"><div class="zen-sheet" id="zenSheet"></div></div>';
+    document.body.appendChild(zenEl);
+    zenEl.querySelector('#zenClose').addEventListener('click', zenClose);
+    zenEl.querySelector('#zenPlayBtn').addEventListener('click', zenToggle);
+    zenEl.querySelector('#zenTimerBtn').addEventListener('click', zenTimerSheet);
+    zenEl.querySelector('#zenMore').addEventListener('click', function(){ zenPresetMenu(zenCur && zenPreset(zenCur) ? zenCur : null); });
+    function mixToggle(){ zenMixOpen = !zenMixOpen; zenSyncUi(); }
+    zenEl.querySelector('#zenMixBtn').addEventListener('click', mixToggle);
+    zenEl.querySelector('#zenChev').addEventListener('click', mixToggle);
+    zenEl.querySelector('#zenChips').addEventListener('click', function(e){ if(!zenMixOpen && e.target.closest('.zen-chip')) mixToggle(); });
+    zenEl.querySelector('#zenSheetOv').addEventListener('click', function(e){ if(e.target.id === 'zenSheetOv') zenSheetClose(); });
+  }
+  function zenOpenScreen(pid, autoplay){
+    zenBuild();
+    if(pid) zenSelect(pid, autoplay);
+    else if(!zenMix.length){
+      var l = zenState.last;
+      if(l && Array.isArray(l.mix) && l.mix.some(function(m){ return zenSound(m.id); })){
+        zenMix = l.mix.filter(function(m){ return zenSound(m.id); }).map(function(m){ return { id: m.id, v: m.v }; });
+        zenCur = l.cur && zenPreset(l.cur) ? l.cur : null; zenDirty = !!l.dirty;
+      } else zenSelect(ZEN_PRESETS[0].id, false);
+    }
+    zenOpen = true; zenMixOpen = false;
+    zenEl.classList.add('open');
+    zenSyncUi(true);
+    document.body.classList.add('zen-open');
+  }
+  function zenClose(){
+    zenSheetClose();
+    if(zenEl) zenEl.classList.remove('open');
+    zenOpen = false; zenMixOpen = false;
+    document.body.classList.remove('zen-open');
+    zenRefreshLists();
+  }
+  var zenBgKey = '';
+  function zenSyncUi(force){
+    zenRefreshLists(true);
+    if(!zenEl || !zenOpen) return;
+    var p = zenCur ? zenPreset(zenCur) : null;
+    var title = zenDirty || !p ? 'Custom mix' : p.n;
+    zenEl.querySelector('#zenTitle').textContent = title;
+    // background art, crossfaded when it changes
+    var key = p ? zenArtOf(p) : zenSceneUrl('stars');
+    if(key !== zenBgKey || force){
+      var bg = zenEl.querySelector('#zenBg');
+      var nb = document.createElement('div'); nb.className = 'zen-bg zen-bg-in';
+      nb.style.backgroundImage = 'url("' + key + '")';
+      bg.parentNode.insertBefore(nb, bg.nextSibling);
+      requestAnimationFrame(function(){ nb.classList.add('on'); });
+      setTimeout(function(){ bg.style.backgroundImage = nb.style.backgroundImage; nb.remove(); }, 650);
+      if(force) { bg.style.backgroundImage = nb.style.backgroundImage; nb.remove(); }
+      zenBgKey = key;
+    }
+    zenEl.classList.toggle('mixer-open', zenMixOpen);
+    zenEl.classList.toggle('is-playing', zenPlaying);
+    var pb = zenEl.querySelector('#zenPlayBtn');
+    pb.setAttribute('aria-label', zenPlaying ? 'Pause' : 'Play');
+    zenEl.querySelector('#zenDisc').innerHTML = zenPlaying
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg>';
+    var tl = zenEl.querySelector('#zenTimerLbl');
+    tl.textContent = zenTimerEnd ? zenLeft() : '';
+    zenEl.querySelector('#zenTimerBtn').classList.toggle('on', !!zenTimerEnd);
+    zenEl.querySelector('#zenChev').innerHTML = zenSvg(zenMixOpen ? 'down' : 'up');
+    zenEl.querySelector('#zenMixBtn').classList.toggle('on', zenMixOpen);
+    zenChipsRender(); zenPresetsRender();
+    if(zenMixOpen && !zenSliding) zenMixBodyRender();
+  }
+  var zenSliding = false;
+  function zenChipsRender(){
+    var box = zenEl.querySelector('#zenChips'); box.innerHTML = '';
+    if(!zenMix.length){ var e = document.createElement('span'); e.className = 'zen-chips-empty'; e.textContent = 'Pick a sound'; box.appendChild(e); return; }
+    zenMix.forEach(function(m){
+      var s = zenSound(m.id); if(!s) return;
+      var b = document.createElement('span'); b.className = 'zen-chip'; b.title = s.n; b.innerHTML = zenSvg(s.i);
+      box.appendChild(b);
+    });
+  }
+  function zenPresetsRender(){
+    var row = zenEl.querySelector('#zenPresets');
+    var keep = row.scrollLeft; row.innerHTML = '';
+    zenAllPresets().forEach(function(p){
+      var b = document.createElement('div'); b.className = 'zen-pre' + (p.id === zenCur && !zenDirty ? ' on' : ''); b.setAttribute('role', 'button'); b.tabIndex = 0; b.dataset.pid = p.id;
+      var th = document.createElement('div'); th.className = 'zen-pre-art'; zenPaint(th, p); b.appendChild(th);
+      var nm = document.createElement('div'); nm.className = 'zen-pre-name'; nm.textContent = p.n; b.appendChild(nm);
+      zenPress(b, function(){ zenSelect(p.id, true); }, function(){ zenPresetMenu(p.id); });
+      row.appendChild(b);
+    });
+    var add = document.createElement('div'); add.className = 'zen-pre zen-pre-new'; add.setAttribute('role', 'button'); add.tabIndex = 0;
+    add.innerHTML = '<div class="zen-pre-art">' + zenSvg('plus') + '</div><div class="zen-pre-name">Save mix</div>';
+    add.addEventListener('click', function(){ zenSavePrompt(); });
+    row.appendChild(add);
+    row.scrollLeft = keep;
+  }
+  // tap, or hold for the menu
+  function zenPress(el, onTap, onHold){
+    var t = 0, held = false, sx = 0, sy = 0;
+    el.addEventListener('pointerdown', function(e){ held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(function(){ held = true; if(onHold) onHold(); }, 520); });
+    function cancel(){ clearTimeout(t); }
+    el.addEventListener('pointerup', cancel); el.addEventListener('pointercancel', cancel); el.addEventListener('pointerleave', cancel);
+    el.addEventListener('pointermove', function(e){ if(Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) cancel(); });
+    el.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    el.addEventListener('click', function(e){ if(held){ held = false; e.preventDefault(); e.stopPropagation(); return; } onTap(e); });
+  }
+  function zenMixBodyRender(){
+    var body = zenEl.querySelector('#zenMixBody');
+    var top = body.scrollTop;
+    var names = zenMix.map(function(m){ var s = zenSound(m.id); return s ? s.n : ''; }).filter(Boolean).join(', ');
+    var h = '<div class="zen-mix-name">' + (names ? zenEsc(names) : 'Pick up to ' + ZEN_MAX + ' sounds') + '</div>';
+    h += '<div class="zen-sliders">';
+    zenMix.forEach(function(m){
+      var s = zenSound(m.id); if(!s) return;
+      h += '<label class="zen-slider" data-id="' + zenEsc(m.id) + '"><span class="zen-slider-ic">' + zenSvg(s.i) + '</span><input type="range" min="0" max="100" value="' + Math.round(m.v * 100) + '" aria-label="' + zenEsc(s.n) + ' volume" style="--v:' + Math.round(m.v * 100) + '%"></label>';
+    });
+    h += '</div>';
+    var cats = ['All'].concat(ZEN_CATS); if(zenAllSounds().some(function(s){ return s.user; })) cats.push('Added');
+    h += '<div class="zen-tabs">' + cats.map(function(c){ return '<button type="button" class="zen-tab' + (c === zenTab ? ' on' : '') + '" data-tab="' + c + '">' + c + '</button>'; }).join('') + '</div>';
+    h += '<div class="zen-grid">';
+    zenAllSounds().filter(function(s){ return zenTab === 'All' || (zenTab === 'Added' ? s.user : s.c === zenTab); }).forEach(function(s){
+      var on = zenMix.some(function(m){ return m.id === s.id; });
+      h += '<button type="button" class="zen-snd' + (on ? ' on' : '') + '" data-id="' + zenEsc(s.id) + '"><span class="zen-snd-ic">' + zenSvg(s.i) + '</span><span class="zen-snd-nm">' + zenEsc(s.n) + '</span></button>';
+    });
+    h += '<button type="button" class="zen-snd zen-snd-add" id="zenAddSnd"><span class="zen-snd-ic">' + zenSvg('plus') + '</span><span class="zen-snd-nm">Add sounds</span></button>';
+    h += '</div>';
+    body.innerHTML = h;
+    body.scrollTop = top;
+    Array.prototype.forEach.call(body.querySelectorAll('.zen-slider input'), function(inp){
+      var id = inp.parentNode.dataset.id;
+      inp.addEventListener('pointerdown', function(){ zenSliding = true; });
+      inp.addEventListener('pointerup', function(){ zenSliding = false; });
+      inp.addEventListener('pointercancel', function(){ zenSliding = false; });
+      inp.addEventListener('input', function(){
+        var m = zenMix.filter(function(x){ return x.id === id; })[0]; if(!m) return;
+        m.v = inp.value / 100; inp.style.setProperty('--v', inp.value + '%');
+        zenSetVol(m); zenDirty = true; zenRemember();
+        zenEl.querySelector('#zenTitle').textContent = 'Custom mix';
+      });
+    });
+    Array.prototype.forEach.call(body.querySelectorAll('.zen-tab'), function(b){ b.addEventListener('click', function(){ zenTab = b.dataset.tab; zenMixBodyRender(); }); });
+    Array.prototype.forEach.call(body.querySelectorAll('.zen-snd[data-id]'), function(b){
+      var s = zenSound(b.dataset.id);
+      zenPress(b, function(){ zenToggleSound(b.dataset.id); }, function(){ if(s && s.user) zenClipMenu(s); });
+    });
+    body.querySelector('#zenAddSnd').addEventListener('click', zenAddSheet);
+  }
+
+  // ----- sheets over the screen -----
+  function zenSheetOpen(html, wire){
+    zenBuild();
+    var sh = zenEl.querySelector('#zenSheet'); sh.innerHTML = html;
+    zenEl.querySelector('#zenSheetOv').classList.add('open');
+    if(wire) wire(sh);
+    return sh;
+  }
+  function zenSheetClose(){ if(!zenEl) return; zenEl.querySelector('#zenSheetOv').classList.remove('open'); zenEl.querySelector('#zenSheet').innerHTML = ''; zenStopPreview(); }
+  function zenAlert(msg){
+    if(!zenOpen){ openDataDialog('Zen', msg, true); return; }
+    zenSheetOpen('<div class="zen-sheet-title">Zen</div><p class="zen-sheet-msg">' + zenEsc(msg) + '</p><div class="zen-sheet-btns"><button type="button" class="zen-btn zen-btn-main" data-x="ok">OK</button></div>', function(sh){
+      sh.querySelector('[data-x=ok]').addEventListener('click', zenSheetClose);
+    });
+  }
+  function zenTimerSheet(){
+    var opts = [[0, 'Off'], [15, '15 minutes'], [30, '30 minutes'], [45, '45 minutes'], [60, '1 hour'], [90, '1 hour 30 minutes'], [120, '2 hours'], [180, '3 hours']];
+    zenSheetOpen('<div class="zen-sheet-title">Sleep timer</div><div class="zen-list">' + opts.map(function(o){
+      return '<button type="button" class="zen-row" data-m="' + o[0] + '"><span>' + o[1] + '</span></button>';
+    }).join('') + '</div>', function(sh){
+      Array.prototype.forEach.call(sh.querySelectorAll('.zen-row'), function(b){
+        b.addEventListener('click', function(){ zenSetTimer(+b.dataset.m); zenSheetClose(); });
+      });
+    });
+  }
+  function zenPresetMenu(pid){
+    var p = pid ? zenPreset(pid) : null, rows = [];
+    rows.push(['save', 'Save this mix as a preset']);
+    if(p){
+      rows.push(['art', 'Change artwork']);
+      if(!p.built){ rows.push(['update', 'Replace “' + p.n + '” with this mix']); rows.push(['rename', 'Rename']); rows.push(['delete', 'Delete']); }
+    } else rows.push(['art', 'Change artwork']);
+    rows.push(['add', 'Add sounds']);
+    zenSheetOpen('<div class="zen-sheet-title">' + (p ? zenEsc(p.n) : 'Custom mix') + '</div><div class="zen-list">' + rows.map(function(r){
+      return '<button type="button" class="zen-row' + (r[0] === 'delete' ? ' danger' : '') + '" data-a="' + r[0] + '"><span>' + zenEsc(r[1]) + '</span></button>';
+    }).join('') + '</div>', function(sh){
+      Array.prototype.forEach.call(sh.querySelectorAll('.zen-row'), function(b){
+        b.addEventListener('click', function(){
+          var a = b.dataset.a;
+          if(a === 'save') zenSavePrompt();
+          else if(a === 'art') zenArtSheet(p ? p.id : null);
+          else if(a === 'rename') zenRenamePrompt(p);
+          else if(a === 'delete') zenDelete(p);
+          else if(a === 'update'){ zenUpdatePreset(p); zenSheetClose(); }
+          else if(a === 'add') zenAddSheet();
+        });
+      });
+    });
+  }
+  function zenNamePrompt(title, val, okLabel, onOk){
+    zenSheetOpen('<div class="zen-sheet-title">' + zenEsc(title) + '</div><input type="text" class="zen-input" id="zenNameIn" maxlength="40" autocomplete="off" spellcheck="false" value="' + zenEsc(val) + '">'
+      + '<div class="zen-sheet-btns"><button type="button" class="zen-btn" data-x="cancel">Cancel</button><button type="button" class="zen-btn zen-btn-main" data-x="ok">' + zenEsc(okLabel) + '</button></div>', function(sh){
+      var inp = sh.querySelector('#zenNameIn');
+      function ok(){ var v = inp.value.trim(); if(!v) return; onOk(v); }
+      sh.querySelector('[data-x=cancel]').addEventListener('click', zenSheetClose);
+      sh.querySelector('[data-x=ok]').addEventListener('click', ok);
+      inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); ok(); } });
+    });
+  }
+  function zenSavePrompt(){
+    if(!zenMix.length){ zenAlert('Pick at least one sound first.'); return; }
+    var n = zenState.presets.length + 1, base = zenCur && zenPreset(zenCur);
+    zenNamePrompt('Save as preset', 'My Mix ' + n, 'Save', function(name){
+      var id = 'u' + Date.now().toString(36), art = zenState.art[zenCur];
+      var p = { id: id, n: name, art: base ? base.art : 'stars', s: zenMix.map(function(m){ return { id: m.id, v: Math.round(m.v * 100) / 100 }; }) };
+      zenState.presets.push(p);
+      if(art){ zenState.art[id] = art; if(art.k === 'photo' && zenPhotos[zenCur]){ zenPhotos[id] = zenPhotos[zenCur]; zenSavePhotos(); } }
+      zenSave(); zenCur = id; zenDirty = false; zenRemember();
+      zenSheetClose(); zenSyncUi();
+    });
+  }
+  function zenRenamePrompt(p){
+    zenNamePrompt('Rename preset', p.n, 'Save', function(name){
+      zenState.presets.forEach(function(x){ if(x.id === p.id) x.n = name; });
+      zenSave(); zenSheetClose(); zenSyncUi();
+    });
+  }
+  function zenUpdatePreset(p){
+    zenState.presets.forEach(function(x){ if(x.id === p.id) x.s = zenMix.map(function(m){ return { id: m.id, v: Math.round(m.v * 100) / 100 }; }); });
+    zenSave(); zenCur = p.id; zenDirty = false; zenRemember(); zenSyncUi();
+  }
+  function zenDelete(p){
+    zenSheetClose();
+    confirmThen({ title: 'Delete preset?', message: 'Delete ' + quoteName(p.n) + '? Your mix is not affected.', ok: 'Delete' }, function(){
+      zenState.presets = zenState.presets.filter(function(x){ return x.id !== p.id; });
+      delete zenState.art[p.id]; delete zenPhotos[p.id]; zenSave(); zenSavePhotos();
+      if(zenCur === p.id){ zenCur = null; zenDirty = true; }
+      zenRemember(); zenSyncUi();
+    });
+  }
+  function zenArtSheet(pid){
+    var target = pid || null;
+    var cur = target && zenState.art[target];
+    var h = '<div class="zen-sheet-title">Artwork</div><div class="zen-art-grid">';
+    Object.keys(ZEN_SCENES).forEach(function(k){
+      var on = cur ? (cur.k === 'scene' && cur.v === k) : (target && (zenPreset(target) || {}).art === k);
+      h += '<button type="button" class="zen-art' + (on ? ' on' : '') + '" data-k="' + k + '" style="background-image:url(\'' + zenSceneUrl(k) + '\')" aria-label="' + zenEsc(ZEN_ART_NAMES[k]) + '"><span>' + zenEsc(ZEN_ART_NAMES[k]) + '</span></button>';
+    });
+    h += '</div><div class="zen-sheet-btns zen-sheet-btns-col"><button type="button" class="zen-btn zen-btn-main" data-x="photo">' + zenSvg('image', 'zen-svg zen-svg-sm') + 'Choose a photo</button>';
+    if(cur) h += '<button type="button" class="zen-btn" data-x="reset">Use the original</button>';
+    h += '<button type="button" class="zen-btn" data-x="close">Done</button></div><input type="file" accept="image/*" id="zenPhotoIn" hidden>';
+    zenSheetOpen(h, function(sh){
+      function applyArt(a){
+        if(!target){ zenAlert('Save this mix as a preset first, then change its artwork.'); return; }
+        if(a) zenState.art[target] = a; else delete zenState.art[target];
+        if(!a || a.k !== 'photo') delete zenPhotos[target];
+        zenSave(); zenSavePhotos(); zenSheetClose(); zenBgKey = ''; zenSyncUi();
+      }
+      Array.prototype.forEach.call(sh.querySelectorAll('.zen-art'), function(b){ b.addEventListener('click', function(){ applyArt({ k: 'scene', v: b.dataset.k }); }); });
+      sh.querySelector('[data-x=close]').addEventListener('click', zenSheetClose);
+      var rs = sh.querySelector('[data-x=reset]'); if(rs) rs.addEventListener('click', function(){ applyArt(null); });
+      var inp = sh.querySelector('#zenPhotoIn');
+      sh.querySelector('[data-x=photo]').addEventListener('click', function(){
+        if(!target){ zenAlert('Save this mix as a preset first, then change its artwork.'); return; }
+        inp.click();
+      });
+      inp.addEventListener('change', function(){
+        var f = inp.files && inp.files[0]; if(!f) return;
+        zenPhotoData(f).then(function(d){
+          var prev = zenPhotos[target]; zenPhotos[target] = d;
+          if(!zenSavePhotos()){ if(prev) zenPhotos[target] = prev; else delete zenPhotos[target]; zenAlert('There is not enough storage left for that photo. Try a smaller one.'); return; }
+          applyArt({ k: 'photo' });
+        })['catch'](function(){ zenAlert('That photo could not be opened.'); });
+      });
+    });
+  }
+  // A chosen photo, shrunk so it fits in the app's storage.
+  function zenPhotoData(file){
+    return new Promise(function(res, rej){
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function(){
+        var max = 1000, sc = Math.min(1, max / Math.max(im.width, im.height)), cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(im.width * sc)); cv.height = Math.max(1, Math.round(im.height * sc));
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        res(cv.toDataURL('image/jpeg', .72));
+      };
+      im.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('image')); };
+      im.src = url;
+    });
+  }
+  function zenClipMenu(s){
+    zenSheetOpen('<div class="zen-sheet-title">' + zenEsc(s.n) + '</div>' + (s.cr ? '<p class="zen-sheet-msg zen-credit">' + zenEsc(s.cr) + '</p>' : '')
+      + '<div class="zen-list"><button type="button" class="zen-row danger" data-a="rm"><span>Remove this sound</span></button></div>', function(sh){
+      sh.querySelector('[data-a=rm]').addEventListener('click', function(){
+        zenSheetClose();
+        confirmThen({ title: 'Remove sound?', message: 'Remove ' + quoteName(s.n) + ' from Zen? Presets that use it will play without it.', ok: 'Remove' }, function(){
+          zenStopVoice(s.id, true);
+          zenMix = zenMix.filter(function(m){ return m.id !== s.id; });
+          zenState.clips = zenState.clips.filter(function(c){ return c.id !== s.id; });
+          delete zenBufs[s.id]; zenIdb('readwrite', function(st){ return st['delete'](s.id); })['catch'](function(){});
+          zenSave(); zenRemember(); zenSyncUi();
+        });
+      });
+    });
+  }
+
+  // ----- adding sounds: search Openverse, or a file from the phone -----
+  var zenPrev = null;
+  function zenStopPreview(){ if(zenPrev){ try{ zenPrev.pause(); zenPrev.src = ''; }catch(e){} zenPrev = null; } }
+  function zenFmtDur(ms){ var s = Math.round((ms || 0) / 1000); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
+  function zenAddSheet(){
+    var h = '<div class="zen-sheet-title">Add sounds</div>'
+      + '<div class="zen-find"><input type="search" class="zen-input" id="zenFind" placeholder="Search sounds (rain, crickets, fan…)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button type="button" class="zen-btn zen-btn-main" id="zenFindGo">Search</button></div>'
+      + '<p class="zen-sheet-msg zen-note">Searches Openverse for free sounds, mostly from Freesound, that may be used with credit. Pixabay has no search service for apps, so download a clip there and use “From this phone”.</p>'
+      + '<div class="zen-results" id="zenResults"></div>'
+      + '<div class="zen-sheet-btns zen-sheet-btns-col"><button type="button" class="zen-btn" id="zenFromPhone">From this phone</button><button type="button" class="zen-btn" data-x="close">Done</button></div>'
+      + '<input type="file" accept="audio/*" id="zenFileIn" hidden>';
+    zenSheetOpen(h, function(sh){
+      var res = sh.querySelector('#zenResults'), inp = sh.querySelector('#zenFind'), token = 0;
+      sh.querySelector('[data-x=close]').addEventListener('click', zenSheetClose);
+      function go(){
+        var q = inp.value.trim(); if(!q) return;
+        var my = ++token; zenStopPreview();
+        res.innerHTML = '<div class="zen-spin" role="status" aria-label="Searching"></div>';
+        fetch('https://api.openverse.org/v1/audio/?q=' + encodeURIComponent(q) + '&license_type=commercial&page_size=30&filter_dead=true')
+          .then(function(r){ if(r.status === 429) throw new Error('limit'); if(!r.ok) throw new Error('http'); return r.json(); })
+          .then(function(j){
+            if(my !== token) return;
+            var list = (j.results || []).filter(function(x){ return x.url && x.duration >= 8000; }).slice(0, 20);
+            if(!list.length){ res.innerHTML = '<p class="zen-sheet-msg">No sounds found for “' + zenEsc(q) + '”. Try another word.</p>'; return; }
+            res.innerHTML = '';
+            list.forEach(function(x){
+              var row = document.createElement('div'); row.className = 'zen-res';
+              var lc = String(x.license || '').toLowerCase(), lic = lc === 'cc0' ? 'CC0 1.0' : lc === 'pdm' ? 'Public domain' : ('CC ' + lc.toUpperCase() + (x.license_version ? ' ' + x.license_version : '')).trim();
+              row.innerHTML = '<button type="button" class="zen-res-play" aria-label="Preview">' + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg></button>'
+                + '<div class="zen-res-text"><div class="zen-res-title">' + zenEsc(x.title || 'Untitled') + '</div><div class="zen-res-sub">' + zenEsc((x.creator || 'Unknown') + ' · ' + lic + ' · ' + zenFmtDur(x.duration)) + '</div></div>'
+                + '<button type="button" class="zen-btn zen-btn-main zen-res-add">Add</button>';
+              row.querySelector('.zen-res-play').addEventListener('click', function(){
+                var was = zenPrev && zenPrev._for === x.id; zenStopPreview();
+                Array.prototype.forEach.call(res.querySelectorAll('.zen-res-play.on'), function(b){ b.classList.remove('on'); });
+                if(was) return;
+                zenPrev = new Audio(); zenPrev._for = x.id; zenPrev.src = x.url; zenPrev.volume = .8;
+                this.classList.add('on'); var btn = this;
+                zenPrev.addEventListener('ended', function(){ btn.classList.remove('on'); });
+                zenPrev.play()['catch'](function(){ btn.classList.remove('on'); });
+              });
+              row.querySelector('.zen-res-add').addEventListener('click', function(){
+                zenStopPreview();
+                var by = (x.creator ? x.creator : 'Unknown') + (x.title ? ', “' + x.title + '”' : '') + ' (' + lic + ') via Openverse';
+                fetch(x.url).then(function(r){ if(!r.ok) throw new Error('http'); return r.arrayBuffer(); })
+                  .then(function(b){ zenAddClipSheet(b, x.title || 'New sound', by); })
+                  ['catch'](function(){ zenAlert('That sound could not be downloaded. Its host may not allow apps to fetch it. Try another one.'); });
+              });
+              res.appendChild(row);
+            });
+          })['catch'](function(e){
+            if(my !== token) return;
+            res.innerHTML = '<p class="zen-sheet-msg">' + (e && e.message === 'limit' ? 'Openverse is limiting searches right now. Try again later, or use “From this phone”.' : 'Could not reach Openverse. Check your connection, or use “From this phone”.') + '</p>';
+          });
+      }
+      sh.querySelector('#zenFindGo').addEventListener('click', go);
+      inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); inp.blur(); go(); } });
+      var fi = sh.querySelector('#zenFileIn');
+      sh.querySelector('#zenFromPhone').addEventListener('click', function(){ fi.click(); });
+      fi.addEventListener('change', function(){
+        var f = fi.files && fi.files[0]; if(!f) return;
+        f.arrayBuffer().then(function(b){ zenAddClipSheet(b, f.name.replace(/\.[^.]+$/, ''), 'From this phone'); })['catch'](function(){ zenAlert('That file could not be read.'); });
+      });
+    });
+  }
+  // Name it and pick its group, then keep it.
+  function zenAddClipSheet(bytes, title, credit){
+    if(bytes.byteLength > 30 * 1024 * 1024){ zenAlert('That file is too large (over 30 MB).'); return; }
+    var ctx = zenAC();
+    zenDecode(ctx, bytes.slice(0)).then(function(buf){
+      if(buf.duration < 3){ zenAlert('That sound is too short to loop (under 3 seconds).'); return; }
+      var cat = 'Nature';
+      var h = '<div class="zen-sheet-title">Add to Zen</div><input type="text" class="zen-input" id="zenClipName" maxlength="28" autocomplete="off" spellcheck="false" value="' + zenEsc(String(title).slice(0, 28)) + '">'
+        + '<div class="zen-tabs zen-tabs-wrap" id="zenClipCats">' + ZEN_CATS.map(function(c){ return '<button type="button" class="zen-tab' + (c === cat ? ' on' : '') + '" data-c="' + c + '">' + c + '</button>'; }).join('') + '</div>'
+        + '<p class="zen-sheet-msg zen-note">' + Math.round(buf.duration) + ' seconds. Its end is blended into its start so it loops without a gap.</p>'
+        + '<div class="zen-sheet-btns"><button type="button" class="zen-btn" data-x="cancel">Cancel</button><button type="button" class="zen-btn zen-btn-main" data-x="ok">Add</button></div>';
+      zenSheetOpen(h, function(sh){
+        Array.prototype.forEach.call(sh.querySelectorAll('[data-c]'), function(b){ b.addEventListener('click', function(){
+          cat = b.dataset.c; Array.prototype.forEach.call(sh.querySelectorAll('[data-c]'), function(x){ x.classList.toggle('on', x === b); });
+        }); });
+        sh.querySelector('[data-x=cancel]').addEventListener('click', zenAddSheet);
+        sh.querySelector('[data-x=ok]').addEventListener('click', function(){
+          var name = sh.querySelector('#zenClipName').value.trim() || 'New sound', id = 'c' + Date.now().toString(36);
+          zenIdb('readwrite', function(st){ return st.put(bytes, id); }).then(function(){
+            zenState.clips.push({ id: id, n: name, c: cat, cr: credit });
+            zenSave(); zenTab = 'Added'; zenSheetClose(); zenSyncUi();
+          })['catch'](function(){ zenAlert('There is not enough storage left to keep that sound.'); });
+        });
+      });
+    })['catch'](function(){ zenAlert('That file could not be played. Use an MP3, OGG, WAV or M4A sound.'); });
+  }
+
+  // ----- Library > Zen, Home and the White Noise genre -----
+  function zenNowPreset(){ var p = zenCur && zenPreset(zenCur); return p || zenPreset(ZEN_PRESETS[0].id); }
+  function zenHeroEl(compact){
+    var p = zenNowPreset(), hero = document.createElement('div');
+    hero.className = 'zen-hero' + (compact ? ' zen-hero-compact' : ''); hero.setAttribute('role', 'button'); hero.tabIndex = 0;
+    zenPaint(hero, p);
+    hero.innerHTML = '<div class="zen-hero-shade"></div><div class="zen-hero-text"><div class="zen-hero-title">Zen</div><div class="zen-hero-sub">' + (compact ? 'Mix rain, waves, fire and more' : 'Mix rain, waves, fire and white noise for sleep and focus') + '</div></div>'
+      + '<span class="zen-hero-go" aria-hidden="true">' + (zenPlaying ? '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg>') + '</span>';
+    hero.addEventListener('click', function(){ zenOpenScreen(null, false); });
+    hero.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); zenOpenScreen(null, false); } });
+    return hero;
+  }
+  function zenPresetTile(p){
+    var t = buildEntityTile({ key: 'zen:' + p.id, entity: 'zen', name: p.n, sub: p.s.length + (p.s.length === 1 ? ' sound' : ' sounds'),
+      renderArt: function(art){ zenPaint(art, p); art.classList.add('zen-tile-art'); }, onClick: function(){} });
+    zenPress(t, function(){ zenOpenScreen(p.id, true); }, function(){ zenOpenScreen(p.id, false); zenPresetMenu(p.id); });
+    return t;
+  }
+  function zenPresetRow(list){
+    var row = document.createElement('div'); row.className = 'gp-row zen-row-tiles';
+    list.forEach(function(p){ row.appendChild(zenPresetTile(p)); });
+    return row;
+  }
+  function zenGenreCard(){ return zenHeroEl(true); }
+  function renderZenGrid(){
+    resetStationsGrid();
+    stationsGrid.classList.remove('grid-songs');
+    document.body.classList.add('genres-open');
+    function head(text){ var h = document.createElement('h2'); h.className = 'gb-head'; h.textContent = text; stationsGrid.appendChild(h); }
+    stationsGrid.appendChild(zenHeroEl(false));
+    var all = zenAllPresets(), mine = all.filter(function(p){ return !p.built; });
+    if(mine.length){ head('My mixes'); stationsGrid.appendChild(zenPresetRow(mine)); }
+    head('Presets'); stationsGrid.appendChild(zenPresetRow(all.filter(function(p){ return p.built; })));
+    head('Sounds');
+    var cats = ZEN_CATS.slice(); if(zenState.clips.length) cats.push('Added');
+    cats.forEach(function(c){
+      var list = zenAllSounds().filter(function(s){ return c === 'Added' ? s.user : (!s.user && s.c === c); });
+      if(!list.length) return;
+      var lab = document.createElement('div'); lab.className = 'zen-cat-label'; lab.textContent = c; stationsGrid.appendChild(lab);
+      var wrap = document.createElement('div'); wrap.className = 'zen-chipwrap';
+      list.forEach(function(s){
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'zen-sndchip';
+        b.innerHTML = '<span class="zen-sndchip-ic">' + zenSvg(s.i) + '</span><span>' + zenEsc(s.n) + '</span>';
+        b.addEventListener('click', function(){
+          Object.keys(zenVoices).forEach(function(id){ zenStopVoice(id, true); });
+          zenMix = [{ id: s.id, v: .7 }]; zenCur = null; zenDirty = true; zenRemember();
+          zenOpenScreen(null, false); zenPlay();
+        });
+        wrap.appendChild(b);
+      });
+      stationsGrid.appendChild(wrap);
+    });
+    var add = document.createElement('button'); add.type = 'button'; add.className = 'zen-addbtn';
+    add.innerHTML = zenSvg('plus', 'zen-svg zen-svg-sm') + '<span>Add sounds</span>';
+    add.addEventListener('click', function(){ zenOpenScreen(null, false); zenAddSheet(); });
+    stationsGrid.appendChild(add);
+    var cr = document.createElement('p'); cr.className = 'zen-fine'; cr.textContent = 'Bundled sounds are from Pixabay and Freesound contributors, free to use under the Pixabay Content License.';
+    stationsGrid.appendChild(cr);
+  }
+  function openZenHome(){
+    enterLibraryChrome();
+    activeLibrarySection = null;
+    onZenView = true;
+    libTabBack();
+    stationsHeading.textContent = 'Library';
+    pageTitle.style.display = 'none';
+    albumPlayBtn.style.display = 'none';
+    libraryShuffleBtn.style.display = 'none';
+    setResultCount(null);
+    genresReorderHeaderBtn.style.display = 'none';
+    renderZenGrid();
+  }
+  // Home's Zen section: the presets, and the way into Zen.
+  function zenRenderHome(){
+    var sec = document.getElementById('zenHomeSection'); if(!sec) return;
+    var grid = sec.querySelector('#zenHomeGrid'); grid.innerHTML = '';
+    grid.appendChild(zenPresetRow(zenAllPresets().slice(0, 12)));
+  }
+  var zenRefreshT = 0;
+  function zenRefreshLists(soft){
+    // the cards on Home and in Library follow the preset in use and whether it is playing
+    clearTimeout(zenRefreshT);
+    zenRefreshT = setTimeout(function(){
+      try{ zenRenderHome(); }catch(e){}
+      if(onZenView && !zenOpen){ try{ var y = window.scrollY; renderZenGrid(); window.scrollTo(0, y); }catch(e){} }
+    }, soft ? 250 : 0);
+  }
+  (function(){
+    var h = document.getElementById('zenHomeHeading');
+    if(h){
+      function go(){ pushView(); openLibTab('zen'); }
+      h.addEventListener('click', go);
+      h.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } });
+    }
+    zenRenderHome();
+  })();
+  // ---------- Zen end ----------
+
   function renderAudiobooksGrid(){
     resetStationsGrid();
     var search = document.createElement('div');
@@ -32499,7 +33531,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    onAudiobooksView = false;
+    onAudiobooksView = false; onZenView = false;
     // A playlist is Playlists' own item, so its back button always returns there -- same
     // fixed-destination treatment as My Library's Artists/Albums/Songs and the Podcasts show
     // page, rather than a history-based one.
@@ -33462,7 +34494,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    onAudiobooksView = false;
+    onAudiobooksView = false; onZenView = false;
     // A true back button: it returns to wherever the search was opened from (Home's For You
     // row, the For You page, the sidebar...). Every place that opens one records where it was
     // first (pushView); re-running it in place (a new result limit, an edit) doesn't.
@@ -38275,7 +39307,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    onAudiobooksView = false;
+    onAudiobooksView = false; onZenView = false;
     onHomeView = false;
     renderGenreNav();
     renderCustomSearchList();
@@ -38394,6 +39426,7 @@
     if(onPlaylistsHomeView) return entry('Playlists', function(){ openPlaylistsHome(); });
     if(onGenresHomeView) return entry('Genres', function(){ openGenresHome(); });
     if(onAudiobooksView) return entry('Audiobooks', function(){ openAudiobooksHome(); });
+    if(onZenView) return entry('Zen', function(){ openZenHome(); });
     if(section) return entry(sectionLabel(section), function(){ runLibrarySection(section); });
     if(homeSection) return entry(homeSectionTitle(homeSection) || 'Back', function(){ openHomeSectionPage(homeSection); });
     if(query && String(query).trim()){
@@ -45504,7 +46537,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    onAudiobooksView = false;
+    onAudiobooksView = false; onZenView = false;
     setDetailBack(null);
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
@@ -45594,7 +46627,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    onAudiobooksView = false;
+    onAudiobooksView = false; onZenView = false;
     setDetailBack(null);
     hideArtistHero();
     // An album page paints the whole column with a colour and leaves a hero above it. These
@@ -47776,7 +48809,7 @@
     onStationsHomeView = false; onVideoView = false; onAddChannelsView = false; onGuideView = false; onVideoDetailView = false; videoDetailRerender = null; document.body.classList.remove('vdetail-open');
     onPlaylistsHomeView = false;
     onGenresHomeView = false;
-    onAudiobooksView = false;
+    onAudiobooksView = false; onZenView = false;
     // A genre's station list is Genres' own category, so its back button always returns
     // there -- same fixed-destination treatment as the other sections' items above, rather
     // than a history-based one.
@@ -48114,6 +49147,7 @@
       });
       stationsGrid.appendChild(chips);
     }
+    if(g.tag.toLowerCase() === 'white noise') stationsGrid.appendChild(zenGenreCard());   // Zen: the way into the mixer
     function head(text){ var h = document.createElement('h2'); h.className = 'gp-head grid-section-label'; h.textContent = text; stationsGrid.appendChild(h); }
     var TOP = 10;
     if(stations.length){
@@ -48416,7 +49450,7 @@
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
     // Playlists and Genres live under My Library (see the drawer's Library accordion).
     if(onVideoView || onAddChannelsView || onGuideView || onVideoDetailView || document.body.classList.contains('lc-page-open')) return 'video';
-    if(onGenresHomeView || onAudiobooksView) return 'library';       // build 430: the Genres tab is under Library (440: Audiobooks too)
+    if(onGenresHomeView || onAudiobooksView || onZenView) return 'library';       // build 430: the Genres tab is under Library (440: Audiobooks too)
     if(activeGenre) return genreNavSec;          // a genre page belongs to where it was opened from
     if(onMyLibraryHomeView || activeLibrarySection || activeArtistKey || activeAlbumKey ||
        onPlaylistsHomeView || activeStationPlaylistId) return 'library';
