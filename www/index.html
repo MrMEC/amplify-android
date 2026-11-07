@@ -7108,8 +7108,9 @@
   /* ---------- Build 403 (Mark): Genres browse grid and the genre page ---------- */
   .gb-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
   /* ---------- Zen: the mixer screen, its cards, and its sheets ---------- */
-  .zen-screen{ --za:#f0a63a; --zt:#2b88a6; --zl:rgba(255,255,255,.26); position:fixed; inset:0; z-index:2200; display:none; background:#04060c; color:#fff; overflow:hidden; font-family:inherit; -webkit-tap-highlight-color:transparent; }
-  .zen-screen.open{ display:block; }
+  .zen-screen{ --za:#f0a63a; --zt:#2b88a6; --zl:rgba(255,255,255,.26); position:fixed; inset:0; z-index:2200; display:block; visibility:hidden; pointer-events:none; transform:translateY(100%); transition:transform .4s cubic-bezier(.22,.8,.24,1), visibility 0s linear .4s; background:#04060c; color:#fff; overflow:hidden; font-family:inherit; -webkit-tap-highlight-color:transparent; }
+  .zen-screen.open{ visibility:visible; pointer-events:auto; transform:none; transition:transform .4s cubic-bezier(.22,.8,.24,1), visibility 0s; }
+  @media (prefers-reduced-motion:reduce){ .zen-screen, .zen-screen.open{ transition:none; } }
   .zen-screen button{ font-family:inherit; color:inherit; cursor:pointer; }
   .zen-svg{ width:24px; height:24px; display:block; }
   .zen-svg-sm{ width:20px; height:20px; }
@@ -7133,9 +7134,9 @@
   .zen-pre-new .zen-pre-art{ background:rgba(255,255,255,.06); border-style:dashed; color:rgba(255,255,255,.8); }
   .zen-stage{ position:absolute; left:0; right:0; top:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:52px; padding:230px 0 140px; z-index:1; }
   .zen-play{ position:relative; width:122px; height:122px; border:0; background:none; padding:0; display:flex; align-items:center; justify-content:center; }
-  .zen-ring{ position:absolute; inset:-34px; border-radius:50%; background:rgba(255,255,255,.2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+  .zen-ring{ position:absolute; inset:-34px; border-radius:50%; background:rgba(255,255,255,.2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); opacity:0; transform:scale(.9); transition:opacity .35s, transform .35s; pointer-events:none; }
   .zen-ring::after{ content:''; position:absolute; inset:15px; border-radius:50%; background:rgba(255,255,255,.22); }
-  .zen-screen.is-playing .zen-ring{ animation:zenPulse 4.5s ease-in-out infinite; }
+  .zen-screen.is-playing .zen-ring{ opacity:1; transform:none; animation:zenPulse 4.5s ease-in-out infinite; }
   @keyframes zenPulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.07); opacity:.8; } }
   .zen-disc{ position:relative; width:122px; height:122px; border-radius:50%; background:#f3f1f2; color:#10131a; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 24px rgba(0,0,0,.4); }
   .zen-disc svg{ width:48px; height:48px; fill:currentColor; }
@@ -32436,7 +32437,28 @@
     zenRemember(); zenSyncUi();
   }
   // Leaves the radio or music paused when Zen starts, and Zen paused when they start.
-  try{ audio.addEventListener('play', function(){ if(zenPlaying) zenPause(); }); }catch(e){}
+  try{ audio.addEventListener('play', function(){ zenBarActive = false; playerBar.classList.remove('zen-on'); if(zenPlaying) zenPause(); }); }catch(e){}
+  // The mini player follows Zen while Zen is the thing that was last started.
+  var zenBarActive = false;
+  function zenBarSync(){
+    if(zenPlaying) zenBarActive = true;
+    if(!zenBarActive) return;
+    var p = zenCur ? zenPreset(zenCur) : null;
+    var names = zenMix.map(function(m){ var x = zenSound(m.id); return x ? x.n : ''; }).filter(Boolean);
+    playerBar.classList.remove('empty'); playerBar.classList.add('zen-on');
+    playerName.textContent = zenDirty || !p ? 'Custom mix' : p.n;
+    playerSub.textContent = 'Zen \u00b7 ' + (names.join(', ') || 'No sounds');
+    playerSub.classList.remove('err');
+    playerIcon.innerHTML = ''; playerIcon.style.background = '';
+    zenPaint(playerIcon, p || { id: '_', art: 'stars' });
+    playPauseBtn.disabled = false;
+    playPauseBtn.innerHTML = zenPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
+    barPrevBtn.disabled = true; barNextBtn.disabled = true;
+  }
+  playPauseBtn.addEventListener('click', function(e){ if(!zenBarActive) return; e.stopImmediatePropagation(); e.preventDefault(); zenToggle(); }, true);
+  playerNowTrigger.addEventListener('click', function(e){ if(!zenBarActive) return; e.stopImmediatePropagation(); e.preventDefault(); zenOpenScreen(); }, true);
+  setPlayingUI = (function(f){ return function(){ var r = f.apply(this, arguments); try{ zenBarSync(); }catch(e){} return r; }; })(setPlayingUI);
+  renderIdlePlayerBar = (function(f){ return function(){ if(zenBarActive){ zenBarSync(); return; } return f.apply(this, arguments); }; })(renderIdlePlayerBar);
 
   // ----- the screen -----
   var zenEl = null, zenTab = 'All', zenOpen = false, zenMixOpen = false;
@@ -32479,6 +32501,7 @@
       } else zenSelect(ZEN_PRESETS[0].id, false);
     }
     zenOpen = true; zenMixOpen = false;
+    void zenEl.offsetHeight;
     zenEl.classList.add('open');
     zenSyncUi(true);
     document.body.classList.add('zen-open');
@@ -32493,6 +32516,7 @@
   var zenBgKey = '';
   function zenSyncUi(force){
     zenRefreshLists(true);
+    try{ zenBarSync(); }catch(e){}
     if(!zenEl || !zenOpen) return;
     var p = zenCur ? zenPreset(zenCur) : null;
     var title = zenDirty || !p ? 'Custom mix' : p.n;
