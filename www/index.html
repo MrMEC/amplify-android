@@ -6589,8 +6589,15 @@
   .tile.station-tile:not(.tile-row):not(.fav-card) .tile-name{ font-size:13px; line-height:1.3; margin-top:8px; }
   .tile.station-tile:not(.tile-row):not(.fav-card) .tile-sub{ font-size:11.5px; margin-top:2px; }
   /* ---------- Build 360 (Mark): the profile, in place of the menu on a phone ---------- */
-  .profile-overlay{ display:none; position:fixed; inset:0; z-index:1400; background:var(--main-bg, var(--bg)); }
-  .profile-overlay.open{ display:block; }
+  .profile-overlay{ display:block; visibility:hidden; pointer-events:none; transform:translateX(100%); transition:transform .32s cubic-bezier(.22,.8,.24,1), visibility 0s linear .32s;
+    position:fixed; inset:0; z-index:1400; background:var(--main-bg, var(--bg)); }
+  .profile-overlay.open{ visibility:visible; pointer-events:auto; transform:none; transition:transform .32s cubic-bezier(.22,.8,.24,1), visibility 0s; }
+  @media (prefers-reduced-motion:reduce){ .profile-overlay, .profile-overlay.open{ transition:none; } }
+  /* Over the Zen screen (which sits above everything else) the profile and what opens from it stay on top. */
+  body.zen-open .profile-overlay{ z-index:2400; }
+  body.zen-open .stats-overlay{ z-index:2420; }
+  body.zen-open #settingsOverlay.settings-full{ z-index:2500; }
+  body.zen-open .settings-overlay:not(#settingsOverlay){ z-index:2600; }
   body.yt-open .profile-overlay{ z-index:3015; }
   .profile-page{
     --pf-pad:var(--main-pad);
@@ -12863,6 +12870,10 @@
     hamburgerBtn.setAttribute('aria-expanded', 'false');
   }
   document.getElementById('profileCloseBtn').addEventListener('click', closeProfile);
+  // Going somewhere from the profile while Zen is open puts Zen away; just closing the profile does not.
+  profileOverlay.addEventListener('click', function(e){
+    if(e.target.closest && e.target.closest('.pf-link, .pf-fav, #pfFavAll, .pf-stat') && typeof zenOpen !== 'undefined' && zenOpen && !e.target.closest('.pf-stat[data-pf-go="stats"]')) zenClose();
+  }, true);
   document.getElementById('pfSettingsBtn').addEventListener('click', function(){ openSettings(); });
   document.getElementById('pfFavAll').addEventListener('click', function(){ closeProfile(); openHomeSectionPage('favorites'); });
   document.getElementById('pfStats').addEventListener('click', function(e){
@@ -32558,7 +32569,7 @@
     zenEl.querySelector('#zenClose').addEventListener('click', zenClose);
     zenEl.querySelector('#zenCast').addEventListener('click', function(){ var b = document.getElementById('castBtn'); if(b) b.click(); });
     zenEl.querySelector('#zenAvatar').addEventListener('click', function(){
-      zenClose(); var h = document.getElementById('hamburgerBtn'); if(h) setTimeout(function(){ h.click(); }, 60);
+      var h = document.getElementById('hamburgerBtn'); if(h) h.click();
     });
     zenEl.querySelector('#zenPlayBtn').addEventListener('click', zenToggle);
     zenEl.querySelector('#zenMore').addEventListener('click', function(){ zenPresetMenu(zenCur && zenPreset(zenCur) ? zenCur : null); });
