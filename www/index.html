@@ -28945,8 +28945,8 @@
     for(var j = 0; j < s.episodes.length; j++) if(s.episodes[j].still) return capUrl(s.episodes[j].still);
     return '';
   }
-  function showBackdropUrl(s){ return capUrl(s.backdrop) || ''; }
-  function movieBackdropUrl(v){ return capUrl(v.backdrop) || stillUrl(v) || ''; }
+  function showBackdropUrl(s){ return getCustomArtUrl('vshowbd:' + s.key) || capUrl(s.backdrop) || ''; }
+  function movieBackdropUrl(v){ return getCustomArtUrl('vbd:' + v.id) || capUrl(v.backdrop) || stillUrl(v) || ''; }
 
   // ---- progress
   function progressOf(v){ return (v && videoProgress[v.id]) || null; }
@@ -30302,6 +30302,9 @@
       item('Change Poster', function(){
         openArtUrlDialogFor({ key: 'vshow:' + x.key, title: 'Poster', name: x.title + ' TV show poster', refresh: refresh });
       });
+      item('Change Wallpaper', function(){
+        openArtUrlDialogFor({ key: 'vshowbd:' + x.key, title: 'Wallpaper', name: x.title + ' TV show wallpaper', refresh: refresh });
+      });
       item('Fix Show Info', function(){ openVideoWikiDialog(x, 'show'); });
     } else {
       item(isWatched(x) ? 'Mark Unwatched' : 'Mark Watched', function(){ markVideoWatched(x, !isWatched(x)); refresh(); });
@@ -30314,6 +30317,11 @@
         vsave(VIDEO_EDITS_KEY, videoEdits);
         refresh();
       });
+      if(what === 'movie'){
+        item('Change Wallpaper', function(){
+          openArtUrlDialogFor({ key: 'vbd:' + x.id, title: 'Wallpaper', name: x.title + ' movie wallpaper', refresh: refresh });
+        });
+      }
       if(what === 'movie' && !x.plex){
         item('This Is a TV Episode', function(){
           var show = window.prompt('Which show is it from?', '');
