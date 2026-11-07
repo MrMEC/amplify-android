@@ -7208,6 +7208,16 @@
   .zen-find .zen-input{ flex:1 1 auto; min-width:0; }
   .zen-find .zen-btn{ flex:none; padding:0 18px; }
   .zen-results{ margin:6px 0 4px; }
+  .zen-imgs{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin:12px 0; min-height:40px; }
+  .zen-imgs.busy{ opacity:.5; pointer-events:none; }
+  .zen-imgs .zen-sheet-msg, .zen-imgs .zen-spin{ grid-column:1/-1; }
+  .zen-img{ aspect-ratio:3/4; border:0; border-radius:12px; background-color:#161d2b; background-size:cover; background-position:center; padding:0; }
+  .zen-ro{ display:flex; align-items:center; gap:12px; padding:8px 0; border-top:1px solid rgba(255,255,255,.1); }
+  .zen-ro-art{ flex:none; width:44px; height:44px; border-radius:10px; background-size:cover; background-position:center; }
+  .zen-ro-name{ flex:1 1 auto; min-width:0; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .zen-ro-btn{ flex:none; width:44px; height:44px; border:0; border-radius:50%; background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; }
+  .zen-ro-btn:disabled{ opacity:.25; }
+  .zen-ro-btn svg{ width:22px; height:22px; }
   .zen-res{ display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid rgba(255,255,255,.1); }
   .zen-res:first-child{ border-top:0; }
   .zen-res-play{ flex:none; width:42px; height:42px; border-radius:50%; border:1.5px solid rgba(255,255,255,.4); background:none; display:flex; align-items:center; justify-content:center; }
@@ -7239,6 +7249,8 @@
   .zen-addbtn{ grid-column:1/-1; justify-self:start; display:inline-flex; align-items:center; gap:10px; height:46px; padding:0 22px; border:1.5px dashed var(--text-faint); border-radius:23px; background:none; color:var(--text); font:inherit; font-size:15px; font-weight:500; margin:6px 0 18px; cursor:pointer; }
   .zen-fine{ grid-column:1/-1; margin:0 0 20px; font-size:12.5px; line-height:1.5; color:var(--text-faint); }
   .zen-home-section{ display:none; margin:6px 0 12px; }
+  .zen-home-section .home-heading-link{ display:flex; width:100%; min-height:48px; padding:6px 0; box-sizing:border-box; touch-action:manipulation; -webkit-user-select:none; user-select:none; }
+  .zen-home-section .home-heading-link:active{ opacity:.7; }
   body.home-view .zen-home-section{ display:block; }
   .gb-head{ grid-column:1/-1; margin:0 0 12px; font-size:19px; font-weight:700; color:var(--text); line-height:1.25; }
   /* Build 432 (Mark): Edit sits on the Browse categories line as a word button, no pencil. */
@@ -32137,6 +32149,13 @@
   }
   function zenSound(id){ var a = zenAllSounds(); for(var i = 0; i < a.length; i++) if(a[i].id === id) return a[i]; return null; }
   function zenAllPresets(){
+    var list = zenAllPresetsRaw(), ord = zenState.order;
+    if(!Array.isArray(ord) || !ord.length) return list;
+    var rank = {}; ord.forEach(function(id, i){ rank[id] = i; });
+    return list.map(function(p, i){ return { p: p, k: rank[p.id] !== undefined ? rank[p.id] : 1000 + i }; })
+      .sort(function(a, b){ return a.k - b.k; }).map(function(x){ return x.p; });
+  }
+  function zenAllPresetsRaw(){
     return ZEN_PRESETS.map(function(p){ return { id: p.id, n: p.n, art: p.art, built: true, s: p.s.map(function(x){ return { id: x[0], v: x[1] }; }) }; })
       .concat(zenState.presets.map(function(p){ return { id: p.id, n: p.n, art: p.art || 'stars', built: false, s: (p.s || []).map(function(x){ return { id: x.id, v: x.v }; }) }; }));
   }
@@ -32252,6 +32271,7 @@
   function zenArtOf(p){
     var a = p && zenState.art[p.id];
     if(a && a.k === 'photo' && zenPhotos[p.id]) return zenPhotos[p.id];
+    if(a && a.k === 'url' && a.v) return a.v;
     if(a && a.k === 'scene' && ZEN_SCENES[a.v]) return zenSceneUrl(a.v);
     return zenSceneUrl(p && ZEN_SCENES[p.art] ? p.art : 'stars');
   }
@@ -32660,6 +32680,7 @@
       if(!p.built){ rows.push(['update', 'Replace “' + p.n + '” with this mix']); rows.push(['rename', 'Rename']); rows.push(['delete', 'Delete']); }
     } else rows.push(['art', 'Change artwork']);
     rows.push(['add', 'Add sounds']);
+    rows.push(['reorder', 'Reorder presets']);
     zenSheetOpen('<div class="zen-sheet-title">' + (p ? zenEsc(p.n) : 'Custom mix') + '</div><div class="zen-list">' + rows.map(function(r){
       return '<button type="button" class="zen-row' + (r[0] === 'delete' ? ' danger' : '') + '" data-a="' + r[0] + '"><span>' + zenEsc(r[1]) + '</span></button>';
     }).join('') + '</div>', function(sh){
@@ -32672,6 +32693,7 @@
           else if(a === 'delete') zenDelete(p);
           else if(a === 'update'){ zenUpdatePreset(p); zenSheetClose(); }
           else if(a === 'add') zenAddSheet();
+          else if(a === 'reorder') zenReorderSheet();
         });
       });
     });
@@ -32725,7 +32747,7 @@
       var on = cur ? (cur.k === 'scene' && cur.v === k) : (target && (zenPreset(target) || {}).art === k);
       h += '<button type="button" class="zen-art' + (on ? ' on' : '') + '" data-k="' + k + '" style="background-image:url(\'' + zenSceneUrl(k) + '\')" aria-label="' + zenEsc(ZEN_ART_NAMES[k]) + '"><span>' + zenEsc(ZEN_ART_NAMES[k]) + '</span></button>';
     });
-    h += '</div><div class="zen-sheet-btns zen-sheet-btns-col"><button type="button" class="zen-btn zen-btn-main" data-x="photo">' + zenSvg('image', 'zen-svg zen-svg-sm') + 'Choose a photo</button>';
+    h += '</div><div class="zen-sheet-btns zen-sheet-btns-col"><button type="button" class="zen-btn zen-btn-main" data-x="photo">' + zenSvg('image', 'zen-svg zen-svg-sm') + 'Choose a photo</button><button type="button" class="zen-btn" data-x="web">Find an image online</button>';
     if(cur) h += '<button type="button" class="zen-btn" data-x="reset">Use the original</button>';
     h += '<button type="button" class="zen-btn" data-x="close">Done</button></div><input type="file" accept="image/*" id="zenPhotoIn" hidden>';
     zenSheetOpen(h, function(sh){
@@ -32737,6 +32759,10 @@
       }
       Array.prototype.forEach.call(sh.querySelectorAll('.zen-art'), function(b){ b.addEventListener('click', function(){ applyArt({ k: 'scene', v: b.dataset.k }); }); });
       sh.querySelector('[data-x=close]').addEventListener('click', zenSheetClose);
+      sh.querySelector('[data-x=web]').addEventListener('click', function(){
+        if(!target){ zenAlert('Save this mix as a preset first, then change its artwork.'); return; }
+        zenWebArtSheet(target, function(url){ applyArt({ k: 'url', v: url }); });
+      });
       var rs = sh.querySelector('[data-x=reset]'); if(rs) rs.addEventListener('click', function(){ applyArt(null); });
       var inp = sh.querySelector('#zenPhotoIn');
       sh.querySelector('[data-x=photo]').addEventListener('click', function(){
@@ -32752,6 +32778,96 @@
         })['catch'](function(){ zenAlert('That photo could not be opened.'); });
       });
     });
+  }
+  // Finds a picture on the web: Openverse search here, Google Images in the browser, or a pasted link.
+  function zenWebArtSheet(target, done){
+    var p = zenPreset(target), q0 = p ? p.n : '';
+    var h = '<div class="zen-sheet-title">Find an image</div><div class="zen-find"><input type="search" class="zen-input" id="zenImgQ" placeholder="Search photos" value="' + zenEsc(q0) + '" autocomplete="off" enterkeyhint="search"><button type="button" class="zen-btn zen-btn-main" id="zenImgGo">Search</button></div>'
+      + '<div class="zen-imgs" id="zenImgs"></div>'
+      + '<p class="zen-sheet-msg zen-note">Photos from Openverse that may be used with credit. For Google results, open Google Images, long-press a picture, copy its image address and paste it below.</p>'
+      + '<div class="zen-find"><input type="url" class="zen-input" id="zenImgUrl" placeholder="Paste an image link" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="zen-btn" id="zenImgUse">Use</button></div>'
+      + '<div class="zen-sheet-btns zen-sheet-btns-col"><button type="button" class="zen-btn" data-x="google">Open Google Images</button><button type="button" class="zen-btn" data-x="close">Back</button></div>';
+    zenSheetOpen(h, function(sh){
+      var box = sh.querySelector('#zenImgs'), q = sh.querySelector('#zenImgQ'), token = 0;
+      function probe(url){
+        return new Promise(function(res, rej){
+          var im = new Image(), t = setTimeout(function(){ rej(new Error('timeout')); }, 20000);
+          im.referrerPolicy = 'no-referrer';
+          im.onload = function(){ clearTimeout(t); res(url); };
+          im.onerror = function(){ clearTimeout(t); rej(new Error('load')); };
+          im.src = url;
+        });
+      }
+      function use(url, fallback){
+        box.classList.add('busy');
+        probe(url)['catch'](function(){ return fallback ? probe(fallback) : Promise.reject(new Error('load')); }).then(function(u){ done(u); }, function(){
+          box.classList.remove('busy'); zenAlert('That image could not be loaded. Try another one.');
+        });
+      }
+      function go(){
+        var t = q.value.trim(); if(!t) return;
+        var my = ++token;
+        box.innerHTML = '<div class="zen-spin" role="status" aria-label="Searching"></div>';
+        fetch('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(t) + '&license_type=commercial&page_size=20&aspect_ratio=tall')
+          .then(function(r){ if(r.status === 429) throw new Error('limit'); if(!r.ok) throw new Error('http ' + r.status); return r.json(); })
+          .then(function(j){
+            if(my !== token) return;
+            var list = (j.results || []).filter(function(x){ return x.url; });
+            if(!list.length){ box.innerHTML = '<p class="zen-sheet-msg">No images found. Try another word.</p>'; return; }
+            box.innerHTML = '';
+            list.forEach(function(x){
+              var b = document.createElement('button'); b.type = 'button'; b.className = 'zen-img';
+              b.style.backgroundImage = 'url("' + (x.thumbnail || x.url) + '")'; b.setAttribute('aria-label', x.title || 'Image');
+              b.addEventListener('click', function(){ use(x.url, x.thumbnail); });
+              box.appendChild(b);
+            });
+          })['catch'](function(e){
+            if(my !== token) return;
+            box.innerHTML = '<p class="zen-sheet-msg">' + (e && e.message === 'limit' ? 'Openverse is limiting searches right now. Try again later.' : (e && /^http/.test(e.message) ? 'Openverse returned an error (' + e.message.slice(5) + ').' : 'Could not reach Openverse. Check your connection.')) + '</p>';
+          });
+      }
+      sh.querySelector('#zenImgGo').addEventListener('click', go);
+      q.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); go(); } });
+      sh.querySelector('#zenImgUse').addEventListener('click', function(){
+        var u = sh.querySelector('#zenImgUrl').value.trim();
+        if(!/^https?:\/\//i.test(u)){ zenAlert('Paste a link that starts with http.'); return; }
+        use(u);
+      });
+      sh.querySelector('[data-x=google]').addEventListener('click', function(){
+        try{ window.open('https://www.google.com/search?tbm=isch&q=' + encodeURIComponent((q.value.trim() || q0 || 'nature') + ' wallpaper'), '_blank', 'noopener,noreferrer'); }catch(e){}
+      });
+      sh.querySelector('[data-x=close]').addEventListener('click', function(){ zenArtSheet(target); });
+      if(q0) go();
+    });
+  }
+  // Moves presets up or down; the order is kept for Home, Library and the Zen screen.
+  function zenReorderSheet(){
+    if(!zenOpen) zenOpenScreen(null, false);
+    function draw(){
+      var list = zenAllPresets();
+      var h = '<div class="zen-sheet-title">Reorder presets</div><div class="zen-list zen-reorder">';
+      list.forEach(function(p, i){
+        h += '<div class="zen-ro" data-id="' + p.id + '"><span class="zen-ro-art" style="background-image:url(\'' + zenArtOf(p) + '\')"></span><span class="zen-ro-name">' + zenEsc(p.n) + '</span>'
+          + '<button type="button" class="zen-ro-btn" data-d="-1" aria-label="Move up"' + (i === 0 ? ' disabled' : '') + '>' + zenSvg('up') + '</button>'
+          + '<button type="button" class="zen-ro-btn" data-d="1" aria-label="Move down"' + (i === list.length - 1 ? ' disabled' : '') + '>' + zenSvg('down') + '</button></div>';
+      });
+      h += '</div><div class="zen-sheet-btns"><button type="button" class="zen-btn zen-btn-main" data-x="close">Done</button></div>';
+      var sh = zenSheetOpen(h, function(sh){
+        var sc = zenReorderScroll;
+        sh.querySelector('[data-x=close]').addEventListener('click', zenSheetClose);
+        Array.prototype.forEach.call(sh.querySelectorAll('.zen-ro-btn'), function(b){
+          b.addEventListener('click', function(){
+            var id = b.parentNode.dataset.id, ids = zenAllPresets().map(function(x){ return x.id; }), at = ids.indexOf(id), to = at + parseInt(b.dataset.d, 10);
+            if(to < 0 || to >= ids.length) return;
+            ids.splice(at, 1); ids.splice(to, 0, id);
+            zenState.order = ids; zenSave(); zenReorderScroll = sh.scrollTop; draw(); zenRefreshLists(); if(zenOpen) zenPresetsRender();
+          });
+        });
+        if(sc) sh.scrollTop = sc;
+      });
+    }
+    var zenReorderScroll = 0;
+    draw();
   }
   // A chosen photo, shrunk so it fits in the app's storage.
   function zenPhotoData(file){
@@ -32908,6 +33024,9 @@
     var all = zenAllPresets(), mine = all.filter(function(p){ return !p.built; });
     if(mine.length){ head('My mixes'); stationsGrid.appendChild(zenPresetRow(mine)); }
     head('Presets'); stationsGrid.appendChild(zenPresetRow(all.filter(function(p){ return p.built; })));
+    var ro = document.createElement('button'); ro.type = 'button'; ro.className = 'zen-addbtn'; ro.innerHTML = '<span>Reorder presets</span>';
+    ro.addEventListener('click', function(){ zenReorderSheet(); });
+    stationsGrid.appendChild(ro);
     head('Sounds');
     var cats = ZEN_CATS.slice(); if(zenState.clips.length) cats.push('Added');
     cats.forEach(function(c){
