@@ -7211,7 +7211,7 @@
   .zen-sheet-ov.open{ visibility:visible; opacity:1; transition:opacity .3s ease, visibility 0s; }
   .zen-sheet-ov .zen-sheet{ transform:translateY(100%); transition:transform .38s cubic-bezier(.22,.8,.24,1); }
   .zen-sheet-ov.open .zen-sheet{ transform:none; }
-  .zen-sheet{ width:100%; max-height:88%; overflow-y:auto; background:#0b111c; border-radius:24px 24px 0 0; padding:22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); box-sizing:border-box; }
+  .zen-sheet{ width:100%; max-height:88%; overflow-y:auto; background:color-mix(in srgb, var(--np-shade, #0a0f1c) 86%, #000); border-radius:24px 24px 0 0; padding:22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); box-sizing:border-box; }
   .zen-sheet-title{ font-size:20px; font-weight:600; margin:0 0 14px; line-height:1.3; overflow-wrap:normal; word-break:normal; }
   .zen-sheet-msg{ margin:0 0 16px; font-size:15px; line-height:1.5; color:rgba(255,255,255,.82); }
   .zen-note{ font-size:13px; color:rgba(255,255,255,.6); }
@@ -32426,7 +32426,7 @@
   }
   function zenPlay(){
     if(!zenMix.length) return;
-    try{ noteHeroPlayed(zenHeroItem()); }catch(e){}
+    try{ zenNote(); }catch(e){}
     var ctx = zenAC();
     try{ if(typeof audio !== 'undefined' && audio && !audio.paused) audio.pause(); }catch(e){}
     zenPlaying = true;
@@ -32489,13 +32489,25 @@
     zenMix = next; zenCur = pid; zenDirty = false;
     zenMix.forEach(function(m){ if(zenVoices[m.id]) { zenVoices[m.id].m = m; zenSetVol(m); } });
     if(autoplay){ if(zenPlaying) zenMix.forEach(zenStartVoice); else zenPlay(); }
-    if(autoplay || zenPlaying){ try{ noteHeroPlayed(zenHeroItem()); }catch(e){} }
+    if(autoplay || zenPlaying){ try{ zenNote(); }catch(e){} }
     zenRemember(); zenSyncUi();
   }
   // Leaves the radio or music paused when Zen starts, and Zen paused when they start.
   try{ audio.addEventListener('play', function(){ if(zenState.active){ zenState.active = false; zenSave(); } zenBarActive = false; playerBar.classList.remove('zen-on'); if(zenPlaying) zenPause(); }); }catch(e){}
   // The mini player follows Zen while Zen is the thing that was last started.
   var zenBarActive = false;
+  // The mixes played, newest first, kept with Zen's own settings so the carousel never loses them.
+  function zenNote(){
+    var it = zenHeroItem(); if(!it) return;
+    try{ noteHeroPlayed(it); }catch(e){}
+    var id = it.zenId || '';
+    var r = (Array.isArray(zenState.recent) ? zenState.recent : []).filter(function(x){ return x !== id; });
+    r.unshift(id); if(r.length > 12) r.length = 12;
+    zenState.recent = r; zenSave();
+  }
+  function zenRecentItems(){
+    return (Array.isArray(zenState.recent) ? zenState.recent : []).map(function(id){ return zenHeroItem(id); }).filter(Boolean);
+  }
   function zenHeroItem(id){
     var cur, dirty;
     if(id){ var q = zenPreset(id); return q ? { type: 'zen', name: q.n, zenId: q.id } : null; }
@@ -51867,6 +51879,7 @@
     if(zenBarActive && typeof zenHeroItem === 'function') add(zenHeroItem());
     add(currentStation);
     heroHistLoad().forEach(function(ref){ add(heroResolve(ref)); });
+    if(typeof zenRecentItems === 'function' && !privacyOn()) zenRecentItems().forEach(add);
     if(!out.length) add(lastPlayedStation());
     return out;
   }
