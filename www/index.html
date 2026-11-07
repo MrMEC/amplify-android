@@ -7141,6 +7141,7 @@
   .zen-title{ margin:0 0 6px; max-width:100%; font-size:clamp(18px, 5vw, 26px); font-weight:800; letter-spacing:-.005em; line-height:1.2; color:#fff; text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.45); overflow-wrap:anywhere; }
   .zen-sub{ margin:0 0 20px; max-width:100%; min-height:1.3em; font-size:13.5px; color:rgba(255,255,255,.8); text-align:center; text-shadow:0 1px 10px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .zen-controls{ display:flex; align-items:center; justify-content:center; gap:30px; margin-bottom:22px; }
+  .zen-screen .zen-side, .zen-screen .zen-kick{ color:var(--np-vivid, #fff); }
   .zen-side{ flex:none; width:46px; height:46px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--np-vivid, #fff); transition:color .5s ease, background .15s ease; }
   .zen-side:active{ background:rgba(255,255,255,.14); }
   .zen-side .zen-svg{ width:26px; height:26px; stroke-width:1.9; }
@@ -32148,7 +32149,7 @@
     note: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
     timer: '<path d="M10 2h4"/><path d="M12 14V10"/><circle cx="12" cy="14" r="8"/><path d="m19 6 1.2-1.2"/>',
     mixer: '<path d="M4 8h9"/><path d="M17 8h3"/><circle cx="15" cy="8" r="2"/><path d="M4 16h3"/><path d="M11 16h9"/><circle cx="9" cy="16" r="2"/>',
-    more: '<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>',
+    more: '<circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/>',
     close: '<path d="M5 5l14 14"/><path d="M19 5 5 19"/>',
     up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5-5 4 4 3-3 4 4"/>'
@@ -32584,9 +32585,9 @@
       + '<svg class="zc-on" viewBox="0 0 24 24"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm18-7H5v1.63c3.96 1.28 7.09 4.41 8.37 8.37H19V7zM1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg></button>'
       + '<button type="button" class="zen-avatar" id="zenAvatar" aria-label="Menu"><i class="za-in" id="zenAvatarIn"></i></button></div>'
       + '<div class="zen-main" id="zenMain"><button type="button" class="zen-kick" id="zenGoZen">Zen</button><h2 class="zen-title" id="zenTitle">Zen</h2><div class="zen-sub" id="zenSub"></div>'
-      + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button>'
+      + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button>'
       + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
-      + '<button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button></div>'
+      + '<button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button></div>'
       + '<div class="zen-next"><div class="zen-next-label">Zen Mixes</div><div class="zen-presets" id="zenPresets"></div></div></div>'
       + '<div class="zen-scrim" id="zenScrim"></div>'
       + '<div class="zen-mixer" id="zenMixer"><div class="zen-mixer-head"><span class="zen-mixer-ttl" id="zenMixTtl">Mix</span>'
