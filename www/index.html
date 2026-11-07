@@ -6633,6 +6633,7 @@
          picture keeps its size and its place on the right margin. */
       box-sizing:border-box; border:2px solid var(--accent);
     }
+    html body.np-open .sidebar-top .hamburger-btn .hb-avatar{ border-color:var(--np-vivid, var(--accent)); transition:border-color .5s ease; }
     .hb-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
     .hb-avatar svg{ width:58%; height:58%; }
     /* Just the picture: no disc behind it, on any page. */
@@ -7191,7 +7192,7 @@
   .zen-cast svg{ width:20px; height:20px; fill:currentColor; display:block; }
   .zen-cast .zc-on{ display:none; } body.cast-on .zen-cast .zc-on{ display:block; } body.cast-on .zen-cast .zc-off{ display:none; }
   .zen-avatar{ width:44px; height:44px; padding:0; border:0; background:none; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-  .zen-avatar .za-in{ display:flex; width:36px; height:36px; border-radius:50%; overflow:hidden; box-sizing:border-box; border:2px solid var(--accent);
+  .zen-avatar .za-in{ display:flex; width:36px; height:36px; border-radius:50%; overflow:hidden; box-sizing:border-box; border:2px solid var(--np-vivid, var(--accent)); transition:border-color .5s ease;
     align-items:center; justify-content:center; font-style:normal; font-size:15px; font-weight:800; line-height:1; color:var(--text);
     background:color-mix(in srgb, var(--accent) 28%, var(--panel-2)); box-shadow:0 1px 4px rgba(0,0,0,.35); }
   .zen-avatar .za-in img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -16888,7 +16889,7 @@
   // are equally available from a browser File and from Android's MediaStore -- so the same
   // IDs survive the eventual port rather than having to be regenerated.
   function favKey(s){
-    if(s && s.type === 'zen') return 'zen:mix';
+    if(s && s.type === 'zen') return 'zen:' + (s.zenId || 'custom');
     // Build 262: one of your own channels, whatever is on it.
     if(s && s.liveCh) return 'livech:' + s.liveCh;
     if(s && s.type === 'video') return 'video:' + (s.id || s.uri || s.name);
@@ -32477,19 +32478,23 @@
     zenMix = next; zenCur = pid; zenDirty = false;
     zenMix.forEach(function(m){ if(zenVoices[m.id]) { zenVoices[m.id].m = m; zenSetVol(m); } });
     if(autoplay){ if(zenPlaying) zenMix.forEach(zenStartVoice); else zenPlay(); }
+    if(autoplay || zenPlaying){ try{ noteHeroPlayed(zenHeroItem()); }catch(e){} }
     zenRemember(); zenSyncUi();
   }
   // Leaves the radio or music paused when Zen starts, and Zen paused when they start.
   try{ audio.addEventListener('play', function(){ if(zenState.active){ zenState.active = false; zenSave(); } zenBarActive = false; playerBar.classList.remove('zen-on'); if(zenPlaying) zenPause(); }); }catch(e){}
   // The mini player follows Zen while Zen is the thing that was last started.
   var zenBarActive = false;
-  function zenHeroItem(){
+  function zenHeroItem(id){
     var cur, dirty;
+    if(id){ var q = zenPreset(id); return q ? { type: 'zen', name: q.n, zenId: q.id } : null; }
+    if(id === ''){ return { type: 'zen', name: 'Custom mix', zenId: null }; }
     if(zenMix.length){ cur = zenCur; dirty = zenDirty; }
     else if(zenState.last && Array.isArray(zenState.last.mix) && zenState.last.mix.length){ cur = zenState.last.cur; dirty = zenState.last.dirty; }
     else return null;
     var p = cur ? zenPreset(cur) : null;
-    return { type: 'zen', name: dirty || !p ? 'Custom mix' : p.n, zenId: p ? p.id : null };
+    if(dirty || !p) return { type: 'zen', name: 'Custom mix', zenId: null };
+    return { type: 'zen', name: p.n, zenId: p.id };
   }
   function zenBarSync(){
     if(zenPlaying){
@@ -32510,6 +32515,17 @@
     playPauseBtn.innerHTML = zenPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
     barPrevBtn.disabled = true; barNextBtn.disabled = true;
   }
+  // Whatever else writes to the mini player (a station's song title, buffering, a late metadata
+  // update) while Zen is playing, the bar goes back to showing Zen straight away.
+  try{
+    var zenBarMo = new MutationObserver(function(){
+      if(!zenBarActive || !zenPlaying) return;
+      var p = zenCur ? zenPreset(zenCur) : null;
+      var want = zenDirty || !p ? 'Custom mix' : p.n;
+      if(playerName.textContent !== want || playerIcon.firstChild || !playerBar.classList.contains('zen-on')) zenBarSync();
+    });
+    [playerName, playerSub, playerIcon].forEach(function(el){ zenBarMo.observe(el, { childList: true, characterData: true, subtree: true }); });
+  }catch(e){}
   playPauseBtn.addEventListener('click', function(e){ if(!zenBarActive) return; e.stopImmediatePropagation(); e.preventDefault(); zenToggle(); }, true);
   playerNowTrigger.addEventListener('click', function(e){ if(!zenBarActive) return; e.stopImmediatePropagation(); e.preventDefault(); zenOpenScreen(); }, true);
   setPlayingUI = (function(f){ return function(){ var r = f.apply(this, arguments); try{ zenBarSync(); }catch(e){} return r; }; })(setPlayingUI);
@@ -32532,7 +32548,7 @@
       + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button>'
       + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
       + '<button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button></div>'
-      + '<div class="zen-next"><div class="zen-next-label">Mixes</div><div class="zen-presets" id="zenPresets"></div></div></div>'
+      + '<div class="zen-next"><div class="zen-next-label">Zen Mixes</div><div class="zen-presets" id="zenPresets"></div></div></div>'
       + '<div class="zen-scrim" id="zenScrim"></div>'
       + '<div class="zen-mixer" id="zenMixer"><div class="zen-mixer-head"><span class="zen-mixer-ttl" id="zenMixTtl">Mix</span>'
       + '<button type="button" class="zen-side" id="zenMixClose" aria-label="Close mix">' + zenSvg('down') + '</button></div><div class="zen-mixer-top" id="zenMixTop"></div><div class="zen-mixer-body" id="zenMixBody"></div></div>'
@@ -51790,7 +51806,7 @@
   }
   function heroRefOf(st){
     if(!st) return null;
-    if(st.type === 'zen') return { k: 'zen:mix', r: 'zen' };
+    if(st.type === 'zen') return { k: 'zen:' + (st.zenId || 'custom'), r: 'zen', z: st.zenId || '' };
     // Build 262: one of your own channels is kept as the channel.
     if(st.liveCh){ var lch = findVideoChannel(st.liveCh); if(!lch) return null; st = channelToStation(lch); }
     if(isLocalTrack(st)) return { k: favKey(st), r: 'song', id: favKey(st) };
@@ -51823,7 +51839,7 @@
   }
   function heroResolve(ref){
     try{
-      if(ref.r === 'zen') return typeof zenHeroItem === 'function' ? zenHeroItem() : null;
+      if(ref.r === 'zen') return ref.k === 'zen:mix' || typeof zenHeroItem !== 'function' ? null : (typeof zenHeroItem === 'function' ? zenHeroItem(ref.z || '') : null);
       if(ref.r === 'song') return libraryById[ref.id] || null;
       if(ref.r === 'video'){ var v = vlib().byId[ref.id]; return v || null; }
       return ref.it || null;
@@ -51937,7 +51953,7 @@
     // and like a station, a tap on the one already playing leaves it playing.
     slide.addEventListener('click', function(){
       if(slide._swiped) return;
-      if(slide._item && slide._item.type === 'zen'){ zenOpenScreen(); return; }
+      if(slide._item && slide._item.type === 'zen'){ zenOpenScreen(slide._item.zenId && zenCur !== slide._item.zenId ? slide._item.zenId : null, false); return; }
       if(slide._entry){ openArtistPage(slide._entry.key); return; }
       if(heroIsStation(slide._item)){ heroPlayStation(slide); return; }
       if(heroIsPodcast(slide._item)){ if(!slideIsPlaying(slide)) heroPlay(slide); }
@@ -52071,7 +52087,7 @@
   }
   function slideIsPlaying(slide){
     var item = slide._item, entry = slide._entry;
-    if(item && item.type === 'zen') return !!zenPlaying;
+    if(item && item.type === 'zen') return !!zenPlaying && (item.zenId ? zenCur === item.zenId && !zenDirty : (!zenCur || zenDirty));
     if(!item || !uiIsPlaying || !currentStation) return false;
     // A favourite playlist or artist Radio is "playing" while its shuffle is the queue.
     if(isPlaylistRadio(item) || isArtistRadio(item)) return !!radioCtx && radioCtx.label === item.name && queueLabel === item.name;
@@ -52141,7 +52157,7 @@
   function heroPlay(slide){
     var item = slide._item;
     if(!item) return;
-    if(item.type === 'zen'){ zenToggle(); return; }
+    if(item.type === 'zen'){ if(slideIsPlaying(slide)) zenToggle(); else if(item.zenId && (zenCur !== item.zenId || zenDirty)) zenSelect(item.zenId, true); else zenToggle(); return; }
     if(slideIsPlaying(slide)){ togglePlayPause(); return; }
     if(slide._entry){ playHeroArtistShuffle(slide._entry, item); return; }
     if(isOnAirItem(item)){ togglePlayPause(); return; }
