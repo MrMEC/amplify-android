@@ -1030,8 +1030,26 @@ final class CarLibrary {
     Set<String> parkUrls = new HashSet<>();
     for (JSONObject p : park) parkUrls.add(p.optString("url"));
     List<JSONObject> stations = new ArrayList<>();
-    for (JSONObject st : stationSearch("tag", tag, 60)) {
-      if (!parkUrls.contains(st.optString("url"))) stations.add(st);
+    // White Noise and Spa read several exact tags (as on the phone); every other genre one tag.
+    List<String[]> asks = new ArrayList<>();
+    if ("white noise".equals(tag)) {
+      for (String n : new String[] {"white noise"}) asks.add(new String[] {"name", n});
+      for (String x : new String[] {"white noise", "whitenoise", "brown noise", "pink noise", "rain", "rain sounds", "nature sounds", "ocean sounds", "sleep sounds", "sleep"}) asks.add(new String[] {"tagExact", x});
+    } else if ("spa".equals(tag)) {
+      for (String x : new String[] {"spa", "spa music", "relaxation", "meditation", "massage", "zen", "wellness"}) asks.add(new String[] {"tagExact", x});
+    } else {
+      asks.add(new String[] {"tag", tag});
+    }
+    Set<String> seenUrls = new HashSet<>();
+    for (String[] ask : asks) {
+      try {
+        for (JSONObject st : stationSearch(ask[0], ask[1], 60)) {
+          String u = st.optString("url");
+          if (!parkUrls.contains(u) && seenUrls.add(u)) stations.add(st);
+        }
+      } catch (JSONException e) {
+        if (asks.size() == 1) throw e;
+      }
     }
     for (JSONObject st : applyGenrePrefs(stations, prefs)) {
       arrayList.add(withGroup(st, "Stations"));
@@ -2249,7 +2267,7 @@ final class CarLibrary {
         String url =
             host
                 + "/json/stations/search?"
-                + by
+                + ("tagExact".equals(by) ? "tagExact=true&tag" : by)
                 + "="
                 + URLEncoder.encode(term, "UTF-8")
                 + "&limit="
