@@ -7135,6 +7135,9 @@
   .zen-back{ position:absolute; top:calc(env(safe-area-inset-top, 0px) + 16px); left:16px; z-index:4; width:40px; height:40px; padding:0; border-radius:50%; background:rgba(20,20,22,.42); border:1px solid rgba(255,255,255,.16); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); color:var(--np-vivid, #fff); display:flex; align-items:center; justify-content:center; transition:color .5s ease; }
   .zen-back .zen-svg{ width:22px; height:22px; stroke-width:2; }
   .zen-main{ position:absolute; left:0; right:0; bottom:var(--mnav-total, 0px); z-index:2; display:flex; flex-direction:column; align-items:center; padding:0 18px 16px; }
+  .zen-kick{ margin:0 0 10px; padding:7px 16px; border-radius:999px; border:1px solid rgba(255,255,255,.22); background:rgba(20,20,22,.38); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    color:var(--np-vivid, #fff); font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; transition:color .5s ease; }
+  .zen-kick:active{ background:rgba(255,255,255,.14); }
   .zen-title{ margin:0 0 6px; max-width:100%; font-size:clamp(18px, 5vw, 26px); font-weight:800; letter-spacing:-.005em; line-height:1.2; color:#fff; text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.45); overflow-wrap:anywhere; }
   .zen-sub{ margin:0 0 20px; max-width:100%; min-height:1.3em; font-size:13.5px; color:rgba(255,255,255,.8); text-align:center; text-shadow:0 1px 10px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .zen-controls{ display:flex; align-items:center; justify-content:center; gap:30px; margin-bottom:22px; }
@@ -7272,6 +7275,19 @@
   .zen-cat-label{ grid-column:1/-1; margin:2px 0 10px; font-size:14px; font-weight:600; color:var(--text-dim); }
   .zen-chipwrap{ grid-column:1/-1; display:flex; flex-wrap:wrap; gap:10px; margin:0 0 20px; }
   .zen-sndchip{ display:inline-flex; align-items:center; gap:10px; height:44px; padding:0 18px 0 12px; border:1px solid var(--border); border-radius:22px; background:var(--panel-2); color:var(--text); font:inherit; font-size:15px; font-weight:500; cursor:pointer; }
+  .zen-srows{ grid-column:1/-1; margin:0 0 20px; }
+  .zen-srow{ display:flex; align-items:center; gap:14px; width:100%; min-height:56px; padding:6px 2px; background:none; border:0; border-bottom:1px solid var(--border); color:var(--text); font:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .zen-srow:last-child{ border-bottom:0; }
+  .zen-srow:active{ background:color-mix(in srgb, var(--text) 7%, transparent); }
+  .zen-srow-ic{ flex:none; display:flex; width:28px; height:28px; color:var(--accent); }
+  .zen-srow-ic .zen-svg{ width:26px; height:26px; }
+  .zen-srow-nm{ flex:1 1 auto; min-width:0; font-size:16px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .zen-srow-go{ flex:none; display:flex; width:20px; height:20px; color:var(--text-dim); }
+  .zen-srow-go svg{ width:18px; height:18px; fill:currentColor; }
+  .zen-more{ grid-column:1/-1; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin:0 0 24px; }
+  .zen-more .gb-card{ height:128px; }
+  .zen-more .gb-card-name{ right:10px; font-size:16px; }
+  .zen-more .gb-card-icon{ width:72px; height:72px; }
   .zen-sndchip-ic{ display:flex; width:24px; height:24px; color:var(--accent); }
   .zen-sndchip-ic .zen-svg{ width:24px; height:24px; }
   .zen-addbtn{ grid-column:1/-1; justify-self:start; display:inline-flex; align-items:center; gap:10px; height:46px; padding:0 22px; border:1.5px dashed var(--text-faint); border-radius:23px; background:none; color:var(--text); font:inherit; font-size:15px; font-weight:500; margin:6px 0 18px; cursor:pointer; }
@@ -32163,7 +32179,7 @@
     { id: 'deep-sleep', n: 'Deep Sleep', art: 'stars', s: [['white-noise', .6], ['gentle-rain', .3]] },
     { id: 'lighthouse', n: 'Lighthouse', art: 'lighthouse', s: [['soft-waves', .7], ['seagulls', .3], ['wind', .25]] },
     { id: 'misty-morning', n: 'Misty Morning', art: 'mist', s: [['calm-rain', .4], ['birds', .5], ['dove', .3], ['stream', .25]] },
-    { id: 'deep-blue', n: 'Deep Blue', art: 'deep', s: [['underwater', .6], ['soft-waves', .3]] }
+    { id: 'deep-blue', n: 'Deep Blue', art: 'deep', s: [['stream', .2], ['underwater', .9]] }
   ];
   var ZEN_ART_NAMES = { 'rainy-night': 'Rainy night', campfire: 'Campfire', 'sea-dawn': 'Sea at dawn', forest: 'Forest', storm: 'Storm', cabin: 'Cabin', stars: 'Starry night', lighthouse: 'Lighthouse', mist: 'Misty morning', deep: 'Deep blue' };
 
@@ -32567,7 +32583,7 @@
       + '<svg class="zc-off" viewBox="0 0 24 24"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>'
       + '<svg class="zc-on" viewBox="0 0 24 24"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm18-7H5v1.63c3.96 1.28 7.09 4.41 8.37 8.37H19V7zM1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg></button>'
       + '<button type="button" class="zen-avatar" id="zenAvatar" aria-label="Menu"><i class="za-in" id="zenAvatarIn"></i></button></div>'
-      + '<div class="zen-main" id="zenMain"><h2 class="zen-title" id="zenTitle">Zen</h2><div class="zen-sub" id="zenSub"></div>'
+      + '<div class="zen-main" id="zenMain"><button type="button" class="zen-kick" id="zenGoZen">Zen</button><h2 class="zen-title" id="zenTitle">Zen</h2><div class="zen-sub" id="zenSub"></div>'
       + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button>'
       + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
       + '<button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button></div>'
@@ -32579,6 +32595,7 @@
     document.body.appendChild(zenEl);
     zenAttachSwipe(zenEl);
     zenEl.querySelector('#zenClose').addEventListener('click', zenClose);
+    zenEl.querySelector('#zenGoZen').addEventListener('click', function(){ zenClose(); try{ pushView(); openLibTab('zen'); }catch(e){} });
     zenEl.querySelector('#zenCast').addEventListener('click', function(){ var b = document.getElementById('castBtn'); if(b) b.click(); });
     zenEl.querySelector('#zenAvatar').addEventListener('click', function(){
       var h = document.getElementById('hamburgerBtn'); if(h) h.click();
@@ -33203,14 +33220,36 @@
 
   // ----- Library > Zen, Home and the White Noise genre -----
   function zenNowPreset(){ var p = zenCur && zenPreset(zenCur); return p || zenPreset(ZEN_PRESETS[0].id); }
+  function zenHeroIcon(){
+    return zenPlaying ? '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg>';
+  }
+  function zenResume(){
+    if(zenPlaying){ zenPause(); return; }
+    if(!zenMix.length){
+      var l = zenState.last;
+      if(l && Array.isArray(l.mix) && l.mix.some(function(m){ return zenSound(m.id); })){
+        zenMix = l.mix.filter(function(m){ return zenSound(m.id); }).map(function(m){ return { id: m.id, v: m.v }; });
+        zenCur = l.cur && zenPreset(l.cur) ? l.cur : null; zenDirty = !!l.dirty;
+      } else { zenSelect(ZEN_PRESETS[0].id, true); return; }
+    }
+    zenPlay();
+  }
   function zenHeroEl(compact){
     var p = zenNowPreset(), hero = document.createElement('div');
     hero.className = 'zen-hero' + (compact ? ' zen-hero-compact' : ''); hero.setAttribute('role', 'button'); hero.tabIndex = 0;
     zenPaint(hero, p);
     hero.innerHTML = '<div class="zen-hero-shade"></div><div class="zen-hero-text"><div class="zen-hero-title">Zen</div><div class="zen-hero-sub">' + (compact ? 'Mix rain, waves, fire and more' : 'Mix rain, waves, fire and white noise for sleep and focus') + '</div></div>'
-      + '<span class="zen-hero-go" aria-hidden="true">' + (zenPlaying ? '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg>') + '</span>';
+      + '<button type="button" class="zen-hero-go" aria-label="' + (zenPlaying ? 'Pause' : 'Play') + '">' + zenHeroIcon() + '</button>';
     hero.addEventListener('click', function(){ zenOpenScreen(null, false); });
-    hero.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); zenOpenScreen(null, false); } });
+    hero.addEventListener('keydown', function(e){ if(e.target === hero && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); zenOpenScreen(null, false); } });
+    // The round button plays or pauses the last mix on the spot; the rest of the card opens Zen.
+    var go = hero.querySelector('.zen-hero-go');
+    go.addEventListener('click', function(e){
+      e.stopPropagation(); e.preventDefault();
+      zenResume();
+      go.innerHTML = zenHeroIcon(); go.setAttribute('aria-label', zenPlaying ? 'Pause' : 'Play');
+    });
     return hero;
   }
   function zenPresetTile(p){
@@ -33243,10 +33282,10 @@
       var list = zenAllSounds().filter(function(s){ return c === 'Added' ? s.user : (!s.user && s.c === c); });
       if(!list.length) return;
       var lab = document.createElement('div'); lab.className = 'zen-cat-label'; lab.textContent = c; stationsGrid.appendChild(lab);
-      var wrap = document.createElement('div'); wrap.className = 'zen-chipwrap';
+      var wrap = document.createElement('div'); wrap.className = 'zen-srows';
       list.forEach(function(s){
-        var b = document.createElement('button'); b.type = 'button'; b.className = 'zen-sndchip';
-        b.innerHTML = '<span class="zen-sndchip-ic">' + zenSvg(s.i) + '</span><span>' + zenEsc(s.n) + '</span>';
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'zen-srow';
+        b.innerHTML = '<span class="zen-srow-ic">' + zenSvg(s.i) + '</span><span class="zen-srow-nm">' + zenEsc(s.n) + '</span><span class="zen-srow-go"><svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg></span>';
         b.addEventListener('click', function(){
           Object.keys(zenVoices).forEach(function(id){ zenStopVoice(id, true); });
           zenMix = [{ id: s.id, v: .7 }]; zenCur = null; zenDirty = true; zenRemember();
@@ -33260,8 +33299,17 @@
     add.innerHTML = zenSvg('plus', 'zen-svg zen-svg-sm') + '<span>Add sounds</span>';
     add.addEventListener('click', function(){ zenOpenScreen(null, false); zenAddSheet(); });
     stationsGrid.appendChild(add);
-    var cr = document.createElement('p'); cr.className = 'zen-fine'; cr.textContent = 'Bundled sounds are from Pixabay and Freesound contributors, free to use under the Pixabay Content License.';
-    stationsGrid.appendChild(cr);
+    head('More Like Zen');
+    var more = document.createElement('div'); more.className = 'zen-more';
+    ['White Noise', 'Spa', 'Ambient'].forEach(function(g){
+      var look = genreLook(g), card = document.createElement('button');
+      card.type = 'button'; card.className = 'gb-card'; card.style.setProperty('--gc', look.color); card.dataset.genre = g;
+      card.innerHTML = '<span class="gb-card-name"></span>' + genreIconSvg(g, 'gb-card-icon');
+      card.querySelector('.gb-card-name').textContent = g;
+      card.addEventListener('click', function(){ openGenre(g); });
+      more.appendChild(card);
+    });
+    stationsGrid.appendChild(more);
   }
   function openZenHome(){
     enterLibraryChrome();

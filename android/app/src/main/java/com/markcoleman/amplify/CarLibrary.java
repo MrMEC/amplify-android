@@ -1156,7 +1156,7 @@ final class CarLibrary {
     {"deep-sleep", "Deep Sleep", "White noise and soft rain"},
     {"lighthouse", "Lighthouse", "Waves, gulls and wind"},
     {"misty-morning", "Misty Morning", "Rain, birds and stream"},
-    {"deep-blue", "Deep Blue", "Underwater and waves"}
+    {"deep-blue", "Deep Blue", "Stream and underwater"}
   };
 
   private List<JSONObject> zenItems() throws JSONException {
