@@ -32790,7 +32790,7 @@
   function zenAddSheet(){
     var h = '<div class="zen-sheet-title">Add sounds</div>'
       + '<div class="zen-find"><input type="search" class="zen-input" id="zenFind" placeholder="Search sounds (rain, crickets, fan…)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button type="button" class="zen-btn zen-btn-main" id="zenFindGo">Search</button></div>'
-      + '<p class="zen-sheet-msg zen-note">Searches Openverse for free sounds, mostly from Freesound, that may be used with credit. Pixabay has no search service for apps, so download a clip there and use “From this phone”.</p>'
+      + '<p class="zen-sheet-msg zen-note">Searches Openverse for free sounds, mostly from Freesound, that may be used with credit.</p>'
       + '<div class="zen-results" id="zenResults"></div>'
       + '<div class="zen-sheet-btns zen-sheet-btns-col"><button type="button" class="zen-btn" id="zenFromPhone">From this phone</button><button type="button" class="zen-btn" data-x="close">Done</button></div>'
       + '<input type="file" accept="audio/*" id="zenFileIn" hidden>';
@@ -32801,8 +32801,8 @@
         var q = inp.value.trim(); if(!q) return;
         var my = ++token; zenStopPreview();
         res.innerHTML = '<div class="zen-spin" role="status" aria-label="Searching"></div>';
-        fetch('https://api.openverse.org/v1/audio/?q=' + encodeURIComponent(q) + '&license_type=commercial&page_size=30&filter_dead=true')
-          .then(function(r){ if(r.status === 429) throw new Error('limit'); if(!r.ok) throw new Error('http'); return r.json(); })
+        fetch('https://api.openverse.org/v1/audio/?q=' + encodeURIComponent(q) + '&license_type=commercial&page_size=20')
+          .then(function(r){ if(r.status === 429) throw new Error('limit'); if(!r.ok) throw new Error('http ' + r.status); return r.json(); })
           .then(function(j){
             if(my !== token) return;
             var list = (j.results || []).filter(function(x){ return x.url && x.duration >= 8000; }).slice(0, 20);
@@ -32834,7 +32834,7 @@
             });
           })['catch'](function(e){
             if(my !== token) return;
-            res.innerHTML = '<p class="zen-sheet-msg">' + (e && e.message === 'limit' ? 'Openverse is limiting searches right now. Try again later, or use “From this phone”.' : 'Could not reach Openverse. Check your connection, or use “From this phone”.') + '</p>';
+            res.innerHTML = '<p class="zen-sheet-msg">' + (e && e.message === 'limit' ? 'Openverse is limiting searches right now. Try again later, or use “From this phone”.' : (e && /^http/.test(e.message) ? 'Openverse returned an error (' + e.message.slice(5) + '). Try again, or use “From this phone”.' : 'Could not reach Openverse. Check your connection, or use “From this phone”.')) + '</p>';
           });
       }
       sh.querySelector('#zenFindGo').addEventListener('click', go);
