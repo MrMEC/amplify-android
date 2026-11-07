@@ -68,6 +68,7 @@ public class PlaybackService extends MediaLibraryService {
   static PlaybackService instance;
   CarLibrary car;
   ExoPlayer exo;
+  boolean zenRepeat = false;
   private String historyPending;
   // Play counts for items played from the car: time actually playing is added up in
   // HISTORY_STEP_MS steps; an item is recorded once it has had HISTORY_FIRST_MS, and a station
@@ -1069,6 +1070,20 @@ public class PlaybackService extends MediaLibraryService {
     public void onMediaItemTransition(MediaItem mediaItem, int i) {
       if (PlaybackService.this.player != null) {
         PlaybackService.this.player.refreshPodcast();
+      }
+      // Zen presets are one long seamless loop: repeat the item, and put repeat back for the rest.
+      try {
+        boolean zen = mediaItem != null
+            && mediaItem.mediaMetadata.extras != null
+            && mediaItem.mediaMetadata.extras.getBoolean("amplify.zen", false);
+        if (zen) {
+          PlaybackService.this.exo.setRepeatMode(androidx.media3.common.Player.REPEAT_MODE_ONE);
+          PlaybackService.this.zenRepeat = true;
+        } else if (PlaybackService.this.zenRepeat) {
+          PlaybackService.this.exo.setRepeatMode(androidx.media3.common.Player.REPEAT_MODE_OFF);
+          PlaybackService.this.zenRepeat = false;
+        }
+      } catch (RuntimeException ignored) {
       }
       if (PlaybackService.this.player == null
           || !PlaybackService.this.player.isNativeMode()

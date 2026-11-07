@@ -76,6 +76,18 @@ public final class ArtProvider extends ContentProvider {
     if (strTrim.startsWith("content:") || strTrim.startsWith("android.resource:")) {
       return Uri.parse(strTrim);
     }
+    if (strTrim.startsWith("zenart:")) {
+      String zk = safeKey(strTrim.substring(7));
+      if (zk.isEmpty()) {
+        return null;
+      }
+      return new Uri.Builder()
+          .scheme("content")
+          .authority("com.markcoleman.amplify.art")
+          .appendPath("zenart")
+          .appendPath(zk)
+          .build();
+    }
     if (strTrim.startsWith("local:")) {
       String strSafeKey = safeKey(strTrim.substring(6));
       if (strSafeKey.isEmpty()) {
@@ -108,6 +120,24 @@ public final class ArtProvider extends ContentProvider {
     if (path.size() == 2 && "local".equals(path.get(0))) {
       File f = localArt(getContext(), seg);
       if (!f.exists() || f.length() == 0) throw new FileNotFoundException("Image unavailable");
+      return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY);
+    }
+    // content://…art/zenart/<preset id>: the cover bundled with the app for a Zen preset
+    if (path.size() == 2 && "zenart".equals(path.get(0))) {
+      File dir = new File(getContext().getCacheDir(), "zenart");
+      if (!dir.exists()) dir.mkdirs();
+      File f = new File(dir, safeKey(seg) + ".jpg");
+      if (!f.exists() || f.length() == 0) {
+        try (InputStream in = getContext().getAssets().open("public/zen/car/art/" + safeKey(seg) + ".jpg");
+            FileOutputStream out = new FileOutputStream(f)) {
+          byte[] buf = new byte[16384];
+          int n;
+          while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        } catch (Exception e) {
+          f.delete();
+          throw new FileNotFoundException("Image unavailable");
+        }
+      }
       return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY);
     }
     String url;

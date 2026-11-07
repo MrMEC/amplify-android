@@ -247,6 +247,8 @@ final class CarLibrary {
     linkedHashMap.put("home:topstations", "Top Stations");
     // Build 310: stations around the phone (only listed while the phone sends some).
     linkedHashMap.put("home:nearme", "Stations Near Me");
+    // Zen (Mark): the built-in presets, last in Listen. They play as ready-made looping mixes.
+    linkedHashMap.put("home:zen", "Zen");
     linkedHashMap.put("lib:artists", "Artists");
     linkedHashMap.put("lib:albums", "Albums");
     linkedHashMap.put("lib:songs", "Songs");
@@ -270,7 +272,8 @@ final class CarLibrary {
           "home:continue",
           "tab:stations",
           "home:mixes",
-          "home:madeforyou"
+          "home:madeforyou",
+          "home:zen"
         });
     linkedHashMap2.put(
         "tab:library",
@@ -527,10 +530,8 @@ final class CarLibrary {
               }
             }
           }
-          if (arrayList.isEmpty()) {
-            arrayList.add(message("Open Amplify on your phone to load the genres."));
-            return arrayList;
-          }
+          // Zen (Mark): always the last genre.
+          arrayList.add(folder("genre:" + enc("Zen"), "Zen", null, null, null));
           break;
         // Build 231: the day's Daily Mixes, then Discover and Hear It Again.
         case "home:mixes":
@@ -666,8 +667,15 @@ final class CarLibrary {
     if (str.startsWith("show:")) {
       return showEpisodes(str.substring(5));
     }
+    if ("home:zen".equals(str)) {
+      return zenItems();
+    }
     if (str.startsWith("genre:")) {
-      return genreItems(dec(str.substring(6)));
+      String zg = dec(str.substring(6));
+      if ("zen".equalsIgnoreCase(zg.trim())) {
+        return zenItems();
+      }
+      return genreItems(zg);
     }
     if (str.startsWith("search:")) {
       List<JSONObject> list2 = this.adhoc.get(str);
@@ -1137,12 +1145,61 @@ final class CarLibrary {
     }
   }
 
+  // ---------- Zen (Mark): the built-in presets, rendered as seamless looping mixes in the app ----------
+  private static final String[][] ZEN_PRESETS = {
+    {"rainy-night", "Rainy Night", "Rain, roof and wind"},
+    {"campfire", "Campfire", "Fire, wind and birds"},
+    {"seaside-dawn", "Seaside Dawn", "Ocean, gulls and birds"},
+    {"forest-stream", "Forest Stream", "Stream, birds and wind"},
+    {"storm", "Storm", "Thunder and rain"},
+    {"cozy-cabin", "Cozy Cabin", "Fire, tin roof and rain"},
+    {"deep-sleep", "Deep Sleep", "White noise and soft rain"},
+    {"lighthouse", "Lighthouse", "Waves, gulls and wind"},
+    {"misty-morning", "Misty Morning", "Rain, birds and stream"},
+    {"deep-blue", "Deep Blue", "Underwater and waves"}
+  };
+
+  private List<JSONObject> zenItems() throws JSONException {
+    List<JSONObject> out = new ArrayList<>();
+    for (String[] p : ZEN_PRESETS) {
+      JSONObject o = new JSONObject();
+      o.put("t", "zen");
+      o.put("k", "zen-" + p[0]);
+      o.put("title", p[1]);
+      o.put("sub", p[2]);
+      o.put("art", "zenart:" + p[0]);
+      o.put("url", "asset:///public/zen/car/" + p[0] + ".ogg");
+      out.add(o);
+    }
+    return out;
+  }
+
+  private MediaItem zenPlayable(String id, JSONObject j) {
+    Bundle bundle = new Bundle();
+    bundle.putBoolean("amplify.live", true);
+    bundle.putBoolean("amplify.zen", true);
+    return new MediaItem.Builder()
+        .setMediaId(id)
+        .setMediaMetadata(
+            new MediaMetadata.Builder()
+                .setTitle(j.optString("title", "Zen"))
+                .setArtist("Zen · " + j.optString("sub"))
+                .setArtworkUri(ArtProvider.uriFor(j.optString("art")))
+                .setIsPlayable(true)
+                .setIsBrowsable(false)
+                .setMediaType(1)
+                .setExtras(bundle)
+                .build())
+        .setUri(j.optString("url"))
+        .build();
+  }
+
   private boolean isPlayable(JSONObject jSONObject) {
     String strOptString = jSONObject.optString("t");
     if ("song".equals(strOptString)) {
       return track(jSONObject.optString("id")) != null;
     }
-    if ("station".equals(strOptString) || "episode".equals(strOptString)) {
+    if ("station".equals(strOptString) || "episode".equals(strOptString) || "zen".equals(strOptString)) {
       return !jSONObject.optString("url").isEmpty();
     }
     return false;
@@ -1160,6 +1217,9 @@ final class CarLibrary {
     String str2 = str + "|" + i + "|" + keyOf(jSONObject, i);
     if ("song".equals(strOptString)) {
       return songItem(str2, jSONObject);
+    }
+    if ("zen".equals(strOptString)) {
+      return zenPlayable(str2, jSONObject);
     }
     boolean zEquals = "episode".equals(strOptString);
     String strOptString2 = jSONObject.optString("url");
