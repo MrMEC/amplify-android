@@ -1591,7 +1591,7 @@
      and the title, details and Play button sit on that blur in white (either theme). */
   /* Build 226: the room under it is padding, not margin, so a tap there belongs to the hero
      (it goes back to the first slide). */
-  .home-hero{ position:relative; margin:12px 0 0; padding-bottom:34px; width:100%; max-width:none; box-sizing:border-box; isolation:isolate; }
+  .home-hero{ position:relative; margin:12px 0 0; padding-bottom:0; width:100%; max-width:none; box-sizing:border-box; isolation:isolate; }
   /* Build 222: a strip of slides that swipes sideways and snaps one at a time; the strip is the
      card (its rounded corners clip every slide). */
   .nph-track{ display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
@@ -1609,9 +1609,9 @@
   .nph-slide.nph-tap{ cursor:pointer; }
   /* Build 223: a thin progress bar in place of the dots, in the same 78 x 6px they took
      (seven 6px dots, six 6px gaps): how far through the slides you are, no knob. */
-  .nph-progress{ position:relative; width:78px; height:6px; margin:16px auto 0; border-radius:3px; overflow:hidden;
-    background:color-mix(in srgb, var(--text-faint) 45%, transparent); }
-  .nph-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--accent); }
+  .nph-progress{ position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:3; width:78px; height:6px; margin:0; border-radius:3px; overflow:hidden; pointer-events:none;
+    background:rgba(255,255,255,.34); box-shadow:0 0 0 .5px rgba(0,0,0,.18); }
+  .nph-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:#fff; }
   /* The pictures never take a press (a drag would pick the image up, a long press open its
      menu): swipes and taps go to the slide. */
   .nph-media{ position:absolute; inset:0; overflow:hidden; background:#15161a; pointer-events:none; }
@@ -1796,12 +1796,12 @@
   .artist-hero-sub{ font-size:13.5px; color:var(--text-dim); max-width:min(560px, 92%); }
   .artist-hero-sub:not(:empty){ margin-bottom:14px; }
   /* Build 503 (Mark): Home's Favorites / Playlists / Top 100 tabs, and the Featured card under the carousel. */
-  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:18px 0 14px; }
+  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:12px 0 10px; }
   .home-group-tabs .home-tab{ flex:0 0 auto; }
   .home-group-all{ margin-left:auto; flex:0 0 auto; background:none; border:0; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; cursor:pointer; }
   body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
-  .featured-home{ margin:14px 0 0; }
-  .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:112px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
+  .featured-home{ margin:10px 0 0; }
+  .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:100px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
     border-radius:var(--r-card, 18px); overflow:hidden; color:#fff; font:inherit; cursor:pointer; isolation:isolate;
     background:linear-gradient(120deg, var(--fh-1, #2a0f3a), var(--fh-2, #d9691b)); -webkit-tap-highlight-color:transparent; }
   .fh-card.has-art{ background-size:cover; background-position:center; }
@@ -7252,6 +7252,8 @@
   .zen-mixer-head{ flex:none; display:flex; align-items:center; gap:8px; padding:10px 8px 4px 20px; }
   .zen-mixer-ttl{ flex:1 1 auto; min-width:0; font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .zen-mixer-top{ flex:none; padding:0 18px; }
+  .zen-mix-acts{ display:flex; gap:10px; margin:6px 0 10px; }
+  .zen-mix-acts .zen-btn{ flex:1; }
   .zen-mixer-body{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:4px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); }
   .zen-scrim{ position:absolute; inset:0; z-index:3; background:rgba(0,0,0,.5); opacity:0; visibility:hidden; transition:opacity .38s ease, visibility 0s linear .38s; }
   .zen-screen.mixer-open .zen-scrim{ opacity:1; visibility:visible; transition:opacity .38s ease, visibility 0s; }
@@ -7359,6 +7361,14 @@
   .zen-hero-go{ position:absolute; right:16px; bottom:16px; width:52px; height:52px; border-radius:50%; background:#f3f1f2; color:#10131a; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,.4); }
   .zen-hero-go svg{ width:24px; height:24px; fill:currentColor; }
   .zen-row-tiles .tile{ flex:none; }
+  .zen-reorder-head{ cursor:pointer; }
+  .zen-reorder-head.on{ color:var(--accent); }
+  .zen-reorder-hint{ margin:-4px 0 10px; font-size:13px; color:var(--text-dim); }
+  .zen-row-tiles.zen-reordering .tile{ animation:zenWiggle .5s ease-in-out infinite alternate; touch-action:none; }
+  @keyframes zenWiggle{ from{ transform:rotate(-.8deg); } to{ transform:rotate(.8deg); } }
+  .zen-row-tiles.zen-reordering .tile.hr-lifted{ animation:none; }
+  .hr-lifted{ position:relative; z-index:20; transition:none !important; filter:drop-shadow(0 12px 20px rgba(0,0,0,.38)); }
+  .hr-active > :not(.hr-lifted){ transition:transform .16s ease; }
   .zen-tile-art{ border-radius:14px; }
   .zen-cat-label{ grid-column:1/-1; margin:2px 0 10px; font-size:14px; font-weight:600; color:var(--text-dim); }
   .zen-chipwrap{ grid-column:1/-1; display:flex; flex-wrap:wrap; gap:10px; margin:0 0 20px; }
@@ -22886,15 +22896,20 @@
   // treats the hold as its own long press: a cover's picture can be dragged out or get a
   // menu), the picture's drag and the menu are refused while a cover is held, and the app is
   // told to skip its own long press for the moment (holdTouch).
-  (function(){
-    var grid = favoritesGrid;
-    if(!grid) return;
+  // Build 504 (Mark): made reusable (attachHoldReorder) so every list can reorder the way Favorites does.
+  // cfg: item (selector, default '.tile'), vertical (a column of rows), enabled() (default always),
+  // onDrop(keys), keyOf(el), min (fewest items, default 2), refuse (also block the picture drag/menu).
+  function attachHoldReorder(grid, cfg){
+    cfg = cfg || {};
+    if(!grid) return null;
+    var itemSel = cfg.item || '.tile', vertical = !!cfg.vertical, minItems = cfg.min || 2;
+    function keyOfEl(el){ return cfg.keyOf ? cfg.keyOf(el) : el.dataset.key; }
     var HOLD_MS = 420, SLOP = 10, EDGE = 44;
     var press = null, eatClick = false;
     var native = null;
     try{ native = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins) ? Capacitor.Plugins.AmplifyPlayer : null; }catch(e){}
     function tellNative(on){ try{ if(native && native.holdTouch) native.holdTouch({ on: !!on }).catch(function(){}); }catch(e){} }
-    function tiles(){ return Array.prototype.filter.call(grid.children, function(el){ return el.classList.contains('tile'); }); }
+    function tiles(){ return Array.prototype.filter.call(grid.children, function(el){ return el.matches(itemSel); }); }
     function stopListening(){
       document.removeEventListener('pointermove', onPointerMove, true);
       document.removeEventListener('pointerup', onPointerUp, true);
@@ -22931,14 +22946,35 @@
       press.active = true;
       var t = press.tile, r = t.getBoundingClientRect();
       press.grabX = press.x - r.left; press.grabY = press.y - r.top;
-      grid.classList.add('fav-reordering');
-      t.classList.add('fav-dragging');
+      grid.classList.add('fav-reordering', 'hr-active');
+      t.classList.add('fav-dragging', 'hr-lifted');
       place();
       try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
       press.raf = requestAnimationFrame(tick);
     }
     // The held cover follows the finger; crossing the middle of a neighbour swaps them.
+    function placeVertical(){
+      var t = press.tile, others = tiles().filter(function(el){ return el !== t; });
+      t.style.transform = 'none';
+      for(var i = 0; i < others.length; i++){
+        var o = others[i], r = o.getBoundingClientRect();
+        if(press.y < r.top || press.y > r.bottom) continue;
+        var tIdx = tiles().indexOf(t), oIdx = tiles().indexOf(o), mid = r.top + r.height / 2;
+        if(oIdx > tIdx && press.y > mid) grid.insertBefore(t, o.nextSibling);
+        else if(oIdx < tIdx && press.y < mid) grid.insertBefore(t, o);
+        break;
+      }
+      if(others.length){
+        var lastR = others[others.length - 1].getBoundingClientRect(), firstR = others[0].getBoundingClientRect();
+        if(press.y > lastR.bottom && others[others.length - 1].nextSibling !== t) grid.insertBefore(t, others[others.length - 1].nextSibling);
+        else if(press.y < firstR.top && others[0].previousSibling !== t) grid.insertBefore(t, others[0]);
+      }
+      t.style.transform = 'none';
+      var base = t.getBoundingClientRect();
+      t.style.transform = 'translate(0px,' + Math.round(press.y - press.grabY - base.top) + 'px) scale(1.02)';
+    }
     function place(){
+      if(vertical) return placeVertical();
       var t = press.tile;
       var others = tiles().filter(function(el){ return el !== t; });
       // Past the last cover (or before the first) it goes to that end.
@@ -22974,6 +23010,13 @@
     // Near either end the row scrolls on its own so a cover can go anywhere in it.
     function tick(){
       if(!press || !press.active) return;
+      if(vertical){
+        var vh = window.innerHeight || 700, vs = 0;
+        if(press.y < 90) vs = -Math.ceil((90 - press.y) / 4); else if(press.y > vh - 130) vs = Math.ceil((press.y - (vh - 130)) / 4);
+        if(vs){ var sy0 = window.scrollY; window.scrollBy(0, vs); if(window.scrollY !== sy0) place(); }
+        press.raf = requestAnimationFrame(tick);
+        return;
+      }
       var g = grid.getBoundingClientRect(), step = 0;
       var L = Math.max(g.left, 0), R = Math.min(g.right, window.innerWidth || g.right);
       if(press.x < L + EDGE) step = -Math.ceil((L + EDGE - press.x) / 4);
@@ -22997,10 +23040,10 @@
       cancelPress();
       if(!was) return;
       eatClick = true; setTimeout(function(){ eatClick = false; }, 400);
-      t.classList.remove('fav-dragging');
+      t.classList.remove('fav-dragging', 'hr-lifted');
       t.style.transform = '';
-      grid.classList.remove('fav-reordering');
-      saveHomeFavRowOrder(tiles().map(function(el){ return el.dataset.key; }));
+      grid.classList.remove('fav-reordering', 'hr-active');
+      if(cfg.onDrop) cfg.onDrop(tiles().map(keyOfEl));
     }
     function touchOf(e){
       if(!press) return null;
@@ -23033,8 +23076,9 @@
       finish();
     }
     function tileFor(target){
-      var t = target && target.closest ? target.closest('.tile') : null;
-      return t && t.parentElement === grid && tiles().length >= 2 ? t : null;
+      if(cfg.enabled && !cfg.enabled()) return null;
+      var t = target && target.closest ? target.closest(itemSel) : null;
+      return t && t.parentElement === grid && tiles().length >= minItems ? t : null;
     }
     grid.addEventListener('touchstart', function(e){
       if(e.touches.length !== 1){ cancelPress(); return; }
@@ -23049,13 +23093,15 @@
       begin(t, 'mouse', e.pointerId, e.clientX, e.clientY);
     });
     // No menu or picture-drag while a cover is pressed (on a phone either one takes the touch away).
-    function refuse(e){ if(press || (e.target && e.target.closest && e.target.closest('#favoritesGrid'))) e.preventDefault(); }
+    function refuse(e){ if(press || ((!cfg.enabled || cfg.enabled()) && e.target && grid.contains(e.target))) e.preventDefault(); }
     document.addEventListener('contextmenu', refuse, true);
     document.addEventListener('dragstart', refuse, true);
     document.addEventListener('selectstart', function(e){ if(press) e.preventDefault(); }, true);
     grid.addEventListener('click', function(e){ if(eatClick){ eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
-    window.__amplifyHomeFavDrag = { holdMs: HOLD_MS };
-  })();
+    return { holdMs: HOLD_MS };
+  }
+  var favHoldReorder = attachHoldReorder(favoritesGrid, { item: '.tile', onDrop: function(keys){ saveHomeFavRowOrder(keys); } });
+  window.__amplifyHomeFavDrag = favHoldReorder || { holdMs: 420 };
   // Saves the Home row in this order. In A to Z there's no order to keep, so a drag switches
   // Favorites to Manual (the last Manual choice), starting from the A to Z order as shown.
   function saveHomeFavRowOrder(keys){
@@ -33207,6 +33253,7 @@
   var zenState = (function(){ try{ var v = JSON.parse(localStorage.getItem(ZEN_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
   zenState.presets = Array.isArray(zenState.presets) ? zenState.presets : [];   // the listener's own mixes
   zenState.art = zenState.art && typeof zenState.art === 'object' ? zenState.art : {};   // preset id -> {k:'scene',v} | {k:'photo'}
+  zenState.edits = zenState.edits && typeof zenState.edits === 'object' && !Array.isArray(zenState.edits) ? zenState.edits : {};   // built-in preset id -> saved mix [{id,v}] (Build 504)
   zenState.clips = Array.isArray(zenState.clips) ? zenState.clips : [];   // added sounds {id,n,c,cr}
   var zenPhotos = (function(){ try{ var v = JSON.parse(localStorage.getItem(ZEN_PHOTOS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
   function zenSave(){
@@ -33225,7 +33272,7 @@
       .sort(function(a, b){ return a.k - b.k; }).map(function(x){ return x.p; });
   }
   function zenAllPresetsRaw(){
-    return ZEN_PRESETS.map(function(p){ return { id: p.id, n: p.n, art: p.art, built: true, s: p.s.map(function(x){ return { id: x[0], v: x[1] }; }) }; })
+    return ZEN_PRESETS.map(function(p){ var ed = zenState.edits[p.id]; return { id: p.id, n: p.n, art: p.art, built: true, edited: Array.isArray(ed), s: Array.isArray(ed) ? ed.map(function(x){ return { id: x.id, v: x.v }; }) : p.s.map(function(x){ return { id: x[0], v: x[1] }; }) }; })
       .concat(zenState.presets.map(function(p){ return { id: p.id, n: p.n, art: p.art || 'stars', built: false, s: (p.s || []).map(function(x){ return { id: x.id, v: x.v }; }) }; }));
   }
   function zenPreset(id){ var a = zenAllPresets(); for(var i = 0; i < a.length; i++) if(a[i].id === id) return a[i]; return null; }
@@ -33772,7 +33819,7 @@
     zenPresetsRender();
     if(zenMixOpen && !zenSliding) zenMixBodyRender();
   }
-  var zenSliding = false;
+  var zenSliding = false, zenReordering = false;
   function zenSubText(){
     if(zenTimerEnd) return 'Sleep timer · ' + zenLeft();
     var names = zenMix.map(function(m){ var s = zenSound(m.id); return s ? s.n : ''; }).filter(Boolean);
@@ -33855,12 +33902,12 @@
   // tap, or hold for the menu
   function zenPress(el, onTap, onHold){
     var t = 0, held = false, sx = 0, sy = 0;
-    el.addEventListener('pointerdown', function(e){ held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(function(){ held = true; if(onHold) onHold(); }, 520); });
+    el.addEventListener('pointerdown', function(e){ if(zenReordering){ held = false; return; } held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(function(){ held = true; if(onHold) onHold(); }, 520); });
     function cancel(){ clearTimeout(t); }
     el.addEventListener('pointerup', cancel); el.addEventListener('pointercancel', cancel); el.addEventListener('pointerleave', cancel);
     el.addEventListener('pointermove', function(e){ if(Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) cancel(); });
     el.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-    el.addEventListener('click', function(e){ if(held){ held = false; e.preventDefault(); e.stopPropagation(); return; } onTap(e); });
+    el.addEventListener('click', function(e){ if(zenReordering){ e.preventDefault(); e.stopPropagation(); return; } if(held){ held = false; e.preventDefault(); e.stopPropagation(); return; } onTap(e); });
   }
   function zenMixBodyRender(){
     var body = zenEl.querySelector('#zenMixBody'), mx = zenEl.querySelector('#zenMixer'), topEl = zenEl.querySelector('#zenMixTop');
@@ -33875,6 +33922,12 @@
     h += '</div>';
     var cats = ['All'].concat(ZEN_CATS); if(zenAllSounds().some(function(s){ return s.user; })) cats.push('Added');
     h += '<div class="zen-tabs">' + cats.map(function(c){ return '<button type="button" class="zen-tab' + (c === zenTab ? ' on' : '') + '" data-tab="' + c + '">' + c + '</button>'; }).join('') + '</div>';
+    // Build 504: Save changes / Restore sit under the sliders whenever a preset is open and its mix has changed (or a saved edit exists).
+    var cp = zenCur ? zenPreset(zenCur) : null, canSave = !!(cp && zenDirty), canRestore = !!(cp && (zenDirty || cp.edited));
+    if(canSave || canRestore){
+      h += '<div class="zen-mix-acts">' + (canSave ? '<button type="button" class="zen-btn zen-btn-main" id="zenMixSave">Save changes</button>' : '')
+        + (canRestore ? '<button type="button" class="zen-btn" id="zenMixRestore">' + (cp.built && cp.edited && !zenDirty ? 'Restore default' : (cp.built && cp.edited ? 'Restore default' : 'Undo changes')) + '</button>' : '') + '</div>';
+    }
     var hTop = h; h = '';
     h += '<div class="zen-grid">';
     zenAllSounds().filter(function(s){ return zenTab === 'All' || (zenTab === 'Added' ? s.user : s.c === zenTab); }).forEach(function(s){
@@ -33886,6 +33939,13 @@
     body.innerHTML = h; topEl.innerHTML = hTop;
     body.scrollTop = top;
     var tb = topEl.querySelector('.zen-tabs'); if(tb) tb.scrollLeft = tabsX;
+    var msv = topEl.querySelector('#zenMixSave'), mrs = topEl.querySelector('#zenMixRestore');
+    if(msv) msv.addEventListener('click', function(){ var q = zenPreset(zenCur); if(q){ zenUpdatePreset(q); setStatus('\u201c' + q.n + '\u201d saved.'); } });
+    if(mrs) mrs.addEventListener('click', function(){
+      var q = zenPreset(zenCur); if(!q) return;
+      if(q.built && q.edited){ zenRestorePreset(q, true); setStatus('\u201c' + q.n + '\u201d is back to its default mix.'); }
+      else zenRestorePreset(q, false);
+    });
     Array.prototype.forEach.call(mx.querySelectorAll('.zen-slider input'), function(inp){
       var id = inp.parentNode.dataset.id;
       inp.addEventListener('pointerdown', function(){ zenSliding = true; });
@@ -33951,6 +34011,10 @@
       rows.push(['art', 'Change artwork']);
       rows.push(['timer', zenTimerEnd ? 'Sleep timer (' + zenLeft() + ' left)' : 'Sleep timer']);
       if(!p.built){ rows.push(['update', 'Replace “' + p.n + '” with this mix']); rows.push(['rename', 'Rename']); rows.push(['delete', 'Delete']); }
+      else {
+        if(zenCur === p.id && zenDirty) rows.push(['update', 'Save changes to “' + p.n + '”']);
+        if(p.edited) rows.push(['restore', 'Restore default mix']);
+      }
     } else { rows.push(['art', 'Change artwork']); rows.push(['timer', zenTimerEnd ? 'Sleep timer (' + zenLeft() + ' left)' : 'Sleep timer']); }
     if(p){
       var zi = zenHeroItem(p.id);
@@ -33958,9 +34022,8 @@
       rows.push(['queue', 'Add to Queue']);
     }
     rows.push(['add', 'Add sounds']);
-    rows.push(['reorder', 'Reorder presets']);
-    zenSheetOpen('<div class="zen-sheet-title">' + (p ? zenEsc(p.n) : 'Custom mix') + '</div><div class="zen-list">' + rows.map(function(r){
-      var ic = { save: 'save', fav: 'star', queue: 'queue', art: 'image', timer: 'timer', update: 'refresh', rename: 'pencil', 'delete': 'trash', add: 'plus', reorder: 'reorder' }[r[0]] || 'note';
+        zenSheetOpen('<div class="zen-sheet-title">' + (p ? zenEsc(p.n) : 'Custom mix') + '</div><div class="zen-list">' + rows.map(function(r){
+      var ic = { save: 'save', fav: 'star', queue: 'queue', art: 'image', timer: 'timer', update: 'refresh', restore: 'refresh', rename: 'pencil', 'delete': 'trash', add: 'plus', reorder: 'reorder' }[r[0]] || 'note';
       return '<button type="button" class="zen-row' + (r[0] === 'delete' ? ' danger' : '') + '" data-a="' + r[0] + '"><span class="zen-row-ic">' + zenSvg(ic) + '</span><span>' + zenEsc(r[1]) + '</span></button>';
     }).join('') + '</div>', function(sh){
       Array.prototype.forEach.call(sh.querySelectorAll('.zen-row'), function(b){
@@ -33975,7 +34038,7 @@
           else if(a === 'fav'){ var fi = zenHeroItem(p.id); if(fi){ toggleFavorite(fi); setStatus(isFavorite(fi) ? '\u201c' + p.n + '\u201d added to Favorites.' : '\u201c' + p.n + '\u201d removed from Favorites.'); } zenSheetClose(); }
           else if(a === 'queue'){ var qi = zenHeroItem(p.id); if(qi) queueAddToEnd([qi]); zenSheetClose(); }
           else if(a === 'add') zenAddSheet();
-          else if(a === 'reorder') zenReorderSheet();
+          else if(a === 'restore'){ zenRestorePreset(p, true); zenSheetClose(); setStatus('\u201c' + p.n + '\u201d is back to its default mix.'); }
         });
       });
     });
@@ -34009,8 +34072,17 @@
     });
   }
   function zenUpdatePreset(p){
-    zenState.presets.forEach(function(x){ if(x.id === p.id) x.s = zenMix.map(function(m){ return { id: m.id, v: Math.round(m.v * 100) / 100 }; }); });
+    var mix = zenMix.map(function(m){ return { id: m.id, v: Math.round(m.v * 100) / 100 }; });
+    if(p.built) zenState.edits[p.id] = mix;      // Build 504: a built-in preset keeps your edit; Restore brings the original back
+    else zenState.presets.forEach(function(x){ if(x.id === p.id) x.s = mix; });
     zenSave(); zenCur = p.id; zenDirty = false; zenRemember(); zenSyncUi();
+    try{ zenRefreshLists(); }catch(e){}
+  }
+  // Puts the preset back to how it was last saved (a built-in one: to the original mix).
+  function zenRestorePreset(p, toDefault){
+    if(p.built && toDefault){ delete zenState.edits[p.id]; zenSave(); }
+    zenSelect(p.id, false);
+    try{ zenRefreshLists(); }catch(e){}
   }
   function zenDelete(p){
     zenSheetClose();
@@ -34336,14 +34408,35 @@
     resetStationsGrid();
     stationsGrid.classList.remove('grid-songs');
     document.body.classList.add('genres-open');
-    function head(text){ var h = document.createElement('h2'); h.className = 'gb-head'; h.textContent = text; stationsGrid.appendChild(h); }
+    function head(text){ var h = document.createElement('h2'); h.className = 'gb-head'; h.textContent = text; stationsGrid.appendChild(h); return h; }
     stationsGrid.appendChild(zenHeroEl(false));
     var all = zenAllPresets(), mine = all.filter(function(p){ return !p.built; });
-    if(mine.length){ head('My mixes'); stationsGrid.appendChild(zenPresetRow(mine)); }
-    head('Presets'); stationsGrid.appendChild(zenPresetRow(all.filter(function(p){ return p.built; })));
-    var ro = document.createElement('button'); ro.type = 'button'; ro.className = 'zen-addbtn'; ro.innerHTML = '<span>Reorder presets</span>';
-    ro.addEventListener('click', function(){ zenReorderSheet(); });
-    stationsGrid.appendChild(ro);
+    var rows = [];
+    if(mine.length){ head('My mixes'); var r1 = zenPresetRow(mine); rows.push(r1); stationsGrid.appendChild(r1); }
+    // Build 504 (Mark): the Presets heading is the way into reordering (no Reorder button): tap it, then press and hold a preset and drag.
+    var ph = head('Presets'); ph.classList.add('zen-reorder-head'); ph.tabIndex = 0; ph.setAttribute('role', 'button');
+    var r2 = zenPresetRow(all.filter(function(p){ return p.built; })); rows.push(r2); stationsGrid.appendChild(r2);
+    function setReorder(on){
+      zenReordering = on;
+      ph.classList.toggle('on', on);
+      ph.textContent = on ? 'Presets \u00b7 Done' : 'Presets';
+      ph.setAttribute('aria-pressed', on ? 'true' : 'false');
+      rows.forEach(function(r){ r.classList.toggle('zen-reordering', on); });
+      zenHint.hidden = !on;
+    }
+    var zenHint = document.createElement('div'); zenHint.className = 'zen-reorder-hint'; zenHint.hidden = true; zenHint.textContent = 'Press and hold a preset, then drag it to a new place.';
+    stationsGrid.insertBefore(zenHint, r2);
+    ph.addEventListener('click', function(){ setReorder(!zenReordering); });
+    ph.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); setReorder(!zenReordering); } });
+    rows.forEach(function(r){
+      attachHoldReorder(r, { item: '.tile', enabled: function(){ return zenReordering; }, onDrop: function(){
+        var ids = [];
+        rows.forEach(function(rr){ Array.prototype.forEach.call(rr.children, function(t){ if(t.dataset && t.dataset.key) ids.push(t.dataset.key.replace(/^zen:/, '')); }); });
+        zenAllPresets().forEach(function(pp){ if(ids.indexOf(pp.id) < 0) ids.push(pp.id); });
+        zenState.order = ids; zenSave(); try{ zenRefreshLists(); }catch(e){} if(zenOpen) zenPresetsRender();
+      } });
+    });
+    zenReordering = false;
     head('Sounds');
     var cats = ZEN_CATS.slice(); if(zenState.clips.length) cats.push('Added');
     cats.forEach(function(c){

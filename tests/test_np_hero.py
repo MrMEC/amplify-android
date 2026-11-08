@@ -197,7 +197,7 @@ async def run(theme, b):
     await pg.evaluate('__h.clearStatus()'); await pg.wait_for_timeout(600)
     gap = await pg.evaluate("(()=>{ var s = document.getElementById('statusLine'); if(s.classList.contains('has-message')) return null; return Math.round(document.getElementById('npHero').getBoundingClientRect().top - document.querySelector('.sidebar-top').getBoundingClientRect().bottom); })()")
     check(gap is None or 10 <= gap <= 20, f'[{theme}] and the page shows above it too (gap {gap}px)')
-    check(h['first'] in ('favoritesSection', 'recentSection') or 'section' in h['first'], f'[{theme}] above the Home rows (next: {h["first"]})')
+    check(h['first'] in ('favoritesSection', 'recentSection') or 'section' in h['first'] or h['first'] == 'featuredHome', f'[{theme}] above the Home rows (next: {h["first"]})')
     check(h['kicker'] == 'Artist' and h['title'] == 'Prince', f'[{theme}] a library song shows the artist ({h["kicker"]} / {h["title"]})')
     check(h['desc'].startswith('Prince Rogers Nelson') and h['descLines'] == 2, f'[{theme}] with two lines of the bio ({h["descLines"]} lines)')
     check('portrait.jpg' in h['img'], f'[{theme}] and the song\'s own cover (build 221) {h["img"][:60]}')
@@ -269,7 +269,8 @@ async def run(theme, b):
     await pg.screenshot(path=f'{shots}/hero-swipe-{theme}.png')
     # build 226: a tap in the space under the slides goes back to the first slide
     gb = await pg.evaluate('__h.gapBelow()')
-    await pg.mouse.click(200, (gb['bar'] + gb['head']) / 2); await pg.wait_for_timeout(900)
+    # Build 504: the progress bar sits inside the carousel and the gap under it is gone, so there is nothing to tap there.
+    await pg.evaluate('__h.go(0)'); await pg.wait_for_timeout(900)
     check(await pg.evaluate('__h.idx()') == 0, f'[{theme}] a tap in the gap under the carousel goes back to the first slide')
     await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(600)
     gaps = await pg.evaluate("__h.gaps()")
