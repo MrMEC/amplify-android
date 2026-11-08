@@ -65,7 +65,7 @@ async def load(pg):
     await pg.wait_for_timeout(1200)
     await pg.evaluate("try{ document.getElementById('addMusicOverlay').classList.remove('open'); hideImportPanel(); setStatus('', false); }catch(e){}")
 CARDS="Array.from(document.querySelectorAll('#stationsGrid .gb-card')).map(function(c){return c.dataset.genre;})"
-CHIPS="(()=>{var b=document.getElementById('artistHeroGenres');return {shown:b.style.display!=='none',chips:Array.from(b.querySelectorAll('.artist-genre-chip')).map(function(c){return c.textContent;})};})()"
+CHIPS="(()=>{var b=document.getElementById('artistGenres');return {shown:!!b,chips:b?Array.from(b.querySelectorAll('.artist-genre-chip')).map(function(c){return c.textContent;}):[]};})()"
 async def run(b, scheme, w, h):
     T=f'[{scheme} {w}]'
     ctx = await b.new_context(viewport={'width': w, 'height': h}, device_scale_factor=2, is_mobile=w < 900, has_touch=w < 900, color_scheme=scheme)
@@ -85,10 +85,14 @@ async def run(b, scheme, w, h):
     await pg.evaluate("__t.ev(\"openArtistPage(artistMatchKey('Ann'))\")"); await pg.wait_for_timeout(1500)
     c = await pg.evaluate(CHIPS)
     check(c['shown'] and c['chips']==['Rock','Synthpop'], f'{T} Ann shows her genres {c}')
-    geo = await pg.evaluate("""(()=>{var b=document.getElementById('artistHeroGenres').getBoundingClientRect(),n=document.getElementById('artistHeroName').getBoundingClientRect(),a=document.getElementById('artistPlayBtn').getBoundingClientRect();
-      return {gap1:Math.round(b.top-n.bottom),gap2:Math.round(a.top-b.bottom),inside:b.left>=0&&b.right<=innerWidth,sw:document.documentElement.scrollWidth,vw:innerWidth};})()""")
-    check(geo['gap1']>=0 and geo['gap2']>=8 and geo['inside'] and geo['sw']<=geo['vw'], f'{T} chips sit between the name and the controls {geo}')
+    geo = await pg.evaluate("""(()=>{var g=document.getElementById('stationsGrid'),labels=Array.from(g.querySelectorAll('.grid-section-label')),al=labels.filter(function(l){return /^Albums/.test(l.textContent);})[0],gh=labels.filter(function(l){return /^Genres/.test(l.textContent);})[0],box=g.querySelector('.artist-albums'),ch=document.getElementById('artistGenres');
+      var gcs=gh?getComputedStyle(gh):null,acs=al?getComputedStyle(al):null;
+      return {hasHero:!!document.getElementById('artistHeroGenres'),below:!!(gh&&box&&gh.getBoundingClientRect().top>=box.getBoundingClientRect().bottom),chipsUnder:!!(gh&&ch&&ch.getBoundingClientRect().top>=gh.getBoundingClientRect().bottom),
+        same:!!(gcs&&acs&&gcs.fontSize===acs.fontSize&&gcs.fontWeight===acs.fontWeight&&gcs.color===acs.color),last:g.lastElementChild===ch,inside:!!ch&&ch.getBoundingClientRect().right<=innerWidth,sw:document.documentElement.scrollWidth,vw:innerWidth};})()""")
+    check(not geo['hasHero'] and geo['below'] and geo['chipsUnder'] and geo['same'] and geo['last'] and geo['inside'] and geo['sw']<=geo['vw'], f'{T} Genres heading + tags sit below the albums, styled like Albums {geo}')
     await pg.screenshot(path=f'{shots}/libgenres-artist-{scheme}-{w}.png')
+    await pg.evaluate("document.getElementById('artistGenres').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(500)
+    await pg.screenshot(path=f'{shots}/libgenres-artist-bottom-{scheme}-{w}.png')
     await pg.evaluate("document.querySelectorAll('.artist-genre-chip')[1].click()"); await pg.wait_for_timeout(1200)
     gp = await pg.evaluate("""(()=>{var g=document.getElementById('stationsGrid');return {title:(g.querySelector('.gp-title')||{}).textContent,heads:Array.from(g.querySelectorAll('.gp-head')).map(function(h){return h.textContent;}),
       artists:Array.from(g.querySelectorAll('.gp-artists > .tile .tile-name')).map(function(e){return e.textContent;}),songs:Array.from(g.querySelectorAll('.gp-songs .song-row:not(.shuffle-all-row) .song-row-title')).map(function(e){return e.textContent;}),chips:Array.from(g.querySelectorAll('.gp-chip')).map(function(e){return e.textContent;}),sw:document.documentElement.scrollWidth,vw:innerWidth};})()""")
@@ -108,6 +112,45 @@ async def run(b, scheme, w, h):
     check('New Wave' in cards and 'Synth-Pop' in cards, f'{T} her genres join the list {cards[-6:]}')
     await pg.evaluate("__t.ev(\"openArtistPage(artistMatchKey('Eve'))\")"); await pg.wait_for_timeout(1200)
     check(len(mbcalls)-n0==2, f'{T} no second lookup')
+    # manual edit: Ann -> remove Synthpop, add Shoegaze
+    await pg.evaluate("__t.ev(\"openArtistPage(artistMatchKey('Ann'))\")"); await pg.wait_for_timeout(1500)
+    await pg.evaluate("document.getElementById('artistGenresEditBtn').click()"); await pg.wait_for_timeout(500)
+    await pg.screenshot(path=f'{shots}/libgenres-edit-{scheme}-{w}.png')
+    await pg.evaluate("(()=>{var r=document.querySelectorAll('#genreEditRows .genre-edit-row');r[1].querySelector('.genre-edit-x').click();var i=document.getElementById('genreEditAddInput');i.value='shoegaze';document.getElementById('genreEditAddBtn').click();var r2=document.querySelectorAll('#genreEditRows .genre-edit-input');r2[0].value='Classic Rock';})()")
+    await pg.evaluate("document.getElementById('genreEditSaveBtn').click()"); await pg.wait_for_timeout(800)
+    c = await pg.evaluate(CHIPS)
+    check(c['chips']==['Classic Rock','Shoegaze'], f'{T} manual add/edit/remove {c}')
+    await pg.screenshot(path=f'{shots}/libgenres-edited-{scheme}-{w}.png')
+    await pg.evaluate("document.querySelectorAll('.artist-genre-chip')[1].click()"); await pg.wait_for_timeout(1200)
+    gp = await pg.evaluate("(document.querySelector('#stationsGrid .gp-title')||{}).textContent+'|'+Array.from(document.querySelectorAll('#stationsGrid .gp-songs .song-row:not(.shuffle-all-row) .song-row-title')).map(function(e){return e.textContent;}).sort().join(',')")
+    check(gp=='Shoegaze|Ann One,Ann Three,Ann Two', f'{T} manual genre finds all her songs {gp}')
+    # rename: Shoegaze -> Dream Pop (manual labels follow)
+    await pg.screenshot(path=f'{shots}/libgenres-renamebtn-{scheme}-{w}.png')
+    await pg.evaluate("document.getElementById('genreRenameBtn').click()"); await pg.wait_for_timeout(400)
+    await pg.screenshot(path=f'{shots}/libgenres-rename-{scheme}-{w}.png')
+    await pg.evaluate("(()=>{document.querySelector('#genreEditRows .genre-edit-input').value='Dream Pop';document.getElementById('genreEditSaveBtn').click();})()"); await pg.wait_for_timeout(2500)
+    gt = await pg.evaluate("(document.querySelector('#stationsGrid .gp-title')||{}).textContent")
+    man = await pg.evaluate("JSON.stringify(artistGenreManual[artistMatchKey('Ann')])" if False else "__t.ev(\"JSON.stringify(artistGenreManual[artistMatchKey('Ann')])\")")
+    check(gt=='Dream Pop' and 'Dream Pop' in str(man), f'{T} rename opens the new genre and follows manual genres {gt} {man}')
+    await pg.evaluate("__t.home()"); await pg.wait_for_timeout(800)
+    cards = await pg.evaluate(CARDS)
+    check('Dream Pop' in cards and 'Shoegaze' not in cards, f'{T} renamed genre in the list')
+    # sort
+    await pg.evaluate("document.querySelector('#stationsGrid .gb-edit').click()"); await pg.wait_for_timeout(700)
+    await pg.screenshot(path=f'{shots}/libgenres-sort-{scheme}-{w}.png')
+    await pg.evaluate("document.querySelector('#genreSortOpts [data-opt=az]').click()"); await pg.wait_for_timeout(600)
+    names = await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .tile[data-entity=genre] .tile-name')).map(function(e){return e.textContent;})")
+    drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile[data-entity=genre][draggable=true], #stationsGrid .tile[data-entity=genre] [draggable=true]').length")
+    check(names==sorted(names, key=str.lower) and len(names)>=18 and drag==0, f'{T} A to Z sorts and locks dragging {names[:5]} drag={drag}')
+    await pg.evaluate("document.querySelector('#genreSortOpts [data-opt=manual]').click()"); await pg.wait_for_timeout(600)
+    drag = await pg.evaluate("document.querySelectorAll('#stationsGrid .tile[data-entity=genre][draggable=true], #stationsGrid .tile[data-entity=genre] [draggable=true]').length")
+    check(drag>0, f'{T} Manually allows dragging {drag}')
+    # rename a genre carried by song tags: the songs themselves change
+    await pg.evaluate("__t.ev(\"openGenre('Trip-Hop')\")"); await pg.wait_for_timeout(1500)
+    await pg.evaluate("document.getElementById('genreRenameBtn').click()"); await pg.wait_for_timeout(300)
+    await pg.evaluate("(()=>{document.querySelector('#genreEditRows .genre-edit-input').value='Triphop';document.getElementById('genreEditSaveBtn').click();})()"); await pg.wait_for_timeout(5000)
+    gs = await pg.evaluate("__t.ev(\"JSON.stringify(libraryTracks.filter(function(t){return /trip/i.test(t.genre||'');}).map(function(t){return t.artist+':'+t.genre;}).sort())\")")
+    check('Triphop' in gs and 'Trip-Hop' not in gs, f'{T} rename rewrites the songs\' genre {gs}')
     check(not errs, f'{T} no page errors {errs}')
     await ctx.close()
 async def main():

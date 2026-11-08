@@ -1795,12 +1795,16 @@
   }
   .artist-hero-sub{ font-size:13.5px; color:var(--text-dim); max-width:min(560px, 92%); }
   .artist-hero-sub:not(:empty){ margin-bottom:14px; }
-  /* Build 501 (Mark): the artist's genres under the name; each opens that genre. */
-  .artist-hero-genres{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; max-width:min(560px, 92%); margin:2px 0 0; }
-  .artist-genre-chip{ flex:0 0 auto; max-width:100%; min-height:30px; padding:5px 13px; border-radius:var(--r-pill, 999px); border:1px solid rgba(255,255,255,.34);
-    background:rgba(255,255,255,.16); color:#fff; font:inherit; font-size:12.5px; font-weight:600; line-height:1.2; cursor:pointer; text-shadow:0 1px 6px rgba(0,0,0,.35);
-    -webkit-tap-highlight-color:transparent; }
-  .artist-genre-chip:active{ background:rgba(255,255,255,.28); }
+  /* Build 502 (Mark): the artist's genres close the page, under the albums. */
+  .tile-grid > .artist-genres-head{ margin:-2px 0 -22px; }
+  .artist-genres-edit{ margin-left:auto; flex:0 0 auto; height:30px; padding:0 14px; border-radius:var(--r-pill, 999px); border:1px solid var(--border); background:none;
+    color:var(--text); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .artist-genres{ grid-column:1/-1; display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  .artist-genre-chip{ max-width:100%; height:auto; min-height:36px; padding:7px 15px; line-height:1.2; text-align:left; }
+  .genre-edit-row{ display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+  .genre-edit-row .art-url-input{ flex:1 1 auto; min-width:0; }
+  .genre-edit-x{ flex:0 0 40px; width:40px; height:40px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--text-dim); font-size:15px; cursor:pointer; }
+  .genre-edit-note{ margin:4px 0 0; font-size:12.5px; color:var(--text-dim); min-height:1em; }
   .gp-row.gp-artists > .tile{ flex:0 0 var(--w-artist); width:var(--w-artist); }
   .artist-hero-actions{
     display:flex; align-items:center; justify-content:center; gap:16px; width:100%;
@@ -8002,7 +8006,6 @@
             <div class="artist-hero-thumb" id="artistHeroThumb" aria-hidden="true"></div>
             <div class="artist-hero-name" id="artistHeroName"></div>
             <div class="artist-hero-sub" id="artistHeroSub"></div>
-            <div class="artist-hero-genres" id="artistHeroGenres" style="display:none;"></div>
             <div class="artist-hero-actions">
               <!-- Build 268: the row always has a control left of Play. With no songs of their
                    own (so no Shuffle), Favorite takes that place; it is left out of the menu
@@ -9251,6 +9254,31 @@
         <button type="button" class="art-url-search-btn" id="artistInfoNoneBtn">Show no info</button>
       </div>
       <button type="button" class="art-url-search-btn" id="artistInfoResetBtn">Reset to automatic</button>
+    </div>
+  </div>
+</div>
+
+<!-- Build 502 (Mark): add, edit and remove an artist's genres by hand; also renames a whole genre. -->
+<div class="settings-overlay" id="genreEditOverlay">
+  <div class="settings-panel" id="genreEditPanel" role="dialog" aria-labelledby="genreEditTitle">
+    <div class="settings-header">
+      <h2 id="genreEditTitle">Edit genres</h2>
+      <button class="settings-close" id="genreEditCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="art-url-body">
+      <p class="artist-info-lede" id="genreEditLede"></p>
+      <div id="genreEditRows"></div>
+      <div class="art-url-input-row" id="genreEditAddRow">
+        <input type="text" class="art-url-input" id="genreEditAddInput" placeholder="Add a genre" enterkeyhint="done" autocomplete="off" maxlength="40">
+        <button type="button" class="art-url-search-btn" id="genreEditAddBtn">Add</button>
+      </div>
+      <div class="genre-edit-note" id="genreEditNote"></div>
+    </div>
+    <div class="art-url-actions">
+      <div class="art-url-actions-left">
+        <button type="button" class="art-url-search-btn" id="genreEditResetBtn">Reset to automatic</button>
+      </div>
+      <button type="button" class="art-url-search-btn" id="genreEditSaveBtn">Save</button>
     </div>
   </div>
 </div>
@@ -22663,7 +22691,7 @@
     var order = Array.prototype.map.call(stationsGrid.querySelectorAll('.tile[data-entity="genre"]'), function(el){
       return el.dataset.reorderId;
     });
-    if(order.length === genreOrder.length){
+    if(genreSort === 'manual' && order.length === genreOrder.length){
       genreOrder = order;
       saveGenreOrder();
     }
@@ -31305,6 +31333,220 @@
     b.addEventListener('click', function(e){ e.stopPropagation(); setGenresEditing(!genresEditing); });
     return b;
   }
+
+  // ---------- Build 502 (Mark): edit an artist's genres by hand, and rename a genre everywhere ----------
+  var genreEditOverlay = document.getElementById('genreEditOverlay');
+  var genreEditState = null;
+  var GENRE_EDIT_MAX = 12;
+  function genreEditEls(){
+    return { title: document.getElementById('genreEditTitle'), lede: document.getElementById('genreEditLede'), rows: document.getElementById('genreEditRows'),
+      addRow: document.getElementById('genreEditAddRow'), addIn: document.getElementById('genreEditAddInput'), note: document.getElementById('genreEditNote'),
+      reset: document.getElementById('genreEditResetBtn'), save: document.getElementById('genreEditSaveBtn') };
+  }
+  function genreEditNote(msg){ genreEditEls().note.textContent = msg || ''; }
+  function genreEditAddRow(value){
+    var e = genreEditEls(), row = document.createElement('div');
+    row.className = 'genre-edit-row';
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'art-url-input genre-edit-input'; inp.value = value; inp.maxLength = 40; inp.setAttribute('aria-label', 'Genre');
+    inp.autocomplete = 'off';
+    row.appendChild(inp);
+    if(genreEditState.mode === 'artist'){
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'genre-edit-x'; x.setAttribute('aria-label', 'Remove ' + (value || 'genre'));
+      x.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+      x.addEventListener('click', function(){ row.remove(); genreEditNote(''); });
+      row.appendChild(x);
+    }
+    e.rows.appendChild(row);
+    return inp;
+  }
+  function genreEditValues(){
+    var vals = [];
+    Array.prototype.forEach.call(genreEditEls().rows.querySelectorAll('.genre-edit-input'), function(i){ vals.push(i.value); });
+    return vals;
+  }
+  function openGenreEditDialog(o){
+    var e = genreEditEls();
+    genreEditState = o;
+    e.rows.innerHTML = ''; e.addIn.value = ''; genreEditNote('');
+    if(o.mode === 'rename'){
+      e.title.textContent = 'Rename genre';
+      e.lede.textContent = 'Every song in your library tagged “' + o.old + '” is changed to the new name.';
+      e.addRow.hidden = true; e.reset.parentNode.hidden = true;
+      genreEditAddRow(o.old);
+      e.save.textContent = 'Rename';
+    } else {
+      e.title.textContent = 'Edit genres';
+      e.lede.textContent = 'The genres shown for ' + o.entry.name + '. Edit a name, remove one or add your own.';
+      e.addRow.hidden = false; e.reset.parentNode.hidden = false;
+      artistGenres(o.entry.key).forEach(function(g){ genreEditAddRow(g.label); });
+      e.reset.hidden = !artistGenreManual[o.entry.key];
+      e.save.textContent = 'Save';
+    }
+    genreEditOverlay.classList.add('open');
+  }
+  function closeGenreEditDialog(){ genreEditOverlay.classList.remove('open'); genreEditState = null; }
+  function genreEditAddFromInput(){
+    var e = genreEditEls(), v = e.addIn.value.trim();
+    if(!v) return;
+    if(genreEditValues().length >= GENRE_EDIT_MAX){ genreEditNote('An artist can have up to ' + GENRE_EDIT_MAX + ' genres.'); return; }
+    genreEditAddRow(v); e.addIn.value = ''; genreEditNote('');
+  }
+  // Each box may hold one genre or several ("Rock / Pop"); the labels come back deduplicated.
+  function genreEditLabels(vals){
+    var keys = [];
+    vals.forEach(function(v){ genreKeysOfText(v).forEach(function(k){ if(keys.indexOf(k) === -1) keys.push(k); }); });
+    return keys.map(genreLabelOf);
+  }
+  function saveArtistGenreEdit(){
+    var st = genreEditState, e = genreEditEls();
+    var pending = e.addIn.value.trim();
+    var vals = genreEditValues(); if(pending) vals.push(pending);
+    var labels = genreEditLabels(vals).slice(0, GENRE_EDIT_MAX);
+    artistGenreManual[st.entry.key] = labels;
+    saveArtistGenreManual();
+    libGenreVersion++;
+    syncLibraryGenres();
+    var entry = st.entry;
+    closeGenreEditDialog();
+    renderArtistGenres(entry);
+    try{ renderGenreNav(); }catch(err){}
+  }
+  function resetArtistGenreEdit(){
+    var st = genreEditState;
+    delete artistGenreManual[st.entry.key];
+    saveArtistGenreManual();
+    libGenreVersion++;
+    syncLibraryGenres();
+    var entry = st.entry;
+    closeGenreEditDialog();
+    renderArtistGenres(entry);
+    ensureArtistGenres(entry).then(function(changed){ if(changed && activeArtistKey === entry.key) renderArtistGenres(entry); });
+    try{ renderGenreNav(); }catch(err){}
+  }
+  // "Rock/Indie" with Rock renamed becomes "Alt/Indie": only the matching part changes.
+  function renameInGenreText(text, oldKey, newName){
+    var parts = String(text || '').split(/([\/,;|]+)/);
+    for(var i = 0; i < parts.length; i += 2){
+      var raw = parts[i];
+      if(genreKeyOf(raw) === oldKey){
+        var lead = (raw.match(/^\s*/) || [''])[0], trail = (raw.match(/\s*$/) || [''])[0];
+        parts[i] = lead + newName + trail;
+      }
+    }
+    return parts.join('');
+  }
+  function renameGenreMeta(oldKey, newName){
+    var newKey = genreKeyOf(newName), oldLabel = genreLabelOf(oldKey);
+    Object.keys(artistGenreManual).forEach(function(ak){
+      var l = artistGenreManual[ak];
+      if(Array.isArray(l)) artistGenreManual[ak] = l.map(function(x){ return genreKeyOf(x) === oldKey ? newName : x; });
+    });
+    saveArtistGenreManual();
+    Object.keys(artistGenreCache).forEach(function(ak){
+      var r = artistGenreCache[ak];
+      if(r && Array.isArray(r.g)) r.g = r.g.map(function(x){ return genreKeyOf(x) === oldKey ? newName : x; });
+    });
+    saveArtistGenres();
+    var seen = {};
+    genreOrder = genreOrder.map(function(g){ return genreKeyOf(g) === oldKey && !isBuiltinGenre(g) ? newName : g; }).filter(function(g){
+      var k = g.toLowerCase(); if(seen[k]) return false; seen[k] = 1; return true; });
+    saveGenreOrder();
+    var ok = oldLabel.toLowerCase(), nk = newName.toLowerCase();
+    if(genrePrefs[ok] && !genrePrefs[nk] && !isBuiltinGenre(oldLabel)){ genrePrefs[nk] = genrePrefs[ok]; delete genrePrefs[ok]; saveGenrePrefs(); }
+    libGenreVersion++;
+  }
+  function renameGenre(oldLabel, newName){
+    var oldKey = genreKeyOf(oldLabel);
+    var tracks = libraryTracks.filter(function(t){ return !isBlacklisted(t) && trackGenreKeys(t).indexOf(oldKey) !== -1; });
+    function changesFor(doc, t){
+      var cur = (doc.values && doc.values.genre) || t.genre || '';
+      var next = renameInGenreText(cur, oldKey, newName);
+      return next !== cur ? { genre: next } : {};
+    }
+    function done(res){
+      renameGenreMeta(oldKey, newName);
+      syncLibraryGenres();
+      var msg = tracks.length ? batchSummary(res, 'The new genre') : 'Genre renamed.';
+      showNotice({ kind: res.skipped.length ? 'info' : 'done', title: 'Renamed to “' + newName + '”', message: msg, autoClose: res.skipped.length ? 0 : 2500 });
+      try{ renderGenreNav(); }catch(err){}
+      searchByTag(newName);
+    }
+    function failed(err){
+      if(err && err.code === 'NO_WRITE'){
+        showNotice({ kind: 'info', title: 'Permission needed', message: folderPermissionText(err.tree), actions: [
+          { label: 'Cancel' },
+          { label: 'Allow', primary: true, run: function(){
+            askFolderWrite(err.tree).then(function(r){
+              if(r !== 'ok'){ showNotice({ kind: 'info', message: r === 'other' ? 'That was a different folder. Try renaming again and choose “' + folderNameOfTree(err.tree) + '”.' : 'The rest wasn’t renamed. Try again to continue.' }); return; }
+              showNotice({ kind: 'working', title: 'Renaming genre', message: 'Continuing…' });
+              err.resume().then(done, failed);
+            }, function(){ showNotice({ kind: 'error', message: 'Permission wasn’t given, so the rest wasn’t renamed.' }); });
+          } }
+        ] });
+        return;
+      }
+      showNotice({ kind: 'error', title: 'Couldn’t rename', message: (err && err.message) || 'The genre could not be renamed.' });
+    }
+    if(!tracks.length){ done({ saved: [], skipped: [], unchanged: [], appOnly: [] }); return; }
+    showNotice({ kind: 'working', title: 'Renaming genre', message: 'Updating 0 of ' + tracks.length + ' songs…' });
+    saveTagsToTracks(tracks, changesFor, function(i, total){
+      var m = document.getElementById('noticeMsg'); if(m) m.textContent = 'Updating ' + (i + 1) + ' of ' + total + ' songs…';
+    }).then(done, failed);
+  }
+  function saveGenreRename(){
+    var st = genreEditState, e = genreEditEls();
+    var v = (genreEditValues()[0] || '').trim();
+    if(!v){ genreEditNote('Type a name.'); return; }
+    if(/[\/,;|]/.test(v)){ genreEditNote('Use one genre name, without / , ; or |.'); return; }
+    var keys = genreKeysOfText(v);
+    if(keys.length !== 1){ genreEditNote('That isn’t a usable genre name.'); return; }
+    var oldLabel = st.old, newName = /[A-Z]/.test(v) ? v.replace(/\s+/g, ' ') : genreLabelOf(keys[0]);
+    if(newName === oldLabel){ closeGenreEditDialog(); return; }
+    closeGenreEditDialog();
+    renameGenre(oldLabel, newName);
+  }
+  document.getElementById('genreEditCloseBtn').addEventListener('click', closeGenreEditDialog);
+  genreEditOverlay.addEventListener('click', function(ev){ if(ev.target === genreEditOverlay) closeGenreEditDialog(); });
+  document.getElementById('genreEditAddBtn').addEventListener('click', genreEditAddFromInput);
+  document.getElementById('genreEditAddInput').addEventListener('keydown', function(ev){ if(ev.key === 'Enter'){ ev.preventDefault(); genreEditAddFromInput(); } });
+  document.getElementById('genreEditResetBtn').addEventListener('click', resetArtistGenreEdit);
+  document.getElementById('genreEditSaveBtn').addEventListener('click', function(){
+    if(!genreEditState) return;
+    if(genreEditState.mode === 'rename') saveGenreRename(); else saveArtistGenreEdit();
+  });
+  document.getElementById('genreEditRows').addEventListener('keydown', function(ev){
+    if(ev.key === 'Enter' && genreEditState && genreEditState.mode === 'rename'){ ev.preventDefault(); saveGenreRename(); }
+  });
+
+  // ---------- Build 502: Genres sorted A to Z or by hand ----------
+  var GENRE_SORT_KEY = 'radioPlayerGenreSort';
+  var genreSort = (function(){ try{ return localStorage.getItem(GENRE_SORT_KEY) === 'az' ? 'az' : 'manual'; }catch(e){ return 'manual'; } })();
+  function genreDisplayOrder(){
+    return genreSort === 'az' ? genreOrder.slice().sort(function(a, b){ return a.localeCompare(b, undefined, { sensitivity: 'base' }); }) : genreOrder;
+  }
+  function genreSortOptions(){
+    var box = document.createElement('div');
+    box.className = 'ch-sort-opts'; box.id = 'genreSortOpts';
+    var line = document.createElement('div'); line.className = 'ch-sort-line';
+    var label = document.createElement('span'); label.className = 'ch-sort-label'; label.textContent = 'Order'; line.appendChild(label);
+    var tabs = document.createElement('div'); tabs.className = 'home-tabs ch-sort-tabs'; tabs.setAttribute('role', 'radiogroup'); tabs.setAttribute('aria-label', 'Order');
+    [['az', 'A to Z'], ['manual', 'Manually']].forEach(function(o){
+      var b = document.createElement('button'), on = genreSort === o[0];
+      b.type = 'button'; b.className = 'home-tab' + (on ? ' active' : ''); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.dataset.opt = o[0]; b.textContent = o[1];
+      b.addEventListener('click', function(){
+        if(genreSort === o[0]) return;
+        genreSort = o[0];
+        try{ localStorage.setItem(GENRE_SORT_KEY, genreSort); }catch(e){}
+        renderGenresRows();
+      });
+      tabs.appendChild(b);
+    });
+    line.appendChild(tabs); box.appendChild(line);
+    return box;
+  }
   function renderGenresRows(){
     resetStationsGrid();
     if(onGenresHomeView){
@@ -31313,7 +31555,8 @@
       head.appendChild(genresEditBtn('Done'));
       stationsGrid.appendChild(head);
     }
-    genreOrder.forEach(function(g){
+    stationsGrid.appendChild(genreSortOptions());
+    genreDisplayOrder().forEach(function(g){
       stationsGrid.appendChild(buildEntityTile({
         key: 'genre-' + g,
         reorderId: g,
@@ -31322,7 +31565,7 @@
         row: true,
         // Each genre's own icon (see GENRE_ICONS), in place of a placeholder cover.
         renderArt: function(art){ genreIconArt(art, g); },
-        draggable: genresEditing,
+        draggable: genresEditing && genreSort === 'manual',
         onReorder: function(){ reorderGenresFromGrid(); renderGenreNav(); },
         onClick: function(){ pushView(); searchInput.value = ''; searchByTag(g); }
       }));
@@ -31450,6 +31693,18 @@
   var genreKeyCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
   var artistGenreCache = (function(){ try{ var v = JSON.parse(localStorage.getItem(ARTIST_GENRE_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
   var artistGenreSaveTimer = null, artistGenrePending = {};
+  // Build 502 (Mark): genres set by hand for an artist ({ artistKey: [labels] }, [] = none). They replace
+  // what the songs and MusicBrainz say for that artist, for all of their songs.
+  var ARTIST_GENRE_MANUAL_KEY = 'radioPlayerArtistGenresManual';
+  var artistGenreManual = (function(){ try{ var v = JSON.parse(localStorage.getItem(ARTIST_GENRE_MANUAL_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
+  function saveArtistGenreManual(){ try{ localStorage.setItem(ARTIST_GENRE_MANUAL_KEY, JSON.stringify(artistGenreManual)); }catch(e){} }
+  function manualGenreKeys(ak){
+    var m = artistGenreManual[ak];
+    if(!Array.isArray(m)) return null;
+    var out = [];
+    m.forEach(function(l){ var k = genreKeyOf(l); if(k && out.indexOf(k) === -1) out.push(k); });
+    return out;
+  }
   function saveArtistGenres(){
     if(artistGenreSaveTimer) return;
     artistGenreSaveTimer = setTimeout(function(){ artistGenreSaveTimer = null; try{ localStorage.setItem(ARTIST_GENRE_KEY, JSON.stringify(artistGenreCache)); }catch(e){} }, 500);
@@ -31480,7 +31735,7 @@
   function libraryGenreIndex(){
     var sig = libraryTracks.length + '|' + libGenreVersion + '|' + blacklist.length;
     if(libGenreIdx && sig === libGenreSig) return libGenreIdx;
-    var byGenre = {}, byArtist = {}, own = {}, noOwn = {};
+    var byGenre = {}, byArtist = {}, own = {}, noOwn = {}, manualN = {};
     function bump(k, ak, n){
       var e = byGenre[k] || (byGenre[k] = { key: k, songs: 0, artists: {} });
       e.songs += n; e.artists[ak] = (e.artists[ak] || 0) + n;
@@ -31491,10 +31746,12 @@
       if(isBlacklisted(t)) return;
       var ak = artistMatchKey((t.artist || '').trim() || UNKNOWN_ARTIST);
       if(!ak) return;
+      if(manualGenreKeys(ak)){ manualN[ak] = (manualN[ak] || 0) + 1; return; }
       var keys = trackGenreKeys(t);
       if(keys.length){ own[ak] = 1; keys.forEach(function(k){ bump(k, ak, 1); }); }
       else noOwn[ak] = (noOwn[ak] || 0) + 1;
     });
+    Object.keys(manualN).forEach(function(ak){ manualGenreKeys(ak).forEach(function(k){ bump(k, ak, manualN[ak]); }); });
     Object.keys(noOwn).forEach(function(ak){
       if(own[ak]) return;
       artistLevelKeys(ak).forEach(function(k){ bump(k, ak, noOwn[ak]); });
@@ -31505,6 +31762,8 @@
   }
   // An artist's genre tags, strongest first: the top one, and any other holding a fifth of their tagged songs.
   function artistGenres(ak){
+    var man = manualGenreKeys(ak);
+    if(man) return man.map(function(k){ return { key: k, label: genreLabelOf(k) }; });
     var m = libraryGenreIndex().byArtist[ak], arr = [];
     if(m){
       var total = 0;
@@ -31582,6 +31841,7 @@
   function ensureArtistGenres(entry){
     var ak = entry.key, name = entry.name;
     if(!name || name === UNKNOWN_ARTIST || name === VARIOUS_ARTISTS) return Promise.resolve(false);
+    if(artistGenreManual[ak]) return Promise.resolve(false);   // set by hand
     if(libraryGenreIndex().byArtist[ak] && !artistGenreCache[ak]) return Promise.resolve(false);   // their songs carry genres
     var r = artistGenreCache[ak];
     if(r && Date.now() - (r.t || 0) < ((r.g && r.g.length) ? 90 : 7) * 86400000) return Promise.resolve(false);
@@ -31596,18 +31856,34 @@
     })['catch'](function(){ delete artistGenrePending[ak]; return false; });
     return artistGenrePending[ak];
   }
+  // Build 502 (Mark): the artist's genres sit at the bottom of the artist page, under Albums, with a
+  // Genres heading like the others; each tag opens that genre and Edit changes them by hand.
   function renderArtistGenres(entry){
-    var box = document.getElementById('artistHeroGenres');
-    if(!box) return;
-    box.innerHTML = '';
+    if(!entry || activeArtistKey !== entry.key) return;
+    Array.prototype.slice.call(stationsGrid.querySelectorAll('[data-genres-sec]')).forEach(function(n){ n.remove(); });
+    if(!stationsGrid.querySelector('.tile, .empty-state') || stationsGrid.querySelector('.empty-state')) return;
     var list = artistGenres(entry.key);
-    box.style.display = list.length ? '' : 'none';
+    var head = document.createElement('div');
+    head.className = 'grid-section-label artist-genres-head'; head.setAttribute('data-genres-sec', '1');
+    var t = document.createElement('span'); t.textContent = 'Genres'; head.appendChild(t);
+    if(list.length){ var c = document.createElement('span'); c.className = 'grid-section-count'; c.textContent = String(list.length); head.appendChild(c); }
+    var eb = document.createElement('button');
+    eb.type = 'button'; eb.className = 'artist-genres-edit'; eb.id = 'artistGenresEditBtn';
+    eb.textContent = list.length ? 'Edit' : 'Add';
+    eb.setAttribute('aria-label', list.length ? 'Edit genres' : 'Add genres');
+    eb.addEventListener('click', function(){ openGenreEditDialog({ mode: 'artist', entry: entry }); });
+    head.appendChild(eb);
+    stationsGrid.appendChild(head);
+    if(!list.length) return;
+    var box = document.createElement('div');
+    box.className = 'artist-genres'; box.id = 'artistGenres'; box.setAttribute('data-genres-sec', '1');
     list.forEach(function(g){
       var b = document.createElement('button');
-      b.type = 'button'; b.className = 'artist-genre-chip'; b.textContent = g.label;
+      b.type = 'button'; b.className = 'gp-chip artist-genre-chip'; b.textContent = g.label;
       b.addEventListener('click', function(){ openGenre(g.label); });
       box.appendChild(b);
     });
+    stationsGrid.appendChild(box);
   }
   // Genres whose one tag finds too little in the directory: the stations come from several exact
   // tags (and a name) instead. An exact tag, because 'rain' would also find 'train' and 'spa'
@@ -31699,7 +31975,7 @@
     }
     allHeadText.textContent = 'Browse categories';
     var grid = document.createElement('div'); grid.className = 'gb-grid';
-    var cards = genreOrder.map(function(g){
+    var cards = genreDisplayOrder().map(function(g){
       var look = genreLook(g), card = document.createElement('button');
       card.type = 'button'; card.className = 'gb-card'; card.style.setProperty('--gc', look.color); card.dataset.genre = g;
       card.innerHTML = '<span class="gb-card-name"></span>' + genreIconSvg(g, 'gb-card-icon');
@@ -41151,6 +41427,9 @@
     syncArtistVideos(entry);
     // Build 389: and what archive.org has of theirs, under it.
     syncArtistArchive(entry);
+    // Build 502: their genres close the page, under the albums.
+    renderArtistGenres(entry);
+    ensureArtistGenres(entry).then(function(changed){ if(changed && activeArtistKey === entry.key) renderArtistGenres(entry); });
   }
 
   // ---------- the artist's albums, ten at a time ----------
@@ -42402,8 +42681,6 @@
       });
     };
 
-    renderArtistGenres(entry);
-    ensureArtistGenres(entry).then(function(changed){ if(changed && activeArtistKey === entry.key) renderArtistGenres(entry); });
     renderArtistBio(entry);
     // The lookup happens here and nowhere else: opening one artist's page is a deliberate
     // act, where a single request is proportionate.
@@ -45079,10 +45356,12 @@
         if(isDisneyExcluded(t)) return false;
         if(isDisneyTrack(t)) return true;
       }
-      var tg = stationTags(t);
-      if(!tg.length) tg = artistLevelKeys(artistMatchKey((t.artist || '').trim() || UNKNOWN_ARTIST));   // an untagged song takes its artist's genres
+      var ak = artistMatchKey((t.artist || '').trim() || UNKNOWN_ARTIST), man = manualGenreKeys(ak);
+      var tg = man || stationTags(t);
+      if(!tg.length) tg = artistLevelKeys(ak);   // an untagged song takes its artist's genres
       if(tg.some(function(x){ return genreTagMatch(x, want); })) return true;
-      return !!wantKey && (trackGenreKeys(t).indexOf(wantKey) !== -1 || (!stationTags(t).length && tg.indexOf(wantKey) !== -1));
+      var ks = man || (trackGenreKeys(t).length ? trackGenreKeys(t) : artistLevelKeys(ak));
+      return !!wantKey && ks.indexOf(wantKey) !== -1;
     });
   }
 
@@ -49920,6 +50199,15 @@
     if(vcount) bits.push(vcount + (vcount === 1 ? ' movie or show' : ' movies and shows'));
     meta.textContent = bits.join(' \u00b7 ');
     acts.appendChild(meta);
+    // Build 502 (Mark): rename the genre on every library song that has it.
+    var gkey = genreKeyOf(g.tag);
+    if(gkey && libraryGenreIndex().byGenre[gkey]){
+      var ren = document.createElement('button');
+      ren.type = 'button'; ren.className = 'gp-round'; ren.id = 'genreRenameBtn'; ren.setAttribute('aria-label', 'Rename ' + g.tag); ren.title = 'Rename genre';
+      ren.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>';
+      ren.addEventListener('click', function(){ openGenreEditDialog({ mode: 'rename', old: g.tag }); });
+      acts.appendChild(ren);
+    }
     stationsGrid.appendChild(acts);
     var subs = look.subs.length ? look.subs : derivedGenreSubs(g.tag);
     if(subs.length){
@@ -50868,6 +51156,8 @@
       stationPlaylists: stationPlaylists,
       blacklist: blacklist,
       genreOrder: genreOrder,
+      genreSort: genreSort,
+      artistGenresManual: artistGenreManual,
       podcastSubscriptions: podcastSubs,
       podcastCategories: podcastCategories,
       videoChannels: videoChannels,
@@ -51260,6 +51550,17 @@
           genreOrder = importedGenreOrder;
           saveGenreOrder();
           genreOrderAdded = true;
+        }
+
+        if(data.artistGenresManual && typeof data.artistGenresManual === 'object'){
+          Object.keys(data.artistGenresManual).forEach(function(ak){
+            var l = data.artistGenresManual[ak];
+            if(!artistGenreManual[ak] && Array.isArray(l)) artistGenreManual[ak] = l.filter(function(x){ return typeof x === 'string' && x.length <= 40; }).slice(0, GENRE_EDIT_MAX);
+          });
+          saveArtistGenreManual(); libGenreVersion++;
+        }
+        if(localStorage.getItem(GENRE_SORT_KEY) === null && (data.genreSort === 'az' || data.genreSort === 'manual')){
+          genreSort = data.genreSort; try{ localStorage.setItem(GENRE_SORT_KEY, genreSort); }catch(e){}
         }
 
         var importedFavorites = Array.isArray(data.favorites) ? data.favorites : [];
