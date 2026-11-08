@@ -32238,6 +32238,8 @@
     { id: 'misty-morning', n: 'Misty Morning', art: 'mist', s: [['calm-rain', .4], ['birds', .5], ['dove', .3], ['stream', .25]] },
     { id: 'deep-blue', n: 'Deep Blue', art: 'deep', s: [['stream', .2], ['underwater', .9]] }
   ];
+  // Default animated artwork bundled in the app (filled in by scripts/fetch-zen-art.sh at build time).
+  var ZEN_BUNDLED = [];
   var ZEN_ART_NAMES = { 'rainy-night': 'Rainy night', campfire: 'Campfire', 'sea-dawn': 'Sea at dawn', forest: 'Forest', storm: 'Storm', cabin: 'Cabin', stars: 'Starry night', lighthouse: 'Lighthouse', mist: 'Misty morning', deep: 'Deep blue' };
 
   // ----- saved state -----
@@ -32379,6 +32381,7 @@
     if(a && a.k === 'photo' && zenPhotos[p.id]) return zenPhotos[p.id];
     if(a && a.k === 'url' && a.v) return a.v;
     if(a && a.k === 'scene' && ZEN_SCENES[a.v]) return zenSceneUrl(a.v);
+    if(p && ZEN_BUNDLED.indexOf(p.id) >= 0) return 'zen/art/' + p.id + '.gif';
     return zenSceneUrl(p && ZEN_SCENES[p.art] ? p.art : 'stars');
   }
   function zenPaint(el, p){ el.style.backgroundImage = 'url("' + zenArtOf(p) + '")'; el.style.backgroundSize = 'cover'; el.style.backgroundPosition = 'center'; }
@@ -32835,7 +32838,7 @@
     var url = p ? zenArtOf(p) : zenSceneUrl('stars');
     if(zenTintCache[url]){ zenSetTint(zenTintCache[url]); return; }
     var a = p && zenState.art[p.id], key = null;
-    if(!a) key = p && ZEN_SCENES[p.art] ? p.art : 'stars';
+    if(!a){ if(!(p && ZEN_BUNDLED.indexOf(p.id) >= 0)) key = p && ZEN_SCENES[p.art] ? p.art : 'stars'; }
     else if(a.k === 'scene' && ZEN_SCENES[a.v]) key = a.v;
     if(key){ zenTintCache[url] = zenSceneTint(key); zenSetTint(zenTintCache[url]); return; }
     zenSetTint(zenSceneTint('stars'));
