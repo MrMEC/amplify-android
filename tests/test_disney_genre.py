@@ -133,7 +133,7 @@ async def main():
         # build 435: More Disney stations come before Podcasts, Movies and TV shows
         await pg.evaluate("window.__dz.many(); window.__dz.open('Disney')"); await pg.wait_for_timeout(1500)
         heads = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-head'), h => h.textContent)")
-        check([h for h in heads if h != 'Artist radio'] == ['Top stations', 'In your library', 'More Disney stations', 'Podcasts', 'Movies', 'TV shows'],   # build 448 adds Artist radio
+        check([h for h in heads if h != 'Artist radio'] == ['Top stations', 'Artists in your library', 'In your library', 'More Disney stations', 'Podcasts', 'Movies', 'TV shows'],   # build 448 adds Artist radio
               f'build 435: More Disney stations sits above Podcasts and Movies {heads}')
         await pg.evaluate("document.querySelectorAll('.gp-head')[2].scrollIntoView({block:'start'}); window.scrollBy(0, -80)"); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'{SHOTS}/disney-more-stations.png')
