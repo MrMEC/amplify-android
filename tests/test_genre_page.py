@@ -169,7 +169,7 @@ async def run(b, scheme, w, h, full):
     check(p['heroFull'] and p['backOnHero'], f'{T} the header runs edge to edge with Back on it')
     check(p['play'] and p['meta'] == '14 stations · 3 songs in your library', f'{T} Play and Shuffle, and what there is {p["meta"]!r}')
     check(p['chips'][:2] == ['Classic Rock', 'Alternative'], f'{T} related styles as chips {p["chips"]}')
-    check(p['heads'] == ['Top stations', 'Artists in your library', 'In your library', 'More Rock stations'] and p['top'] == 10 and p['more'] == 4, f'{T} Top stations (10), In your library, More stations (4) {p["heads"]} {p["top"]} {p["more"]}')
+    check(p['heads'] == ['Top stations', 'In your library', 'More Rock stations', 'Artists in your library'] and p['top'] == 10 and p['more'] == 4, f'{T} Top stations (10), In your library, More stations (4) {p["heads"]} {p["top"]} {p["more"]}')
     check(p['songs'] == ['Rock One', 'Rock Three', 'Rock Two'] and p['shuffleAll'] and not p['seeAll'], f'{T} the library\'s Rock songs with Shuffle All {p["songs"]}')
     check(p['sw'] <= p['vw'], f'{T} nothing scrolls sideways on the genre page')
     await pg.screenshot(path=f'{shots}/genre-page-{scheme}-{w}.png')
@@ -192,7 +192,7 @@ async def run(b, scheme, w, h, full):
     # Jazz: songs only
     await pg.evaluate("__t.genre('Jazz')"); await pg.wait_for_timeout(1500)
     p = await pg.evaluate(GP)
-    check(p['heads'] == ['Artists in your library', 'In your library'] and p['songs'] == ['Jazz Tune'] and p['play'] and not p['spinner'], f'{T} songs only: just In your library, and Play works {p["heads"]}')
+    check(p['heads'] == ['In your library', 'Artists in your library'] and p['songs'] == ['Jazz Tune'] and p['play'] and not p['spinner'], f'{T} songs only: just In your library, and Play works {p["heads"]}')
     await pg.evaluate("document.querySelector('.gp-play').click()"); await pg.wait_for_timeout(1500)
     q = await pg.evaluate('__t.q()')
     check(q['cur'] == 'Jazz Tune', f'{T} Play plays the song {q["cur"]}')

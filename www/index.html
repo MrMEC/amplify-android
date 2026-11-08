@@ -50398,38 +50398,6 @@
       krow._ctxList = park;
       stationsGrid.appendChild(krow);
     }
-    // Build 447: artist radio.
-    if(radio.length){
-      head('Artist radio');
-      var arow = document.createElement('div');
-      arow.className = 'gp-row gp-artist-radio';
-      radio.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'radio'; arow.appendChild(t); });
-      arow._ctxList = radio;
-      stationsGrid.appendChild(arow);
-    }
-    // Build 501 (Mark): the library's artists in this genre.
-    var gArtists = genreArtistsOf(songs);
-    if(gArtists.length){
-      head('Artists in your library');
-      if(g.allArtists){
-        var agrid = document.createElement('div');
-        agrid.className = 'tile-grid grid-artists gp-grid gp-artist-list';
-        gArtists.forEach(function(e){ agrid.appendChild(buildArtistTile(e)); });
-        stationsGrid.appendChild(agrid);
-      } else {
-        var artrow = document.createElement('div');
-        artrow.className = 'gp-row gp-artists';
-        gArtists.slice(0, 20).forEach(function(e){ artrow.appendChild(buildArtistTile(e)); });
-        stationsGrid.appendChild(artrow);
-      }
-      if(gArtists.length > 20){
-        var amore = document.createElement('button');
-        amore.type = 'button'; amore.className = 'gp-more';
-        amore.textContent = g.allArtists ? 'Show fewer' : 'Show more';
-        amore.addEventListener('click', function(){ g.allArtists = !g.allArtists; var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); });
-        stationsGrid.appendChild(amore);
-      }
-    }
     if(songs.length){
       head('In your library');
       var list = document.createElement('div');
@@ -50473,6 +50441,39 @@
       srow.className = 'gp-row';
       g.shows.forEach(function(sh){ srow.appendChild(buildShowTile(sh)); });
       stationsGrid.appendChild(srow);
+    }
+    // Build 503 (Mark): Artist radio and the library's artists close the page.
+    // Build 447: artist radio.
+    if(radio.length){
+      head('Artist radio');
+      var arow = document.createElement('div');
+      arow.className = 'gp-row gp-artist-radio';
+      radio.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'radio'; arow.appendChild(t); });
+      arow._ctxList = radio;
+      stationsGrid.appendChild(arow);
+    }
+    // Build 501 (Mark): the library's artists in this genre.
+    var gArtists = genreArtistsOf(songs);
+    if(gArtists.length){
+      head('Artists in your library');
+      if(g.allArtists){
+        var agrid = document.createElement('div');
+        agrid.className = 'tile-grid grid-artists gp-grid gp-artist-list';
+        gArtists.forEach(function(e){ agrid.appendChild(buildArtistTile(e)); });
+        stationsGrid.appendChild(agrid);
+      } else {
+        var artrow = document.createElement('div');
+        artrow.className = 'gp-row gp-artists';
+        gArtists.slice(0, 20).forEach(function(e){ artrow.appendChild(buildArtistTile(e)); });
+        stationsGrid.appendChild(artrow);
+      }
+      if(gArtists.length > 20){
+        var amore = document.createElement('button');
+        amore.type = 'button'; amore.className = 'gp-more';
+        amore.textContent = g.allArtists ? 'Show fewer' : 'Show more';
+        amore.addEventListener('click', function(){ g.allArtists = !g.allArtists; var y = window.scrollY; renderGenrePage(); window.scrollTo(0, y); });
+        stationsGrid.appendChild(amore);
+      }
     }
     // Build 436 (Mark): Restore sits at the bottom of the page.
     var gp = genrePrefs[String(g.tag).toLowerCase()];
