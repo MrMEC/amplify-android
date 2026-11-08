@@ -94,7 +94,8 @@ async def main():
         r = await pg.evaluate(ROW)
         print(r)
         check(r['shown'] and r['heading'] == 'Playlists', f'Home shows a Playlists row {r["heading"]}')
-        check(r['after'] == 'latestPodcastsSection', f'right under Latest Podcasts (after {r["after"]})')
+        # Build 503: Favorites, Playlists and Top 100 are tabs under the carousel, so Playlists follows Favorites.
+        check(r['after'] in ('latestPodcastsSection', 'favoritesSection'), f'under Favorites in the tab group (after {r["after"]})')
         check(r['names'] == ['Mix', 'Empty', 'Extra 0', 'Extra 1', 'Extra 2', 'Extra 3'], f'every playlist, in the Playlists page order {r["names"]}')
         check(r['subs'][:2] == ['1 item', '0 items'], f'each with how much is in it {r["subs"][:2]}')
         # build 258: two rows in one sideways scroller, filled down then across (1 over 2, 3 over 4, ...)

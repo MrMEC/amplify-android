@@ -190,12 +190,13 @@ async def run(theme, b):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
 
-    # ---- Home row
+    # ---- Home row (Build 503: Top 100 is a tab under the carousel; open it)
+    await pg.evaluate("__h.ev(\"homeGroupTab='top100'; syncHomeGroup();\")"); await pg.wait_for_timeout(400)
     home = await pg.evaluate("""(()=>{ const s = document.getElementById('top100Section'), g = document.getElementById('top100HomeGrid');
       const t = [...g.querySelectorAll('.tile')]; return { shown: s && getComputedStyle(s).display !== 'none', n: t.length,
       first: t[0] ? t[0].querySelector('.tile-name').textContent + ' / ' + (t[0].querySelector('.tile-sub')||{}).textContent : '',
       row: g.classList.contains('home-row') || (g.parentElement && g.parentElement.classList.contains('home-row')),
-      before: !!(s && s.nextElementSibling && s.nextElementSibling.id === 'nearMeSection' && s.nextElementSibling.nextElementSibling.id === 'dailyHomeSections' && s.nextElementSibling.nextElementSibling.nextElementSibling.id === 'madeForYouSection') }; })()""")
+      before: (function(){ var ids=['top100Section','nearMeSection','dailyHomeSections','madeForYouSection'].map(function(x){return document.getElementById(x);}); if(ids.some(function(x){return !x;})) return false; for(var k=1;k<ids.length;k++){ if(!(ids[k-1].compareDocumentPosition(ids[k]) & Node.DOCUMENT_POSITION_FOLLOWING)) return false; } return true; })() }; })()""")
     print(theme, home)
     check(home['shown'] and home['n'] == 20 and home['first'] == '1. Patient Zero / Taylor Swift', f'{theme}: Home shows a Top 100 row of this week\'s top 20 {home}')
     check(home['before'], f'{theme}: Top 100, then Stations Near Me (build 310), the daily rows (build 219), then Made for You')

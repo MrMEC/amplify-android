@@ -62,7 +62,7 @@ async def run(theme, w, h):
             gaps.append((a['name'], nx['name'], nx['headTop'] - a['boxBottom'], nx['headTop'] - (a['inkBottom'] or a['boxBottom'])))
         for g in gaps: print(T, g)
         names = [x['name'] for x in r]
-        check(any('Top Artists' in n for n in names) and any('Hear It Again' in n for n in names) and any('Playlists' in n for n in names) and any(n == 'Kay' for n in names), f'{T} the busy Home has every kind of row {names}')
+        check(any('Top Artists' in n for n in names) and any('Hear It Again' in n for n in names) and ('homeGroupTabs' in names) and any(n == 'Kay' for n in names), f'{T} the busy Home has every kind of row {names}')
         vals = sorted(set(g[2] for g in gaps))
         check(len(gaps) >= 8 and vals[-1] - vals[0] <= 1 and vals[0] == 40, f'{T} every section ends 40px above the next heading {vals}')
         ink = [g[3] - g[2] for g in gaps]

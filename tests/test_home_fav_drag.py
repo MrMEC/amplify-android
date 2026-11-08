@@ -153,6 +153,7 @@ async def main():
             check(await pg.evaluate('__d.cur()') == before[0], f'{T} a tap still plays {await pg.evaluate("__d.cur()")}')
             # mouse: press, hold, drag
             await pg.evaluate("document.getElementById('favoritesGrid').scrollLeft = 0"); await pg.wait_for_timeout(300)
+            await pg.evaluate("document.getElementById('favoritesGrid').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(300)
             cur_row = await pg.evaluate('__d.row()')
             ra = await pg.evaluate("__d.rect('" + cur_row[0] + "')"); rb = await pg.evaluate("__d.rect('" + cur_row[1] + "')")
             await pg.mouse.move(ra['x'], ra['y']); await pg.mouse.down(); await pg.wait_for_timeout(650)

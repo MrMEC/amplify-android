@@ -1795,6 +1795,47 @@
   }
   .artist-hero-sub{ font-size:13.5px; color:var(--text-dim); max-width:min(560px, 92%); }
   .artist-hero-sub:not(:empty){ margin-bottom:14px; }
+  /* Build 503 (Mark): Home's Favorites / Playlists / Top 100 tabs, and the Featured card under the carousel. */
+  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:18px 0 14px; }
+  .home-group-tabs .home-tab{ flex:0 0 auto; }
+  .home-group-all{ margin-left:auto; flex:0 0 auto; background:none; border:0; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; cursor:pointer; }
+  body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
+  .featured-home{ margin:14px 0 0; }
+  .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:112px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
+    border-radius:var(--r-card, 18px); overflow:hidden; color:#fff; font:inherit; cursor:pointer; isolation:isolate;
+    background:linear-gradient(120deg, var(--fh-1, #2a0f3a), var(--fh-2, #d9691b)); -webkit-tap-highlight-color:transparent; }
+  .fh-card.has-art{ background-size:cover; background-position:center; }
+  .fh-card.has-art::before{ content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg, rgba(0,0,0,.68), rgba(0,0,0,.18)); }
+  .fh-icon{ position:absolute; right:56px; top:-14px; width:124px; height:124px; transform:rotate(14deg); fill:none; stroke:rgba(255,255,255,.16); stroke-width:1.2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; z-index:-1; }
+  .fh-text{ position:relative; flex:1; min-width:0; }
+  .fh-eyebrow{ font-size:10.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.92); }
+  .fh-title{ margin-top:4px; font-size:21px; font-weight:800; letter-spacing:-.02em; line-height:1.12; overflow-wrap:anywhere; }
+  .fh-sub{ margin-top:3px; font-size:12px; line-height:1.35; color:rgba(255,255,255,.94); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .fh-play{ position:relative; flex:0 0 48px; width:48px; height:48px; border:0; padding:0; border-radius:var(--r-play, 999px); background:var(--accent); color:var(--accent-text, #0b0c0e);
+    display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,.35); cursor:pointer; }
+  .fh-play svg{ width:20px; height:20px; margin-left:2px; }
+  .fh-more{ position:absolute; top:4px; right:6px; width:30px; height:30px; border:0; border-radius:50%; background:rgba(0,0,0,.18); color:#fff; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .fh-more svg{ width:16px; height:16px; }
+  .season-list{ display:flex; flex-direction:column; gap:2px; margin:6px 0 10px; width:100%; }
+  .season-row{ display:flex; align-items:center; gap:12px; width:100%; padding:10px 0; background:none; border:0; border-bottom:1px solid var(--border); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .season-row:last-child{ border-bottom:0; }
+  .season-sw{ flex:0 0 40px; width:40px; height:40px; border-radius:12px; background-size:cover; background-position:center; }
+  .season-row-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .season-row-name{ font-size:15px; font-weight:600; }
+  .season-row-sub{ font-size:12.5px; color:var(--text-dim); }
+  .season-row.off .season-row-name{ color:var(--text-dim); }
+  .season-edit-body{ display:flex; flex-direction:column; gap:6px; }
+  .se-label{ margin-top:8px; font-size:12.5px; font-weight:700; color:var(--text-dim); }
+  .se-dates{ display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
+  .se-dates .settings-select{ flex:1 1 0; min-width:0; width:auto; padding-left:8px; padding-right:20px; background-position:right 6px center; }
+  .se-dates #seSM, .se-dates #seEM{ flex:1.5 1 0; } .se-dates #seSD, .se-dates #seED{ flex:1.1 1 0; padding-right:22px; }
+  .se-to{ font-size:13px; color:var(--text-dim); }
+  .se-look{ display:flex; align-items:center; gap:10px; }
+  .se-look input[type=color]{ width:46px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:none; }
+  .se-poster{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .se-poster-thumb{ width:56px; height:56px; border-radius:12px; background-size:cover; background-position:center; border:1px solid var(--border); }
+  .se-note{ font-size:12.5px; color:var(--text-dim); }
+  .se-err{ min-height:1em; color:var(--danger, #ff6b6b); }
   /* Build 502 (Mark): the artist's genres close the page, under the albums. */
   .tile-grid > .artist-genres-head{ margin:-2px 0 -22px; }
   .artist-genres-edit{ margin-left:auto; flex:0 0 auto; height:30px; padding:0 14px; border-radius:var(--r-pill, 999px); border:1px solid var(--border); background:none;
@@ -7713,6 +7754,8 @@
         <div class="nph-track" id="npHeroTrack" tabindex="0"></div>
         <div class="nph-progress" id="npHeroProgress" aria-hidden="true"><div class="nph-progress-fill"></div></div>
       </section>
+      <!-- Build 503 (Mark): the seasonal Featured card, under the carousel (see "Featured seasons" in the script). -->
+      <section class="featured-home" id="featuredHome" style="display:none;" aria-label="Featured"></section>
       <div class="home-tabs" id="homeTabs" style="display:none;" role="tablist">
         <button type="button" class="home-tab" id="tabTop" role="tab">
           <span class="tab-label-full">Top Stations</span><span class="tab-label-short">Top</span>
@@ -8599,6 +8642,11 @@
         <span class="set-cat-text"><span class="set-cat-name">Radio</span><span class="set-cat-sub">Station languages, Stations Near Me, search results</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
+      <button type="button" class="set-cat" data-set-cat="featured">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Featured</span><span class="set-cat-sub">Seasonal card on Home, dates and poster art</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
       <button type="button" class="set-cat" data-set-cat="sources">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4" width="17" height="6.5" rx="1.6"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.6"/><path d="M7.5 7.25h.01M7.5 16.75h.01"/></svg></span>
         <span class="set-cat-text"><span class="set-cat-name">Sources</span><span class="set-cat-sub">Plex, Pluto TV, archive.org</span></span>
@@ -8888,6 +8936,23 @@
     </section>
 
     <!-- Sources -->
+    <!-- Build 503 (Mark): Featured seasons: which seasons show on Home, when, and with what poster. -->
+    <section class="set-page" data-set-page="featured" data-set-title="Featured" hidden>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="featOnLabel">Featured on Home</span><span class="set-desc">A seasonal card under the carousel</span></div>
+        <select class="settings-select" id="featOnSelect" aria-labelledby="featOnLabel"><option value="on">On</option><option value="off">Off</option></select>
+      </div>
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label">Seasons</span>
+        <span class="set-desc">When dates overlap, the shorter season is the one shown.</span>
+        <div class="season-list" id="seasonList"></div>
+        <button type="button" class="settings-data-btn" id="seasonAddBtn">Add a season</button>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Reset seasons</span>
+        <button class="accent-reset-btn" id="seasonResetBtn">Reset</button>
+      </div>
+    </section>
     <section class="set-page" data-set-page="sources" data-set-title="Sources" hidden>
       <!-- Plex (build 130): sign in with a Plex account (PIN approved on plex.tv), and the movies
            and TV shows on its server join Video's Movies and TV Shows next to the phone's own
@@ -9178,6 +9243,51 @@
         <i class="fa-solid fa-trash"></i>
       </button>
       <button class="art-url-save-btn" id="liveChSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Build 503 (Mark): add or edit a Featured season. -->
+<div class="settings-overlay" id="seasonEditOverlay">
+  <div class="settings-panel" id="seasonEditPanel" role="dialog" aria-labelledby="seasonEditTitle">
+    <div class="settings-header">
+      <h2 id="seasonEditTitle">Edit season</h2>
+      <button class="settings-close" id="seasonEditCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="art-url-body season-edit-body">
+      <label class="se-label" for="seName">Title</label>
+      <input type="text" class="art-url-input" id="seName" maxlength="40" autocomplete="off">
+      <label class="se-label" for="seBlurb">Description</label>
+      <input type="text" class="art-url-input" id="seBlurb" maxlength="80" autocomplete="off">
+      <div class="se-label">Dates</div>
+      <div class="se-dates" id="seDates">
+        <select class="settings-select" id="seSM" aria-label="Start month"></select><select class="settings-select" id="seSD" aria-label="Start day"></select>
+        <span class="se-to">to</span>
+        <select class="settings-select" id="seEM" aria-label="End month"></select><select class="settings-select" id="seED" aria-label="End day"></select>
+      </div>
+      <div class="se-note" id="seRuleNote" hidden>Moves every year: the two weeks before Easter Sunday.</div>
+      <label class="se-label" for="seGenre">Genre it opens</label>
+      <input type="text" class="art-url-input" id="seGenre" maxlength="40" autocomplete="off">
+      <label class="se-label" for="seTags">Station tags (comma separated)</label>
+      <input type="text" class="art-url-input" id="seTags" maxlength="160" autocomplete="off" placeholder="halloween, spooky, horror">
+      <div class="se-label">Look</div>
+      <div class="se-look">
+        <input type="color" id="seC1" aria-label="First colour"><input type="color" id="seC2" aria-label="Second colour">
+        <select class="settings-select" id="seIcon" aria-label="Icon"></select>
+      </div>
+      <div class="se-label">Poster art</div>
+      <div class="se-poster">
+        <div class="se-poster-thumb" id="sePosterThumb" aria-hidden="true"></div>
+        <button type="button" class="art-url-search-btn" id="sePosterBtn">Choose image</button>
+        <button type="button" class="art-url-search-btn" id="sePosterRemoveBtn">Remove</button>
+      </div>
+      <div class="se-label">Show this season</div>
+      <select class="settings-select" id="seOn" aria-label="Show this season"><option value="on">On</option><option value="off">Off</option></select>
+      <div class="se-note se-err" id="seNote" role="status"></div>
+    </div>
+    <div class="art-url-actions">
+      <div class="art-url-actions-left"><button type="button" class="art-url-search-btn" id="seDeleteBtn">Delete</button></div>
+      <button type="button" class="art-url-search-btn" id="seSaveBtn">Save</button>
     </div>
   </div>
 </div>
@@ -19029,7 +19139,7 @@
       });
       top100HomeGrid.appendChild(tile);
     });
-    if(top100Section && document.body.classList.contains('home-stacked')) top100Section.style.display = hot100Shown ? '' : 'none';
+    if(top100Section && document.body.classList.contains('home-stacked') && typeof syncHomeGroup === 'function') syncHomeGroup();
     // Build 215: the rest of this week's covers are fetched in the background (after the ones on
     // screen), so the Top 100 page opens with them already there.
     if(hot100Latest && renderTop100HomeSection._prefetched !== hot100Latest.date){
@@ -21816,6 +21926,360 @@
     if(rotateLockQuery.addEventListener) rotateLockQuery.addEventListener('change', syncRotateLock);
     else if(rotateLockQuery.addListener) rotateLockQuery.addListener(syncRotateLock); // older Safari
   }
+
+  // ---------- Build 503 (Mark): Favorites / Playlists / Top 100 as tabs under the carousel ----------
+  // The three sections keep their own content and code; they are moved to sit together and only the
+  // chosen one shows. Favorites is the tab Home opens on. A tab appears only while it has something.
+  var homeGroupTab = 'favorites', homeGroupBar = null, homeGroupBtns = {}, homeGroupAll = null;
+  (function(){
+    var names = [['favorites', 'Favorites'], ['playlists', 'Playlists'], ['top100', 'Top 100']];
+    var bar = document.createElement('div');
+    bar.className = 'home-group-tabs'; bar.id = 'homeGroupTabs'; bar.setAttribute('role', 'tablist'); bar.style.display = 'none';
+    names.forEach(function(n){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'home-tab'; b.id = 'homeGroupTab-' + n[0]; b.setAttribute('role', 'tab'); b.textContent = n[1];
+      b.addEventListener('click', function(){ homeGroupTab = n[0]; syncHomeGroup(); });
+      homeGroupBtns[n[0]] = b; bar.appendChild(b);
+    });
+    homeGroupAll = document.createElement('button');
+    homeGroupAll.type = 'button'; homeGroupAll.className = 'home-group-all'; homeGroupAll.id = 'homeGroupAll'; homeGroupAll.textContent = 'See all';
+    homeGroupAll.addEventListener('click', function(){
+      var h = document.getElementById({ favorites: 'favoritesHeading', playlists: 'playlistsHomeHeading', top100: 'top100Heading' }[homeGroupTab]);
+      if(h) h.click();
+    });
+    bar.appendChild(homeGroupAll);
+    homeGroupBar = bar;
+    if(!homeTabs || !homeTabs.parentNode) return;
+    homeTabs.parentNode.insertBefore(bar, homeTabs.nextSibling);
+    var after = bar;
+    [favoritesSection, playlistsHomeSection, top100Section].forEach(function(sec){
+      if(!sec) return;
+      sec.classList.add('in-group');
+      after.parentNode.insertBefore(sec, after.nextSibling);
+      after = sec;
+    });
+  })();
+  function syncHomeGroup(){
+    if(!homeGroupBar) return;
+    var stacked = document.body.classList.contains('home-stacked') && !!onHomeView;
+    var av = { favorites: !(favoritesSection.dataset.empty && !favoritesEditing), playlists: !!playlistsHomeShown, top100: !!hot100Shown };
+    var secs = { favorites: favoritesSection, playlists: playlistsHomeSection, top100: top100Section };
+    var order = ['favorites', 'playlists', 'top100'], list = order.filter(function(k){ return av[k]; });
+    var cur = av[homeGroupTab] ? homeGroupTab : list[0];
+    document.body.classList.toggle('home-grouped', stacked && list.length > 0);
+    homeGroupBar.style.display = (stacked && list.length) ? '' : 'none';
+    order.forEach(function(k){
+      secs[k].style.display = (stacked && k === cur) ? '' : 'none';
+      homeGroupBtns[k].style.display = av[k] ? '' : 'none';
+      homeGroupBtns[k].classList.toggle('active', k === cur);
+      homeGroupBtns[k].setAttribute('aria-selected', k === cur ? 'true' : 'false');
+    });
+    homeGroupAll.style.display = (cur && !favoritesEditing) ? '' : 'none';
+    if(typeof syncHomeRows === 'function') syncHomeRows();
+  }
+
+  // ---------- Build 503 (Mark): Featured seasons ----------
+  // A card under the Home carousel for whichever season it is: a genre page plus the season's own
+  // station tags. Seasons, their dates, colours and poster art are all editable in Settings > Featured.
+  var SEASONS_KEY = 'radioPlayerSeasons', FEATURED_ON_KEY = 'radioPlayerFeaturedOn', SEASON_HIDE_KEY = 'radioPlayerSeasonHidden';
+  var SEASON_ICONS = {
+    moon: '<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/><path d="M16 4l.6 1.4L18 6l-1.4.6L16 8l-.6-1.4L14 6l1.4-.6z"/>',
+    tree: '<path d="M12 3l3 5h-2l3 5h-2l3 5H5l3-5H6l3-5H7z"/><path d="M12 18v3"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+    burst: '<circle cx="12" cy="12" r="2.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5M5 5l3.5 3.5M15.5 15.5L19 19M19 5l-3.5 3.5M8.5 15.5L5 19"/>',
+    heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"/>',
+    clover: '<circle cx="9" cy="9" r="3.2"/><circle cx="15" cy="9" r="3.2"/><circle cx="9" cy="15" r="3.2"/><circle cx="15" cy="15" r="3.2"/><path d="M12 12l5 8"/>',
+    star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+    leaf: '<path d="M5 19C5 9 11 4 20 4c0 9-5 15-15 15z"/><path d="M5 19L14 10"/>',
+    egg: '<path d="M12 3c3.5 0 6 6 6 10a6 6 0 01-12 0c0-4 2.5-10 6-10z"/><path d="M7 13c2-1 3 1 5 0s3 1 5 0"/>',
+    note: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>'
+  };
+  var SEASON_ICON_NAMES = { moon: 'Moon', tree: 'Tree', sun: 'Sun', burst: 'Fireworks', heart: 'Heart', clover: 'Clover', star: 'Star', leaf: 'Leaf', egg: 'Egg', note: 'Music note' };
+  function defaultSeasons(){
+    return [
+      { id: 'halloween', name: 'Spooky Season', label: 'Halloween', blurb: 'Monster mashes, haunted soundscapes and creepy classics.', start: '10-01', end: '10-31', genre: 'Halloween', tags: ['halloween', 'spooky', 'horror', 'monster mash'], c1: '#2a0f3a', c2: '#d9691b', icon: 'moon', on: true },
+      { id: 'christmas', name: 'Christmas', label: 'Christmas', blurb: 'Carols, classics and holiday favourites.', start: '11-01', end: '12-31', genre: 'Christmas', tags: ['christmas', 'xmas', 'holiday', 'christmas carols'], c1: '#0f3d2a', c2: '#a3242b', icon: 'tree', on: true },
+      { id: 'newyear', name: 'New Year’s Party', label: 'New Year’s', blurb: 'Big nights, big choruses, a fresh start.', start: '01-01', end: '01-02', genre: 'New Year', tags: ['new year', 'countdown', 'party', 'dance'], c1: '#16163a', c2: '#d9a21b', icon: 'burst', on: true },
+      { id: 'valentines', name: 'Love Songs', label: 'Valentine’s', blurb: 'Slow dances and sweet serenades.', start: '02-01', end: '02-14', genre: 'Love Songs', tags: ['love songs', 'romantic', 'valentine', 'slow jams'], c1: '#4a0f2e', c2: '#e86a8a', icon: 'heart', on: true },
+      { id: 'stpatricks', name: 'St. Patrick’s Day', label: 'St. Patrick’s', blurb: 'Irish folk, pub songs and Celtic favourites.', start: '03-10', end: '03-17', genre: 'Irish', tags: ['irish', 'celtic', 'irish folk', 'pub'], c1: '#0f3d22', c2: '#2fa84f', icon: 'clover', on: true },
+      { id: 'easter', name: 'Easter', label: 'Easter', blurb: 'Spring sounds, gospel and gentle favourites.', rule: 'easter', start: '', end: '', genre: 'Easter', tags: ['easter', 'spring', 'gospel'], c1: '#5a3d8f', c2: '#d98cc0', icon: 'egg', on: true },
+      { id: 'summer', name: 'Summer Party', label: 'Summer', blurb: 'Poolside, road-trip and sunset sing-alongs.', start: '06-01', end: '08-31', genre: 'Summer', tags: ['summer', 'beach', 'tropical', 'party'], c1: '#0c5a7a', c2: '#f5a524', icon: 'sun', on: true },
+      { id: 'july4', name: 'Fourth of July', label: 'Fourth of July', blurb: 'Red, white and blue anthems and cookout classics.', start: '06-28', end: '07-04', genre: 'Patriotic', tags: ['patriotic', 'american', 'usa', 'country'], c1: '#12265a', c2: '#b22234', icon: 'star', on: true },
+      { id: 'thanksgiving', name: 'Thanksgiving', label: 'Thanksgiving', blurb: 'Cosy autumn acoustic and gathering-round favourites.', start: '11-20', end: '11-28', genre: 'Thanksgiving', tags: ['thanksgiving', 'autumn', 'fall', 'acoustic'], c1: '#5a3a12', c2: '#d9812a', icon: 'leaf', on: true }
+    ];
+  }
+  var seasons = (function(){
+    try{
+      var v = JSON.parse(localStorage.getItem(SEASONS_KEY) || 'null');
+      if(Array.isArray(v)) return v.filter(function(x){ return x && typeof x.id === 'string' && x.name; });
+    }catch(e){}
+    return defaultSeasons();
+  })();
+  var featuredOn = (function(){ try{ return localStorage.getItem(FEATURED_ON_KEY) !== 'off'; }catch(e){ return true; } })();
+  var seasonHidden = (function(){ try{ var v = JSON.parse(localStorage.getItem(SEASON_HIDE_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }catch(e){ return {}; } })();
+  var seasonsRegistered = false;
+  function saveSeasons(){ try{ localStorage.setItem(SEASONS_KEY, JSON.stringify(seasons)); }catch(e){} seasonsRegistered = false; }
+  function saveSeasonHidden(){ try{ localStorage.setItem(SEASON_HIDE_KEY, JSON.stringify(seasonHidden)); }catch(e){} }
+  var SEASON_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function easterOf(y){
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(y, month - 1, day);
+  }
+  function seasonParts(str){ var m = /^(\d{1,2})-(\d{1,2})$/.exec(String(str || '')); return m ? [+m[1], +m[2]] : null; }
+  // The occurrence of a season that begins in year y: [start, end] as Dates, or null.
+  function seasonRange(sn, y){
+    if(sn.rule === 'easter'){
+      var e = easterOf(y);
+      return [new Date(y, e.getMonth(), e.getDate() - 14), new Date(y, e.getMonth(), e.getDate(), 23, 59, 59)];
+    }
+    var a = seasonParts(sn.start), b = seasonParts(sn.end);
+    if(!a || !b) return null;
+    var st = new Date(y, a[0] - 1, a[1]), en = new Date(y, b[0] - 1, b[1], 23, 59, 59);
+    if(en < st) en = new Date(y + 1, b[0] - 1, b[1], 23, 59, 59);
+    return [st, en];
+  }
+  function seasonNow(sn, now){
+    for(var y = now.getFullYear() - 1; y <= now.getFullYear(); y++){
+      var r = seasonRange(sn, y);
+      if(r && now >= r[0] && now <= r[1]) return r;
+    }
+    return null;
+  }
+  // The season to feature today: enabled, in its dates, not hidden; the shortest window wins.
+  function activeSeason(now){
+    now = now || new Date();
+    var best = null, bestLen = 0;
+    seasons.forEach(function(sn){
+      if(sn.on === false) return;
+      var r = seasonNow(sn, now);
+      if(!r) return;
+      if(seasonHidden[sn.id] && now.getTime() <= seasonHidden[sn.id]) return;
+      var len = r[1] - r[0];
+      if(!best || len < bestLen){ best = { sn: sn, range: r }; bestLen = len; }
+    });
+    return best;
+  }
+  function seasonDatesText(sn){
+    if(sn.rule === 'easter') return 'Two weeks before Easter';
+    var a = seasonParts(sn.start), b = seasonParts(sn.end);
+    if(!a || !b) return '';
+    return SEASON_MONTHS[a[0] - 1] + ' ' + a[1] + ' – ' + SEASON_MONTHS[b[0] - 1] + ' ' + b[1];
+  }
+  // The season's genre gets its colour and its station tags, so its page is a genre page that finds more than one tag.
+  function registerSeasonGenres(){
+    if(seasonsRegistered) return true;
+    if(typeof GENRE_LOOK === 'undefined' || !GENRE_LOOK || typeof GENRE_STATION_QUERIES === 'undefined' || !GENRE_STATION_QUERIES) return false;
+    seasons.forEach(function(sn){
+      var k = String(sn.genre || '').trim().toLowerCase();
+      if(!k) return;
+      var builtin = (typeof GENRES !== 'undefined') && GENRES.some(function(g){ return g.toLowerCase() === k; });
+      if(!builtin){
+        GENRE_LOOK[k] = [sn.c1 || '#3d4fb0', sn.blurb || 'Stations and songs', []];
+        var tags = (sn.tags || []).slice(0, 12), qs = tags.map(function(t){ return ['tagExact', t]; });
+        qs.push(['name', sn.genre]);
+        GENRE_STATION_QUERIES[k] = qs;
+      }
+    });
+    seasonsRegistered = true;
+    return true;
+  }
+  function seasonOpen(sn){
+    registerSeasonGenres();
+    openGenre(sn.genre || sn.name);
+  }
+  function seasonPlay(sn){
+    registerSeasonGenres();
+    var g = sn.genre || sn.name;
+    genreStations(g).then(function(list){
+      if(list.length){ var q = list.slice(); setQueue(q, q[0], g); playStation(q[0]); return; }
+      var songs = localTracksWithTag(g);
+      if(songs.length){ var s2 = songs.slice().sort(function(){ return Math.random() - 0.5; }); playTrackInList(s2, s2[0], g); return; }
+      setStatus('No stations found for ' + g + ' right now.', true);
+    })['catch'](function(err){ setStatus((err && err.message) || 'Stations could not be reached.', true); });
+  }
+  var featuredHomeEl = document.getElementById('featuredHome');
+  function renderFeaturedHome(){
+    if(!featuredHomeEl) return;
+    var on = featuredOn && !!onHomeView && document.body.classList.contains('home-stacked');
+    var act = on ? activeSeason() : null;
+    if(!act){ featuredHomeEl.style.display = 'none'; featuredHomeEl.innerHTML = ''; featuredHomeEl.dataset.id = ''; featuredHomeEl.dataset.sig = ''; return; }
+    var sn = act.sn, art = getCustomArtUrl('season:' + sn.id) || '';
+    var sig = [sn.id, sn.name, sn.blurb, sn.c1, sn.c2, sn.icon, sn.genre, art.length, act.range[1].getTime()].join('|');
+    featuredHomeEl.style.display = '';
+    if(featuredHomeEl.dataset.sig === sig) return;
+    featuredHomeEl.dataset.sig = sig; featuredHomeEl.dataset.id = sn.id;
+    featuredHomeEl.innerHTML = '';
+    var card = document.createElement('div');
+    card.className = 'fh-card' + (art ? ' has-art' : ''); card.setAttribute('role', 'button'); card.tabIndex = 0;
+    card.setAttribute('aria-label', 'Featured: ' + sn.name);
+    card.style.setProperty('--fh-1', sn.c1 || '#2a0f3a'); card.style.setProperty('--fh-2', sn.c2 || '#d9691b');
+    if(art) card.style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
+    var end = act.range[1], until = 'Until ' + SEASON_MONTHS[end.getMonth()] + ' ' + end.getDate();
+    card.innerHTML = '<svg class="fh-icon" viewBox="0 0 24 24" aria-hidden="true">' + (SEASON_ICONS[sn.icon] || SEASON_ICONS.star) + '</svg>'
+      + '<div class="fh-text"><div class="fh-eyebrow"></div><div class="fh-title"></div><div class="fh-sub"></div></div>'
+      + '<button type="button" class="fh-play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>'
+      + '<button type="button" class="fh-more" aria-label="More options"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>';
+    card.querySelector('.fh-eyebrow').textContent = 'Featured · ' + (sn.label || sn.name);
+    card.querySelector('.fh-title').textContent = sn.name;
+    card.querySelector('.fh-sub').textContent = (sn.blurb ? sn.blurb + ' · ' : '') + until;
+    card.querySelector('.fh-play').setAttribute('aria-label', 'Play ' + sn.name);
+    card.querySelector('.fh-play').addEventListener('click', function(e){ e.stopPropagation(); seasonPlay(sn); });
+    card.querySelector('.fh-more').addEventListener('click', function(e){
+      e.stopPropagation();
+      showNotice({ kind: 'info', title: sn.name, message: 'This card is a Featured season.', stack: true, actions: [
+        { label: 'Hide until next year', primary: true, run: function(){ seasonHidden[sn.id] = act.range[1].getTime(); saveSeasonHidden(); renderFeaturedHome(); } },
+        { label: 'Edit seasons', run: function(){ openSettingsAt('featured'); } },
+        { label: 'Cancel' }
+      ] });
+    });
+    card.addEventListener('click', function(){ seasonOpen(sn); });
+    card.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); seasonOpen(sn); } });
+    featuredHomeEl.appendChild(card);
+  }
+  function openSettingsAt(cat){
+    try{ if(typeof openSettings === 'function') openSettings(); }catch(e){}
+    try{ showSettingsCat(cat); }catch(e){}
+  }
+
+  // ----- Settings > Featured -----
+  var seasonListEl = document.getElementById('seasonList');
+  function seasonSwatchStyle(sn){
+    var art = getCustomArtUrl('season:' + sn.id);
+    return art ? 'background-image:url("' + art.replace(/"/g, '%22') + '")' : 'background:linear-gradient(135deg,' + (sn.c1 || '#333') + ',' + (sn.c2 || '#666') + ')';
+  }
+  function renderSeasonList(){
+    if(!seasonListEl) return;
+    seasonListEl.innerHTML = '';
+    seasons.forEach(function(sn){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'season-row' + (sn.on === false ? ' off' : ''); b.dataset.id = sn.id;
+      b.innerHTML = '<span class="season-sw" style=\'' + seasonSwatchStyle(sn).replace(/'/g, '%27') + '\'></span><span class="season-row-text"><span class="season-row-name"></span><span class="season-row-sub"></span></span>';
+      b.querySelector('.season-row-name').textContent = sn.name;
+      b.querySelector('.season-row-sub').textContent = seasonDatesText(sn) + (sn.on === false ? ' · Off' : '');
+      b.addEventListener('click', function(){ openSeasonEdit(sn.id); });
+      seasonListEl.appendChild(b);
+    });
+  }
+  var seOverlay = document.getElementById('seasonEditOverlay'), seDraft = null;
+  var seEl = {};
+  ['seName', 'seBlurb', 'seSM', 'seSD', 'seEM', 'seED', 'seGenre', 'seTags', 'seC1', 'seC2', 'seIcon', 'sePosterThumb', 'seOn', 'seNote', 'seRuleNote', 'seDates', 'seDeleteBtn', 'seaonTitle'].forEach(function(id){ seEl[id] = document.getElementById(id); });
+  function fillDaySelect(sel, max, val){
+    sel.innerHTML = '';
+    for(var d = 1; d <= max; d++){ var o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); }
+    sel.value = String(Math.min(val || 1, max));
+  }
+  var SE_MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function seBuildDates(sn){
+    [['seSM', 'seSD', sn.start], ['seEM', 'seED', sn.end]].forEach(function(p){
+      var parts = seasonParts(p[2]) || [1, 1], m = document.getElementById(p[0]), d = document.getElementById(p[1]);
+      m.innerHTML = '';
+      SEASON_MONTHS.forEach(function(n, i){ var o = document.createElement('option'); o.value = i + 1; o.textContent = n; m.appendChild(o); });
+      m.value = String(parts[0]);
+      fillDaySelect(d, SE_MONTH_DAYS[parts[0] - 1], parts[1]);
+      m.onchange = function(){ fillDaySelect(d, SE_MONTH_DAYS[+m.value - 1], +d.value); };
+    });
+  }
+  function seRefreshPoster(){
+    if(!seDraft) return;
+    var art = getCustomArtUrl('season:' + seDraft.id);
+    seEl.sePosterThumb.style.cssText = art ? 'background-image:url("' + art.replace(/"/g, '%22') + '")' : 'background:linear-gradient(135deg,' + seEl.seC1.value + ',' + seEl.seC2.value + ')';
+    document.getElementById('sePosterRemoveBtn').hidden = !art;
+  }
+  function openSeasonEdit(id){
+    var existing = seasons.filter(function(x){ return x.id === id; })[0];
+    var sn = existing ? JSON.parse(JSON.stringify(existing)) : { id: 's' + Date.now().toString(36), name: '', label: '', blurb: '', start: '06-01', end: '06-30', genre: '', tags: [], c1: '#3d4fb0', c2: '#8a2626', icon: 'star', on: true };
+    seDraft = { id: sn.id, isNew: !existing, rule: sn.rule || '', label: sn.label || '' };
+    document.getElementById('seasonEditTitle').textContent = existing ? 'Edit season' : 'Add a season';
+    seEl.seName.value = sn.name; seEl.seBlurb.value = sn.blurb || ''; seEl.seGenre.value = sn.genre || ''; seEl.seTags.value = (sn.tags || []).join(', ');
+    seEl.seC1.value = sn.c1 || '#3d4fb0'; seEl.seC2.value = sn.c2 || '#8a2626';
+    seEl.seIcon.innerHTML = '';
+    Object.keys(SEASON_ICON_NAMES).forEach(function(k){ var o = document.createElement('option'); o.value = k; o.textContent = SEASON_ICON_NAMES[k]; seEl.seIcon.appendChild(o); });
+    seEl.seIcon.value = sn.icon || 'star';
+    seEl.seOn.value = sn.on === false ? 'off' : 'on';
+    seBuildDates(sn);
+    var easter = sn.rule === 'easter';
+    seEl.seDates.hidden = easter; seEl.seRuleNote.hidden = !easter;
+    seEl.seNote.textContent = '';
+    seEl.seDeleteBtn.hidden = !existing;
+    seRefreshPoster();
+    seOverlay.classList.add('open');
+  }
+  function closeSeasonEdit(){
+    if(seDraft && seDraft.isNew && !seasons.some(function(x){ return x.id === seDraft.id; })) clearCustomArtUrl('season:' + seDraft.id);
+    seOverlay.classList.remove('open'); seDraft = null;
+  }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function saveSeasonEdit(){
+    if(!seDraft) return;
+    var name = seEl.seName.value.trim();
+    if(!name){ seEl.seNote.textContent = 'Give the season a title.'; return; }
+    var tags = [];
+    seEl.seTags.value.split(',').forEach(function(t){ t = t.trim().toLowerCase(); if(t && tags.indexOf(t) === -1) tags.push(t); });
+    var sn = {
+      id: seDraft.id, name: name, label: seDraft.label || name, blurb: seEl.seBlurb.value.trim(),
+      start: pad2(+seEl.seSM.value) + '-' + pad2(+seEl.seSD.value), end: pad2(+seEl.seEM.value) + '-' + pad2(+seEl.seED.value),
+      genre: seEl.seGenre.value.trim() || name, tags: tags.slice(0, 12), c1: seEl.seC1.value, c2: seEl.seC2.value, icon: seEl.seIcon.value, on: seEl.seOn.value !== 'off'
+    };
+    if(seDraft.rule){ sn.rule = seDraft.rule; sn.start = ''; sn.end = ''; }
+    else if(!seDraft.isNew && seDraft.label && seDraft.label !== name) sn.label = seDraft.label;
+    if(seDraft.isNew) sn.label = name;
+    var at = -1;
+    seasons.forEach(function(x, i){ if(x.id === sn.id) at = i; });
+    if(at >= 0) seasons[at] = sn; else seasons.push(sn);
+    saveSeasons();
+    seDraft = null; seOverlay.classList.remove('open');
+    renderSeasonList(); featuredHomeEl && (featuredHomeEl.dataset.sig = ''); renderFeaturedHome();
+  }
+  function deleteSeasonEdit(){
+    if(!seDraft) return;
+    var id = seDraft.id;
+    showNotice({ kind: 'info', title: 'Delete this season?', message: 'It will no longer be featured. You can add it again, or reset the list to get the standard seasons back.', actions: [
+      { label: 'Cancel' },
+      { label: 'Delete', primary: true, run: function(){
+        seasons = seasons.filter(function(x){ return x.id !== id; });
+        clearCustomArtUrl('season:' + id); saveSeasons();
+        seDraft = null; seOverlay.classList.remove('open');
+        renderSeasonList(); featuredHomeEl.dataset.sig = ''; renderFeaturedHome();
+      } }
+    ] });
+  }
+  if(seOverlay){
+    document.getElementById('seasonEditCloseBtn').addEventListener('click', closeSeasonEdit);
+    seOverlay.addEventListener('click', function(e){ if(e.target === seOverlay) closeSeasonEdit(); });
+    document.getElementById('seSaveBtn').addEventListener('click', saveSeasonEdit);
+    seEl.seDeleteBtn.addEventListener('click', deleteSeasonEdit);
+    ['seC1', 'seC2'].forEach(function(k){ seEl[k].addEventListener('input', seRefreshPoster); });
+    document.getElementById('sePosterBtn').addEventListener('click', function(){
+      if(!seDraft) return;
+      var d = seDraft;
+      openArtUrlDialogFor({ key: 'season:' + d.id, name: seEl.seName.value || 'Season', title: 'Poster Art', refresh: function(){ seRefreshPoster(); renderSeasonList(); featuredHomeEl.dataset.sig = ''; renderFeaturedHome(); } });
+    });
+    document.getElementById('sePosterRemoveBtn').addEventListener('click', function(){
+      if(!seDraft) return;
+      clearCustomArtUrl('season:' + seDraft.id); seRefreshPoster(); renderSeasonList(); featuredHomeEl.dataset.sig = ''; renderFeaturedHome();
+    });
+    document.getElementById('seasonAddBtn').addEventListener('click', function(){ openSeasonEdit(''); });
+    document.getElementById('seasonResetBtn').addEventListener('click', function(){
+      showNotice({ kind: 'info', title: 'Reset seasons?', message: 'Your changes to the seasons and their dates go, and the standard seasons come back. Poster art you added to a standard season is kept.', actions: [
+        { label: 'Cancel' },
+        { label: 'Reset', primary: true, run: function(){
+          seasons.forEach(function(x){ if(!defaultSeasons().some(function(d){ return d.id === x.id; })) clearCustomArtUrl('season:' + x.id); });
+          seasons = defaultSeasons(); seasonHidden = {}; saveSeasonHidden(); saveSeasons();
+          renderSeasonList(); featuredHomeEl.dataset.sig = ''; renderFeaturedHome();
+        } }
+      ] });
+    });
+    var fsel = document.getElementById('featOnSelect');
+    fsel.value = featuredOn ? 'on' : 'off';
+    fsel.addEventListener('change', function(){
+      featuredOn = fsel.value !== 'off';
+      try{ localStorage.setItem(FEATURED_ON_KEY, featuredOn ? 'on' : 'off'); }catch(e){}
+      renderFeaturedHome();
+    });
+    renderSeasonList();
+  }
   // Recent leads the row once there's listening history, since that's what a returning
   // listener reaches for; with nothing to show it drops behind Top Stations. Re-appending an
   // element moves it, so this is just "put them back in the right order" -- and it's skipped
@@ -21931,11 +22395,15 @@
       channelsHomeSection.style.display = channelsHomeSection.dataset.empty ? 'none' : '';
       stationsGrid.style.display = '';
       syncFavReorderView();
+      syncHomeGroup();
+      renderFeaturedHome();
       syncHomeRows();
       return;
     }
     homeTopHeading.style.display = 'none';
     if(npHero) npHero.style.display = 'none';
+    if(typeof renderFeaturedHome === 'function') renderFeaturedHome();
+    if(typeof syncHomeGroup === 'function') syncHomeGroup();
     if(!onHomeView){
       // Genre / search / playlist views keep the old single-heading layout.
       homeTabs.style.display = 'none';
@@ -22115,9 +22583,7 @@
         onClick: function(){ pushView(); runStationPlaylist(item); }
       }));
     });
-    if(playlistsHomeSection && document.body.classList.contains('home-stacked') && onHomeView){
-      playlistsHomeSection.style.display = playlistsHomeShown ? '' : 'none';
-    }
+    if(playlistsHomeSection && document.body.classList.contains('home-stacked') && onHomeView && typeof syncHomeGroup === 'function') syncHomeGroup();
   }
   (function(){
     var h = document.getElementById('playlistsHomeHeading');
@@ -22385,6 +22851,7 @@
     favoritesGrid.innerHTML = '';
     var homeFavs = favoritesInOrder().filter(isHomeFavorite);
     if(!homeFavs.length) favoritesSection.dataset.empty = '1'; else delete favoritesSection.dataset.empty;
+    if(typeof syncHomeGroup === 'function') syncHomeGroup();
     if(!homeFavs.length){
       favoritesGrid.innerHTML = '<div class="empty-state">Tap the heart on any station to save it here.</div>';
     } else {
@@ -31600,6 +32067,7 @@
   };
   var GENRE_PALETTE = ['#8f5420', '#a3245f', '#1f6a73', '#3d4fb0', '#6b4c94', '#146b52', '#b8302b', '#255f9e'];
   function genreLook(g){
+    if(typeof registerSeasonGenres === 'function') registerSeasonGenres();
     var k = String(g || '').trim().toLowerCase(), l = GENRE_LOOK[k];
     if(l) return { color: l[0], blurb: l[1], subs: l[2] };
     var h = 0; for(var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
@@ -31894,6 +32362,7 @@
     'spa': [['tagExact', 'spa'], ['tagExact', 'spa music'], ['tagExact', 'relaxation'], ['tagExact', 'meditation'], ['tagExact', 'massage'], ['tagExact', 'zen'], ['tagExact', 'wellness']]
   };
   function genreStationAsks(tag){
+    if(typeof registerSeasonGenres === 'function') registerSeasonGenres();
     var k = String(tag || '').trim().toLowerCase(), qs = GENRE_STATION_QUERIES[k];
     var tail = '&limit=' + resultLimit + '&hidebroken=true&order=clickcount&reverse=true';
     if(!qs){
@@ -51315,6 +51784,8 @@
       blacklist: blacklist,
       genreOrder: genreOrder,
       genreSort: genreSort,
+      featuredSeasons: seasons,
+      featuredOn: featuredOn,
       artistGenresManual: artistGenreManual,
       podcastSubscriptions: podcastSubs,
       podcastCategories: podcastCategories,
@@ -51716,6 +52187,13 @@
             if(!artistGenreManual[ak] && Array.isArray(l)) artistGenreManual[ak] = l.filter(function(x){ return typeof x === 'string' && x.length <= 40; }).slice(0, GENRE_EDIT_MAX);
           });
           saveArtistGenreManual(); libGenreVersion++;
+        }
+        if(localStorage.getItem(SEASONS_KEY) === null && Array.isArray(data.featuredSeasons) && data.featuredSeasons.length){
+          seasons = data.featuredSeasons.filter(function(x){ return x && typeof x.id === 'string' && typeof x.name === 'string'; }).slice(0, 60);
+          saveSeasons(); renderSeasonList();
+        }
+        if(localStorage.getItem(FEATURED_ON_KEY) === null && (data.featuredOn === true || data.featuredOn === false)){
+          featuredOn = data.featuredOn; try{ localStorage.setItem(FEATURED_ON_KEY, featuredOn ? 'on' : 'off'); }catch(e){}
         }
         if(localStorage.getItem(GENRE_SORT_KEY) === null && (data.genreSort === 'az' || data.genreSort === 'manual')){
           genreSort = data.genreSort; try{ localStorage.setItem(GENRE_SORT_KEY, genreSort); }catch(e){}
@@ -54255,7 +54733,10 @@
       { icon: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
         title: 'Settings',
         text: 'Your picture at the top right opens your profile, with shortcuts, your favorites and Settings: theme and accent color, equalizer, Plex, backups and more. This tour is in Settings too.',
-        target: function(){ return document.getElementById('hamburgerBtn') || document.getElementById('settingsFab'); } }
+        target: function(){
+          // The menu button lives in the header, which hides on scroll; bring it back so the ring can find it.
+          if(window.scrollY > 0 && document.body.classList.contains('hdr-hidden')){ window.scrollTo(0, 0); document.body.classList.remove('hdr-hidden'); setTimeout(place, 160); setTimeout(place, 320); }
+          return document.getElementById('hamburgerBtn') || document.getElementById('settingsFab'); } }
     ];
     var at = 0, openNow = false;
     function tourDone(){ try{ return localStorage.getItem(TOUR_DONE_KEY) === '1'; }catch(e){ return false; } }
