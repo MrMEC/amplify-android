@@ -15447,7 +15447,7 @@
       if(data[i + 3] < 128) continue;
       var hsl = rgbToHsl(data[i], data[i + 1], data[i + 2]);
       // Near-white, near-black and near-grey carry no hue worth building a page on.
-      if(hsl[2] < 0.12 || hsl[2] > 0.92 || hsl[1] < 0.15) continue;
+      if(o.loose ? (hsl[2] < 0.04 || hsl[2] > 0.97 || hsl[1] < 0.04) : (hsl[2] < 0.12 || hsl[2] > 0.92 || hsl[1] < 0.15)) continue;
       var key = Math.round(hsl[0] / 24);            // 15 buckets around the wheel
       var b2 = buckets[key] || (buckets[key] = { h: 0, s: 0, l: 0, w: 0 });
       var weight = hsl[1];
@@ -15485,7 +15485,7 @@
     var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform());
     if(!src || !/^https?:/i.test(src) || !native || !H || typeof H.request !== 'function') return Promise.resolve(null);
     if(readableCopyBusy[src] && !maxBytes) return readableCopyBusy[src];
-    var job = Promise.resolve(H.request({ url: src, method: 'GET', responseType: 'blob', connectTimeout: 8000, readTimeout: 8000 })).then(function(r){
+    var job = Promise.resolve(H.request({ url: src, method: 'GET', responseType: 'blob', connectTimeout: maxBytes ? 30000 : 8000, readTimeout: maxBytes ? 60000 : 8000, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36', 'Accept': 'image/*,*/*' } })).then(function(r){
       if(!r || r.status < 200 || r.status >= 300 || typeof r.data !== 'string' || !r.data) return null;
       var bin = atob(r.data.replace(/^data:[^,]*,/, ''));
       if(bin.length > (maxBytes || 4 * 1024 * 1024)) return null;
@@ -32240,6 +32240,20 @@
   ];
   // Default animated artwork bundled in the app (filled in by scripts/fetch-zen-art.sh at build time).
   var ZEN_BUNDLED = [];
+  // The web addresses the bundled GIFs came from: a preset whose saved picture is still one of these
+  // uses the copy inside the app (instant, offline, and its colour can be read).
+  var ZEN_GIF_URLS = {
+    'storm': 'https://i.pinimg.com/originals/2a/69/ab/2a69abcd11ecc2fed2f24c9212abfee7.gif',
+    'lighthouse': 'https://cdn.pixabay.com/animation/2024/05/27/21/55/21-55-52-574_512.gif',
+    'deep-sleep': 'https://i.makeagif.com/media/12-27-2023/QZRRMz.gif',
+    'cozy-cabin': 'https://i.makeagif.com/media/9-03-2020/uTRhF8.gif',
+    'forest-stream': 'https://i.pinimg.com/originals/8f/b1/a6/8fb1a65ac9a08636be60455ce87f0ca6.gif',
+    'rainy-night': 'https://i.pinimg.com/originals/e2/89/1a/e2891a60b8c9b60ead0a617eb26411b4.gif',
+    'campfire': 'https://i.pinimg.com/originals/6a/ad/41/6aad4128ff7d3c11406835667101ef82.gif',
+    'seaside-dawn': 'https://giffiles.alphacoders.com/457/4571.gif',
+    'misty-morning': 'https://i.pinimg.com/originals/a4/35/23/a43523b94c546f6a8a06c1a24e66152c.gif',
+    'deep-blue': 'https://i.pinimg.com/originals/cc/d0/db/ccd0dbb7eeb48aa6790ec216c543da89.gif'
+  };
   var ZEN_ART_NAMES = { 'rainy-night': 'Rainy night', campfire: 'Campfire', 'sea-dawn': 'Sea at dawn', forest: 'Forest', storm: 'Storm', cabin: 'Cabin', stars: 'Starry night', lighthouse: 'Lighthouse', mist: 'Misty morning', deep: 'Deep blue' };
 
   // ----- saved state -----
@@ -32379,7 +32393,7 @@
   function zenArtOf(p){
     var a = p && zenState.art[p.id];
     if(a && a.k === 'photo' && zenPhotos[p.id]) return zenPhotos[p.id];
-    if(a && a.k === 'url' && a.v) return a.v;
+    if(a && a.k === 'url' && a.v){ if(p && ZEN_GIF_URLS[p.id] === a.v && ZEN_BUNDLED.indexOf(p.id) >= 0) return 'zen/art/' + p.id + '.gif'; return a.v; }
     if(a && a.k === 'scene' && ZEN_SCENES[a.v]) return zenSceneUrl(a.v);
     if(p && ZEN_BUNDLED.indexOf(p.id) >= 0) return 'zen/art/' + p.id + '.gif';
     return zenSceneUrl(p && ZEN_SCENES[p.art] ? p.art : 'stars');
@@ -32834,27 +32848,33 @@
     zenEl.style.setProperty('--np-on-vivid', dv.on);
     document.body.style.setProperty('--zen-tint', colour || '');
   }
+  var zenTintStore = (function(){ try{ return JSON.parse(localStorage.getItem('radioPlayerZenTints') || '{}') || {}; }catch(e){ return {}; } })();
+  function zenTintRemember(url, c){
+    zenTintCache[url] = c;
+    if(/^https?:/i.test(url)){ zenTintStore[url] = c; try{ localStorage.setItem('radioPlayerZenTints', JSON.stringify(zenTintStore)); }catch(e){} }
+  }
   function zenApplyTint(p){
     var url = p ? zenArtOf(p) : zenSceneUrl('stars');
     if(zenTintCache[url]){ zenSetTint(zenTintCache[url]); return; }
+    if(zenTintStore[url]){ zenTintCache[url] = zenTintStore[url]; zenSetTint(zenTintStore[url]); return; }
     var a = p && zenState.art[p.id], key = null;
     if(!a){ if(!(p && ZEN_BUNDLED.indexOf(p.id) >= 0)) key = p && ZEN_SCENES[p.art] ? p.art : 'stars'; }
     else if(a.k === 'scene' && ZEN_SCENES[a.v]) key = a.v;
     if(key){ zenTintCache[url] = zenSceneTint(key); zenSetTint(zenTintCache[url]); return; }
     zenSetTint(zenSceneTint('stars'));
     var im = new Image(); im.crossOrigin = 'anonymous';
-    var apply = function(c){ if(c){ zenTintCache[url] = c; if(zenEl && zenBgKey === url) zenSetTint(c); } };
+    var apply = function(c){ if(c){ zenTintRemember(url, c); if(zenEl && zenBgKey === url) zenSetTint(c); } };
+    var read = function(img){ var c = null; try{ c = dominantColorFrom(img) || dominantColorFrom(img, { loose: true }); }catch(e){} return c; };
     // A picture from another site (a GIF you chose) taints the canvas without CORS, so the
-    // colour was never read: fall back to a natively fetched copy (large, animated GIFs allowed).
+    // colour could not be read: fall back to a natively fetched copy (large, animated GIFs allowed).
     var viaCopy = function(){
       readableImageCopy(url, 16 * 1024 * 1024).then(function(r){
         if(!r) return;
-        var c = null; try{ c = dominantColorFrom(r.img); }catch(e){}
-        r.done(); apply(c);
+        var c = read(r.img); r.done(); apply(c);
       });
     };
     im.onload = function(){
-      var c = null; try{ c = dominantColorFrom(im); }catch(e){}
+      var c = read(im);
       if(c) apply(c); else if(/^https?:/i.test(url)) viaCopy();
     };
     im.onerror = function(){ if(/^https?:/i.test(url)) viaCopy(); };
