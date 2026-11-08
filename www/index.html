@@ -32843,10 +32843,21 @@
     if(key){ zenTintCache[url] = zenSceneTint(key); zenSetTint(zenTintCache[url]); return; }
     zenSetTint(zenSceneTint('stars'));
     var im = new Image(); im.crossOrigin = 'anonymous';
+    var apply = function(c){ if(c){ zenTintCache[url] = c; if(zenEl && zenBgKey === url) zenSetTint(c); } };
+    // A picture from another site (a GIF you chose) taints the canvas without CORS, so the
+    // colour was never read: fall back to a natively fetched copy (large, animated GIFs allowed).
+    var viaCopy = function(){
+      readableImageCopy(url, 16 * 1024 * 1024).then(function(r){
+        if(!r) return;
+        var c = null; try{ c = dominantColorFrom(r.img); }catch(e){}
+        r.done(); apply(c);
+      });
+    };
     im.onload = function(){
       var c = null; try{ c = dominantColorFrom(im); }catch(e){}
-      if(c){ zenTintCache[url] = c; if(zenEl && zenBgKey === url) zenSetTint(c); }
+      if(c) apply(c); else if(/^https?:/i.test(url)) viaCopy();
     };
+    im.onerror = function(){ if(/^https?:/i.test(url)) viaCopy(); };
     im.src = url;
   }
   function zenChipsRender(){
