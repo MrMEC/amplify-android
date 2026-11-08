@@ -4336,6 +4336,7 @@
   /* The cover dialog can be opened from on top of another dialog (a custom search's edit
      modal), so it has to stack above the other .settings-overlay panels. */
   #artUrlOverlay{ z-index:502; }
+  #artUrlOverlay.over-tags{ z-index:1003; }
   /* Build 263: the channel editor. Its list of shows and movies scrolls inside the dialog. */
   #liveChPanel{ width:min(400px, 100%); max-height:calc(100dvh - 40px); overflow-y:auto; box-sizing:border-box; }
   .lc-opts{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -16277,6 +16278,8 @@
     if(!target || !target.key) return;
     artDialogTarget = target;
     artUrlTitle.textContent = target.title || 'Custom Cover Art';
+    artUrlOverlay.classList.toggle('over-tags', !!target.pick);
+    artUrlClearBtn.style.display = target.pick ? 'none' : '';
     var existing = getCustomArtUrl(target.key) || (target.clearAlso && getCustomArtUrl(target.clearAlso)) || '';
     // An uploaded image is kept out of the text field -- a data: URL is tens of thousands of
     // characters of noise there -- and shown in the preview instead.
@@ -16384,6 +16387,8 @@
     if(artFilesBusy) return; // the song files are being written; it closes itself after
     showArtMainScreen();
     artUrlOverlay.classList.remove('open');
+    artUrlOverlay.classList.remove('over-tags');
+    artUrlClearBtn.style.display = '';
     artPendingUpload = null;
     artPendingFile = null;
     artUrlFileInput.value = '';
@@ -16428,6 +16433,13 @@
     var t = artDialogTarget;
     if(!t) return;
     var val = currentArtDialogValue();
+    if(t.pick){
+      if(!val){ setArtNote('Choose a suggestion, upload an image or paste a link first.', true); return; }
+      var picked = artPendingFile || val;
+      closeArtUrlDialog();
+      t.pick(picked);
+      return;
+    }
     if(t.clearAlso) clearCustomArtUrl(t.clearAlso);
     var ok = val ? setCustomArtUrl(t.key, val) : clearCustomArtUrl(t.key);
     if(!ok && val){
@@ -16723,6 +16735,7 @@
       });
     }).then(function(url){
       if(seq !== artSuggestSeq || artDialogTarget !== t) return;
+      if(t.pick){ closeArtUrlDialog(); t.pick(url); return; }
       if(t.clearAlso) clearCustomArtUrl(t.clearAlso);
       if(!setCustomArtUrl(t.key, url)){ fail(); return; }
       if(t.refresh) t.refresh();
@@ -46255,6 +46268,34 @@
       saveTagEdits();
     }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
   }
+  // The same cover finder as everywhere else (MusicBrainz / Cover Art Archive suggestions, Google
+  // Images, an upload or a pasted link), opened over Info & Tags: the picture it returns becomes the
+  // sheet's pending cover, written into the file(s) when Save is tapped.
+  function openTagCoverFinder(suggestFirst){
+    var s = tagState;
+    if(!s) return;
+    var artist, album, nm;
+    if(s.mode === 'album'){ artist = s.album.artist || ''; album = s.album.name || ''; }
+    else { artist = s.track.artist || ''; album = s.track.album || s.track.name || ''; }
+    nm = (artist + ' ' + album).trim();
+    openArtUrlDialogFor({
+      key: 'tagpick:' + (s.mode === 'album' ? s.album.key : favKey(s.track)),
+      name: nm,
+      title: 'Cover Art',
+      suggest: { kind: 'album', artist: artist, album: album },
+      pick: function(src){
+        if(tagState !== s) return;
+        setTagNote('Preparing the picture…', 'info');
+        coverFromImage(src).then(function(c){
+          if(tagState !== s) return;
+          s.cover = c;
+          setTagNote('');
+          renderTagSheet();
+        }, function(err){ if(tagState === s) setTagNote((err && err.message) || 'That picture couldn’t be used.', 'err'); });
+      }
+    });
+    if(suggestFirst) showArtSuggestScreen();
+  }
   function buildTagCoverRow(current, opts){
     var s = tagState;
     var row = tagEl('div', 'tag-row tag-cover-row');
@@ -46298,6 +46339,8 @@
         btns.appendChild(b);
       }
       btn(blob ? 'Change' : 'Add', function(){ tagCoverInput.click(); });
+      btn('Suggest Images', function(){ openTagCoverFinder(true); });
+      btn('Search Google', function(){ openTagCoverFinder(false); });
       if(opts.shown) btn('Use Amplify’s Cover', useShownCover);
       if(blob || (!pending && opts.some)) btn('Remove', function(){ s.cover = null; renderTagSheet(); }, 'danger');
       if(pending) btn('Undo', function(){ s.cover = undefined; renderTagSheet(); });
