@@ -46064,7 +46064,7 @@
           doc.values = id3FieldValues(t.frames, t.major);
           if(t.major === 2) doc.whyNot = 'This file has an old ID3v2.2 tag, which can be viewed but not edited here.';
           else if(t.major > 4) doc.whyNot = 'This file’s tag version isn’t supported for editing.';
-          else if(ext !== 'mp3') doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+          else if(ext !== 'mp3') doc.whyNot = 'Editing tags works for MP3, M4A and FLAC files.';
           else doc.editable = true;
         });
       }
@@ -46103,7 +46103,7 @@
       if(magic === 'OggS'){
         doc.format = 'ogg';
         doc.formatLabel = (ext === 'opus' ? 'Opus' : 'Ogg') + ' · Vorbis comments';
-        doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+        doc.whyNot = 'Editing tags works for MP3, M4A and FLAC files.';
         return readBlobSlice(blob, 0, Math.min(blob.size, TAG_HEAD_BYTES)).then(function(buf){
           var b = new Uint8Array(buf), chunks = [], total = 0, p = 0, pages = 0;
           while(p + 27 <= b.length && pages < 16 && bytesToString(b, p, 4) === 'OggS'){
@@ -46130,12 +46130,22 @@
       if(bytesToString(h, 4, 4) === 'ftyp'){
         doc.format = 'mp4';
         doc.formatLabel = (ext === 'm4b' ? 'M4B' : ext === 'mp4' ? 'MP4' : 'M4A') + ' · iTunes tags';
-        doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
-        return findMp4Moov(blob).then(function(moov){
+        doc.whyNot = 'This file’s tags can’t be edited here.';
+        return mp4Layout(blob).then(function(lay){
+          var moov = lay.filter(function(c){ return c.name === 'moov'; })[0];
           if(!moov) return;
-          var r = describeMp4(moov);
-          doc.rows = r.rows;
-          doc.values = r.values;
+          if(lay.some(function(c){ return c.name === 'moof'; })){ doc.whyNot = 'This is a fragmented MP4 file, whose tags can’t be edited here.'; }
+          if(moov.size > MP4_MOOV_MAX){ doc.whyNot = 'This file’s header is too large to edit here.'; return; }
+          return readBlobSlice(blob, moov.off, moov.size).then(function(mb){
+            var atom = new Uint8Array(mb);
+            var r = describeMp4(atom.subarray(moov.hdr));
+            doc.rows = r.rows;
+            doc.values = r.values;
+            if(!lay.some(function(c){ return c.name === 'moof'; })){
+              doc.editable = true; doc.whyNot = '';
+              doc.mp4 = { off: moov.off, size: moov.size, hdr: moov.hdr, atom: atom };
+            }
+          });
         });
       }
       // No tag at the front yet: an MP3 gets a brand new ID3v2.3 tag when saved.
@@ -46144,10 +46154,10 @@
         doc.formatLabel = 'MP3 · no ID3v2 tag';
         doc.id3 = { major: 3, revision: 0, end: 0, frames: [] };
         doc.editable = ext === 'mp3';
-        if(!doc.editable) doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+        if(!doc.editable) doc.whyNot = 'Editing tags works for MP3, M4A and FLAC files.';
         return;
       }
-      doc.whyNot = 'Editing tags works for MP3 and FLAC files.';
+      doc.whyNot = 'Editing tags works for MP3, M4A and FLAC files.';
     }).then(function(){
       return readId3v1(blob).then(function(v1){
         doc.v1 = v1;
@@ -46162,6 +46172,138 @@
       });
     });
   }
+
+  // ---------- Build 503 (Mark): editing tags in M4A / MP4 / M4B files ----------
+  // The tags live in moov > udta > meta > ilst. A changed tag makes moov a different length, so the
+  // whole moov atom is rebuilt and written over the old one (the phone rewrites the file around it);
+  // when moov comes before the audio (mdat), every chunk offset in it is moved by the difference.
+  var MP4_TEXT_ITEMS = { title: '©nam', artist: '©ART', album: '©alb', albumArtist: 'aART', genre: '©gen',
+    year: '©day', composer: '©wrt', comment: '©cmt', lyrics: '©lyr' };
+  function mp4Layout(blob){
+    var offset = 0, out = [];
+    function step(){
+      if(offset + 8 > blob.size || out.length > 4000) return Promise.resolve(out);
+      return readBlobSlice(blob, offset, 16).then(function(hb){
+        var h = new Uint8Array(hb);
+        if(h.length < 8) return out;
+        var size = u32be(h, 0), name = bytesToString(h, 4, 4), hdr = 8;
+        if(size === 1){ if(h.length < 16) return out; size = u32be(h, 8) * 4294967296 + u32be(h, 12); hdr = 16; }
+        else if(size === 0) size = blob.size - offset;
+        if(size < hdr || offset + size > blob.size) return out;
+        out.push({ name: name, off: offset, size: size, hdr: hdr });
+        offset += size;
+        return step();
+      });
+    }
+    return step();
+  }
+  function mp4Children(b, start, end){
+    var list = [], p = start;
+    while(p + 8 <= end){
+      var size = u32be(b, p), hdr = 8;
+      if(size === 1){ if(p + 16 > end) break; size = u32be(b, p + 8) * 4294967296 + u32be(b, p + 12); hdr = 16; }
+      else if(size === 0) size = end - p;
+      if(size < hdr || p + size > end) break;
+      list.push({ name: bytesToString(b, p + 4, 4), start: p, hdr: hdr, end: p + size, bytes: b.subarray(p, p + size) });
+      p += size;
+    }
+    return list;
+  }
+  function mp4Atom(name, parts){
+    var body = tagConcat(parts);
+    return tagConcat([tagBe32(8 + body.length), tagLatin1(name), body]);
+  }
+  function mp4Item(name, type, payload){
+    return mp4Atom(name, [mp4Atom('data', [new Uint8Array([0, 0, 0, type, 0, 0, 0, 0]), payload])]);
+  }
+  function mp4Pair(v){
+    var m = /^\s*(\d+)\s*(?:\/\s*(\d+))?\s*$/.exec(String(v || ''));
+    return m ? [Math.min(+m[1], 65535), Math.min(+(m[2] || 0), 65535)] : null;
+  }
+  // The new ilst item for a changed field: bytes, or null when the field is cleared.
+  function mp4ItemFor(key, value, cover){
+    if(key === 'cover'){
+      if(!value || !value.bytes) return null;
+      return mp4Item('covr', /png/i.test(value.mime || '') ? 14 : 13, value.bytes);
+    }
+    var v = String(value == null ? '' : value).trim();
+    if(!v) return null;
+    if(key === 'track' || key === 'disc'){
+      var pr = mp4Pair(v);
+      if(!pr) return null;
+      var a = [0, 0, pr[0] >> 8, pr[0] & 255, pr[1] >> 8, pr[1] & 255];
+      return mp4Item(key === 'track' ? 'trkn' : 'disk', 0, new Uint8Array(key === 'track' ? a.concat([0, 0]) : a));
+    }
+    return mp4Item(MP4_TEXT_ITEMS[key], 1, tagUtf8(v));
+  }
+  function mp4ItemName(key){ return key === 'cover' ? 'covr' : key === 'track' ? 'trkn' : key === 'disc' ? 'disk' : MP4_TEXT_ITEMS[key]; }
+  // Moves every chunk offset that points past the old moov (stco / co64) by delta.
+  function mp4ShiftOffsets(b, start, end, delta, oldEnd){
+    mp4Children(b, start, end).forEach(function(c){
+      if(c.name === 'trak' || c.name === 'mdia' || c.name === 'minf' || c.name === 'stbl') mp4ShiftOffsets(b, c.start + c.hdr, c.end, delta, oldEnd);
+      else if(c.name === 'stco' || c.name === 'co64'){
+        var w = c.name === 'stco' ? 4 : 8, n = u32be(b, c.start + c.hdr + 4), at = c.start + c.hdr + 8;
+        for(var i = 0; i < n && at + w <= c.end; i++, at += w){
+          if(w === 4){
+            var v = u32be(b, at);
+            if(v >= oldEnd){ v += delta; if(v < 0 || v > 4294967295) throw new Error('This file is too large to edit here.'); b[at] = v >>> 24; b[at + 1] = (v >>> 16) & 255; b[at + 2] = (v >>> 8) & 255; b[at + 3] = v & 255; }
+          } else {
+            var big = u32be(b, at) * 4294967296 + u32be(b, at + 4);
+            if(big >= oldEnd){ big += delta; var hi = Math.floor(big / 4294967296), lo = big % 4294967296;
+              b[at] = hi >>> 24; b[at + 1] = (hi >>> 16) & 255; b[at + 2] = (hi >>> 8) & 255; b[at + 3] = hi & 255;
+              b[at + 4] = lo >>> 24; b[at + 5] = (lo >>> 16) & 255; b[at + 6] = (lo >>> 8) & 255; b[at + 7] = lo & 255; }
+          }
+        }
+      }
+    });
+  }
+  function mp4Hdlr(){
+    return mp4Atom('hdlr', [new Uint8Array(8), tagLatin1('mdir'), tagLatin1('appl'), new Uint8Array(9)]);
+  }
+  // The whole new moov atom for doc.mp4 with the changes applied.
+  function buildMp4Moov(doc, changes){
+    var m = doc.mp4, a = m.atom, hdr = m.hdr;
+    var kids = mp4Children(a, hdr, a.length);
+    var udta = kids.filter(function(c){ return c.name === 'udta'; })[0];
+    var udtaKids = udta ? mp4Children(a, udta.start + udta.hdr, udta.end) : [];
+    var meta = udtaKids.filter(function(c){ return c.name === 'meta'; })[0];
+    var metaKids = meta ? mp4Children(a, meta.start + meta.hdr + 4, meta.end) : [];
+    var ilst = metaKids.filter(function(c){ return c.name === 'ilst'; })[0];
+    var items = ilst ? mp4Children(a, ilst.start + ilst.hdr, ilst.end).map(function(c){ return { name: c.name, bytes: c.bytes }; }) : [];
+    Object.keys(changes || {}).forEach(function(key){
+      var name = mp4ItemName(key);
+      if(!name) return;
+      var made = mp4ItemFor(key, changes[key]);
+      if(key === 'genre') items = items.filter(function(it){ return it.name !== 'gnre'; });
+      var placed = false;
+      items = items.filter(function(it){
+        if(it.name !== name) return true;
+        if(made && !placed){ it.bytes = made; placed = true; return true; }
+        return false;
+      });
+      if(made && !placed) items.push({ name: name, bytes: made });
+    });
+    var newIlst = mp4Atom('ilst', items.map(function(it){ return it.bytes; }));
+    var newMetaParts = [new Uint8Array(4)], sawIlst = false, sawHdlr = metaKids.some(function(c){ return c.name === 'hdlr'; });
+    if(!sawHdlr) newMetaParts.push(mp4Hdlr());
+    metaKids.forEach(function(c){
+      if(c.name === 'free' || c.name === 'skip') return;
+      if(c.name === 'ilst'){ newMetaParts.push(newIlst); sawIlst = true; } else newMetaParts.push(c.bytes);
+    });
+    if(!sawIlst) newMetaParts.push(newIlst);
+    var newMeta = mp4Atom('meta', newMetaParts);
+    var newUdtaParts = [], sawMeta = false;
+    udtaKids.forEach(function(c){ if(c.name === 'meta'){ if(!sawMeta){ newUdtaParts.push(newMeta); sawMeta = true; } } else newUdtaParts.push(c.bytes); });
+    if(!sawMeta) newUdtaParts.push(newMeta);
+    var newUdta = mp4Atom('udta', newUdtaParts);
+    var parts = [], sawUdta = false;
+    kids.forEach(function(c){ if(c.name === 'udta'){ if(!sawUdta){ parts.push(newUdta); sawUdta = true; } } else parts.push(c.bytes); });
+    if(!sawUdta) parts.push(newUdta);
+    var moov = mp4Atom('moov', parts);
+    var delta = moov.length - m.size;
+    if(delta !== 0) mp4ShiftOffsets(moov, 8, moov.length, delta, m.off + m.size);
+    return moov;
+  }
   function buildTagHead(doc, changes){
     return doc.format === 'flac' ? buildFlacHead(doc, changes) : buildId3Tag(doc, changes);
   }
@@ -46169,7 +46311,7 @@
   // --- the song's bytes: the folder copy first ---
   function tagSourceFor(track){
     var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer;
-    var canDisk = !!(NATIVE_APP && track.srcUri && P && typeof P.writeFileHead === 'function');
+    var canDisk = !!(NATIVE_APP && track.srcUri && P && typeof P.writeFileHead === 'function' && typeof P.writeFileRange === 'function');
     function fromLibrary(){
       return localFileBlob(track).then(function(b){
         if(!b) throw new Error('This song’s file isn’t on this device.');
@@ -46358,7 +46500,7 @@
 
     var sec = tagEl('div', 'tag-sec');
     sec.appendChild(tagEl('div', 'tag-sec-title', 'Tags'));
-    // Build 232: the cover in the file, which Edit can change or take out (MP3 and FLAC).
+    // Build 232: the cover in the file, which Edit can change or take out (MP3, M4A and FLAC).
     if(doc.editable || docCover(doc)){
       var cur = docCover(doc);
       sec.appendChild(buildTagCoverRow(cur, { some: !!cur, shown: !!(customArtFor(track) || s.shownSrc) }));
@@ -46498,7 +46640,22 @@
   // ---- writing tags (build 232: shared by a song, an album and the cover art dialog) ----
   // The new tag goes over the old one in the music folder's file (or only Amplify's copy, when
   // the file can't be reached), then the library is brought up to date. Resolves { file, disk }.
+  function writeMp4Changes(track, doc, onDisk, changes, opts){
+    return Promise.resolve().then(function(){
+      var m = doc.mp4, moov = buildMp4Moov(doc, changes);
+      var newBlob = new Blob([doc.blob.slice(0, m.off), moov, doc.blob.slice(m.off + m.size)], { type: doc.blob.type || track.mime || '' });
+      var write = onDisk
+        ? tagPlugin().writeFileRange({ uri: track.srcUri, data: tagBase64(moov), offset: m.off, replace: m.size, crc: crc32(m.atom), size: doc.blob.size })
+        : Promise.resolve(null);
+      return write.then(function(disk){
+        var file = new File([newBlob], track.fileName || 'song', { type: newBlob.type, lastModified: (disk && disk.lastModified) || Date.now() });
+        return applySavedTags(track, file, disk, { quiet: !!(opts && opts.quiet), cover: hasCoverChange(changes) })
+          .then(function(){ return { file: file, disk: disk }; });
+      });
+    });
+  }
   function writeTagChanges(track, doc, onDisk, changes, opts){
+    if(doc.format === 'mp4') return writeMp4Changes(track, doc, onDisk, changes, opts);
     return Promise.resolve().then(function(){
       var newHead = buildTagHead(doc, changes);
       var oldHead = doc.head.subarray(0, doc.headLen);
@@ -46853,7 +47010,7 @@
       if(tagState !== mine) return;
       mine.doc = { editable: mine.album.editable > 0, whyNot: mine.album.why || 'These files can’t be edited here.' };
       renderTagSheet();
-      if(!mine.album.editable) setTagNote(mine.album.why || 'Editing tags works for MP3 and FLAC files.', 'info');
+      if(!mine.album.editable) setTagNote(mine.album.why || 'Editing tags works for MP3, M4A and FLAC files.', 'info');
     })['catch'](function(err){
       if(tagState !== mine) return;
       tagBody.innerHTML = '';

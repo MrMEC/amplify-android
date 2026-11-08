@@ -94,6 +94,81 @@ final class TagWriter {
     }
   }
 
+  /**
+   * M4A / MP4 tags: replaces {@code removeLen} bytes at {@code offset} (the moov atom) with new
+   * bytes of any length. The bytes before and after are copied aside first; the checksum of the
+   * removed bytes and the file size must match what the page read, and a failed write puts the old
+   * bytes back.
+   */
+  static void replaceRange(Io io, byte[] data, long offset, int removeLen, long crc, long expectSize, File tmpDir)
+      throws IOException, Changed {
+    long size = io.size();
+    if (expectSize >= 0 && size >= 0 && size != expectSize) throw new Changed();
+    if (offset < 0 || removeLen < 0 || (size >= 0 && offset + removeLen > size)) throw new Changed();
+    byte[] old = new byte[removeLen];
+    File front = File.createTempFile("tag-front", ".bin", tmpDir);
+    File back = File.createTempFile("tag-back", ".bin", tmpDir);
+    boolean keep = false;
+    try {
+      long backLen;
+      try (InputStream in = io.read()) {
+        try (OutputStream out = new FileOutputStream(front)) {
+          long left = offset;
+          byte[] b = new byte[64 * 1024];
+          while (left > 0) {
+            int n = in.read(b, 0, (int) Math.min(b.length, left));
+            if (n < 0) throw new IOException("The file ended early");
+            out.write(b, 0, n);
+            left -= n;
+          }
+        }
+        readFully(in, old);
+        CRC32 c = new CRC32();
+        c.update(old, 0, old.length);
+        if (c.getValue() != (crc & 0xffffffffL)) throw new Changed();
+        try (OutputStream out = new FileOutputStream(back)) {
+          backLen = copy(in, out);
+        }
+      }
+      if (size >= 0 && offset + removeLen + backLen != size) {
+        throw new IOException("The whole file could not be read");
+      }
+      boolean ok = false;
+      try {
+        writeParts(io, front, data, back);
+        ok = true;
+      } finally {
+        if (!ok) {
+          try {
+            writeParts(io, front, old, back);
+          } catch (Exception restoreFailed) {
+            keep = true; // the audio stays in the app's cache rather than being lost
+          }
+        }
+      }
+    } finally {
+      if (!keep) {
+        //noinspection ResultOfMethodCallIgnored
+        front.delete();
+        //noinspection ResultOfMethodCallIgnored
+        back.delete();
+      }
+    }
+  }
+
+  private static void writeParts(Io io, File front, byte[] middle, File back) throws IOException {
+    try (OutputStream out = io.rewrite()) {
+      try (InputStream in = new FileInputStream(front)) {
+        copy(in, out);
+      }
+      out.write(middle);
+      try (InputStream in = new FileInputStream(back)) {
+        copy(in, out);
+      }
+      out.flush();
+    }
+  }
+
   private static void writeAll(Io io, byte[] head, File tail) throws IOException {
     try (OutputStream out = io.rewrite();
         InputStream in = new FileInputStream(tail)) {

@@ -2022,6 +2022,98 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
         .start();
   }
 
+  @PluginMethod
+  public void writeFileRange(PluginCall call) {
+    final String u = call.getString("uri");
+    final String b64 = call.getString("data");
+    final Integer replace = call.getInt("replace");
+    final long offset = call.getData().optLong("offset", -1);
+    final long crc = call.getData().optLong("crc", -1);
+    final long expect = call.getData().optLong("size", -1);
+    if (u == null || b64 == null || replace == null || offset < 0 || crc < 0) {
+      call.reject("Missing details");
+      return;
+    }
+    final Uri doc = Uri.parse(u);
+    if (!canWrite(doc)) {
+      call.reject("Amplify can't change files in this folder yet", "NO_WRITE");
+      return;
+    }
+    final ContentResolver cr = getContext().getContentResolver();
+    final File tmpDir = getContext().getCacheDir();
+    new Thread(
+            () -> {
+              try {
+                byte[] head = Base64.decode(b64, Base64.DEFAULT);
+                TagWriter.replaceRange(
+                    new TagWriter.Io() {
+                      @Override
+                      public long size() {
+                        try (android.os.ParcelFileDescriptor pfd = cr.openFileDescriptor(doc, "r")) {
+                          return pfd == null ? -1 : pfd.getStatSize();
+                        } catch (Exception e) {
+                          return -1;
+                        }
+                      }
+
+                      @Override
+                      public java.io.InputStream read() throws java.io.IOException {
+                        java.io.InputStream in = cr.openInputStream(doc);
+                        if (in == null) throw new java.io.IOException("The file can't be opened");
+                        return in;
+                      }
+
+                      @Override
+                      public java.io.OutputStream rewrite() throws java.io.IOException {
+                        java.io.OutputStream out = cr.openOutputStream(doc, "wt");
+                        if (out == null) throw new java.io.IOException("The file can't be written");
+                        return out;
+                      }
+
+                      @Override
+                      public void writeInPlace(byte[] data) throws java.io.IOException {
+                        try (android.os.ParcelFileDescriptor pfd = cr.openFileDescriptor(doc, "rw")) {
+                          if (pfd == null) throw new java.io.IOException("The file can't be written");
+                          try (FileOutputStream fos = new FileOutputStream(pfd.getFileDescriptor())) {
+                            java.nio.channels.FileChannel ch = fos.getChannel();
+                            java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(data);
+                            long pos = 0;
+                            while (buf.hasRemaining()) pos += ch.write(buf, pos);
+                            fos.getFD().sync();
+                          }
+                        }
+                      }
+                    },
+                    head,
+                    offset,
+                    replace,
+                    crc,
+                    expect,
+                    tmpDir);
+                JSObject o = new JSObject();
+                String[] cols = {
+                  DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                };
+                try (Cursor c = cr.query(doc, cols, null, null, null)) {
+                  if (c != null && c.moveToFirst()) {
+                    o.put("size", c.isNull(0) ? 0 : c.getLong(0));
+                    o.put("lastModified", c.isNull(1) ? 0 : c.getLong(1));
+                  }
+                } catch (Exception ignored) {
+                }
+                call.resolve(o);
+              } catch (TagWriter.Changed e) {
+                call.reject(e.getMessage(), "CHANGED");
+              } catch (SecurityException e) {
+                call.reject("Amplify can't change files in this folder yet", "NO_WRITE");
+              } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Write failed" : e.getMessage());
+              }
+            })
+        .start();
+  }
+
+
   /** Asks again for a music folder, this time with permission to change its files. */
   @PluginMethod
   public void grantFolderWrite(PluginCall call) {
