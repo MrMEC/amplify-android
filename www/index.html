@@ -7176,6 +7176,12 @@
   .zen-screen.is-playing .zen-ring{ opacity:1; visibility:visible; transition-delay:0s; transform:none; animation:zenPulse 4.5s ease-in-out infinite; }
   @keyframes zenPulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.09); opacity:.8; } }
   .zen-next{ width:100%; max-width:520px; box-sizing:border-box; padding:12px 0 12px; border-radius:18px; background:color-mix(in srgb, var(--np-vivid, #fff) 24%, transparent); border:1px solid color-mix(in srgb, var(--np-vivid, #fff) 38%, transparent); text-shadow:0 1px 3px rgba(0,0,0,.35); }
+  .zen-next-label{ display:flex; align-items:center; justify-content:space-between; width:100%; border:0; background:none; text-align:left; transition:padding .3s ease; }
+  .zen-next-label .zen-svg{ width:20px; height:20px; stroke-width:2.2; transition:transform .3s ease; }
+  .zen-next.closed .zen-next-label .zen-svg{ transform:rotate(180deg); }
+  .zen-presets{ max-height:170px; transition:max-height .3s ease, opacity .3s ease, padding .3s ease; }
+  .zen-next.closed .zen-presets{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; pointer-events:none; }
+  .zen-next.closed .zen-next-label{ padding-bottom:0; }
   .zen-next-label{ padding:0 16px 8px; font-size:11.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--np-vivid, #fff); }
   .zen-presets{ display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; padding:4px 16px 2px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   .zen-presets::-webkit-scrollbar{ display:none; }
@@ -7255,6 +7261,7 @@
   .zen-sheet-btns .zen-btn{ flex:1 1 0; }
   .zen-sheet-btns-col{ flex-direction:column; }
   .zen-btn{ height:48px; padding:0 20px; border-radius:24px; border:1.5px solid rgba(255,255,255,.35); background:none; font-size:16px; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .zen-sheet-btns-col .zen-btn{ flex:none; height:54px; min-height:54px; }
   .zen-btn-main{ background:var(--za); border-color:var(--za); color:#1a1205 !important; }
   .zen-art-grid{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
   .zen-art{ position:relative; aspect-ratio:1/1.1; border:2px solid transparent; border-radius:14px; background-size:cover; background-position:center; padding:0; overflow:hidden; display:flex; align-items:flex-end; }
@@ -32626,7 +32633,7 @@
       + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button>'
       + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
       + '<button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button></div>'
-      + '<div class="zen-next"><div class="zen-next-label">Zen Mixes</div><div class="zen-presets" id="zenPresets"></div></div></div>'
+      + '<div class="zen-next' + (zenState.nextClosed ? ' closed' : '') + '" id="zenNext"><button type="button" class="zen-next-label" id="zenNextHead" aria-expanded="' + (zenState.nextClosed ? 'false' : 'true') + '"><span>Zen Mixes</span>' + zenSvg('down') + '</button><div class="zen-presets" id="zenPresets"></div></div></div>'
       + '<div class="zen-scrim" id="zenScrim"></div>'
       + '<div class="zen-mixer" id="zenMixer"><div class="zen-mixer-head"><span class="zen-mixer-ttl" id="zenMixTtl">Mix</span>'
       + '<button type="button" class="zen-side" id="zenMixClose" aria-label="Close mix">' + zenSvg('down') + '</button></div><div class="zen-mixer-top" id="zenMixTop"></div><div class="zen-mixer-body" id="zenMixBody"></div></div>'
@@ -32634,6 +32641,11 @@
     document.body.appendChild(zenEl);
     zenAttachSwipe(zenEl);
     zenEl.querySelector('#zenClose').addEventListener('click', zenClose);
+    zenEl.querySelector('#zenNextHead').addEventListener('click', function(){
+      var box = zenEl.querySelector('#zenNext'), c = box.classList.toggle('closed');
+      this.setAttribute('aria-expanded', c ? 'false' : 'true');
+      zenState.nextClosed = c; zenSave();
+    });
     zenEl.querySelector('#zenGoZen').addEventListener('click', function(){ zenClose(); try{ pushView(); openLibTab('zen'); }catch(e){} });
     zenEl.querySelector('#zenCast').addEventListener('click', function(){ var b = document.getElementById('castBtn'); if(b) b.click(); });
     zenEl.querySelector('#zenAvatar').addEventListener('click', function(){
