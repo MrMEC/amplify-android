@@ -7161,7 +7161,7 @@
   .zen-kick:active{ background:rgba(255,255,255,.14); }
   .zen-title{ margin:0 0 6px; max-width:100%; font-size:clamp(18px, 5vw, 26px); font-weight:800; letter-spacing:-.005em; line-height:1.2; color:#fff; text-align:center; text-shadow:0 2px 18px rgba(0,0,0,.45); overflow-wrap:anywhere; }
   .zen-sub{ margin:0 0 20px; max-width:100%; min-height:1.3em; font-size:13.5px; color:rgba(255,255,255,.8); text-align:center; text-shadow:0 1px 10px rgba(0,0,0,.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .zen-controls{ display:flex; align-items:center; justify-content:center; gap:30px; margin-bottom:22px; }
+  .zen-controls{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:32px; }
   .zen-screen .zen-side, .zen-screen .zen-kick{ color:var(--np-vivid, #fff); }
   .zen-side{ flex:none; width:46px; height:46px; border:0; background:none; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--np-vivid, #fff); transition:color .5s ease, background .15s ease; }
   .zen-side:active{ background:rgba(255,255,255,.14); }
@@ -7171,6 +7171,7 @@
   .zen-disc{ position:relative; width:68px; height:68px; border-radius:50%; background:var(--np-vivid, #fff); color:var(--np-on-vivid, #111); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 26px rgba(0,0,0,.35); transition:background-color .5s ease, color .5s ease, filter .15s ease, transform .15s ease; }
   .zen-play:active .zen-disc{ filter:brightness(.94); transform:scale(.97); }
   .zen-disc svg{ width:28px; height:28px; fill:currentColor; }
+  .zen-ring, .zen-ring::after{ display:none !important; }
   .zen-ring{ position:absolute; inset:-14px; border-radius:calc(var(--r-play, 999px) + 14px); background:color-mix(in srgb, var(--np-vivid, #fff) 24%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--np-vivid, #fff) 22%, transparent); opacity:0; visibility:hidden; transform:scale(.9); transition:opacity .35s, transform .35s, visibility 0s linear .35s; pointer-events:none; }
   .zen-ring::after{ content:''; position:absolute; inset:8px; border-radius:inherit; background:color-mix(in srgb, var(--np-vivid, #fff) 22%, transparent); }
   .zen-screen.is-playing .zen-ring{ opacity:1; visibility:visible; transition-delay:0s; transform:none; animation:zenPulse 4.5s ease-in-out infinite; }
@@ -18090,6 +18091,12 @@
     return true;
   }
   function renderStationArt(container, station){
+    if(station && station.type === 'zen'){
+      container.innerHTML = '';
+      var zpp = (station.zenId && zenPreset(station.zenId)) || { id: '_', art: 'stars' };
+      zenPaint(container, zpp);
+      return;
+    }
     if(deferArt(container, function(){ renderStationArt(container, station); })) return;
     if(container && container._lazyArt){ container._lazyArt = null; if(lazyArtIO) lazyArtIO.unobserve(container); }
     // Build 416: a re-render while the same song cover is already showing must not blank the
@@ -32195,6 +32202,10 @@
     pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
+    prev: '<path d="M6 5v14" stroke-width="2.2"/><path d="M19 5.5v13a.6.6 0 0 1-.92.5l-9.4-6.5a.6.6 0 0 1 0-1l9.4-6.5a.6.6 0 0 1 .92.5z" fill="currentColor"/>',
+    next: '<path d="M18 5v14" stroke-width="2.2"/><path d="M5 5.5v13a.6.6 0 0 0 .92.5l9.4-6.5a.6.6 0 0 0 0-1L5.92 5a.6.6 0 0 0-.92.5z" fill="currentColor"/>',
+    star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+    queue: '<path d="M4 6h12"/><path d="M4 11h12"/><path d="M4 16h7"/><path d="M17 14v6"/><path d="M14 17h6"/>',
     close: '<path d="M5 5l14 14"/><path d="M19 5 5 19"/>',
     up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
     plus: '<path d="M12 5v14"/><path d="M5 12h14"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5-5 4 4 3-3 4 4"/>'
@@ -32631,7 +32642,9 @@
       + '<button type="button" class="zen-avatar" id="zenAvatar" aria-label="Menu"><i class="za-in" id="zenAvatarIn"></i></button></div>'
       + '<div class="zen-main" id="zenMain"><button type="button" class="zen-kick" id="zenGoZen">Zen</button><h2 class="zen-title" id="zenTitle">Zen</h2><div class="zen-sub" id="zenSub"></div>'
       + '<div class="zen-controls"><button type="button" class="zen-side" id="zenMixBtn" aria-label="Mix">' + zenSvg('mixer') + '</button>'
-      + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-ring"></span><span class="zen-disc" id="zenDisc"></span></button>'
+      + '<button type="button" class="zen-side" id="zenPrev" aria-label="Previous mix">' + zenSvg('prev') + '</button>'
+      + '<button type="button" class="zen-play" id="zenPlayBtn" aria-label="Play"><span class="zen-disc" id="zenDisc"></span></button>'
+      + '<button type="button" class="zen-side" id="zenNextBtn" aria-label="Next mix">' + zenSvg('next') + '</button>'
       + '<button type="button" class="zen-side" id="zenMore" aria-label="Menu">' + zenSvg('more') + '</button></div>'
       + '<div class="zen-next' + (zenState.nextClosed ? ' closed' : '') + '" id="zenNext"><button type="button" class="zen-next-label" id="zenNextHead" aria-expanded="' + (zenState.nextClosed ? 'false' : 'true') + '"><span>Zen Mixes</span>' + zenSvg('down') + '</button><div class="zen-presets" id="zenPresets"></div></div></div>'
       + '<div class="zen-scrim" id="zenScrim"></div>'
@@ -32652,6 +32665,8 @@
       var h = document.getElementById('hamburgerBtn'); if(h) h.click();
     });
     zenEl.querySelector('#zenPlayBtn').addEventListener('click', zenToggle);
+    zenEl.querySelector('#zenPrev').addEventListener('click', function(){ zenSkip(-1); });
+    zenEl.querySelector('#zenNextBtn').addEventListener('click', function(){ zenSkip(1); });
     zenEl.querySelector('#zenMore').addEventListener('click', function(){ zenPresetMenu(zenCur && zenPreset(zenCur) ? zenCur : null); });
     function mixToggle(){ zenMixOpen = !zenMixOpen; zenSyncUi(); }
     zenEl.querySelector('#zenMixBtn').addEventListener('click', mixToggle);
@@ -32956,10 +32971,15 @@
       rows.push(['timer', zenTimerEnd ? 'Sleep timer (' + zenLeft() + ' left)' : 'Sleep timer']);
       if(!p.built){ rows.push(['update', 'Replace “' + p.n + '” with this mix']); rows.push(['rename', 'Rename']); rows.push(['delete', 'Delete']); }
     } else { rows.push(['art', 'Change artwork']); rows.push(['timer', zenTimerEnd ? 'Sleep timer (' + zenLeft() + ' left)' : 'Sleep timer']); }
+    if(p){
+      var zi = zenHeroItem(p.id);
+      rows.push(['fav', zi && isFavorite(zi) ? 'Remove from Favorites' : 'Add to Favorites']);
+      rows.push(['queue', 'Add to Queue']);
+    }
     rows.push(['add', 'Add sounds']);
     rows.push(['reorder', 'Reorder presets']);
     zenSheetOpen('<div class="zen-sheet-title">' + (p ? zenEsc(p.n) : 'Custom mix') + '</div><div class="zen-list">' + rows.map(function(r){
-      var ic = { save: 'save', art: 'image', timer: 'timer', update: 'refresh', rename: 'pencil', 'delete': 'trash', add: 'plus', reorder: 'reorder' }[r[0]] || 'note';
+      var ic = { save: 'save', fav: 'star', queue: 'queue', art: 'image', timer: 'timer', update: 'refresh', rename: 'pencil', 'delete': 'trash', add: 'plus', reorder: 'reorder' }[r[0]] || 'note';
       return '<button type="button" class="zen-row' + (r[0] === 'delete' ? ' danger' : '') + '" data-a="' + r[0] + '"><span class="zen-row-ic">' + zenSvg(ic) + '</span><span>' + zenEsc(r[1]) + '</span></button>';
     }).join('') + '</div>', function(sh){
       Array.prototype.forEach.call(sh.querySelectorAll('.zen-row'), function(b){
@@ -32971,6 +32991,8 @@
           else if(a === 'rename') zenRenamePrompt(p);
           else if(a === 'delete') zenDelete(p);
           else if(a === 'update'){ zenUpdatePreset(p); zenSheetClose(); }
+          else if(a === 'fav'){ var fi = zenHeroItem(p.id); if(fi){ toggleFavorite(fi); setStatus(isFavorite(fi) ? '\u201c' + p.n + '\u201d added to Favorites.' : '\u201c' + p.n + '\u201d removed from Favorites.'); } zenSheetClose(); }
+          else if(a === 'queue'){ var qi = zenHeroItem(p.id); if(qi) queueAddToEnd([qi]); zenSheetClose(); }
           else if(a === 'add') zenAddSheet();
           else if(a === 'reorder') zenReorderSheet();
         });
@@ -33272,6 +33294,19 @@
 
   // ----- Library > Zen, Home and the White Noise genre -----
   function zenNowPreset(){ var p = zenCur && zenPreset(zenCur); return p || zenPreset(ZEN_PRESETS[0].id); }
+  // Next / Previous: the next mix in the queue or playlist the mix came from, else the next one listed.
+  function zenSkip(dir){
+    var cur = zenCur && zenPreset(zenCur) ? zenCur : null;
+    var inCtx = !!cur && queueIndex >= 0 && !!playQueue[queueIndex] && favKey(playQueue[queueIndex]) === 'zen:' + cur;
+    if(dir > 0){
+      if(upNext.length){ playNextInLine(); return; }
+      if(inCtx && queueIndex < playQueue.length - 1){ playQueueStep(1); return; }
+    } else if(inCtx && queueIndex > 0){ playQueueStep(-1); return; }
+    var all = zenAllPresets(); if(!all.length) return;
+    var at = -1; all.forEach(function(p, i){ if(p.id === cur) at = i; });
+    var n = at < 0 ? (dir > 0 ? 0 : all.length - 1) : (at + dir + all.length) % all.length;
+    zenSelect(all[n].id, true);
+  }
   function zenHeroIcon(){
     return zenPlaying ? '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.8" height="14" rx="1"/><rect x="13.7" y="5" width="3.8" height="14" rx="1"/></svg>'
       : '<svg viewBox="0 0 24 24"><path d="M8 5.2v13.6a.6.6 0 0 0 .92.5l11-6.8a.6.6 0 0 0 0-1l-11-6.8A.6.6 0 0 0 8 5.2z"/></svg>';
@@ -43462,6 +43497,7 @@
 
   // ---------- the queue panel ----------
   function queueRowSub(t){
+    if(t && t.type === 'zen') return 'Zen Mix';
     if(isLocalTrack(t)) return [t.artist, t.album].filter(Boolean).join(' · ') || 'Song';
     if(isPodcastTrack(t)) return subtitleForPodcast(t);
     // Build 303: a music video by its artist (or "Music Video"); another video of yours as "Video".
@@ -51243,6 +51279,7 @@
   // so a stream keeps the directory click-ping and the .m3u/.pls fallback below while a
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
+    if(track && track.type === 'zen'){ if(track.zenId && zenPreset(track.zenId)) zenSelect(track.zenId, true); return; }
     // Build 262: one of your own channels (a favourite, Continue Watching, the hero, the last
     // thing played): tuned in to what's on it now.
     if(track && track.liveCh && !track._liveTuned) return tuneLiveChannel(track.liveCh);
