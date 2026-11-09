@@ -1802,7 +1802,7 @@
   body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
   .featured-home{ margin:0 0 40px; }   /* the card ends 40px above the next heading, like every row */
   .fh-head{ margin-bottom:12px; }
-  .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:100px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
+  .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:112px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
     border-radius:var(--r-card, 18px); overflow:hidden; color:#fff; font:inherit; cursor:pointer; isolation:isolate;
     background:linear-gradient(120deg, var(--fh-1, #2a0f3a), var(--fh-2, #d9691b)); -webkit-tap-highlight-color:transparent; }
   .fh-card.has-art{ background-size:cover; background-position:center; }
@@ -1812,7 +1812,7 @@
   .fh-eyebrow{ font-size:10.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.92); }
   .fh-title{ margin-top:4px; font-size:21px; font-weight:800; letter-spacing:-.02em; line-height:1.12; overflow-wrap:anywhere; }
   .fh-sub{ margin-top:3px; font-size:12px; line-height:1.35; color:rgba(255,255,255,.94); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .fh-play{ position:relative; flex:0 0 48px; width:48px; height:48px; border:0; padding:0; border-radius:var(--r-play, 999px); background:var(--accent); color:var(--accent-text, #0b0c0e);
+  .fh-play{ position:relative; align-self:flex-end; flex:0 0 48px; width:48px; height:48px; border:0; padding:0; border-radius:var(--r-play, 999px); background:var(--accent); color:var(--accent-text, #0b0c0e);
     display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,.35); cursor:pointer; }
   .fh-play svg{ width:20px; height:20px; margin-left:2px; }
   .fh-more{ position:absolute; top:4px; right:6px; width:30px; height:30px; border:0; border-radius:50%; background:rgba(0,0,0,.18); color:#fff; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -1832,9 +1832,21 @@
   .se-date-row .se-to{ flex:0 0 46px; }
   .se-date-row .settings-select{ flex:1 1 0; min-width:0; width:auto; font-size:15px; padding:9px 30px 9px 12px; text-overflow:clip; }
   .se-date-row #seSM, .se-date-row #seEM{ flex:1.6 1 0; }
-  #seasonEditPanel{ display:flex; flex-direction:column; max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px); box-sizing:border-box; }
-  #seasonEditPanel .season-edit-body{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding-right:2px; }
-  #seasonEditPanel .settings-header, #seasonEditPanel .art-url-actions{ flex:none; }
+  /* Build 543 (Mark): Edit season is a full page (like Settings): a back arrow and title at the top,
+     the fields scrolling in the middle, and the banner's preview and the buttons fixed at the bottom. */
+  #seasonEditOverlay{ padding:0; background:var(--main-bg, var(--bg)); align-items:stretch; justify-content:stretch; }
+  #seasonEditPanel{ display:flex; flex-direction:column; box-sizing:border-box; width:100%; max-width:none; height:100%; max-height:none;
+    margin:0; border:0; border-radius:0; box-shadow:none; background:var(--main-bg, var(--bg));
+    padding:env(safe-area-inset-top, 0px) max(var(--main-pad, 18px), calc((100% - 640px) / 2)) calc(12px + env(safe-area-inset-bottom, 0px)); }
+  #seasonEditPanel .se-header{ flex:none; justify-content:flex-start; gap:6px; height:56px; margin:0; padding-top:4px; box-sizing:border-box; }
+  #seasonEditPanel .se-header h2{ font-size:20px; font-weight:800; letter-spacing:-.01em; }
+  .se-back{ width:44px; height:44px; margin-left:-10px; padding:0; border:0; background:none; color:var(--text); font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .se-back:active{ transform:scale(.92); }
+  #seasonEditPanel .season-edit-body{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:0 2px 16px 0; }
+  .se-foot{ flex:none; border-top:1px solid var(--border); padding-top:10px; }
+  .se-preview-label{ font-size:12.5px; font-weight:700; color:var(--text-dim); margin-bottom:8px; }
+  .se-preview .fh-card{ pointer-events:none; cursor:default; }
+  #seasonEditPanel .se-foot .art-url-actions{ margin-top:12px; }
   .se-to{ font-size:13px; color:var(--text-dim); }
   .se-look{ display:flex; align-items:center; gap:10px; }
   .se-look input[type=color]{ width:46px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:none; }
@@ -9279,9 +9291,9 @@
 <!-- Build 503 (Mark): add or edit a Featured season. -->
 <div class="settings-overlay" id="seasonEditOverlay">
   <div class="settings-panel" id="seasonEditPanel" role="dialog" aria-labelledby="seasonEditTitle">
-    <div class="settings-header">
+    <div class="settings-header se-header">
+      <button type="button" class="se-back" id="seasonEditCloseBtn" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button>
       <h2 id="seasonEditTitle">Edit season</h2>
-      <button class="settings-close" id="seasonEditCloseBtn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="art-url-body season-edit-body">
       <label class="se-label" for="seName">Title</label>
@@ -9313,9 +9325,14 @@
       <select class="settings-select" id="seOn" aria-label="Show this season"><option value="on">On</option><option value="off">Off</option></select>
       <div class="se-note se-err" id="seNote" role="status"></div>
     </div>
-    <div class="art-url-actions">
-      <div class="art-url-actions-left"><button type="button" class="art-url-search-btn" id="seDeleteBtn">Delete</button></div>
-      <button type="button" class="art-url-search-btn" id="seSaveBtn">Save</button>
+    <!-- Build 543 (Mark): a full-size preview of the banner, fixed at the bottom above the buttons. -->
+    <div class="se-foot">
+      <div class="se-preview-label">Preview</div>
+      <div class="se-preview" id="sePreview" aria-hidden="true"></div>
+      <div class="art-url-actions">
+        <div class="art-url-actions-left"><button type="button" class="art-url-search-btn" id="seDeleteBtn">Delete</button></div>
+        <button type="button" class="art-url-search-btn" id="seSaveBtn">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -22164,6 +22181,18 @@
     })['catch'](function(err){ setStatus((err && err.message) || 'Stations could not be reached.', true); });
   }
   var featuredHomeEl = document.getElementById('featuredHome');
+  // The banner's inside: icon, title, the description (build 543: no "Until" line), Play at the
+  // bottom right and the menu at the top right. Shared by Home and the Edit season preview.
+  function seasonCardFill(card, sn){
+    card.innerHTML = '<svg class="fh-icon" viewBox="0 0 24 24" aria-hidden="true">' + (SEASON_ICONS[sn.icon] || SEASON_ICONS.star) + '</svg>'
+      + '<div class="fh-text"><div class="fh-title"></div><div class="fh-sub"></div></div>'
+      + '<button type="button" class="fh-play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>'
+      + '<button type="button" class="fh-more" aria-label="More options"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>';
+    card.querySelector('.fh-title').textContent = sn.name;
+    var sub = card.querySelector('.fh-sub');
+    sub.textContent = sn.blurb || '';
+    sub.hidden = !sn.blurb;
+  }
   function renderFeaturedHome(){
     if(!featuredHomeEl) return;
     var on = featuredOn && !!onHomeView && document.body.classList.contains('home-stacked');
@@ -22180,13 +22209,7 @@
     card.setAttribute('aria-label', 'Featured: ' + sn.name);
     card.style.setProperty('--fh-1', sn.c1 || '#2a0f3a'); card.style.setProperty('--fh-2', sn.c2 || '#d9691b');
     if(art) card.style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
-    var end = act.range[1], until = 'Until ' + SEASON_MONTHS[end.getMonth()] + ' ' + end.getDate();
-    card.innerHTML = '<svg class="fh-icon" viewBox="0 0 24 24" aria-hidden="true">' + (SEASON_ICONS[sn.icon] || SEASON_ICONS.star) + '</svg>'
-      + '<div class="fh-text"><div class="fh-title"></div><div class="fh-sub"></div></div>'
-      + '<button type="button" class="fh-play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>'
-      + '<button type="button" class="fh-more" aria-label="More options"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>';
-    card.querySelector('.fh-title').textContent = sn.name;
-    card.querySelector('.fh-sub').textContent = (sn.blurb ? sn.blurb + ' · ' : '') + until;
+    seasonCardFill(card, sn);
     card.querySelector('.fh-play').setAttribute('aria-label', 'Play ' + sn.name);
     card.querySelector('.fh-play').addEventListener('click', function(e){ e.stopPropagation(); seasonPlay(sn); });
     card.querySelector('.fh-more').addEventListener('click', function(e){
@@ -22249,6 +22272,19 @@
     var art = getCustomArtUrl('season:' + seDraft.id);
     seEl.sePosterThumb.style.cssText = art ? 'background-image:url("' + art.replace(/"/g, '%22') + '")' : 'background:linear-gradient(135deg,' + seEl.seC1.value + ',' + seEl.seC2.value + ')';
     document.getElementById('sePosterRemoveBtn').hidden = !art;
+    seRenderPreview();
+  }
+  // Build 543 (Mark): the banner as it will look on Home, updated as the fields change.
+  function seRenderPreview(){
+    var box = document.getElementById('sePreview');
+    if(!box || !seDraft) return;
+    var art = getCustomArtUrl('season:' + seDraft.id) || '';
+    var card = document.createElement('div');
+    card.className = 'fh-card' + (art ? ' has-art' : '');
+    card.style.setProperty('--fh-1', seEl.seC1.value || '#2a0f3a'); card.style.setProperty('--fh-2', seEl.seC2.value || '#d9691b');
+    if(art) card.style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
+    seasonCardFill(card, { name: seEl.seName.value.trim() || 'Season title', blurb: seEl.seBlurb.value.trim(), icon: seEl.seIcon.value });
+    box.innerHTML = ''; box.appendChild(card);
   }
   function openSeasonEdit(id){
     var existing = seasons.filter(function(x){ return x.id === id; })[0];
@@ -22314,6 +22350,8 @@
     document.getElementById('seSaveBtn').addEventListener('click', saveSeasonEdit);
     seEl.seDeleteBtn.addEventListener('click', deleteSeasonEdit);
     ['seC1', 'seC2'].forEach(function(k){ seEl[k].addEventListener('input', seRefreshPoster); });
+    ['seName', 'seBlurb'].forEach(function(k){ seEl[k].addEventListener('input', seRenderPreview); });
+    seEl.seIcon.addEventListener('change', seRenderPreview);
     document.getElementById('sePosterBtn').addEventListener('click', function(){
       if(!seDraft) return;
       var d = seDraft;

@@ -102,8 +102,11 @@ async def run(b, scheme, w, h):
     check(await pg.evaluate("/^Featured/.test(document.querySelector('#featuredHome .fh-head').innerText)") and 'FEATURED' not in (await pg.evaluate("document.querySelector('#featuredHome .fh-card').innerText")).upper().split('CHRISTMAS')[0], f'{T} heading outside the card, none inside')
     vis = await pg.evaluate("(()=>{var t=Array.from(document.querySelectorAll('#favoritesGrid .tile, #favoritesGrid .fav-card')).filter(function(e){return e.getBoundingClientRect().height>0;});var b=Math.max.apply(null,t.map(function(e){return e.getBoundingClientRect().bottom;}));return Math.round(document.querySelector('#featuredHome .fh-head').getBoundingClientRect().top-b);})()")
     check(abs(vis-40) <= 1, f'tiles to Featured heading is 40px like every Home gap ({vis}px)')
-    print('kids', await pg.evaluate("(()=>{var o=[];function w(e,d){var c=getComputedStyle(e),b=e.getBoundingClientRect();o.push(' '.repeat(d)+(e.id||e.className||e.tagName)+' '+Math.round(b.top)+'-'+Math.round(b.bottom)+' pb'+c.paddingBottom+' mb'+c.marginBottom+' mt'+c.marginTop+' '+c.position);if(d<2)Array.from(e.children).forEach(function(k){w(k,d+1);});}w(document.getElementById('favoritesSection'),0);w(document.getElementById('featuredHome'),0);return o.join('\\n');})()"))
-    print('dbg', await pg.evaluate("(()=>{var o={};['npHero','homeTabs','homeGroupTabs','favoritesSection','playlistsHomeSection','top100Section','featuredHome'].forEach(function(i){var e=document.getElementById(i);if(!e){o[i]='none';return;}var c=getComputedStyle(e),b=e.getBoundingClientRect();o[i]=[c.display,Math.round(b.top),Math.round(b.bottom),c.marginTop,c.marginBottom].join(' ');});return o;})()"))
+    # Build 543: no "Until" line; Play at the bottom right, clear of the menu at the top right
+    cg = await pg.evaluate("""(()=>{var c=document.querySelector('#featuredHome .fh-card'),p=c.querySelector('.fh-play'),m=c.querySelector('.fh-more');var C=c.getBoundingClientRect(),P=p.getBoundingClientRect(),M=m.getBoundingClientRect();
+      return {txt:c.innerText, bot:Math.round(C.bottom-P.bottom), right:Math.round(C.right-P.right), gap:Math.round(P.top-M.bottom)};})()""")
+    check('Until' not in cg['txt'], f'{T} the banner has no "Until" line {cg["txt"]!r}')
+    check(10 <= cg['bot'] <= 18 and 10 <= cg['right'] <= 20 and cg['gap'] >= 8, f'{T} Play sits at the bottom right, clear of the menu {cg}')
     await pg.screenshot(path=f'{shots}/featured-home-{scheme}-{w}.png')
     # tap card opens genre page
     await pg.evaluate("document.querySelector('#featuredHome .fh-card').click()"); await pg.wait_for_timeout(1500)
@@ -128,6 +131,19 @@ async def run(b, scheme, w, h):
     await pg.screenshot(path=f'{shots}/featured-settings-{scheme}-{w}.png')
     await pg.evaluate("document.querySelector('#seasonList .season-row[data-id=halloween]').click()"); await pg.wait_for_timeout(500)
     await pg.screenshot(path=f'{shots}/featured-edit-{scheme}-{w}.png')
+    # Build 543: a full page, with a full-size banner preview fixed above the buttons
+    ed = await pg.evaluate("""(()=>{var p=document.getElementById('seasonEditPanel').getBoundingClientRect(),pv=document.querySelector('#sePreview .fh-card'),a=document.querySelector('#seasonEditPanel .art-url-actions').getBoundingClientRect(),b=document.querySelector('#seasonEditPanel .season-edit-body');
+      var P=pv?pv.getBoundingClientRect():null;return {w:Math.round(p.width),h:Math.round(p.height),vw:innerWidth,vh:innerHeight,pv:!!pv,pvW:P?Math.round(P.width):0,pvH:P?Math.round(P.height):0,pvBottom:P?Math.round(P.bottom):0,aTop:Math.round(a.top),aBottom:Math.round(a.bottom),
+        scrolls:b.scrollHeight>b.clientHeight,back:!!document.querySelector('#seasonEditPanel .se-back'),txt:pv?pv.innerText:''};})()""")
+    homeW = await pg.evaluate("Math.round(document.querySelector('#featuredHome .fh-card') ? document.querySelector('#featuredHome .fh-card').getBoundingClientRect().width : 0)")
+    print(T, 'edit page', ed, 'home card', homeW)
+    check(ed['w'] == ed['vw'] and ed['h'] == ed['vh'] and ed['back'], f'{T} Edit season is a full page with a back arrow {ed}')
+    check(ed['pv'] and ed['pvH'] >= 100 and ed['pvW'] >= ed['vw'] - 50 and ed['pvBottom'] <= ed['aTop'] and ed['aBottom'] >= ed['vh'] - 40, f'{T} a full-size banner preview sits above the buttons at the bottom {ed}')
+    check('Monster mashes' in ed['txt'] and 'Until' not in ed['txt'], f'{T} the preview shows the season {ed["txt"]!r}')
+    await pg.fill('#seName', 'Night of Frights'); await pg.wait_for_timeout(150)
+    check('Night of Frights' in await pg.evaluate("document.querySelector('#sePreview').innerText"), f'{T} the preview follows the title as it is typed')
+    sc = await pg.evaluate("(()=>{var b=document.querySelector('#seasonEditPanel .season-edit-body');b.scrollTop=9999;var r=document.querySelector('#sePreview').getBoundingClientRect();return Math.round(r.top);})()")
+    check(sc == await pg.evaluate("Math.round(document.querySelector('#sePreview').getBoundingClientRect().top)") and sc > 300, f'{T} the preview stays put while the fields scroll ({sc})')
     # edit: change Christmas end, name; add new; delete
     await pg.evaluate(EV("closeSeasonEdit()"))
     await pg.evaluate("document.querySelector('#seasonList .season-row[data-id=christmas]').click()")
