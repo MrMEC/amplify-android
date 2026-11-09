@@ -8685,12 +8685,7 @@
       </button>
       <button type="button" class="set-cat" data-set-cat="home">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">What shows under Favorites on Home</span></span>
-        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="set-cat" data-set-cat="featured">
-        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Featured</span><span class="set-cat-sub">Seasonal card on Home, dates and poster art</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Favorites and the Featured card on Home</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="sources">
@@ -8984,12 +8979,27 @@
     <!-- Sources -->
     <!-- Build 503 (Mark): Featured seasons: which seasons show on Home, when, and with what poster. -->
     <!-- Build 545 (Mark): which kinds of favourite show in Home's Favorites tab. -->
+    <!-- Build 546 (Mark): Home is a category with two pages under it, Favorites (what was Home) and Featured. -->
     <section class="set-page" data-set-page="home" data-set-title="Home" hidden>
+      <div class="set-subcats">
+      <button type="button" class="set-cat" data-set-cat="home-favorites">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Favorites</span><span class="set-cat-sub">What shows under Favorites on Home</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="home-featured">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Featured</span><span class="set-cat-sub">Seasonal card on Home, dates and poster art</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      </div>
+    </section>
+    <section class="set-page" data-set-page="home-favorites" data-set-title="Favorites" data-set-parent="home" hidden>
       <h3 class="set-sub">Favorites on Home</h3>
       <div class="set-desc set-desc-block">Choose which favourites show in the Favorites tab on Home. Everything you favourite is always on the Favorites page.</div>
       <div id="homeFavKindRows"></div>
     </section>
-    <section class="set-page" data-set-page="featured" data-set-title="Featured" hidden>
+    <section class="set-page" data-set-page="home-featured" data-set-title="Featured" data-set-parent="home" hidden>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="featOnLabel">Featured on Home</span><span class="set-desc">A seasonal card under the carousel</span></div>
         <select class="settings-select" id="featOnSelect" aria-labelledby="featOnLabel"><option value="on">On</option><option value="off">Off</option></select>
@@ -22227,7 +22237,7 @@
       e.stopPropagation();
       showNotice({ kind: 'info', title: sn.name, message: 'This card is a Featured season.', stack: true, actions: [
         { label: 'Hide until next year', primary: true, run: function(){ seasonHidden[sn.id] = act.range[1].getTime(); saveSeasonHidden(); renderFeaturedHome(); } },
-        { label: 'Edit seasons', run: function(){ openSettingsAt('featured'); } },
+        { label: 'Edit seasons', run: function(){ openSettingsAt('home-featured'); } },
         { label: 'Cancel' }
       ] });
     });
@@ -41666,10 +41676,10 @@
       var homeList = all.filter(isHomeFavorite), otherList = all.filter(function(f){ return !isHomeFavorite(f); });
       stationsGrid.appendChild(buildFavGroupHead('Home row', homeList.length
         ? (favOrder === 'az' ? 'Shown at the top of Home.' : 'Shown at the top of Home. You can also long-press a cover there and drag it.')
-        : 'Favourites of the kinds chosen in Settings > Home show here.', 'home'));
+        : 'Favourites of the kinds chosen in Settings > Home > Favorites show here.', 'home'));
       homeList.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
       if(otherList.length){
-        stationsGrid.appendChild(buildFavGroupHead('Other favorites', 'Kinds turned off for Home in Settings > Home. These stay on this page.', 'other'));
+        stationsGrid.appendChild(buildFavGroupHead('Other favorites', 'Kinds turned off for Home in Settings > Home > Favorites. These stay on this page.', 'other'));
         otherList.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
       }
       setResultCount(null); /* build 210: no count (Mark) */

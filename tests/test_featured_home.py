@@ -125,7 +125,7 @@ async def run(b, scheme, w, h):
     check(not (await pg.evaluate(HOME_JS))['feat'], f'{T} hide removes the card')
     await pg.evaluate(EV("seasonHidden={}; saveSeasonHidden(); renderFeaturedHome();"))
     # settings page
-    await pg.evaluate(EV("openSettingsAt('featured')")); await pg.wait_for_timeout(700)
+    await pg.evaluate(EV("openSettingsAt('home-featured')")); await pg.wait_for_timeout(700)
     rows = await pg.evaluate("document.querySelectorAll('#seasonList .season-row').length")
     check(rows==9, f'{T} nine standard seasons listed {rows}')
     await pg.screenshot(path=f'{shots}/featured-settings-{scheme}-{w}.png')

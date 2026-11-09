@@ -70,11 +70,11 @@ async def main():
             panel_grey = (178, 178, 178) if scheme == 'light' else (15, 17, 20)
             check(band and band.startswith('url(') and max(abs(a - b) for a, b in zip(px, panel_grey)) > 12, f'{T} the Zen card band is drawn from its picture, not the plain grey {px}')
             # Settings > Home
-            await pg.evaluate(EV("openSettingsAt('home')")); await pg.wait_for_timeout(700)
+            await pg.evaluate(EV("openSettingsAt('home-favorites')")); await pg.wait_for_timeout(700)
             rows = await pg.evaluate("Array.from(document.querySelectorAll('#homeFavKindRows .settings-row')).map(function(r){return r.querySelector('.settings-label').textContent+'='+r.querySelector('select').value;})")
             print(T, rows)
             check(len(rows) == 11 and 'Songs=off' in rows and 'Zen mixes=on' in rows and 'Radio stations=on' in rows, f'{T} Settings > Home lists every kind with On/Off {rows}')
-            check(await pg.evaluate("!document.querySelector('[data-set-page=home]').hidden"), f'{T} the Home settings page opens')
+            check(await pg.evaluate("!document.querySelector('[data-set-page=home-favorites]').hidden"), f'{T} the Home settings page opens')
             await pg.screenshot(path=f'{shots}/b545-settings-home-{scheme}.png')
             for k in ['songs', 'artists', 'albums', 'podcasts', 'channels', 'videos']:
                 await pg.evaluate("(k)=>{var e=document.getElementById('homeFavKind-'+k);e.value='on';e.dispatchEvent(new Event('change',{bubbles:true}));}", k)
