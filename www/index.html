@@ -927,6 +927,8 @@
      (.fav-artists-row), not the 150px covers the other home rows use -- a row of people,
      sized so several fit across a phone at once. */
   body.home-stacked .home-row > #topArtistsGrid{ gap:0 16px; }
+  /* Build 539 (Mark): titles in Home rows take one line, so no row reserves a blank second line under its tiles: every row ends exactly 40px above the next heading. */
+  body.home-stacked .home-view-row-title, body.home-stacked :is(.home-section, .recent-section, #dailyHomeSections) .home-row .tile:not(.fav-card):not(.tile-row) .tile-name, body.home-stacked :is(.home-section, .recent-section, #dailyHomeSections) .home-row .yt-title{ display:block !important; -webkit-line-clamp:1 !important; line-clamp:1 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis; }
   body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 100px; } /* build 210: a little larger (was 92) */
   /* The arrows sit on the middle of the circle rather than the middle of a 150px cover. */
   #topArtistsSection .home-row-nav{ top:29px; }
@@ -1796,14 +1798,11 @@
   .artist-hero-sub{ font-size:13.5px; color:var(--text-dim); max-width:min(560px, 92%); }
   .artist-hero-sub:not(:empty){ margin-bottom:14px; }
   /* Build 503 (Mark): Home's Favorites / Playlists / Top 100 tabs, and the Featured card under the carousel. */
-  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:34px 0 10px; }   /* 34px = the gap between every Home section (build 400) */
+  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:40px 0 10px; }   /* 40px from the carousel, the same as from any row to the next heading (build 400) */
   .home-group-tabs .home-tab{ flex:0 0 auto; }
   .home-group-all{ margin-left:auto; flex:0 0 auto; background:none; border:0; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; cursor:pointer; }
   body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
-  /* The Favorites grid carries 42px of room under its tiles (padding for the row's shadow and arrows), so its section gives 22px back: the visible gap under the tiles is the same 34px as everywhere. */
-  body.home-grouped #favoritesSection.in-group{ margin-bottom:12px; }
-  body.home-grouped #playlistsHomeSection.in-group, body.home-grouped #top100Section.in-group{ margin-bottom:28px; }   /* 26px of grid room under the tiles + 28 - 20 overlap = 34 */
-  .featured-home{ margin:0 0 34px; }
+  .featured-home{ margin:0 0 40px; }   /* the card ends 40px above the next heading, like every row */
   .fh-head{ margin-bottom:12px; }
   .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:100px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
     border-radius:var(--r-card, 18px); overflow:hidden; color:#fff; font:inherit; cursor:pointer; isolation:isolate;
@@ -7097,6 +7096,8 @@
   .pf-favs{ grid-auto-columns:var(--w-cover); }
   body.home-stacked .home-row > #stationsGrid:has(> .tile), body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile), body.home-stacked .home-row > #top100HomeGrid:has(> .tile),
   body.home-stacked .home-row > #favoritesGrid:has(> .tile){ grid-auto-columns:var(--w-cover); }
+  /* Build 539 (Mark): a two-row grid holding a single tile drops its empty second row, which otherwise added a 16-22px row gap under the row. */
+  body.home-stacked .home-row > :is(#favoritesGrid, #playlistsHomeGrid, #top100HomeGrid):has(> .tile):not(:has(> .tile ~ .tile)){ grid-template-rows:auto; row-gap:0; }
   .vw-tile.vw-channel, .vw-home-grid .vw-tile.vw-channel{ width:var(--w-cover); }
   /* Artist circles */
   body.home-stacked .home-row > #topArtistsGrid > .tile, .fav-artists-row > .tile{ flex:0 0 var(--w-artist); }
@@ -7410,7 +7411,7 @@
   .zen-sndchip-ic .zen-svg{ width:24px; height:24px; }
   .zen-addbtn{ grid-column:1/-1; justify-self:start; display:inline-flex; align-items:center; gap:10px; height:46px; padding:0 22px; border:1.5px dashed var(--text-faint); border-radius:23px; background:none; color:var(--text); font:inherit; font-size:15px; font-weight:500; margin:6px 0 18px; cursor:pointer; }
   .zen-fine{ grid-column:1/-1; margin:0 0 20px; font-size:12.5px; line-height:1.5; color:var(--text-faint); }
-  .zen-home-section{ display:none; margin:6px 0 12px; }
+  .zen-home-section{ display:none; margin:34px 0 12px; }   /* 40px under Top Stations, like every Home gap */
   .zen-home-section .home-heading-link{ display:flex; width:100%; min-height:48px; padding:6px 0; box-sizing:border-box; touch-action:manipulation; -webkit-user-select:none; user-select:none; }
   .zen-home-section .home-heading-link:active{ opacity:.7; }
   body.home-view .zen-home-section{ display:block; }

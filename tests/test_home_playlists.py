@@ -103,7 +103,7 @@ async def main():
               and r['overflow'] in ('auto', 'scroll') and r['scrolls'],
               f'two rows that scroll sideways together {r["tops"]} {r["lefts"]} {r["overflow"]}')
         tg = await pg.evaluate("(()=>{var s=document.getElementById('playlistsHomeSection'),t=[...document.querySelectorAll('#playlistsHomeGrid .tile')].filter(e=>e.getBoundingClientRect().height>0);var b=Math.max.apply(null,t.map(e=>e.getBoundingClientRect().bottom));return Math.round(s.getBoundingClientRect().bottom-b)+parseFloat(getComputedStyle(s).marginBottom)+parseFloat(getComputedStyle(document.getElementById('playlistsHomeGrid')).marginBottom);})()")
-        check(abs(tg - 34) <= 1, f'Playlists tiles are 34px above whatever follows ({tg}px)')
+        check(abs(tg - 40) <= 1, f'Playlists tiles are 40px above whatever follows ({tg}px)')
         await pg.evaluate("document.getElementById('playlistsHomeSection').scrollIntoView()"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'{shots}/home-playlists.png')
         await pg.evaluate("document.getElementById('playlistsHomeGrid').scrollBy({ left: 400 })"); await pg.wait_for_timeout(800)

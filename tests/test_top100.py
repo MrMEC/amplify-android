@@ -204,7 +204,7 @@ async def run(theme, b):
     await el.scroll_into_view_if_needed(); await pg.wait_for_timeout(1800)
     tg = await pg.evaluate("(()=>{var s=document.getElementById('top100Section'),t=[...document.querySelectorAll('#top100HomeGrid .tile')];var b=Math.max.apply(null,t.map(e=>e.getBoundingClientRect().bottom));var cs=getComputedStyle(s);var g=getComputedStyle(document.getElementById('top100HomeGrid'));return {below:Math.round(s.getBoundingClientRect().bottom-b),mb:parseFloat(cs.marginBottom),gmb:parseFloat(g.marginBottom),gpb:g.paddingBottom};})()")
     print('top100 tile->section end', tg)
-    check(abs(tg['below'] + tg['mb'] + tg['gmb'] - 34) <= 1, f'{theme}: Top 100 tiles are 34px above whatever follows {tg}')
+    check(abs(tg['below'] + tg['mb'] + tg['gmb'] - 40) <= 1, f'{theme}: Top 100 tiles are 40px above whatever follows {tg}')
     imgs = await pg.evaluate("[...document.querySelectorAll('#top100HomeGrid .tile-art img')].map(i => i.src).slice(0, 3)")
     check(len(imgs) >= 2 and all(u.endswith('/500.jpg') and '/999/' not in u for u in imgs), f'{theme}: covers come from Deezer (the studio version, not a live one) {imgs[:2]}')
     await el.screenshot(path=f'{OUT}/top100-home-{theme}.png')

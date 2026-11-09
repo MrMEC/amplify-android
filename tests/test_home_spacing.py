@@ -16,13 +16,13 @@ MEASURE = r"""(()=>{
     if(!e.offsetParent || e.getBoundingClientRect().height <= 0) return;
     if(e.id === 'dailyHomeSections'){ Array.from(e.children).forEach(function(c){ if(c.offsetParent) blocks.push(c); }); return; }
     if(e.classList.contains('recent-section')){ Array.from(e.querySelectorAll('.recent-col')).forEach(function(c){ if(c.offsetParent) blocks.push(c); }); return; }
-    if(e.id === 'npHero' || e.id === 'statusLine' || e.classList.contains('home-tabs')) return;
+    if(e.id === 'statusLine' || e.classList.contains('home-tabs')) return;
     blocks.push(e);
   });
   var vw = innerWidth;
   return blocks.map(function(b){
-    var h = b.matches('h2, .home-section-head') ? b : b.querySelector('h2');
-    var items = Array.from(b.querySelectorAll('.tile, .yt-tile, .vw-tile, .song-row, .mfy-row, .empty-state, .loading-state')).filter(function(x){ return x.offsetParent && !x.parentElement.closest('.tile, .yt-tile, .vw-tile, .song-row'); });
+    var h = b.matches('h2, .home-section-head, #homeGroupTabs') ? b : (b.id === 'npHero' ? null : b.querySelector('h2'));
+    var items = Array.from((b.id === 'npHero' ? [b] : b.querySelectorAll('.tile, .yt-tile, .vw-tile, .song-row, .mfy-row, .empty-state, .loading-state, .fh-card, .zen-tile, .zen-card'))).filter(function(x){ return x.offsetParent && !x.parentElement.closest('.tile, .yt-tile, .vw-tile, .song-row'); });
     var boxBottom = items.length ? Math.max.apply(null, items.map(function(x){ return x.getBoundingClientRect().bottom; })) : null;
     var ink = Array.from(b.querySelectorAll('.tile-art, .yt-thumb, .vw-thumb, .tile-name, .tile-sub, .yt-title, .yt-date, .fav-card, .song-row, .empty-state')).filter(function(x){ var r = x.getBoundingClientRect(); return x.offsetParent && r.height > 0 && r.left < vw && r.right > 0; });
     var inkBottom = ink.length ? Math.max.apply(null, ink.map(function(x){ return x.getBoundingClientRect().bottom; })) : null;
@@ -62,12 +62,21 @@ async def run(theme, w, h):
             gaps.append((a['name'], nx['name'], nx['headTop'] - a['boxBottom'], nx['headTop'] - (a['inkBottom'] or a['boxBottom'])))
         for g in gaps: print(T, g)
         names = [x['name'] for x in r]
-        check(any('Top Artists' in n for n in names) and any('Hear It Again' in n for n in names) and ('homeGroupTabs' in names) and any(n == 'Kay' for n in names), f'{T} the busy Home has every kind of row {names}')
+        check(any('Top Artists' in n for n in names) and any('Hear It Again' in n for n in names) and any(n.startswith('Favorites') for n in names) and any(n == 'Kay' for n in names), f'{T} the busy Home has every kind of row {names}')
         vals = sorted(set(g[2] for g in gaps))
+        print(T, 'ink', [(g[0], g[3]) for g in gaps if g[3] != g[2]])
         check(len(gaps) >= 8 and vals[-1] - vals[0] <= 1 and vals[0] == 40, f'{T} every section ends 40px above the next heading {vals}')
         ink = [g[3] - g[2] for g in gaps]
-        check(all(0 <= x <= 20 for x in ink), f'{T} no row leaves more than one line of blank under what is on screen {ink}')
-        check(all(x['maxLines'] <= 2 for x in r), f'{T} titles on Home rows stop at two lines {[(x["name"], x["maxLines"]) for x in r]}')
+        check(all(0 <= x <= 4 for x in ink), f'{T} no row leaves blank space under its last line, so every gap looks the same {ink}')
+        for tab in ['playlists', 'top100', 'favorites']:
+            tg = await pg.evaluate("""(k)=>{ var b=document.getElementById('homeGroupTab-'+k); if(!b||getComputedStyle(b).display==='none') return null; b.click();
+              var sec={favorites:'favoritesSection',playlists:'playlistsHomeSection',top100:'top100Section'}[k], s=document.getElementById(sec);
+              var t=Array.from(s.querySelectorAll('.tile, .fav-card')).filter(function(x){ return x.offsetParent && !x.parentElement.closest('.tile'); });
+              var f=document.querySelector('#featuredHome .fh-head'); if(!t.length||!f||!f.offsetParent) return null;
+              return Math.round(f.getBoundingClientRect().top - Math.max.apply(null, t.map(function(x){ return x.getBoundingClientRect().bottom; }))); }""", tab)
+            print(T, 'tab', tab, tg)
+            check(tg is None or tg == 40, f'{T} the {tab} tab ends 40px above Featured ({tg})')
+        check(all(x['maxLines'] <= 2 for x in r), f'{T} titles on Home rows stop at two lines (one in rows, build 539) {[(x["name"], x["maxLines"]) for x in r]}')
         pl = await pg.evaluate("""(()=>{ var t=Array.from(document.querySelectorAll('#playlistsHomeGrid > .tile')).filter(x=>x.offsetParent); if(t.length<2) return null;
           var tops=[...new Set(t.map(x=>Math.round(x.getBoundingClientRect().top)))].sort((a,b)=>a-b); if(tops.length<2) return null;
           var r1=t.filter(x=>Math.round(x.getBoundingClientRect().top)===tops[0]); var b1=Math.max(...r1.map(x=>Math.max(...Array.from(x.querySelectorAll('.tile-name,.tile-sub')).map(y=>y.getBoundingClientRect().bottom))));
