@@ -22638,7 +22638,10 @@
     stationPlaylists.forEach(function(item){
       playlistsHomeGrid.appendChild(buildEntityTile({
         key: 'playlist-home-' + item.id,
+        reorderId: item.id,
         entity: 'playlist',
+        holdReorder: true, container: playlistsHomeGrid,
+        onReorder: function(){ reorderStationPlaylistsFromGrid(playlistsHomeGrid); try{ renderStationPlaylistList(); }catch(e){} },
         name: item.label || 'Playlist',
         sub: plural((item.stations || []).length, 'item', 'items'),
         renderArt: function(art){ renderPlaylistCoverArt(art, item); },
@@ -22952,6 +22955,8 @@
   // Build 504 (Mark): made reusable (attachHoldReorder) so every list can reorder the way Favorites does.
   // cfg: item (selector, default '.tile'), vertical (a column of rows), enabled() (default always),
   // onDrop(keys), keyOf(el), min (fewest items, default 2), refuse (also block the picture drag/menu).
+  var hrEatClicksUntil = 0;
+  document.addEventListener('click', function(e){ if(Date.now() < hrEatClicksUntil){ hrEatClicksUntil = 0; e.stopPropagation(); e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   function attachHoldReorder(grid, cfg){
     cfg = cfg || {};
     if(!grid) return null;
@@ -22960,8 +22965,10 @@
       if(cfg.vertical !== 'auto') return vertical;
       var it = tiles();
       if(it.length < 2) return true;
-      var a = it[0].getBoundingClientRect(), b = it[1].getBoundingClientRect();
-      return Math.abs(a.left - b.left) < 4 && b.top > a.top;
+      // a single column: the first and the last item line up (a two-row grid, filled down then
+      // across, has its second item under the first too, but not its last one)
+      var a = it[0].getBoundingClientRect(), b = it[1].getBoundingClientRect(), z = it[it.length - 1].getBoundingClientRect();
+      return Math.abs(a.left - b.left) < 4 && b.top > a.top && Math.abs(a.left - z.left) < 4;
     }
     function okItem(el){ return el.matches(itemSel) && (!cfg.accept || cfg.accept(el)); }
     function keyOfEl(el){ return cfg.keyOf ? cfg.keyOf(el) : el.dataset.key; }
@@ -23004,7 +23011,7 @@
     }
     function lift(){
       if(!press) return;
-      press.active = true;
+      press.active = true; press.lx = press.x; press.ly = press.y; press.moved = false;
       var t = press.tile, r = t.getBoundingClientRect();
       press.grabX = press.x - r.left; press.grabY = press.y - r.top;
       grid.classList.add('fav-reordering', 'hr-active');
@@ -23093,18 +23100,27 @@
         return false;
       }
       press.x = x; press.y = y;
+      if(!press.moved && (Math.abs(x - press.lx) > SLOP || Math.abs(y - press.ly) > SLOP)){ press.moved = true; press.tile._onStillHold = null; }
       place();
       return true;
     }
     function finish(){
       if(!press) return;
-      var was = press.active, t = press.tile;
+      var was = press.active, t = press.tile, moved = !!press.moved;
       cancelPress();
       if(!was) return;
       eatClick = true; setTimeout(function(){ eatClick = false; }, 400);
       t.classList.remove('fav-dragging', 'hr-lifted');
       t.style.transform = '';
       grid.classList.remove('fav-reordering', 'hr-active');
+      // Build 542: held still and let go -- nothing moved, so no reorder; a list whose long press
+      // opens a menu (genre page, Zen presets) left that menu here to open now.
+      if(!moved){
+        var still = t._onStillHold; t._onStillHold = null;
+        // the tap that ends the hold must not land on the menu that opens under the finger
+        if(still){ hrEatClicksUntil = Date.now() + 450; still(); }
+        return;
+      }
       if(cfg.onDrop) cfg.onDrop(tiles().map(keyOfEl), t);
     }
     function touchOf(e){
@@ -23139,10 +23155,11 @@
     }
     function tileFor(target){
       if(cfg.enabled && !cfg.enabled()) return null;
-      var t = target && target.closest ? target.closest(itemSel) : null;
+      var t = cfg.findItem ? cfg.findItem(target) : (target && target.closest ? target.closest(itemSel) : null);
       if(t && cfg.accept && !cfg.accept(t)) return null;
       // a press on a button or field inside a row is that control's, not the row's
-      if(t && target.closest && cfg.skip && target.closest(cfg.skip) && t.contains(target.closest(cfg.skip))) return null;
+      var sk = (t && target.closest && cfg.skip) ? target.closest(cfg.skip) : null;
+      if(sk && sk !== t && t.contains(sk)) return null;
       return t && t.parentElement === grid && tiles().length >= minItems ? t : null;
     }
     grid.addEventListener('touchstart', function(e){
@@ -23952,6 +23969,12 @@
     row.appendChild(name);
     if(!favArtistsEditing){
       row.addEventListener('click', function(){ openArtistPage(entry.key); });
+      // Build 542 (Mark): press, hold and drag straight away, as on Home Favorites. In A to Z the
+      // order on screen becomes the Manual order.
+      enableTouchReorder({ item: row, list: list, onDrop: function(){
+        reorderFavoriteArtistsFromRows(list);
+        if(favArtistOrder !== 'manual'){ favArtistOrder = 'manual'; try{ localStorage.setItem(FAV_ARTIST_ORDER_KEY, 'manual'); }catch(e){} }
+      } });
       return row;
     }
     var remove = document.createElement('button');
@@ -31849,7 +31872,7 @@
           name: item.label,
           row: true,
           renderArt: function(art){ renderCustomSearchCoverArt(art, item); },
-          draggable: customSearchesEditing,
+          draggable: customSearchesEditing, holdReorder: true,
           onReorder: function(){ reorderCustomSearchesFromGrid(); renderCustomSearchList(); },
           onClick: function(){ pushView(); searchInput.value = ''; runCustomSearch(item); }
         }));
@@ -31875,8 +31898,8 @@
         sub: count + (count === 1 ? ' item' : ' items'),
         row: true,
         renderArt: function(art){ renderPlaylistCoverArt(art, item); },
-        draggable: stationPlaylistsEditing,
-        onReorder: function(){ reorderStationPlaylistsFromGrid(); renderStationPlaylistList(); },
+        draggable: stationPlaylistsEditing, holdReorder: true,
+        onReorder: function(){ reorderStationPlaylistsFromGrid(); renderStationPlaylistList(); try{ renderPlaylistsHomeSection(); }catch(e){} },
         onClick: function(){ pushView(); runStationPlaylist(item); }
       }));
     });
@@ -32102,6 +32125,13 @@
   // ---------- Build 502: Genres sorted A to Z or by hand ----------
   var GENRE_SORT_KEY = 'radioPlayerGenreSort';
   var genreSort = (function(){ try{ return localStorage.getItem(GENRE_SORT_KEY) === 'az' ? 'az' : 'manual'; }catch(e){ return 'manual'; } })();
+  // Build 542: a drag in A to Z keeps what's on screen as the new Manual order (as Home Favorites does).
+  function genreAdoptManual(order){
+    if(order.length !== genreOrder.length) return false;
+    genreOrder = order; saveGenreOrder();
+    if(genreSort !== 'manual'){ genreSort = 'manual'; try{ localStorage.setItem(GENRE_SORT_KEY, 'manual'); }catch(e){} }
+    return true;
+  }
   function genreDisplayOrder(){
     return genreSort === 'az' ? genreOrder.slice().sort(function(a, b){ return a.localeCompare(b, undefined, { sensitivity: 'base' }); }) : genreOrder;
   }
@@ -32146,8 +32176,12 @@
         row: true,
         // Each genre's own icon (see GENRE_ICONS), in place of a placeholder cover.
         renderArt: function(art){ genreIconArt(art, g); },
-        draggable: genresEditing && genreSort === 'manual',
-        onReorder: function(){ reorderGenresFromGrid(); renderGenreNav(); },
+        draggable: genresEditing && genreSort === 'manual', holdReorder: true,
+        onReorder: function(){
+          var wasAz = genreSort !== 'manual';
+          genreAdoptManual(Array.prototype.map.call(stationsGrid.querySelectorAll('.tile[data-entity="genre"]'), function(el){ return el.dataset.reorderId; }));
+          renderGenreNav(); if(wasAz) renderGenresRows();
+        },
         onClick: function(){ pushView(); searchInput.value = ''; searchByTag(g); }
       }));
     });
@@ -32567,6 +32601,10 @@
       card.querySelector('.gb-card-name').textContent = g;
       card.addEventListener('click', function(){ openG(g); });
       grid.appendChild(card);
+      // Build 542 (Mark): press, hold and drag a genre to move it, as on Home Favorites.
+      enableTouchReorder({ item: card, list: grid, onDrop: function(){
+        if(genreAdoptManual(Array.prototype.map.call(grid.querySelectorAll('.gb-card'), function(c){ return c.dataset.genre; }))) renderGenreNav();
+      } });
       return card;
     });
     var none = document.createElement('div'); none.className = 'gb-none'; none.hidden = true;
@@ -32783,8 +32821,18 @@
     block.appendChild(label);
     var row = document.createElement('div');
     row.className = 'lib-fav-row';
-    favArtists.forEach(function(entry){ row.appendChild(buildArtistTile(entry)); });
+    favArtists.forEach(function(entry){ var t = buildArtistTile(entry); t._favArtistKey = entry.key; row.appendChild(t); });
     row._ctxNone = true;
+    // Build 542 (Mark): press, hold and drag a favourite artist, as on Home Favorites. In A to Z
+    // the order on screen becomes the Manual order.
+    attachHoldReorder(row, { item: '.tile', onDrop: function(){
+      var order = Array.prototype.map.call(row.children, function(t){ return t._favArtistKey; }).filter(Boolean);
+      var byKey = {}; favorites.filter(isArtistFav).forEach(function(f){ byKey[f.artistKey] = f; });
+      var re = order.map(function(k){ return byKey[k]; }).filter(Boolean);
+      if(re.length !== Object.keys(byKey).length) return;
+      var i = 0; favorites = favorites.map(function(f){ return isArtistFav(f) ? re[i++] : f; }); saveFavorites();
+      if(favArtistOrder !== 'manual'){ favArtistOrder = 'manual'; try{ localStorage.setItem(FAV_ARTIST_ORDER_KEY, 'manual'); }catch(e){} }
+    } });
     block.appendChild(row);
     var all = document.createElement('div');
     all.className = 'lib-head lib-all-head';
@@ -33972,12 +34020,12 @@
   // tap, or hold for the menu
   function zenPress(el, onTap, onHold){
     var t = 0, held = false, sx = 0, sy = 0;
-    el.addEventListener('pointerdown', function(e){ if(zenReordering){ held = false; return; } held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(function(){ held = true; if(onHold) onHold(); }, 520); });
+    el.addEventListener('pointerdown', function(e){ held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(function(){ held = true; if(el.classList.contains('hr-lifted')){ el._onStillHold = function(){ if(onHold) onHold(); }; return; } if(onHold) onHold(); }, 520); });
     function cancel(){ clearTimeout(t); }
     el.addEventListener('pointerup', cancel); el.addEventListener('pointercancel', cancel); el.addEventListener('pointerleave', cancel);
     el.addEventListener('pointermove', function(e){ if(Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) cancel(); });
     el.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-    el.addEventListener('click', function(e){ if(zenReordering){ e.preventDefault(); e.stopPropagation(); return; } if(held){ held = false; e.preventDefault(); e.stopPropagation(); return; } onTap(e); });
+    el.addEventListener('click', function(e){ if(held){ held = false; e.preventDefault(); e.stopPropagation(); return; } onTap(e); });
   }
   function zenMixBodyRender(){
     var body = zenEl.querySelector('#zenMixBody'), mx = zenEl.querySelector('#zenMixer'), topEl = zenEl.querySelector('#zenMixTop');
@@ -34470,7 +34518,7 @@
     ph.addEventListener('click', function(){ setReorder(!zenReordering); });
     ph.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); setReorder(!zenReordering); } });
     rows.forEach(function(r){
-      attachHoldReorder(r, { item: '.tile', enabled: function(){ return zenReordering; }, onDrop: function(){
+      attachHoldReorder(r, { item: '.tile', onDrop: function(){   // build 542: always, like Home Favorites
         var ids = [];
         rows.forEach(function(rr){ Array.prototype.forEach.call(rr.children, function(t){ if(t.dataset && t.dataset.key) ids.push(t.dataset.key.replace(/^zen:/, '')); }); });
         zenAllPresets().forEach(function(pp){ if(ids.indexOf(pp.id) < 0) ids.push(pp.id); });
@@ -35095,8 +35143,8 @@
     }
   }
   // Same as reorderStationPlaylistsFromDom, for the Playlists home page's own tile grid.
-  function reorderStationPlaylistsFromGrid(){
-    var order = Array.prototype.map.call(stationsGrid.querySelectorAll('.tile[data-entity="playlist"]'), function(el){
+  function reorderStationPlaylistsFromGrid(grid){
+    var order = Array.prototype.map.call((grid || stationsGrid).querySelectorAll('.tile[data-entity="playlist"]'), function(el){
       return el.dataset.reorderId;
     });
     var byId = {};
@@ -35323,13 +35371,29 @@
     }
     var songs = cards.filter(isLocalTrack);
     cards.forEach(function(s){
-      if(isLocalTrack(s)) stationsGrid.appendChild(buildSongRow(s, { queueList: songs, queueLabel: playlist.label }));
-      else if(trackType(s) === 'podcast') stationsGrid.appendChild(buildPodcastEpisodeRow(s));
-      else stationsGrid.appendChild(buildRow(s, false));
+      var el;
+      if(isLocalTrack(s)) el = buildSongRow(s, { queueList: songs, queueLabel: playlist.label });
+      else if(trackType(s) === 'podcast') el = buildPodcastEpisodeRow(s);
+      else el = buildRow(s, false);
+      stationsGrid.appendChild(el);
+      // Build 542 (Mark): press, hold and drag a playlist's entries straight away, as on Home Favorites.
+      el._plKey = favKey(s);
+      enableTouchReorder({ item: el, list: stationsGrid, onDrop: function(){ commitPlaylistViewOrder(playlist); } });
     });
     setResultCount(cards.length, 'item');
   }
 
+  // Build 542: the order after a hold-drag on the playlist's own page. Entries not shown there
+  // (hidden or repeated streams) keep their places; the shown ones take the dragged order.
+  function commitPlaylistViewOrder(pl){
+    var keys = Array.prototype.filter.call(stationsGrid.children, function(el){ return el._plKey; }).map(function(el){ return el._plKey; });
+    var shown = {}, byKey = {};
+    keys.forEach(function(k){ shown[k] = true; });
+    pl.stations.forEach(function(st){ var k = favKey(st); if(shown[k] && !byKey[k]) byKey[k] = st; });
+    var queue = keys.map(function(k){ return byKey[k]; }).filter(Boolean), used = {};
+    var next = pl.stations.map(function(st){ var k = favKey(st); if(!shown[k] || used[k]) return st; used[k] = true; return queue.shift() || st; });
+    if(next.some(function(st, i){ return st !== pl.stations[i]; })){ pl.stations = next; saveStationPlaylists(); }
+  }
   // Saves the order the rows are in now (after a drag), while editing a playlist.
   function commitPlaylistEditOrder(pl){
     var keys = Array.prototype.map.call(stationsGrid.querySelectorAll('.playlist-edit-row'), function(el){ return el.dataset.key; });
@@ -40714,6 +40778,13 @@
         selector: '.tile[data-entity="' + o.entity + '"]',
         onDrop: function(){ if(o.onReorder) o.onReorder(); }
       });
+    }
+    // Build 542 (Mark): press, hold and drag works on a list's tiles straight away, as it does on
+    // Home Favorites -- no edit mode first. A tap still opens the tile and a swipe still scrolls.
+    else if(o.holdReorder){
+      enableTouchReorder({ item: tile, list: o.container || stationsGrid,
+        accept: function(b){ return b.dataset.entity === o.entity; },
+        onDrop: function(){ if(o.onReorder) o.onReorder(); } });
     }
 
     var art = document.createElement('div');
@@ -50822,7 +50893,7 @@
     if(i < 0) return;
     var m = document.createElement('div');
     m.className = 'np-menu row-menu open';
-    m.id = 'genreStMenu';
+    m.id = 'genreStMenu'; m._openedAt = Date.now();   // build 542: the lift of the finger that opened it doesn't close it
     m.setAttribute('role', 'menu');
     function item(icon, label, fn){
       var b = document.createElement('button');
@@ -50847,7 +50918,7 @@
     top = Math.max(8, Math.min(top, window.innerHeight - h - 70));
     m.style.left = left + 'px'; m.style.top = top + 'px';
   }
-  document.addEventListener('click', function(e){ var m = document.getElementById('genreStMenu'); if(m && !m.contains(e.target)) closeGenreStMenu(); }, true);
+  document.addEventListener('click', function(e){ var m = document.getElementById('genreStMenu'); if(m && !m.contains(e.target) && !(Date.now() - (m._openedAt || 0) < 500)) closeGenreStMenu(); }, true);
   window.addEventListener('scroll', closeGenreStMenu, { passive: true });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeGenreStMenu(); });
   (function(){
@@ -50856,13 +50927,15 @@
     try{ native = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins) ? Capacitor.Plugins.AmplifyPlayer : null; }catch(e){}
     function tellNative(on){ try{ if(native && native.holdTouch) native.holdTouch({ on: !!on }).catch(function(){}); }catch(e){} }
     function tileOf(el){
-      if(!genrePage || genreReordering || !document.body.classList.contains('genre-open')) return null;
+      if(!genrePage || !document.body.classList.contains('genre-open')) return null;
       var t = el && el.closest ? el.closest('.tile') : null;
       return t && t._genreSt && stationsGrid.contains(t) ? t : null;
     }
     function cancel(){ if(press){ clearTimeout(press.timer); press = null; tellNative(false); } }
     function fire(t){
       eatUntil = Date.now() + 800;
+      // Build 542: the station is lifted for a drag; its menu opens on letting go, unless it moves.
+      if(t.classList.contains('hr-lifted')){ t._onStillHold = function(){ eatUntil = Date.now() + 800; openGenreStMenu(t); }; return; }
       try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
       openGenreStMenu(t);
     }
@@ -50994,8 +51067,7 @@
     // Build 504: with the heading's reorder on, press and hold a station and drag it; the order is kept per genre.
     function genreHold(el, which){
       el.classList.toggle('genre-reordering', genreReordering);
-      attachHoldReorder(el, { item: '.tile', enabled: function(){ return genreReordering; }, onDrop: function(){ genreSaveOrder(g, which); } });
-      el.addEventListener('click', function(e){ if(genreReordering){ e.preventDefault(); e.stopPropagation(); } }, true);
+      attachHoldReorder(el, { item: '.tile', onDrop: function(){ genreSaveOrder(g, which); } });   // build 542: always, like Home Favorites
     }
     var TOP = 10;
     if(stations.length){
@@ -51808,8 +51880,12 @@
     item._hrAccept = o.accept || null;
     if(list._hrAttached) return;
     list._hrAttached = true;
+    // Build 542: one hold-drag per list, shared by every kind of item put in it later (stationsGrid
+    // shows a different page each time), so items are found by their own flag, not by the first
+    // caller's selector.
     attachHoldReorder(list, {
-      item: o.selector || '*', vertical: 'auto', touchOnly: true,
+      item: '*', vertical: 'auto', touchOnly: true,
+      findItem: function(target){ var el = target; while(el && el.parentElement !== list) el = el.parentElement; return el && el._hrOn ? el : null; },
       accept: function(el){ return !!el._hrOn; },
       canSwap: function(a, b){ return !a._hrAccept || a._hrAccept(b); },
       skip: 'button, input, select, textarea, a, .row-more-btn, .fav-edit-remove',

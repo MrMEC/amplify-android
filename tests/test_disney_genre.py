@@ -1,3 +1,4 @@
+import sys as _sd_sys, os as _sd_os; _sd_sys.path.insert(0, _sd_os.path.dirname(_sd_os.path.abspath(__file__))); from syn_drag import syn_drag
 """Build 426: the Disney genre (library songs, stations, podcasts, movies, TV shows).
 Run: python3 tests/test_disney_genre.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools
@@ -83,15 +84,16 @@ async def main():
         async def hold(name):
             await pg.evaluate("(n)=>{ var tl=Array.prototype.filter.call(document.querySelectorAll('.gp-row .tile'), x=>x.querySelector('.tile-name').textContent===n)[0]; var r=tl.getBoundingClientRect(); var tc=new Touch({identifier:1,target:tl,clientX:r.left+20,clientY:r.top+20}); tl.dispatchEvent(new TouchEvent('touchstart',{touches:[tc],targetTouches:[tc],changedTouches:[tc],bubbles:true,cancelable:true})); window.__held=tl; window.__tc=tc; }", name)
             await pg.wait_for_timeout(650)
+            await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))"); await pg.wait_for_timeout(550)   # build 542: the menu opens on letting go
         await hold('Magic Mix')
         items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
         await pg.screenshot(path=f'{SHOTS}/disney-menu.png')
         check(items == ['Remove from Disney'], f'long press opens the menu {items}')
-        await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))")
-        await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.indexOf('Move to Top')>=0)[0].click()")
-        await pg.wait_for_timeout(300)
+        await pg.evaluate("try{ __t.ev('closeGenreStMenu()'); }catch(e){ var m=document.getElementById('genreStMenu'); if(m) m.remove(); }")
+        first = await pg.evaluate("document.querySelector('.gp-row .tile-name').textContent")
+        await syn_drag(pg, '.gp-row:not(.gp-park-radio):not(.gp-artist-radio) .tile', 'Magic Mix', first, True)   # build 542: drag, in place of Move to Top
         order = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('.gp-row .tile-name'), x=>x.textContent).slice(0,3)")
-        check(order == ['Magic Mix', 'Disney Hits Radio', 'Disney Classics'], f'Move to Top puts it first {order}')
+        check(order == ['Magic Mix', 'Disney Hits Radio', 'Disney Classics'], f'hold and drag puts it first {order}')
         saved = await pg.evaluate("JSON.parse(localStorage.getItem('radioPlayerGenreStations'))")
         check(saved['disney']['order'][0] == 'dz2' or 'Magic' in json.dumps(saved), f'the order is saved {saved}')
         await pg.evaluate("window.__dz.open('Disney')"); await pg.wait_for_timeout(900)

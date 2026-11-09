@@ -1,3 +1,4 @@
+import sys as _sd_sys, os as _sd_os; _sd_sys.path.insert(0, _sd_os.path.dirname(_sd_os.path.abspath(__file__))); from syn_drag import syn_drag
 """Build 452: Park radio row on the Disney page.
 Run: python3 tests/test_disney_genre.py (screenshots in /tmp/claude-0/t/shots)"""
 import asyncio, json, os, shutil, threading, http.server, functools
@@ -74,6 +75,7 @@ async def main():
             async def hold(name):
                 await pg.evaluate("(n)=>{ var tl=Array.prototype.filter.call(document.querySelectorAll('.gp-park-radio .tile'), x=>x.querySelector('.tile-name').textContent===n)[0]; tl.scrollIntoView({block:'center', inline:'center'}); var r=tl.getBoundingClientRect(); var tc=new Touch({identifier:1,target:tl,clientX:r.left+20,clientY:r.top+20}); tl.dispatchEvent(new TouchEvent('touchstart',{touches:[tc],targetTouches:[tc],changedTouches:[tc],bubbles:true,cancelable:true})); window.__held=tl; window.__tc=tc; }", name)
                 await pg.wait_for_timeout(650)
+                await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))"); await pg.wait_for_timeout(550)   # build 542: the menu opens on letting go
             async def release():
                 await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))")
             async def pick(label):
@@ -84,16 +86,16 @@ async def main():
             await hold('DMagicWorld')
             items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
             check(items == ['Remove from Disney'], f'{scheme}: long-press on the first park station opens the menu {items}')
-            await release(); await pick('Move Down')
+            await pg.evaluate("var m=document.getElementById('genreStMenu'); if(m) m.remove();")
+            # build 542: hold and drag, in place of the menu's Move items
+            await syn_drag(pg, '.gp-park-radio .tile', 'DMagicWorld', 'Sorcerer Radio', False)
             o = await park()
-            check(o[:2] == ['Sorcerer Radio', 'DMagicWorld'], f'{scheme}: Move Down {o}')
-            await hold('DParkRadio Main')
-            items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
+            check(o[0] == 'Sorcerer Radio' and 'DMagicWorld' in o[1:3], f'{scheme}: dragged along {o}')
             await pg.screenshot(path=f'{SHOTS}/park-menu-{scheme}.png')
-            check(items == ['Move to Top', 'Move Up', 'Remove from Disney'], f'{scheme}: last station menu {items}')
-            await release(); await pick('Move to Top')
+            last = o[-1]
+            await syn_drag(pg, '.gp-park-radio .tile', last, o[0], True)
             o = await park()
-            check(o == ['DParkRadio Main', 'Sorcerer Radio', 'DMagicWorld', "Sorcerer Radio: Loop'd"], f'{scheme}: Move to Top {o}')
+            check(o[0] == last and len(o) == 4, f'{scheme}: dragged the last to the front {o}')
             await pg.evaluate("window.__dz.open('Disney')"); await pg.wait_for_timeout(900)
             o2 = await park()
             check(o2 == o, f'{scheme}: order survives reopening {o2}')

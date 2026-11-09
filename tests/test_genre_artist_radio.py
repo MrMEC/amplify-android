@@ -1,3 +1,4 @@
+import sys as _sd_sys, os as _sd_os; _sd_sys.path.insert(0, _sd_os.path.dirname(_sd_os.path.abspath(__file__))); from syn_drag import syn_drag
 """Build 448 (Mark: "Exclusively Radio stations don't appear under Genres"): a genre page has an Artist radio
 row after Top stations: the Exclusively channels of artists whose library songs carry the genre first, then
 the channels the directory tags with it; none already among the genre's stations; none when Settings >
@@ -83,6 +84,7 @@ async def run2(b, scheme, w, h):
     async def hold(name):
         await pg.evaluate("(n)=>{ var tl=Array.prototype.filter.call(document.querySelectorAll('.gp-artist-radio .tile'), x=>x.querySelector('.tile-name').textContent===n)[0]; tl.scrollIntoView({block:'center'}); var r=tl.getBoundingClientRect(); var tc=new Touch({identifier:1,target:tl,clientX:r.left+20,clientY:r.top+20}); tl.dispatchEvent(new TouchEvent('touchstart',{touches:[tc],targetTouches:[tc],changedTouches:[tc],bubbles:true,cancelable:true})); window.__held=tl; window.__tc=tc; }", name)
         await pg.wait_for_timeout(650)
+        await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))"); await pg.wait_for_timeout(550)   # build 542: the menu opens on letting go
         items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
         await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))")
         return items
@@ -91,7 +93,9 @@ async def run2(b, scheme, w, h):
     items = await hold('Zed')
     check(items == ['Remove from Rock'], f'{T} long-pressing an artist radio tile opens the genre menu {items}')
     await pg.screenshot(path=f'{shots}/genre-radio-menu-{scheme}-{w}.png')
-    await pick('Move to Top')
+    await pg.evaluate("var m=document.getElementById('genreStMenu'); if(m) m.remove();")
+    firstR = await pg.evaluate("document.querySelector('.gp-artist-radio .tile-name').textContent")
+    await syn_drag(pg, '.gp-artist-radio .tile', 'Zed', firstR, True)   # build 542: drag, in place of Move to Top
     p = await pg.evaluate(PROBE)
     tops = await pg.evaluate("Array.from(document.querySelectorAll('.gp-row:not(.gp-artist-radio) .tile-name')).slice(0,2).map(function(e){ return e.textContent; })")
     check(p['radio'] == ['Zed', 'Rock Legend', 'Ann'] and tops == ['Rock Station 1', 'Rock Station 2'], f'{T} Move to Top reorders the artist radio row only {p["radio"]} {tops}')
