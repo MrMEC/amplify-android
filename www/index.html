@@ -927,8 +927,6 @@
      (.fav-artists-row), not the 150px covers the other home rows use -- a row of people,
      sized so several fit across a phone at once. */
   body.home-stacked .home-row > #topArtistsGrid{ gap:0 16px; }
-  /* Build 539 (Mark): titles in Home rows take one line, so no row reserves a blank second line under its tiles: every row ends exactly 40px above the next heading. */
-  body.home-stacked .home-view-row-title, body.home-stacked :is(.home-section, .recent-section, #dailyHomeSections) .home-row .tile:not(.fav-card):not(.tile-row) .tile-name, body.home-stacked :is(.home-section, .recent-section, #dailyHomeSections) .home-row .yt-title{ display:block !important; -webkit-line-clamp:1 !important; line-clamp:1 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis; }
   body.home-stacked .home-row > #topArtistsGrid > .tile{ flex:0 0 100px; } /* build 210: a little larger (was 92) */
   /* The arrows sit on the middle of the circle rather than the middle of a 150px cover. */
   #topArtistsSection .home-row-nav{ top:29px; }

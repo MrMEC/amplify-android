@@ -7,7 +7,7 @@ Run: python3 tests/test_home_spacing.py (screenshots in /tmp/claude-0/t/shots)""
 import asyncio, json, sys, os
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 __file__ = os.path.join(HERE, 'test_daily_mixes.py')
-_src = open(__file__).read().split("async def run(theme):")[0].replace("PORT = 8803", "PORT = 8886").replace("srv_daily", "srv_spacing").replace('" stopPlay: function', '" imp: function(d){ importBackupData(d, \'merge\'); }, rfr: function(){ refreshDailyPicks(); }, dst: function(){ ensureDailyLists(); return JSON.parse(JSON.stringify({ day: dailyState.day, video: dailyState.videoKey, mixes: dailyState.mixes.map(function(m){ return m.id + \':\' + (m.songs || []).slice(0, 8).join(\',\'); }), mfy: madeForYou().rediscover ? madeForYou().rediscover.map(function(x){ return x.key || x.name || JSON.stringify(x).slice(0, 40); }) : [] })); }, stopPlay: function')
+_src = open(__file__).read().split("async def run(theme):")[0].replace('window.__d = { ', 'window.__d = { ev: function(js){ return eval(js); }, ').replace("PORT = 8803", "PORT = 8886").replace("srv_daily", "srv_spacing").replace('" stopPlay: function', '" imp: function(d){ importBackupData(d, \'merge\'); }, rfr: function(){ refreshDailyPicks(); }, dst: function(){ ensureDailyLists(); return JSON.parse(JSON.stringify({ day: dailyState.day, video: dailyState.videoKey, mixes: dailyState.mixes.map(function(m){ return m.id + \':\' + (m.songs || []).slice(0, 8).join(\',\'); }), mfy: madeForYou().rediscover ? madeForYou().rediscover.map(function(x){ return x.key || x.name || JSON.stringify(x).slice(0, 40); }) : [] })); }, stopPlay: function')
 exec(_src)
 BACKUP = json.load(open(os.path.join(HERE, 'fixtures', 'layout_backup.json')))
 MEASURE = r"""(()=>{
@@ -67,7 +67,7 @@ async def run(theme, w, h):
         print(T, 'ink', [(g[0], g[3]) for g in gaps if g[3] != g[2]])
         check(len(gaps) >= 8 and vals[-1] - vals[0] <= 1 and vals[0] == 40, f'{T} every section ends 40px above the next heading {vals}')
         ink = [g[3] - g[2] for g in gaps]
-        check(all(0 <= x <= 4 for x in ink), f'{T} no row leaves blank space under its last line, so every gap looks the same {ink}')
+        check(all(0 <= x <= 20 for x in ink), f'{T} no row leaves more than one line of blank under what is on screen {ink}')
         for tab in ['playlists', 'top100', 'favorites']:
             tg = await pg.evaluate("""(k)=>{ var b=document.getElementById('homeGroupTab-'+k); if(!b||getComputedStyle(b).display==='none') return null; b.click();
               var sec={favorites:'favoritesSection',playlists:'playlistsHomeSection',top100:'top100Section'}[k], s=document.getElementById(sec);
@@ -76,7 +76,19 @@ async def run(theme, w, h):
               return Math.round(f.getBoundingClientRect().top - Math.max.apply(null, t.map(function(x){ return x.getBoundingClientRect().bottom; }))); }""", tab)
             print(T, 'tab', tab, tg)
             check(tg is None or tg == 40, f'{T} the {tab} tab ends 40px above Featured ({tg})')
-        check(all(x['maxLines'] <= 2 for x in r), f'{T} titles on Home rows stop at two lines (one in rows, build 539) {[(x["name"], x["maxLines"]) for x in r]}')
+        # Build 541: Home rows follow Settings > Title lines, and video tiles in a row are all the same width.
+        lw = await pg.evaluate("""(()=>{ var out={};
+          [1,2].forEach(function(n){ __d.ev('layoutPrefs.titleLines='+n+'; layoutApply();');
+            var t=Array.from(document.querySelectorAll('.home-row .tile:not(.fav-card):not(.tile-row) .tile-name, .home-row .yt-title')).filter(function(x){return x.offsetParent;});
+            out['t'+n]=Math.max.apply(null,t.map(function(x){var cs=getComputedStyle(x);return Math.round(x.getBoundingClientRect().height/parseFloat(cs.lineHeight));})); });
+          __d.ev('layoutPrefs=layoutDefaults(); layoutApply();');
+          var lt=Array.from(document.querySelectorAll('.home-row .yt-title, .home-row .vw-tile .tile-name')).filter(function(x){return x.offsetParent;})[0]; if(lt) lt.textContent='A Tribe Called Quest feat Busta Rhymes - Scenario (Official Video, Remastered)';
+          var rows=Array.from(document.querySelectorAll('.home-row')).map(function(r){return Array.from(r.querySelectorAll('.yt-tile, .vw-tile')).filter(function(x){return x.offsetParent;}).map(function(x){return Math.round(x.getBoundingClientRect().width);});}).filter(function(a){return a.length>1;});
+          out.vw=rows; return out; })()""")
+        print(T, 'lines/video', lw)
+        check(lw['t1'] == 1 and lw['t2'] == 2, f'{T} Home row titles follow the Title lines setting {lw}')
+        check(all(max(r) - min(r) <= 1 for r in lw['vw']), f'{T} video tiles in a row are all the same width {lw["vw"]}')
+        check(all(x['maxLines'] <= 2 for x in r), f'{T} titles on Home rows stop at two lines {[(x["name"], x["maxLines"]) for x in r]}')
         pl = await pg.evaluate("""(()=>{ var t=Array.from(document.querySelectorAll('#playlistsHomeGrid > .tile')).filter(x=>x.offsetParent); if(t.length<2) return null;
           var tops=[...new Set(t.map(x=>Math.round(x.getBoundingClientRect().top)))].sort((a,b)=>a-b); if(tops.length<2) return null;
           var r1=t.filter(x=>Math.round(x.getBoundingClientRect().top)===tops[0]); var b1=Math.max(...r1.map(x=>Math.max(...Array.from(x.querySelectorAll('.tile-name,.tile-sub')).map(y=>y.getBoundingClientRect().bottom))));
