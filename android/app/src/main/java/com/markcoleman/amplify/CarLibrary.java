@@ -101,6 +101,7 @@ final class CarLibrary {
             }
           });
   private final Map<String, JSONObject> extraShows = new ConcurrentHashMap();
+  private final Map<String, JSONObject> bookInfo = new ConcurrentHashMap();
   private volatile int rootLimit = 4;
 
   private static final class CachedList {
@@ -254,6 +255,10 @@ final class CarLibrary {
     linkedHashMap.put("lib:songs", "Songs");
     linkedHashMap.put("lib:playlists", "Playlists");
     linkedHashMap.put("lib:genres", "Genres");
+    // Audiobooks (Mark): Library > Audiobooks, only while the phone says its source is on.
+    linkedHashMap.put("lib:audiobooks", "Audiobooks");
+    linkedHashMap.put("ab:continue", "Continue Listening");
+    linkedHashMap.put("ab:popular", "Popular");
     linkedHashMap.put("st:foryou", "My Stations");
     linkedHashMap.put("st:recent", "Recent Stations");
     linkedHashMap.put("st:top", "Top Stations");
@@ -277,7 +282,9 @@ final class CarLibrary {
         });
     linkedHashMap2.put(
         "tab:library",
-        new String[] {"lib:artists", "lib:albums", "lib:songs", "lib:playlists", "lib:genres"});
+        new String[] {
+          "lib:artists", "lib:albums", "lib:songs", "lib:playlists", "lib:genres", "lib:audiobooks"
+        });
     linkedHashMap2.put(
         "tab:stations", new String[] {"st:foryou", "st:recent", "home:nearme", "st:top"});
     linkedHashMap3.put("home:favorites", "favorites");
@@ -296,6 +303,7 @@ final class CarLibrary {
     linkedHashMap3.put("pod:az", "shows");
     linkedHashMap3.put("pod:popular", "popular");
     linkedHashMap3.put("pod:continue", "continue");
+    linkedHashMap3.put("ab:continue", "abContinue");
     linkedHashMap4.put("tab:favorites", "ic_car_favorites");
     linkedHashMap4.put("tab:home", "ic_car_listen");
     linkedHashMap4.put("tab:library", "ic_car_library");
@@ -390,6 +398,15 @@ final class CarLibrary {
     if (str.startsWith("voice:")) {
       return folder(str, "Results", null, null, null);
     }
+    if (str.startsWith("abcat:")) {
+      return folder(str, dec(str.substring(6)), null, null, null);
+    }
+    if (str.startsWith("book:")) {
+      JSONObject info = this.bookInfo.get(dec(str.substring(5)));
+      return info != null
+          ? bookFolder(info, null)
+          : folder(str, "Audiobook", null, null, null);
+    }
     return null;
   }
 
@@ -444,6 +461,11 @@ final class CarLibrary {
           i++;
           continue;
         }
+        // Audiobooks shows only while the phone has its source on.
+        if ("lib:audiobooks".equals(strArr[i]) && !audiobooksOn()) {
+          i++;
+          continue;
+        }
         MediaItem mediaItemNode = node(strArr[i]);
         if (mediaItemNode != null) {
           arrayList.add(mediaItemNode);
@@ -469,6 +491,14 @@ final class CarLibrary {
             break;
           }
           break;
+        // Audiobooks (Mark): Continue Listening, Popular, then a folder for each category.
+        case "lib:audiobooks":
+          arrayList.add(node("ab:continue"));
+          arrayList.add(node("ab:popular"));
+          for (String[] cat : audiobookCats()) {
+            arrayList.add(folder("abcat:" + enc(cat[0]), cat[0], null, null, null));
+          }
+          return arrayList;
         case "tab:podcasts":
           arrayList.add(node("pod:latest"));
           synchronized (this) {
@@ -644,8 +674,14 @@ final class CarLibrary {
         return "Songs, stations and episodes you play will show up here.";
       case "pod:continue":
         return "Nothing in progress.";
+      case "ab:continue":
+        return "Audiobooks you start will show up here.";
       default:
-        return str.startsWith("show:")
+        return str.startsWith("book:")
+            ? "Couldn't load this audiobook's sections."
+            : str.startsWith("abcat:") || "ab:popular".equals(str)
+                ? "Couldn't load audiobooks right now."
+                : str.startsWith("show:")
             ? "Couldn't load this show's episodes."
             : str.startsWith("artist:")
                 ? "No songs or stations for this artist on the phone yet."
@@ -676,6 +712,21 @@ final class CarLibrary {
         return zenItems();
       }
       return genreItems(zg);
+    }
+    if ("ab:popular".equals(str)) {
+      return audiobookSearch("ab:popular", AB_BASE);
+    }
+    if (str.startsWith("abcat:")) {
+      String abName = dec(str.substring(6));
+      for (String[] cat : audiobookCats()) {
+        if (cat[0].equals(abName)) {
+          return audiobookSearch(str, AB_BASE + " AND subject:(" + cat[1] + ")");
+        }
+      }
+      return Collections.emptyList();
+    }
+    if (str.startsWith("book:")) {
+      return bookSections(dec(str.substring(5)));
     }
     if (str.startsWith("search:")) {
       List<JSONObject> list2 = this.adhoc.get(str);
@@ -1128,6 +1179,8 @@ final class CarLibrary {
         return radioItem(jSONObject, strEmptyToNull);
       case "show":
         return showFolder(jSONObject, strEmptyToNull);
+      case "book":
+        return bookFolder(jSONObject, strEmptyToNull);
       case "album":
         synchronized (this) {
           jSONObject2 = this.albumsByKey.get(jSONObject.optString("key"));
@@ -2492,6 +2545,285 @@ final class CarLibrary {
       netCache.put("show:" + cid, new CachedList(out));
     } catch (Exception ignored) {
       if (c != null) return c.items; // an older list beats none
+    }
+    return out;
+  }
+
+  // ---------- Audiobooks (Mark): Library > Audiobooks in the car ----------
+  // The same books as the app's Library > Audiobooks: LibriVox's recordings on archive.org. The
+  // phone sends whether the source is on, the category list, covers it has changed and the books
+  // in progress; Popular, a category's books and a book's sections are looked up here (archive.org's
+  // search and file list, as the app does), so they work without opening the app. A section plays
+  // like a podcast episode: it keeps its place, honours the speed, and the rest of the book follows.
+  private static final String AB_BASE =
+      "collection:(librivoxaudio) AND mediatype:(audio) AND (language:eng OR language:English)";
+  private static final String[][] AB_CATS_DEFAULT = {
+    {"Classics", "classics"}, {"Mystery", "mystery"}, {"Science Fiction", "\"science fiction\""},
+    {"Adventure", "adventure"}, {"Short Stories", "\"short stories\""}, {"Poetry", "poetry"},
+    {"Children", "children"}, {"Romance", "romance"}, {"History", "history"},
+    {"Philosophy", "philosophy"}, {"Humor", "humor"}, {"Non-fiction", "nonfiction"}
+  };
+
+  /** True while the phone has Audiobooks on (Settings > Sources); it sends nothing when off. */
+  boolean audiobooksOn() {
+    synchronized (this) {
+      return this.catalog.optJSONObject("audiobooks") != null;
+    }
+  }
+
+  private List<String[]> audiobookCats() {
+    List<String[]> out = new ArrayList<>();
+    synchronized (this) {
+      JSONObject ab = this.catalog.optJSONObject("audiobooks");
+      JSONArray cats = ab == null ? null : ab.optJSONArray("cats");
+      if (cats != null) {
+        for (int i = 0; i < cats.length(); i++) {
+          JSONObject c = cats.optJSONObject(i);
+          if (c != null && !c.optString("name").isEmpty() && !c.optString("subject").isEmpty()) {
+            out.add(new String[] {c.optString("name"), c.optString("subject")});
+          }
+        }
+      }
+    }
+    if (out.isEmpty()) {
+      for (String[] c : AB_CATS_DEFAULT) out.add(c);
+    }
+    return out;
+  }
+
+  private MediaItem bookFolder(JSONObject j, String group) {
+    String id = j.optString("id");
+    this.bookInfo.put(id, j);
+    return folder(
+        "book:" + enc(id),
+        j.optString("title", "Audiobook"),
+        emptyToNull(j.optString("sub")),
+        ArtProvider.uriFor(j.optString("art")),
+        group);
+  }
+
+  /** A book's cover: the one chosen on the phone, else archive.org's picture of it. */
+  private String bookArtFor(String id) {
+    synchronized (this) {
+      JSONObject ab = this.catalog.optJSONObject("audiobooks");
+      JSONObject art = ab == null ? null : ab.optJSONObject("art");
+      String own = art == null ? "" : art.optString(id, "");
+      if (!own.isEmpty()) return own;
+    }
+    try {
+      return "https://archive.org/services/img/" + encQ(id);
+    } catch (Exception e) {
+      return "";
+    }
+  }
+
+  private static String encQ(String s) throws Exception {
+    return URLEncoder.encode(s, "UTF-8").replace("+", "%20");
+  }
+
+  /** archive.org gives a field as text or as a list of text; the first is the one wanted. */
+  private static String firstText(Object o) {
+    if (o instanceof JSONArray) {
+      JSONArray a = (JSONArray) o;
+      return a.length() > 0 ? firstText(a.opt(0)) : "";
+    }
+    if (o == null || o == JSONObject.NULL) return "";
+    return String.valueOf(o).trim();
+  }
+
+  /** The most downloaded books for a query, as book rows (30). An older list beats none. */
+  private List<JSONObject> audiobookSearch(String cacheKey, String query) {
+    CachedList c = netCache.get(cacheKey);
+    if (c != null && c.fresh()) return c.items;
+    List<JSONObject> out = new ArrayList<>();
+    try {
+      String url =
+          "https://archive.org/advancedsearch.php?q="
+              + encQ(query)
+              + "&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=creator&fl%5B%5D=runtime"
+              + "&sort%5B%5D="
+              + encQ("downloads desc")
+              + "&rows=30&page=1&output=json";
+      JSONObject data = new JSONObject(httpGet(url, 2 * 1024 * 1024));
+      JSONObject resp = data.optJSONObject("response");
+      JSONArray docs = resp == null ? null : resp.optJSONArray("docs");
+      if (docs != null) {
+        for (int i = 0; i < docs.length(); i++) {
+          JSONObject d = docs.optJSONObject(i);
+          if (d == null) continue;
+          String id = firstText(d.opt("identifier"));
+          String title = firstText(d.opt("title"));
+          if (id.isEmpty() || title.isEmpty()) continue;
+          JSONObject e = new JSONObject();
+          e.put("t", "book");
+          e.put("id", id);
+          e.put("title", title);
+          e.put("sub", firstText(d.opt("creator")));
+          e.put("art", bookArtFor(id));
+          out.add(e);
+        }
+      }
+      netCache.put(cacheKey, new CachedList(out));
+    } catch (Exception ignored) {
+      if (c != null) return c.items;
+    }
+    return out;
+  }
+
+  private static Integer leadingInt(String s) {
+    int i = 0;
+    while (i < s.length() && Character.isDigit(s.charAt(i))) i++;
+    if (i == 0 || i > 9) return null;
+    return Integer.valueOf(s.substring(0, i));
+  }
+
+  /** Names compared the way people count: "part 2" before "part 10". */
+  private static int natCompare(String a, String b) {
+    int i = 0, j = 0;
+    while (i < a.length() && j < b.length()) {
+      char x = a.charAt(i), y = b.charAt(j);
+      if (Character.isDigit(x) && Character.isDigit(y)) {
+        int i2 = i, j2 = j;
+        while (i2 < a.length() && Character.isDigit(a.charAt(i2))) i2++;
+        while (j2 < b.length() && Character.isDigit(b.charAt(j2))) j2++;
+        String na = a.substring(i, i2).replaceFirst("^0+(?=.)", "");
+        String nb = b.substring(j, j2).replaceFirst("^0+(?=.)", "");
+        if (na.length() != nb.length()) return na.length() < nb.length() ? -1 : 1;
+        int cmp = na.compareTo(nb);
+        if (cmp != 0) return cmp;
+        i = i2;
+        j = j2;
+      } else {
+        int cmp = Character.compare(Character.toLowerCase(x), Character.toLowerCase(y));
+        if (cmp != 0) return cmp;
+        i++;
+        j++;
+      }
+    }
+    return Integer.compare(a.length() - i, b.length() - j);
+  }
+
+  private static double fileSeconds(String v) {
+    if (v == null || v.isEmpty()) return 0;
+    try {
+      if (v.matches("\\d+(\\.\\d+)?")) return Math.round(Double.parseDouble(v));
+      double total = 0;
+      for (String part : v.split(":")) total = total * 60 + Double.parseDouble(part);
+      return total;
+    } catch (Exception e) {
+      return 0;
+    }
+  }
+
+  /** The audio files of one archive.org book: one format, the best that plays, in reading order. */
+  private static List<JSONObject> bookAudioFiles(JSONArray files) {
+    List<JSONObject> usable = new ArrayList<>();
+    if (files == null) return usable;
+    for (int i = 0; i < files.length(); i++) {
+      JSONObject f = files.optJSONObject(i);
+      if (f == null || f.optString("name").isEmpty()) continue;
+      String priv = f.optString("private", "");
+      if (!priv.isEmpty() && !priv.equalsIgnoreCase("false")) continue;
+      if ("metadata".equals(f.optString("source"))) continue;
+      usable.add(f);
+    }
+    List<JSONObject> audio = new ArrayList<>();
+    for (int pass = 0; pass < 4 && audio.isEmpty(); pass++) {
+      for (JSONObject f : usable) {
+        String fmt = f.optString("format", "").toLowerCase(Locale.ROOT);
+        String name = f.optString("name").toLowerCase(Locale.ROOT);
+        boolean ok;
+        switch (pass) {
+          case 0:
+            ok = fmt.equals("vbr mp3");
+            break;
+          case 1:
+            ok = fmt.endsWith("mp3") || name.endsWith(".mp3");
+            break;
+          case 2:
+            ok = fmt.contains("ogg vorbis");
+            break;
+          default:
+            ok =
+                fmt.matches(".*(flac|aac|m4a|wave|opus).*")
+                    || name.matches(".*\\.(flac|m4a|aac|wav|opus|oga)$");
+            break;
+        }
+        if (ok) audio.add(f);
+      }
+    }
+    Collections.sort(
+        audio,
+        (a, b) -> {
+          Integer ta = leadingInt(a.optString("track", ""));
+          Integer tb = leadingInt(b.optString("track", ""));
+          if (ta != null && tb != null && !ta.equals(tb)) return Integer.compare(ta, tb);
+          return natCompare(a.optString("name"), b.optString("name"));
+        });
+    return audio.size() > 200 ? new ArrayList<>(audio.subList(0, 200)) : audio;
+  }
+
+  /** A book's sections, in order, as episodes (guid "ia:<book>/<file>", as on the phone). */
+  private List<JSONObject> bookSections(String id) {
+    if (id.isEmpty()) return Collections.emptyList();
+    CachedList c = netCache.get("book:" + id);
+    if (c != null && c.fresh()) return c.items;
+    List<JSONObject> out = new ArrayList<>();
+    try {
+      JSONObject meta = new JSONObject(httpGet("https://archive.org/metadata/" + encQ(id), 8 * 1024 * 1024));
+      JSONObject md = meta.optJSONObject("metadata");
+      String bookTitle = md == null ? "" : firstText(md.opt("title"));
+      if (bookTitle.isEmpty()) bookTitle = "Audiobook";
+      String author = md == null ? "" : firstText(md.opt("creator"));
+      String art = bookArtFor(id);
+      String base = "https://archive.org/download/" + encQ(id) + "/";
+      JSONObject progress = CarProgress.readAll(ctx);
+      for (JSONObject f : bookAudioFiles(meta.optJSONArray("files"))) {
+        String fileName = f.optString("name");
+        StringBuilder url = new StringBuilder(base);
+        String[] segs = fileName.split("/");
+        for (int k = 0; k < segs.length; k++) {
+          if (k > 0) url.append('/');
+          url.append(encQ(segs[k]));
+        }
+        String title = f.optString("title", "");
+        if (title.isEmpty()) title = fileName.replaceFirst("\\.[^.]+$", "");
+        title = title.replaceFirst("^\\s*\\d{1,3}\\s*[-.)]\\s*", "");
+        if (title.isEmpty()) title = "Section";
+        double dur = fileSeconds(f.optString("length", ""));
+        String guid = "ia:" + id + "/" + fileName;
+        JSONObject rec = new JSONObject();
+        rec.put("guid", guid);
+        rec.put("collectionId", "");
+        rec.put("collectionName", bookTitle);
+        rec.put("artistName", author);
+        rec.put("trackName", title);
+        rec.put("artworkUrl", art);
+        rec.put("releaseDate", "");
+        rec.put("durationSec", dur);
+        rec.put("episodeUrl", url.toString());
+        rec.put("description", "Internet Archive");
+        rec.put("isVideo", false);
+        JSONObject e = new JSONObject();
+        e.put("t", "episode");
+        e.put("k", "podcast:" + guid);
+        e.put("guid", guid);
+        e.put("title", title);
+        e.put("sub", bookTitle);
+        e.put("art", art);
+        e.put("url", url.toString());
+        e.put("dur", dur);
+        JSONObject pr = progress.optJSONObject(guid);
+        if (pr != null) {
+          e.put("pos", pr.optDouble("positionSec", 0));
+          e.put("done", pr.optBoolean("completed", false));
+        }
+        e.put("rec", rec);
+        out.add(e);
+      }
+      netCache.put("book:" + id, new CachedList(out));
+    } catch (Exception ignored) {
+      if (c != null) return c.items;
     }
     return out;
   }

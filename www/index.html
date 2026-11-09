@@ -24382,6 +24382,7 @@
     });
   })();
   function refreshAfterSourceChange(){
+    try{ if(window.AmplifyScheduleCarMenu) window.AmplifyScheduleCarMenu(); }catch(e){}   // the car's Audiobooks row follows its switch
     // Build 440: Audiobooks' tab comes and goes with its switch; off while it is showing, Artists opens.
     try{
       if(typeof onAudiobooksView !== 'undefined' && onAudiobooksView && !sourceOn('audiobooks')) openLibTab('artists');
@@ -54313,6 +54314,19 @@
       if(group) o.g = group;
       return o;
     }
+    // Audiobooks (Mark): null while its source is off (the car then has no Audiobooks row); else the
+    // categories to browse and the covers chosen on the phone for books (archive.org's own picture
+    // is used for the rest).
+    function audiobooksForCar(){
+      if(!sourceOn('audiobooks')) return null;
+      var art = {}, map = loadCustomArtMap();
+      Object.keys(map || {}).forEach(function(k){
+        if(k.indexOf('audiobook:') !== 0 || !map[k]) return;
+        var a = carImage(k, map[k]);
+        if(a) art[k.slice(10)] = a;
+      });
+      return { cats: AB_CATS.map(function(c){ return { name: c[0], subject: c[1] }; }), art: art };
+    }
     // A library song is referred to by id; its details and where it lives are in the library
     // snapshot (buildCarLibrary), and one without a place on the phone is left out there.
     function carSong(t){
@@ -54466,6 +54480,25 @@
         }).concat((r[1] || []).filter(function(rec){ return rec && !seenEp[rec.guid]; }).map(function(rec){
           return carEpisode(podcastTrackFromProgress(rec), prog);
         })));
+        // Audiobooks (Mark): Library > Audiobooks in the car -- the books in progress, newest first, one
+        // per book (it opens on its sections). A Project Gutenberg book can't be listed from here, so
+        // the last section played stands in for it.
+        lists.abContinue = [];
+        try{
+          if(sourceOn('audiobooks')){
+            var seenBook = {};
+            recentStations.forEach(function(st){
+              if(!st || st.type !== 'podcast' || !isAudiobookGuid(st.guid)) return;
+              var bid = abIdFromGuid(st.guid);
+              if(!bid || seenBook[bid] || lists.abContinue.length >= 12) return;
+              seenBook[bid] = true;
+              if(abIsGutenberg(bid)){ var ge = carEpisode(st, prog); if(ge) lists.abContinue.push(ge); return; }
+              var own = abBookArt(bid);
+              lists.abContinue.push({ t: 'book', id: bid, title: st.collectionName || st.name || 'Audiobook', sub: st.artistName || '',
+                art: own ? carImage('audiobook:' + bid, own) : secureUrl(abDefaultArt(bid)) });
+            });
+          }
+        }catch(e){ lists.abContinue = []; }
         lists.podLatest = latestOf(podcastSubs, prog);
         podcastCategories.forEach(function(cat){
           lists['cat:' + cat.id] = latestOf(podcastSubs.filter(function(sub){ return isShowInPodcastCategory(cat, sub.collectionId); }), prog);
@@ -54488,6 +54521,7 @@
           apiHosts: API_HOSTS.slice(),
           stationArt: stationArt,
           genrePrefs: genrePrefs,
+          audiobooks: audiobooksForCar(),
           lists: lists
         };
       });
