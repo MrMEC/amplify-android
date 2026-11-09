@@ -836,7 +836,7 @@
   body.home-stacked .home-row > #favoritesGrid:has(> .tile){ grid-auto-columns:226px; gap:16px 16px; }
   /* Build 293 (Mark): Playlists and Top 100's two rows closer together. */
   body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile),
-  body.home-stacked .home-row > #top100HomeGrid:has(> .tile){ row-gap:10px; }
+  body.home-stacked .home-row > #top100HomeGrid:has(> .tile){ row-gap:20px; }   /* Build 504: +10px (was 10px) */
   @media (max-width: 900px){
     body.home-stacked .home-row > #playlistsHomeGrid:has(> .tile),
     body.home-stacked .home-row > #top100HomeGrid:has(> .tile),
@@ -1800,7 +1800,8 @@
   .home-group-tabs .home-tab{ flex:0 0 auto; }
   .home-group-all{ margin-left:auto; flex:0 0 auto; background:none; border:0; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; cursor:pointer; }
   body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
-  .featured-home{ margin:10px 0 0; }
+  .featured-home{ margin:4px 0 30px; }
+  .fh-head{ margin-bottom:12px; }
   .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:100px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
     border-radius:var(--r-card, 18px); overflow:hidden; color:#fff; font:inherit; cursor:pointer; isolation:isolate;
     background:linear-gradient(120deg, var(--fh-1, #2a0f3a), var(--fh-2, #d9691b)); -webkit-tap-highlight-color:transparent; }
@@ -1826,9 +1827,14 @@
   .season-row.off .season-row-name{ color:var(--text-dim); }
   .season-edit-body{ display:flex; flex-direction:column; gap:6px; }
   .se-label{ margin-top:8px; font-size:12.5px; font-weight:700; color:var(--text-dim); }
-  .se-dates{ display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
-  .se-dates .settings-select{ flex:1 1 0; min-width:0; width:auto; padding-left:8px; padding-right:20px; background-position:right 6px center; }
-  .se-dates #seSM, .se-dates #seEM{ flex:1.5 1 0; } .se-dates #seSD, .se-dates #seED{ flex:1.1 1 0; padding-right:22px; }
+  .se-dates{ display:flex; flex-direction:column; gap:8px; }
+  .se-date-row{ display:flex; align-items:center; gap:8px; }
+  .se-date-row .se-to{ flex:0 0 46px; }
+  .se-date-row .settings-select{ flex:1 1 0; min-width:0; width:auto; font-size:15px; padding:9px 30px 9px 12px; text-overflow:clip; }
+  .se-date-row #seSM, .se-date-row #seEM{ flex:1.6 1 0; }
+  #seasonEditPanel{ display:flex; flex-direction:column; max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px); box-sizing:border-box; }
+  #seasonEditPanel .season-edit-body{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding-right:2px; }
+  #seasonEditPanel .settings-header, #seasonEditPanel .art-url-actions{ flex:none; }
   .se-to{ font-size:13px; color:var(--text-dim); }
   .se-look{ display:flex; align-items:center; gap:10px; }
   .se-look input[type=color]{ width:46px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:none; }
@@ -7361,6 +7367,17 @@
   .zen-hero-go{ position:absolute; right:16px; bottom:16px; width:52px; height:52px; border-radius:50%; background:#f3f1f2; color:#10131a; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,.4); }
   .zen-hero-go svg{ width:24px; height:24px; fill:currentColor; }
   .zen-row-tiles .tile{ flex:none; }
+  /* Build 504: no grips or Reorder buttons; tap a heading, then press and hold a row to drag it. */
+  #forYouReorderHeaderBtn, #videoReorderHeaderBtn, #playlistsReorderHeaderBtn, #genresReorderHeaderBtn{ position:absolute !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important; overflow:hidden !important; clip:rect(0 0 0 0) !important; }
+  .section-heading.reorderable{ cursor:pointer; }
+  .section-heading.reorderable::after{ content:'\21C5'; margin-left:10px; font-size:.7em; opacity:.45; vertical-align:middle; }
+  .section-heading.reorder-on{ color:var(--accent); }
+  .section-heading.reorder-on::after{ content:'\00B7  Done'; font-size:.6em; opacity:1; letter-spacing:.02em; }
+  .gp-row.genre-reordering .tile, .gp-grid.genre-reordering .tile{ animation:zenWiggle .5s ease-in-out infinite alternate; touch-action:none; }
+  .genre-reordering .tile.hr-lifted{ animation:none; }
+  .row-drag-handle, .ch-grip, .zen-ro-btn, .gb-edit{ display:none !important; }
+  .gb-head-toggle{ cursor:pointer; }
+  .gb-head-toggle.reorder-on::after{ content:' \00b7  drag to reorder'; font-size:12px; opacity:.7; font-weight:500; }
   .zen-reorder-head{ cursor:pointer; }
   .zen-reorder-head.on{ color:var(--accent); }
   .zen-reorder-hint{ margin:-4px 0 10px; font-size:13px; color:var(--text-dim); }
@@ -9271,9 +9288,8 @@
       <input type="text" class="art-url-input" id="seBlurb" maxlength="80" autocomplete="off">
       <div class="se-label">Dates</div>
       <div class="se-dates" id="seDates">
-        <select class="settings-select" id="seSM" aria-label="Start month"></select><select class="settings-select" id="seSD" aria-label="Start day"></select>
-        <span class="se-to">to</span>
-        <select class="settings-select" id="seEM" aria-label="End month"></select><select class="settings-select" id="seED" aria-label="End day"></select>
+        <div class="se-date-row"><span class="se-to">From</span><select class="settings-select" id="seSM" aria-label="Start month"></select><select class="settings-select" id="seSD" aria-label="Start day"></select></div>
+        <div class="se-date-row"><span class="se-to">To</span><select class="settings-select" id="seEM" aria-label="End month"></select><select class="settings-select" id="seED" aria-label="End day"></select></div>
       </div>
       <div class="se-note" id="seRuleNote" hidden>Moves every year: the two weeks before Easter Sunday.</div>
       <label class="se-label" for="seGenre">Genre it opens</label>
@@ -10638,6 +10654,39 @@
   var addToPlaylistCloseBtn = document.getElementById('addToPlaylistCloseBtn');
   var addToPlaylistNewBtn = document.getElementById('addToPlaylistNewBtn');
   var stationsHeadingActions = document.getElementById('stationsHeadingActions');
+  // Build 504 (Mark): one way into reordering a list: tap its heading (then press, hold and drag).
+  // The header "Reorder" buttons are gone from view; their modes are switched from the heading.
+  var REORDER_BTN_IDS = ['forYouReorderHeaderBtn', 'videoReorderHeaderBtn', 'playlistsReorderHeaderBtn', 'genresReorderHeaderBtn'];
+  function activeReorderBtn(){
+    for(var i = 0; i < REORDER_BTN_IDS.length; i++){
+      var b = document.getElementById(REORDER_BTN_IDS[i]);
+      if(b && b.style.display !== 'none' && getComputedStyle(b).display !== 'none') return b;
+    }
+    return null;
+  }
+  function genreHeadingReorderable(){ return !!(genrePage && document.body.classList.contains('genre-open') && ((genrePage.stations && genrePage.stations.length) || (genrePage.artistRadio && genrePage.artistRadio.length))); }
+  function syncHeadingReorder(){
+    if(!stationsHeading) return;
+    var b = activeReorderBtn(), g = !b && genreHeadingReorderable();
+    stationsHeading.classList.toggle('reorderable', !!(b || g));
+    stationsHeading.classList.toggle('reorder-on', !!((b && b.title === 'Done') || (g && genreReordering)));
+    if(b || g){ stationsHeading.setAttribute('role', 'button'); stationsHeading.tabIndex = 0; } else { stationsHeading.removeAttribute('role'); stationsHeading.removeAttribute('tabindex'); }
+  }
+  function headingReorderToggle(){
+    var b = activeReorderBtn();
+    if(b){ b.click(); }
+    else if(genreHeadingReorderable()){ genreReordering = !genreReordering; try{ genreRefresh(genrePage); }catch(e){} }
+    else return;
+    syncHeadingReorder();
+  }
+  if(stationsHeading){
+    stationsHeading.addEventListener('click', function(){ if(stationsHeading.classList.contains('reorderable')) headingReorderToggle(); });
+    stationsHeading.addEventListener('keydown', function(e){ if((e.key === 'Enter' || e.key === ' ') && stationsHeading.classList.contains('reorderable')){ e.preventDefault(); headingReorderToggle(); } });
+    var hrObs = new MutationObserver(syncHeadingReorder);
+    hrObs.observe(stationsHeading, { childList: true, characterData: true, subtree: true });
+    REORDER_BTN_IDS.forEach(function(id){ var b = document.getElementById(id); if(b) hrObs.observe(b, { attributes: true, attributeFilter: ['style', 'title'] }); });
+    document.addEventListener('amplify:view', syncHeadingReorder);
+  }
   var podcastAddHeaderBtn = document.getElementById('podcastAddHeaderBtn');
   var podcastRefreshHeaderBtn = document.getElementById('podcastRefreshHeaderBtn');
   var podcastCategoriesHeaderBtn = document.getElementById('podcastCategoriesHeaderBtn');
@@ -21968,6 +22017,9 @@
       after.parentNode.insertBefore(sec, after.nextSibling);
       after = sec;
     });
+    // Build 504 (Mark): Featured sits below the tabs, under its own heading.
+    var fh = document.getElementById('featuredHome');
+    if(fh) after.parentNode.insertBefore(fh, after.nextSibling);
   })();
   function syncHomeGroup(){
     if(!homeGroupBar) return;
@@ -22120,7 +22172,7 @@
     featuredHomeEl.style.display = '';
     if(featuredHomeEl.dataset.sig === sig) return;
     featuredHomeEl.dataset.sig = sig; featuredHomeEl.dataset.id = sn.id;
-    featuredHomeEl.innerHTML = '';
+    featuredHomeEl.innerHTML = '<div class="home-section-head fh-head"><h2 class="home-heading-link" style="cursor:default">Featured</h2></div>';
     var card = document.createElement('div');
     card.className = 'fh-card' + (art ? ' has-art' : ''); card.setAttribute('role', 'button'); card.tabIndex = 0;
     card.setAttribute('aria-label', 'Featured: ' + sn.name);
@@ -22128,10 +22180,9 @@
     if(art) card.style.backgroundImage = 'url("' + art.replace(/"/g, '%22') + '")';
     var end = act.range[1], until = 'Until ' + SEASON_MONTHS[end.getMonth()] + ' ' + end.getDate();
     card.innerHTML = '<svg class="fh-icon" viewBox="0 0 24 24" aria-hidden="true">' + (SEASON_ICONS[sn.icon] || SEASON_ICONS.star) + '</svg>'
-      + '<div class="fh-text"><div class="fh-eyebrow"></div><div class="fh-title"></div><div class="fh-sub"></div></div>'
+      + '<div class="fh-text"><div class="fh-title"></div><div class="fh-sub"></div></div>'
       + '<button type="button" class="fh-play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>'
       + '<button type="button" class="fh-more" aria-label="More options"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>';
-    card.querySelector('.fh-eyebrow').textContent = 'Featured · ' + (sn.label || sn.name);
     card.querySelector('.fh-title').textContent = sn.name;
     card.querySelector('.fh-sub').textContent = (sn.blurb ? sn.blurb + ' · ' : '') + until;
     card.querySelector('.fh-play').setAttribute('aria-label', 'Play ' + sn.name);
@@ -22903,13 +22954,21 @@
     cfg = cfg || {};
     if(!grid) return null;
     var itemSel = cfg.item || '.tile', vertical = !!cfg.vertical, minItems = cfg.min || 2;
+    function isVert(){
+      if(cfg.vertical !== 'auto') return vertical;
+      var it = tiles();
+      if(it.length < 2) return true;
+      var a = it[0].getBoundingClientRect(), b = it[1].getBoundingClientRect();
+      return Math.abs(a.left - b.left) < 4 && b.top > a.top;
+    }
+    function okItem(el){ return el.matches(itemSel) && (!cfg.accept || cfg.accept(el)); }
     function keyOfEl(el){ return cfg.keyOf ? cfg.keyOf(el) : el.dataset.key; }
     var HOLD_MS = 420, SLOP = 10, EDGE = 44;
     var press = null, eatClick = false;
     var native = null;
     try{ native = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins) ? Capacitor.Plugins.AmplifyPlayer : null; }catch(e){}
     function tellNative(on){ try{ if(native && native.holdTouch) native.holdTouch({ on: !!on }).catch(function(){}); }catch(e){} }
-    function tiles(){ return Array.prototype.filter.call(grid.children, function(el){ return el.matches(itemSel); }); }
+    function tiles(){ return Array.prototype.filter.call(grid.children, okItem); }
     function stopListening(){
       document.removeEventListener('pointermove', onPointerMove, true);
       document.removeEventListener('pointerup', onPointerUp, true);
@@ -22959,12 +23018,13 @@
       for(var i = 0; i < others.length; i++){
         var o = others[i], r = o.getBoundingClientRect();
         if(press.y < r.top || press.y > r.bottom) continue;
+        if(cfg.canSwap && !cfg.canSwap(t, o)) break;
         var tIdx = tiles().indexOf(t), oIdx = tiles().indexOf(o), mid = r.top + r.height / 2;
         if(oIdx > tIdx && press.y > mid) grid.insertBefore(t, o.nextSibling);
         else if(oIdx < tIdx && press.y < mid) grid.insertBefore(t, o);
         break;
       }
-      if(others.length){
+      if(others.length && !cfg.canSwap){
         var lastR = others[others.length - 1].getBoundingClientRect(), firstR = others[0].getBoundingClientRect();
         if(press.y > lastR.bottom && others[others.length - 1].nextSibling !== t) grid.insertBefore(t, others[others.length - 1].nextSibling);
         else if(press.y < firstR.top && others[0].previousSibling !== t) grid.insertBefore(t, others[0]);
@@ -22974,7 +23034,7 @@
       t.style.transform = 'translate(0px,' + Math.round(press.y - press.grabY - base.top) + 'px) scale(1.02)';
     }
     function place(){
-      if(vertical) return placeVertical();
+      if(isVert()) return placeVertical();
       var t = press.tile;
       var others = tiles().filter(function(el){ return el !== t; });
       // Past the last cover (or before the first) it goes to that end.
@@ -23010,7 +23070,7 @@
     // Near either end the row scrolls on its own so a cover can go anywhere in it.
     function tick(){
       if(!press || !press.active) return;
-      if(vertical){
+      if(isVert()){
         var vh = window.innerHeight || 700, vs = 0;
         if(press.y < 90) vs = -Math.ceil((90 - press.y) / 4); else if(press.y > vh - 130) vs = Math.ceil((press.y - (vh - 130)) / 4);
         if(vs){ var sy0 = window.scrollY; window.scrollBy(0, vs); if(window.scrollY !== sy0) place(); }
@@ -23043,7 +23103,7 @@
       t.classList.remove('fav-dragging', 'hr-lifted');
       t.style.transform = '';
       grid.classList.remove('fav-reordering', 'hr-active');
-      if(cfg.onDrop) cfg.onDrop(tiles().map(keyOfEl));
+      if(cfg.onDrop) cfg.onDrop(tiles().map(keyOfEl), t);
     }
     function touchOf(e){
       if(!press) return null;
@@ -23078,6 +23138,9 @@
     function tileFor(target){
       if(cfg.enabled && !cfg.enabled()) return null;
       var t = target && target.closest ? target.closest(itemSel) : null;
+      if(t && cfg.accept && !cfg.accept(t)) return null;
+      // a press on a button or field inside a row is that control's, not the row's
+      if(t && target.closest && cfg.skip && target.closest(cfg.skip) && t.contains(target.closest(cfg.skip))) return null;
       return t && t.parentElement === grid && tiles().length >= minItems ? t : null;
     }
     grid.addEventListener('touchstart', function(e){
@@ -23086,14 +23149,14 @@
       var p = e.changedTouches[0];
       begin(t, 'touch', p.identifier, p.clientX, p.clientY);
     }, { passive: true });
-    grid.addEventListener('pointerdown', function(e){
+    if(!cfg.touchOnly) grid.addEventListener('pointerdown', function(e){
       if(e.pointerType === 'touch') return;          // fingers go through touchstart above
       if(e.button !== 0) return;
       var t = tileFor(e.target); if(!t) return;
       begin(t, 'mouse', e.pointerId, e.clientX, e.clientY);
     });
     // No menu or picture-drag while a cover is pressed (on a phone either one takes the touch away).
-    function refuse(e){ if(press || ((!cfg.enabled || cfg.enabled()) && e.target && grid.contains(e.target))) e.preventDefault(); }
+    function refuse(e){ if(press || (!cfg.touchOnly && (!cfg.enabled || cfg.enabled()) && e.target && grid.contains(e.target))) e.preventDefault(); }
     document.addEventListener('contextmenu', refuse, true);
     document.addEventListener('dragstart', refuse, true);
     document.addEventListener('selectstart', function(e){ if(press) e.preventDefault(); }, true);
@@ -31844,6 +31907,7 @@
     b.innerHTML = '<span class="btn-text">' + label + '</span>';
     b.title = label; b.setAttribute('aria-label', label);
     b.addEventListener('click', function(e){ e.stopPropagation(); setGenresEditing(!genresEditing); });
+    b.hidden = true;   // build 504: the heading text is the toggle now
     return b;
   }
 
@@ -32065,6 +32129,8 @@
     if(onGenresHomeView){
       var head = document.createElement('h2'); head.className = 'gb-head gb-head-row gb-head-edit';
       var t = document.createElement('span'); t.textContent = 'Browse categories'; head.appendChild(t);
+      t.className = 'gb-head-toggle reorder-on'; t.setAttribute('role','button'); t.tabIndex = 0;
+      t.addEventListener('click', function(){ setGenresEditing(false); });
       head.appendChild(genresEditBtn('Done'));
       stationsGrid.appendChild(head);
     }
@@ -32486,6 +32552,8 @@
     if(!inSearch && genreOrder.length){
       allHead.classList.add('gb-head-row');
       allHeadText = document.createElement('span'); allHead.appendChild(allHeadText);
+      allHeadText.className = 'gb-head-toggle'; allHeadText.setAttribute('role','button'); allHeadText.tabIndex = 0;
+      allHeadText.addEventListener('click', function(){ setGenresEditing(true); });
       allHead.appendChild(genresEditBtn('Edit'));
     }
     allHeadText.textContent = 'Browse categories';
@@ -34193,35 +34261,6 @@
       sh.querySelector('[data-x=close]').addEventListener('click', function(){ zenArtSheet(target); });
       if(q0) go();
     });
-  }
-  // Moves presets up or down; the order is kept for Home, Library and the Zen screen.
-  function zenReorderSheet(){
-    if(!zenOpen) zenOpenScreen(null, false);
-    function draw(){
-      var list = zenAllPresets();
-      var h = '<div class="zen-sheet-title">Reorder presets</div><div class="zen-list zen-reorder">';
-      list.forEach(function(p, i){
-        h += '<div class="zen-ro" data-id="' + p.id + '"><span class="zen-ro-art" style="background-image:url(\'' + zenArtOf(p) + '\')"></span><span class="zen-ro-name">' + zenEsc(p.n) + '</span>'
-          + '<button type="button" class="zen-ro-btn" data-d="-1" aria-label="Move up"' + (i === 0 ? ' disabled' : '') + '>' + zenSvg('up') + '</button>'
-          + '<button type="button" class="zen-ro-btn" data-d="1" aria-label="Move down"' + (i === list.length - 1 ? ' disabled' : '') + '>' + zenSvg('down') + '</button></div>';
-      });
-      h += '</div><div class="zen-sheet-btns"><button type="button" class="zen-btn zen-btn-main" data-x="close">Done</button></div>';
-      var sh = zenSheetOpen(h, function(sh){
-        var sc = zenReorderScroll;
-        sh.querySelector('[data-x=close]').addEventListener('click', zenSheetClose);
-        Array.prototype.forEach.call(sh.querySelectorAll('.zen-ro-btn'), function(b){
-          b.addEventListener('click', function(){
-            var id = b.parentNode.dataset.id, ids = zenAllPresets().map(function(x){ return x.id; }), at = ids.indexOf(id), to = at + parseInt(b.dataset.d, 10);
-            if(to < 0 || to >= ids.length) return;
-            ids.splice(at, 1); ids.splice(to, 0, id);
-            zenState.order = ids; zenSave(); zenReorderScroll = sh.scrollTop; draw(); zenRefreshLists(); if(zenOpen) zenPresetsRender();
-          });
-        });
-        if(sc) sh.scrollTop = sc;
-      });
-    }
-    var zenReorderScroll = 0;
-    draw();
   }
   // A chosen photo, shrunk so it fits in the app's storage.
   function zenPhotoData(file){
@@ -50633,6 +50672,7 @@
     // Build 178: the genre's name alone, and its songs and stations on tabs of their own.
     stationsHeading.textContent = tag;
     setResultCount(null);
+    genreReordering = false;
     var g = genrePage = { tag: tag, songs: localTracksWithTag(tag), stations: [], pending: true, tab: null, podcasts: [], movies: [], shows: [] };
     var isDisney = tag.toLowerCase() === 'disney';
     if(isDisney){
@@ -50679,7 +50719,7 @@
   // A genre's page (build 178): Songs (your library songs tagged with it, A-Z, with Shuffle All)
   // and Stations (the directory's stations for the tag), as tabs, Songs first. Tabs only when it
   // has both; otherwise just the one list. Each tab names its own count.
-  var genrePage = null;
+  var genrePage = null, genreReordering = false;
   // The artist radio (Exclusively channels) for a genre, in this order:
   //  1. channels named for it ("Exclusively Disney", "Exclusively Country"),
   //  2. channels of artists the library holds mostly in it -- at least half their songs (build 449,
@@ -50706,7 +50746,7 @@
   }
   var GENRE_TABS = [['songs', 'Songs', 'song', 'songs'], ['stations', 'Stations', 'station', 'stations']];
   // ---- Build 428: put favourite stations first, or remove stations, within a genre ----
-  // Long-press a station on a genre page: Move to top, Move up, Move down, Remove from <genre>.
+  // Long-press a station on a genre page: Remove from <genre>. (Build 504: to reorder, tap the genre's heading, then press, hold and drag.)
   // Saved per genre ({ order: [keys], hidden: [keys] }); stations not yet placed keep the
   // directory's order after the placed ones. Removed stations can be restored from the page.
   var GENRE_PREF_KEY = 'radioPlayerGenreStations';
@@ -50739,6 +50779,16 @@
     else if(how === 'up' && i > 0){ keys[i] = keys[i - 1]; keys[i - 1] = k; }
     else if(how === 'down' && i < keys.length - 1){ keys[i] = keys[i + 1]; keys[i + 1] = k; }
     else return;
+    genrePref(g.tag)[genrePrefKeys(which)[0]] = keys;
+    saveGenrePrefs();
+    genreRefresh(g);
+  }
+  function genreSaveOrder(g, which){
+    var keys = [];
+    Array.prototype.forEach.call(stationsGrid.querySelectorAll('.tile'), function(t){
+      if(t._genreSt && (t._genreWhich || '') === (which || '')) keys.push(favKey(t._genreSt));
+    });
+    if(!keys.length) return;
     genrePref(g.tag)[genrePrefKeys(which)[0]] = keys;
     saveGenrePrefs();
     genreRefresh(g);
@@ -50785,9 +50835,6 @@
       b.addEventListener('click', function(e){ e.stopPropagation(); closeGenreStMenu(); fn(); });
       m.appendChild(b);
     }
-    if(i > 0) item('top', 'Move to Top', function(){ genreMoveStation(g, st, 'top', which); });
-    if(i > 0) item('up', 'Move Up', function(){ genreMoveStation(g, st, 'up', which); });
-    if(i < keys.length - 1) item('down', 'Move Down', function(){ genreMoveStation(g, st, 'down', which); });
     item('fa-trash', 'Remove from ' + g.tag, function(){
       confirmThen({ title: 'Remove ' + quoteName(stripExclusively(st.name || '')) + ' from ' + g.tag + '?', message: 'It stays in the app; you can restore it from the bottom of this page.', ok: 'Remove' }, function(){ genreRemoveStation(g, st, which); });
     });
@@ -50807,7 +50854,7 @@
     try{ native = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins) ? Capacitor.Plugins.AmplifyPlayer : null; }catch(e){}
     function tellNative(on){ try{ if(native && native.holdTouch) native.holdTouch({ on: !!on }).catch(function(){}); }catch(e){} }
     function tileOf(el){
-      if(!genrePage || !document.body.classList.contains('genre-open')) return null;
+      if(!genrePage || genreReordering || !document.body.classList.contains('genre-open')) return null;
       var t = el && el.closest ? el.closest('.tile') : null;
       return t && t._genreSt && stationsGrid.contains(t) ? t : null;
     }
@@ -50942,6 +50989,12 @@
     }
     if(g.tag.toLowerCase() === 'white noise') stationsGrid.appendChild(zenGenreCard());   // Zen: the way into the mixer
     function head(text){ var h = document.createElement('h2'); h.className = 'gp-head grid-section-label'; h.textContent = text; stationsGrid.appendChild(h); }
+    // Build 504: with the heading's reorder on, press and hold a station and drag it; the order is kept per genre.
+    function genreHold(el, which){
+      el.classList.toggle('genre-reordering', genreReordering);
+      attachHoldReorder(el, { item: '.tile', enabled: function(){ return genreReordering; }, onDrop: function(){ genreSaveOrder(g, which); } });
+      el.addEventListener('click', function(e){ if(genreReordering){ e.preventDefault(); e.stopPropagation(); } }, true);
+    }
     var TOP = 10;
     if(stations.length){
       head('Top stations');
@@ -50949,6 +51002,7 @@
       row.className = 'gp-row';
       stations.slice(0, TOP).forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; row.appendChild(t); });
       row._ctxList = stations.slice(0, TOP);
+      genreHold(row);
       stationsGrid.appendChild(row);
     }
     // Build 470 (Mark): Park radio sits right below Top stations.
@@ -50958,6 +51012,7 @@
       krow.className = 'gp-row gp-park-radio';
       park.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'park'; krow.appendChild(t); });
       krow._ctxList = park;
+      genreHold(krow, 'park');
       stationsGrid.appendChild(krow);
     }
     if(songs.length){
@@ -50981,6 +51036,7 @@
       var moreGrid = document.createElement('div');
       moreGrid.className = 'tile-grid gp-grid';
       stations.slice(TOP).forEach(function(st){ var tile = buildTile(st); markStationVideo(tile, st); tile._genreSt = st; moreGrid.appendChild(tile); });
+      genreHold(moreGrid);
       stationsGrid.appendChild(moreGrid);
     }
     if(g.podcasts && g.podcasts.length){
@@ -51011,6 +51067,7 @@
       var arow = document.createElement('div');
       arow.className = 'gp-row gp-artist-radio';
       radio.forEach(function(st){ var t = buildTile(st); markStationVideo(t, st); t._genreSt = st; t._genreWhich = 'radio'; arow.appendChild(t); });
+      genreHold(arow, 'radio');
       arow._ctxList = radio;
       stationsGrid.appendChild(arow);
     }
@@ -51060,7 +51117,7 @@
       empty.textContent = 'No songs or stations found for ' + g.tag + '.';
       stationsGrid.appendChild(empty);
     }
-    setResultCount(null);
+    setResultCount(null);    try{ syncHeadingReorder(); }catch(e){}
   }
 
 
@@ -51739,58 +51796,22 @@
   // order by hand is the natural gesture. This runs the same insert-before/insert-after logic
   // off pointer events, which every input device produces, and leaves the native path alone
   // for a mouse so nothing that already worked changes.
+  // Build 504 (Mark): one way to reorder by touch everywhere: press and hold the row, then drag it
+  // (the way Favorites works). The grips are gone; every list that used enableTouchReorder gets it.
+  // A mouse keeps the browser's own drag and drop where a row is draggable.
   function enableTouchReorder(o){
-    var item = o.item, handle = o.handle, list = o.list, selector = o.selector;
-    var dragging = false;
-    var pointerId = null;
-
-    // Bound to `document`, not `handle`: the original version listened on the handle itself
-    // and leaned on setPointerCapture to keep events arriving there once the drag left its
-    // bounds. That capture is supposed to bypass hit-testing entirely per spec, but combined
-    // with item.style.pointerEvents = 'none' (needed below, so elementFromPoint can see the
-    // row underneath instead of the dragged row itself) it silently stopped delivering
-    // pointermove/pointerup at all on real phones -- the drag would start (the row got its
-    // "dragging" look) and then never move or release. Listening on the document sidesteps
-    // that combination altogether: nothing about routing the event depends on capture or
-    // hit-testing working correctly on the handle any more, only on comparing e.pointerId,
-    // which is reliable everywhere.
-    function onMove(e){
-      if(!dragging || e.pointerId !== pointerId) return;
-      e.preventDefault();
-      // Only needs to be true for the instant of this lookup -- toggling it around
-      // elementFromPoint rather than leaving it off for the whole drag (as before) means it
-      // can never end up interacting with anything else that reads pointer-events elsewhere.
-      item.style.pointerEvents = 'none';
-      var under = document.elementFromPoint(e.clientX, e.clientY);
-      item.style.pointerEvents = '';
-      var target = under && under.closest ? under.closest(selector) : null;
-      if(!target || target === item || target.parentElement !== list) return;
-      if(o.accept && !o.accept(target)) return;
-      var rect = target.getBoundingClientRect();
-      var before = (e.clientY - rect.top) < rect.height / 2;
-      list.insertBefore(item, before ? target : target.nextSibling);
-    }
-    function onUp(e){
-      if(!dragging || e.pointerId !== pointerId) return;
-      dragging = false;
-      pointerId = null;
-      item.classList.remove('dragging');
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      document.removeEventListener('pointercancel', onUp);
-      o.onDrop();
-    }
-    handle.addEventListener('pointerdown', function(e){
-      if(e.pointerType === 'mouse') return;
-      dragging = true;
-      pointerId = e.pointerId;
-      // Otherwise the browser treats the press as the start of a scroll and takes the
-      // gesture away mid-drag. touch-action:none on the handle is the other half of this.
-      e.preventDefault();
-      item.classList.add('dragging');
-      document.addEventListener('pointermove', onMove);
-      document.addEventListener('pointerup', onUp);
-      document.addEventListener('pointercancel', onUp);
+    var item = o.item, list = o.list;
+    item._hrOn = true;
+    item._hrDrop = o.onDrop;
+    item._hrAccept = o.accept || null;
+    if(list._hrAttached) return;
+    list._hrAttached = true;
+    attachHoldReorder(list, {
+      item: o.selector || '*', vertical: 'auto', touchOnly: true,
+      accept: function(el){ return !!el._hrOn; },
+      canSwap: function(a, b){ return !a._hrAccept || a._hrAccept(b); },
+      skip: 'button, input, select, textarea, a, .row-more-btn, .fav-edit-remove',
+      onDrop: function(keys, t){ if(t && t._hrDrop) t._hrDrop(); }
     });
   }
 

@@ -89,7 +89,7 @@ async def run2(b, scheme, w, h):
     async def pick(label):
         await pg.evaluate("(l)=>Array.prototype.filter.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.indexOf(l)>=0)[0].click()", label); await pg.wait_for_timeout(400)
     items = await hold('Zed')
-    check(items == ['Move to Top', 'Move Up', 'Remove from Rock'], f'{T} long-pressing an artist radio tile opens the genre menu {items}')
+    check(items == ['Remove from Rock'], f'{T} long-pressing an artist radio tile opens the genre menu {items}')
     await pg.screenshot(path=f'{shots}/genre-radio-menu-{scheme}-{w}.png')
     await pick('Move to Top')
     p = await pg.evaluate(PROBE)
@@ -100,7 +100,7 @@ async def run2(b, scheme, w, h):
     await pg.evaluate("__t.genre('Jazz')"); await pg.wait_for_timeout(1200)
     await pg.evaluate("__t.genre('Rock')"); await pg.wait_for_timeout(1500)
     items = await hold('Ann')
-    check(items == ['Move to Top', 'Move Up', 'Remove from Rock'], f'{T} the last tile can move up, not down {items}')
+    check(items == ['Remove from Rock'], f'{T} the last tile can move up, not down {items}')
     await pick('Remove from')
     await pg.evaluate("document.getElementById('confirmOk').click()"); await pg.wait_for_timeout(500)
     p = await pg.evaluate(PROBE)

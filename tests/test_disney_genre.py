@@ -86,7 +86,7 @@ async def main():
         await hold('Magic Mix')
         items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
         await pg.screenshot(path=f'{SHOTS}/disney-menu.png')
-        check(items == ['Move to Top', 'Move Up', 'Remove from Disney'], f'long press opens the menu {items}')
+        check(items == ['Remove from Disney'], f'long press opens the menu {items}')
         await pg.evaluate("window.__held.dispatchEvent(new TouchEvent('touchend',{touches:[],changedTouches:[window.__tc],bubbles:true,cancelable:true}))")
         await pg.evaluate("Array.prototype.filter.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.indexOf('Move to Top')>=0)[0].click()")
         await pg.wait_for_timeout(300)

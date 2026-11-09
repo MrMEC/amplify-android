@@ -32,7 +32,7 @@ DHOOK = r"""window.__d = {
    if(el.classList.contains('fav-group-head')){ cur = { title: el.querySelector('.fav-group-title').textContent, note: (el.querySelector('.fav-group-note') || {}).textContent || '', rows: [] }; out.push(cur); }
    else if(el.classList.contains('fav-edit-row') && cur){ cur.rows.push(el.querySelector('.row-name').textContent); } }); return out; },
  handle: function(name){ var r = Array.from(stationsGrid.querySelectorAll('.fav-edit-row')).filter(function(x){ return x.querySelector('.row-name').textContent === name; })[0];
-   var h = r.querySelector('.row-drag-handle').getBoundingClientRect(); return { x: h.left + h.width / 2, y: h.top + h.height / 2 }; },
+   var h = r.querySelector('.row-name').getBoundingClientRect(); return { x: h.left + h.width / 2, y: h.top + h.height / 2 }; },
  rowRect: function(name){ var r = Array.from(stationsGrid.querySelectorAll('.fav-edit-row')).filter(function(x){ return x.querySelector('.row-name').textContent === name; })[0].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, h: r.height }; },
  done: function(){ document.getElementById('favPageEditBtn').click(); },
  home: function(){ loadTopStations(); },
@@ -91,10 +91,10 @@ async def main():
             await pg.screenshot(path=f'{shots}/favdrag-edit-{theme}.png')
             # drag Echo (home) to the top of its group with the grip
             h = await pg.evaluate("__d.handle('Echo')"); a = await pg.evaluate("__d.rowRect('Alpha')")
-            await touch_drag(pg, cdp, h['x'], h['y'], h['x'], a['y'] - a['h'] * 0.3, hold=60, steps=16)
+            await touch_drag(pg, cdp, h['x'], h['y'], h['x'], a['y'] - a['h'] * 0.3, hold=650, steps=16)
             # and try to drag Kay (other) up into the Home row group: it must stay in its own group
             h = await pg.evaluate("__d.handle('Kay')"); a = await pg.evaluate("__d.rowRect('Bravo')")
-            await touch_drag(pg, cdp, h['x'], h['y'], h['x'], a['y'], hold=60, steps=16)
+            await touch_drag(pg, cdp, h['x'], h['y'], h['x'], a['y'], hold=650, steps=16)
             g = await pg.evaluate('__d.groups()')
             check(g[0]['rows'] == ['Echo', 'Alpha', 'Bravo', 'Charlie', 'Delta'], f'{T} a grip drag reorders the Home row group {g[0]["rows"]}')
             check(g[1]['rows'][-1] == 'Kay' or g[1]['rows'] == ['Kay', song], f'{T} Other favorites can\'t be dragged into the Home row {g}')
@@ -105,6 +105,7 @@ async def main():
             await pg.evaluate('__d.done()'); await pg.wait_for_timeout(300)
 
             # ---- Home: long-press and drag ----
+            await pg.evaluate('window.__hold = []')   # Build 504: the Edit rows hold-drag tells the app too
             await pg.evaluate("document.getElementById('detailBackBtn').click()"); await pg.wait_for_timeout(900)
             await pg.evaluate("document.getElementById('favoritesSection').scrollIntoView({block:'start'}); window.scrollBy(0, -70)"); await pg.wait_for_timeout(400)
             check(await pg.evaluate('__d.row()') == ['Echo', 'Alpha', 'Bravo', 'Charlie', 'Delta'], f'{T} Home shows the order set in Edit {await pg.evaluate("__d.row()")}')

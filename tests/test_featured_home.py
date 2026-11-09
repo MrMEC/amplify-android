@@ -96,9 +96,10 @@ async def run(b, scheme, w, h):
     check(st['feat'], f'{T} featured card visible')
     txt = await pg.evaluate("document.getElementById('featuredHome').innerText")
     check('Christmas' in txt, f'{T} card text {txt!r}')
-    box = await pg.evaluate("(()=>{var f=document.getElementById('featuredHome').getBoundingClientRect(),n=document.getElementById('npHero').getBoundingClientRect(),g=document.getElementById('homeGroupTabs').getBoundingClientRect();return {fh:f.height,belowHero:f.top>=n.bottom-1||n.height===0,aboveTabs:f.bottom<=g.top+1||g.height===0,w:f.width,vw:innerWidth};})()")
-    check(box['fh']<150 and box['fh']>80, f'{T} card compact {box}')
-    check(box['aboveTabs'], f'{T} card sits above tabs {box}')
+    box = await pg.evaluate("(()=>{var f=document.getElementById('featuredHome').getBoundingClientRect(),n=document.getElementById('npHero').getBoundingClientRect(),g=document.getElementById('homeGroupTabs').getBoundingClientRect();return {fh:f.height,belowTabs:f.top>=g.bottom-1,w:f.width,vw:innerWidth};})()")
+    check(box['fh']<220 and box['fh']>80, f'{T} card compact {box}')
+    check(box['belowTabs'], f'{T} Featured sits below the tabs {box}')
+    check(await pg.evaluate("/^Featured/.test(document.querySelector('#featuredHome .fh-head').innerText)") and 'FEATURED' not in (await pg.evaluate("document.querySelector('#featuredHome .fh-card').innerText")).upper().split('CHRISTMAS')[0], f'{T} heading outside the card, none inside')
     await pg.screenshot(path=f'{shots}/featured-home-{scheme}-{w}.png')
     # tap card opens genre page
     await pg.evaluate("document.querySelector('#featuredHome .fh-card').click()"); await pg.wait_for_timeout(1500)

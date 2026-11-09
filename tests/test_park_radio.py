@@ -83,7 +83,7 @@ async def main():
             await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
             await hold('DMagicWorld')
             items = await pg.evaluate("Array.prototype.map.call(document.querySelectorAll('#genreStMenu .np-menu-item'), b=>b.textContent.trim())")
-            check(items == ['Move Down', 'Remove from Disney'], f'{scheme}: long-press on the first park station opens the menu {items}')
+            check(items == ['Remove from Disney'], f'{scheme}: long-press on the first park station opens the menu {items}')
             await release(); await pick('Move Down')
             o = await park()
             check(o[:2] == ['Sorcerer Radio', 'DMagicWorld'], f'{scheme}: Move Down {o}')

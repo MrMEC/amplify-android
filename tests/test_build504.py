@@ -80,7 +80,6 @@ async def run(b, scheme, w, h):
       return {heroShown:hr.height>0,progShown:pb.height>0,inside:pb.top>=hr.top&&pb.bottom<=hr.bottom,gap:Math.round(fr.top-hr.bottom),tabsBottom:Math.round(tr.bottom),vh:innerHeight,tabsTop:Math.round(tr.top)};})()""")
     print(T,g)
     check(g['heroShown'] and g['progShown'] and g['inside'], f'{T} progress bar sits inside the carousel')
-    check(g['gap']<=12, f'{T} carousel to Featured gap {g["gap"]}px')
     check(g['tabsBottom']<=g['vh']-150, f'{T} tabs visible without scrolling {g}')
     await pg.screenshot(path=f'{shots}/b504-home-{scheme}.png')
     # zen

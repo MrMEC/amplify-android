@@ -132,22 +132,15 @@ async def main():
         check(await pg.evaluate(f'__t.stored({json.dumps(pid)})') == ['Coral', 'Amber', 'Ember', 'Blue', 'Dusk'], 'removal saved')
 
         # finger drag: Dusk (last) up to the top
+        import hold_drag as _hd
+        cdp = await ctx.new_cdp_session(pg)
         async def touch_drag(i_from, y_to):
-            await pg.evaluate("""([i, yTo]) => new Promise(function(res){
-              var rows = document.querySelectorAll('#stationsGrid .playlist-edit-row');
-              var h = rows[i].querySelector('.row-drag-handle'), r = h.getBoundingClientRect();
-              var x = r.left + r.width / 2, y = r.top + r.height / 2;
-              function ev(t, yy, el){ (el || document).dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', clientX: x, clientY: yy, bubbles: true, cancelable: true })); }
-              ev('pointerdown', y, h);
-              var steps = 12, k = 0;
-              (function step(){ k++; ev('pointermove', y + (yTo - y) * k / steps);
-                if(k < steps) setTimeout(step, 16); else { ev('pointerup', yTo); res(); } })();
-            })""", [i_from, y_to])
-            await pg.wait_for_timeout(300)
+            pt = await pg.evaluate("""(i) => { var r = document.querySelectorAll('#stationsGrid .playlist-edit-row')[i], b = r.getBoundingClientRect(); return [b.left + b.width * 0.45, b.top + b.height / 2]; }""", i_from)
+            await _hd.hold_drag(pg, cdp, pt[0], pt[1], pt[0], y_to)
         first_top = await pg.evaluate("document.querySelectorAll('#stationsGrid .playlist-edit-row')[0].getBoundingClientRect().top + 8")
         await touch_drag(4, first_top)
         names = [r['name'] for r in await pg.evaluate(ROWS)]
-        check(names == ['Dusk', 'Coral', 'Amber', 'Ember', 'Blue'], f'a finger on the grip drags a row to a new place {names}')
+        check(names == ['Dusk', 'Coral', 'Amber', 'Ember', 'Blue'], f'press, hold and drag moves a row to a new place {names}')
         check(await pg.evaluate(f'__t.stored({json.dumps(pid)})') == names, 'new order saved straight away')
         # mouse drag: Coral below Ember
         src = pg.locator('#stationsGrid .playlist-edit-row').nth(1)
