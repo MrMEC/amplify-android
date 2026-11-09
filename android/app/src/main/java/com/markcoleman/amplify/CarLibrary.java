@@ -2617,6 +2617,15 @@ final class CarLibrary {
     }
   }
 
+  /** Changes whenever a book's cover is set, changed or cleared on the phone. */
+  private String bookArtSignature() {
+    synchronized (this) {
+      JSONObject ab = this.catalog.optJSONObject("audiobooks");
+      JSONObject art = ab == null ? null : ab.optJSONObject("art");
+      return art == null ? "" : String.valueOf(art.toString().hashCode());
+    }
+  }
+
   private static String encQ(String s) throws Exception {
     return URLEncoder.encode(s, "UTF-8").replace("+", "%20");
   }
@@ -2632,7 +2641,10 @@ final class CarLibrary {
   }
 
   /** The most downloaded books for a query, as book rows (30). An older list beats none. */
-  private List<JSONObject> audiobookSearch(String cacheKey, String query) {
+  private List<JSONObject> audiobookSearch(String baseKey, String query) {
+    // The covers chosen on the phone are part of the key: a new cover shows at once, not after the
+    // half hour a list is kept.
+    String cacheKey = baseKey + "|" + bookArtSignature();
     CachedList c = netCache.get(cacheKey);
     if (c != null && c.fresh()) return c.items;
     List<JSONObject> out = new ArrayList<>();
@@ -2766,7 +2778,8 @@ final class CarLibrary {
   /** A book's sections, in order, as episodes (guid "ia:<book>/<file>", as on the phone). */
   private List<JSONObject> bookSections(String id) {
     if (id.isEmpty()) return Collections.emptyList();
-    CachedList c = netCache.get("book:" + id);
+    String cacheKey = "book:" + id + "|" + bookArtFor(id);
+    CachedList c = netCache.get(cacheKey);
     if (c != null && c.fresh()) return c.items;
     List<JSONObject> out = new ArrayList<>();
     try {
@@ -2821,7 +2834,7 @@ final class CarLibrary {
         e.put("rec", rec);
         out.add(e);
       }
-      netCache.put("book:" + id, new CachedList(out));
+      netCache.put(cacheKey, new CachedList(out));
     } catch (Exception ignored) {
       if (c != null) return c.items;
     }

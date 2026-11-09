@@ -54319,11 +54319,17 @@
     // is used for the rest).
     function audiobooksForCar(){
       if(!sourceOn('audiobooks')) return null;
-      var art = {}, map = loadCustomArtMap();
+      // A book's cover is saved under "audiobook:<id>"; one chosen before build 442 under a section's
+      // "podcast:<guid>" (abBookArt finds either).
+      var art = {}, map = loadCustomArtMap(), ids = {};
       Object.keys(map || {}).forEach(function(k){
-        if(k.indexOf('audiobook:') !== 0 || !map[k]) return;
-        var a = carImage(k, map[k]);
-        if(a) art[k.slice(10)] = a;
+        if(!map[k]) return;
+        if(k.indexOf('audiobook:') === 0) ids[k.slice(10)] = 1;
+        else if(k.indexOf('podcast:') === 0 && isAudiobookGuid(k.slice(8))) ids[abIdFromGuid(k.slice(8))] = 1;
+      });
+      Object.keys(ids).forEach(function(id){
+        var own = abBookArt(id), a = own ? carImage('audiobook:' + id, own) : '';
+        if(a) art[id] = a;
       });
       return { cats: AB_CATS.map(function(c){ return { name: c[0], subject: c[1] }; }), art: art };
     }

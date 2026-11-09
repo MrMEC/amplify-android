@@ -18,7 +18,11 @@ seed = {
    sec('ia:dracula_librivox/dracula_01.mp3', 'Dracula', 'Chapter 1', 'Bram Stoker'),
    sec('gb:84/part1.mp3', 'Frankenstein', 'Part 1', 'Mary Shelley'),
    sec('ia:notabook/file.mp3', 'A Podcast Episode', 'Ep'),
- ]
+   sec('ia:emma_librivox/emma_01.mp3', 'Emma', 'Chapter 1', 'Jane Austen'),
+ ],
+ # a cover chosen for the book, and one chosen before build 442 for a section of another
+ 'radioPlayerCustomArt': {'audiobook:dracula_librivox': 'https://example.com/dracula.jpg',
+                          'podcast:ia:emma_librivox/emma_01.mp3': 'https://example.com/emma.jpg'}
 }
 def mock(sources_off):
     s = dict(seed)
@@ -57,11 +61,12 @@ async def main():
         ab = c.get('audiobooks')
         check(ab and len(ab['cats']) == 12 and ab['cats'][0] == {'name': 'Classics', 'subject': 'classics'}, 'on: the categories are sent %s' % (ab and ab['cats'][:2]))
         check(ab and ab['cats'][2]['subject'] == '"science fiction"', 'a two-word subject keeps its quotes')
+        check(ab and ab['art'] == {'dracula_librivox': 'https://example.com/dracula.jpg', 'emma_librivox': 'https://example.com/emma.jpg'}, 'custom covers (also pre-442 section ones) are sent by book id %s' % (ab and ab['art']))
         cont = c['lists']['abContinue']
         print([(e['t'], e.get('id') or e.get('guid'), e.get('title')) for e in cont])
-        check([e['t'] for e in cont] == ['book', 'episode'], 'Dracula (two sections played) is one book, Frankenstein (Gutenberg) is its last section')
+        check([e['t'] for e in cont] == ['book', 'episode', 'book'], 'Dracula (two sections played) is one book, Frankenstein (Gutenberg) is its last section, then Emma')
+        check(cont[0]['art'] == 'https://example.com/dracula.jpg' and cont[2]['art'] == 'https://example.com/emma.jpg', 'Continue Listening books use their custom cover')
         check(cont[0]['id'] == 'dracula_librivox' and cont[0]['title'] == 'Dracula' and cont[0]['sub'] == 'Bram Stoker', 'the book row has its id, title and author')
-        check(cont[0]['art'].startswith('https://archive.org/services/img/'), 'the book row has archive.org\'s cover')
         check(cont[1]['guid'] == 'gb:84/part1.mp3' and cont[1]['url'], 'the Gutenberg stand-in plays')
         check(not any('Podcast' in (e.get('title') or '') for e in cont), 'an ordinary podcast episode is not a book')
         check(not errs, 'no page errors %s' % errs[:3])
