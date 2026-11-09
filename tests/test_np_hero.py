@@ -21,12 +21,12 @@ HOOK = ("window.__h = { stub: function(){ var on = false; try{ Object.defineProp
         " play: function(name){ __h.stub(); var t = libraryTracks.filter(function(x){ return x.name === name; })[0]; playTrackInList([t], t, 'Test'); },"
         " fake: function(st){ __h.stub(); audio.play(); currentStation = st; noteHeroPlayed(st); updatePlayerMeta(st, ''); setPlayingUI(true); },"
         " playing: function(v){ setPlayingUI(v); },"
-        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gapBelow: function(){ var b = document.getElementById('npHeroProgress').getBoundingClientRect(), h = document.getElementById('npHero').getBoundingClientRect(); var n = document.getElementById('npHero').nextElementSibling; while(n && (getComputedStyle(n).display === 'none' || !n.getBoundingClientRect().height)) n = n.nextElementSibling; var hd = n.querySelector('h2') || n; return { bar: Math.round(b.bottom), heroBottom: Math.round(h.bottom), head: Math.round(hd.getBoundingClientRect().top) }; },"
+        " el: function(sel){ return heroSlides[heroIndex()].querySelector(sel); }, idx: function(){ return heroIndex(); }, n: function(){ return heroSlides.length; }, gapBelow: function(){ var b = document.getElementById('npHero').getBoundingClientRect(), h = document.getElementById('npHero').getBoundingClientRect(); var n = document.getElementById('npHero').nextElementSibling; while(n && (getComputedStyle(n).display === 'none' || !n.getBoundingClientRect().height)) n = n.nextElementSibling; var hd = n.querySelector('h2') || n; return { bar: Math.round(b.bottom), heroBottom: Math.round(h.bottom), head: Math.round(hd.getBoundingClientRect().top) }; },"
         " drawer: function(){ var sc = document.querySelector('.sidebar-scroll'); var sp = document.getElementById('settingsPanel'); var back = document.getElementById('drawerSettingsBack'); var tabs = document.querySelector('.drawer-tabs');"
         "   return { open: sc.classList.contains('open'), settings: sc.classList.contains('settings-on'), inDrawer: !!sp.closest('#drawerSettings'), overlay: document.getElementById('settingsOverlay').classList.contains('open'),"
         "     backShown: back.offsetParent !== null, tabsShown: tabs.offsetParent !== null, themeShown: document.getElementById('themeSwitch').offsetParent !== null, menuShown: document.getElementById('homeHeading').offsetParent !== null,"
         "     backTop: Math.round(back.getBoundingClientRect().top), theme: document.documentElement.getAttribute('data-theme') }; },"
-        " gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(document.getElementById('npHeroProgress').getBoundingClientRect().top - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
+        " gaps: function(){ return heroSlides.slice(0, 4).map(function(sl){ return Math.round(sl.getBoundingClientRect().bottom - sl.querySelector('.nph-play').getBoundingClientRect().bottom); }); },"
         " titles: function(){ return heroSlides.map(function(x){ return x.querySelector('.nph-title').textContent; }); },"
         " rmRecent: function(name){ var r = recentStations.filter(function(x){ return x.name === name; })[0]; removeFromRecent(r || { name: name, url: 'https://radio.example/kiss', urlToResolve: 'https://radio.example/kiss', stationuuid: 'kiss-1' }); },"
         " rmChannel: function(url){ removeFromContinueWatching({ kind: 'channel', ch: { url: url } }); },"
@@ -263,22 +263,25 @@ async def run(theme, b):
     # build 222: swipe through what was played
     t = await pg.evaluate('__h.titles()'); print(t)
     check(t[:4] == ['Heat', 'Funk History Hour', 'Ray TV News', 'Prince'] and await pg.evaluate('__h.idx()') == 0, f'[{theme}] the slides are what is playing, then what was played, newest first {t[:5]}')
-    d = await pg.evaluate('__h.bar()')
     n = len(t)
-    check(d['shown'] and d['w'] == 78 and d['h'] == 6 and d['knobs'] == 1 and abs(d['fill'] - 1 / n) < .02, f'[{theme}] a thin 78x6 progress bar (where the dots were), no knob, filled 1/{n} {d}')
+    check(not await pg.evaluate("!!document.getElementById('npHeroProgress') || !!document.querySelector('.nph-progress')"), f'[{theme}] no progress bar on the carousel (build 544)')
     await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(600)
     h = await pg.evaluate('__h.hero()')
-    check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and abs((await pg.evaluate('__h.bar()'))['fill'] - 3 / n) < .02,
+    check(await pg.evaluate('__h.idx()') == 2 and h['title'] == 'Ray TV News' and 'logo.png' in h['img'],
           f'[{theme}] swiping shows the next one, picture and all {h["title"]}')
     await pg.screenshot(path=f'{shots}/hero-swipe-{theme}.png')
     # build 226: a tap in the space under the slides goes back to the first slide
     gb = await pg.evaluate('__h.gapBelow()')
-    # Build 504: the progress bar sits inside the carousel and the gap under it is gone, so there is nothing to tap there.
-    await pg.evaluate('__h.go(0)'); await pg.wait_for_timeout(900)
-    check(await pg.evaluate('__h.idx()') == 0, f'[{theme}] a tap in the gap under the carousel goes back to the first slide')
+    # Build 544 (Mark): the Amplify logo takes the carousel back to its first slide.
+    await pg.evaluate("document.getElementById('brandHomeLink').click()"); await pg.wait_for_timeout(1500)
+    check(await pg.evaluate('__h.idx()') == 0, f'[{theme}] the logo goes back to the first slide ({await pg.evaluate("__h.idx()")})')
+    await pg.evaluate('__h.go(3)'); await pg.wait_for_timeout(600)
+    await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=library]').click()"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("document.getElementById('brandHomeLink').click()"); await pg.wait_for_timeout(1800)
+    check(await pg.evaluate('__h.idx()') == 0, f'[{theme}] and from another page too ({await pg.evaluate("__h.idx()")})')
     await pg.evaluate('__h.go(2)'); await pg.wait_for_timeout(600)
     gaps = await pg.evaluate("__h.gaps()")
-    check(max(gaps) - min(gaps) <= 2 and max(gaps) < 40, f'[{theme}] every slide\'s Play button sits the same short way above the bar {gaps}')
+    check(max(gaps) - min(gaps) <= 2, f'[{theme}] every slide\'s Play button sits the same way above the slide\'s bottom {gaps}')
     # a drag (mouse) pages one slide on
     box = await pg.evaluate("(()=>{ var r = document.getElementById('npHeroTrack').getBoundingClientRect(); return [r.left + r.width * .7, r.top + 80]; })()")
     await pg.mouse.move(box[0], box[1]); await pg.mouse.down(); await pg.mouse.move(box[0] - 150, box[1], steps=8); await pg.mouse.up(); await pg.wait_for_timeout(900)

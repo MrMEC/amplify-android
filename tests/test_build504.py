@@ -75,11 +75,11 @@ async def run(b, scheme, w, h):
     await pg.route('**/*', route)
     await load(pg)
     await pg.evaluate(EV("toggleFavorite({name:'Test FM',url:'http://127.0.0.1/x',stationuuid:'t1'}); renderFavoritesSection(); zenSelect('campfire', false); zenNote(); zenSelect('rainy-night', false); zenNote(); renderNpHero();")); await pg.wait_for_timeout(1500)
-    g = await pg.evaluate("""(()=>{var hero=document.getElementById('npHero'),pr=document.getElementById('npHeroProgress'),f=document.getElementById('featuredHome'),t=document.getElementById('homeGroupTabs');
-      var hr=hero.getBoundingClientRect(),pb=pr.getBoundingClientRect(),fr=f.getBoundingClientRect(),tr=t.getBoundingClientRect();
-      return {heroShown:hr.height>0,progShown:pb.height>0,inside:pb.top>=hr.top&&pb.bottom<=hr.bottom,gap:Math.round(fr.top-hr.bottom),tabsBottom:Math.round(tr.bottom),vh:innerHeight,tabsTop:Math.round(tr.top)};})()""")
+    g = await pg.evaluate("""(()=>{var hero=document.getElementById('npHero'),f=document.getElementById('featuredHome'),t=document.getElementById('homeGroupTabs');
+      var hr=hero.getBoundingClientRect(),fr=f.getBoundingClientRect(),tr=t.getBoundingClientRect();
+      return {heroShown:hr.height>0,progGone:!document.getElementById('npHeroProgress'),gap:Math.round(fr.top-hr.bottom),tabsBottom:Math.round(tr.bottom),vh:innerHeight,tabsTop:Math.round(tr.top)};})()""")
     print(T,g)
-    check(g['heroShown'] and g['progShown'] and g['inside'], f'{T} progress bar sits inside the carousel')
+    check(g['heroShown'] and g['progGone'], f'{T} the carousel has no progress bar (build 544)')
     check(g['tabsBottom']<=g['vh']-150, f'{T} tabs visible without scrolling {g}')
     await pg.screenshot(path=f'{shots}/b504-home-{scheme}.png')
     # zen
@@ -116,6 +116,19 @@ async def run(b, scheme, w, h):
     await pg.evaluate("document.getElementById('zenMixRestore').click()"); await pg.wait_for_timeout(400)
     v = await pg.evaluate(EV("zenPreset('rainy-night').s[0].v"))
     check(abs(v-.7)<.001 and not await pg.evaluate(EV("zenPreset('rainy-night').edited")), f'{T} restored to default {v}')
+    # Build 544 (Mark): a favourite Zen preset shows in the Home Favorites tab
+    await pg.evaluate(EV("zenPause(); try{ zenClose(); }catch(e){} loadTopStations(); toggleFavorite(zenHeroItem('campfire')); renderFavoritesSection();")); await pg.wait_for_timeout(1500)
+    await pg.evaluate("(()=>{var b=document.getElementById('homeGroupTab-favorites'); if(b) b.click();})()"); await pg.wait_for_timeout(300)
+    zf = await pg.evaluate("(()=>{var t=Array.from(document.querySelectorAll('#favoritesGrid .tile')).filter(function(x){return x.dataset.key==='zen:campfire';})[0];if(!t)return null;var a=t.querySelector('.tile-art'),r=t.getBoundingClientRect();return {txt:t.innerText,art:getComputedStyle(a).backgroundImage.slice(0,40),card:t.classList.contains('fav-card'),w:Math.round(r.width),h:Math.round(r.height)};})()")
+    print(T, 'zen fav', zf)
+    check(zf and 'Campfire' in zf['txt'] and zf['card'] and 'url' in zf['art'], f'{T} a favourite Zen preset is a card in the Home Favorites tab {zf}')
+    await pg.evaluate("document.querySelector('#favoritesGrid .tile[data-key=\"zen:campfire\"]').scrollIntoView({block:'center'})")
+    await pg.wait_for_timeout(300); await pg.screenshot(path=f'{shots}/b544-zen-fav-{scheme}.png')
+    check(not await pg.evaluate("document.body.classList.contains('zen-open')"), f'{T} (on Home for the screenshot)')
+    await pg.evaluate("document.querySelector('#favoritesGrid .tile[data-key=\"zen:campfire\"] .tile-art').click()"); await pg.wait_for_timeout(800)
+    check(await pg.evaluate(EV("zenCur")) == 'campfire' and await pg.evaluate(EV("!!zenPlaying")), f'{T} tapping it plays the preset')
+    await pg.evaluate(EV("zenPause(); toggleFavorite(zenHeroItem('campfire')); renderFavoritesSection();")); await pg.wait_for_timeout(300)
+    check(not await pg.evaluate("!!document.querySelector('#favoritesGrid .tile[data-key=\"zen:campfire\"]')"), f'{T} and it leaves the row when unfavourited')
     check(not errs, f'{T} no page errors {errs[:3]}')
     await ctx.close()
 async def main():

@@ -7793,7 +7793,6 @@
            podcast's or video's cover with its details. See "Home hero" in the script. -->
       <section class="home-hero" id="npHero" style="display:none;" aria-label="Now playing and recently played" aria-roledescription="carousel">
         <div class="nph-track" id="npHeroTrack" tabindex="0"></div>
-        <div class="nph-progress" id="npHeroProgress" aria-hidden="true"><div class="nph-progress-fill"></div></div>
       </section>
       <!-- Build 503 (Mark): the seasonal Featured card, under the carousel (see "Featured seasons" in the script). -->
       <section class="featured-home" id="featuredHome" style="display:none;" aria-label="Featured"></section>
@@ -22948,6 +22947,8 @@
   // Favorites page (the heading) but not in this row.
   function isHomeFavorite(s){
     if(!s) return false;
+    // Build 544 (Mark): favourite Zen presets join the row too.
+    if(s.type === 'zen') return !!(s.zenId && zenPreset(s.zenId));
     if(isArtistRadio(s) || isPlaylistRadio(s) || isCustomStation(s)) return true;
     return isLiveStream(s) && !isArtistFav(s) && !isAlbumFav(s) && !isChannelEntry(s);
   }
@@ -22962,7 +22963,13 @@
       homeFavs.forEach(function(s){
         // A song is a full-width row everywhere else; in a row of cards it has to be a card
         // like everything beside it.
-        var tile = isLocalTrack(s) ? buildEntityTile({
+        var zp = s.type === 'zen' ? zenPreset(s.zenId) : null;
+        var tile = zp ? buildEntityTile({
+          key: favKey(s), entity: 'zen', name: zp.n, sub: 'Zen \u00b7 ' + zp.s.length + (zp.s.length === 1 ? ' sound' : ' sounds'),
+          renderArt: function(art){ zenPaint(art, zp); art.classList.add('zen-tile-art'); },
+          favTarget: s,
+          onClick: function(){ playStation(s); }
+        }) : isLocalTrack(s) ? buildEntityTile({
           key: favKey(s),
           entity: 'song',
           name: s.name || '',
@@ -23302,7 +23309,10 @@
   brandHomeLink.addEventListener('click', function(e){
     e.preventDefault();
     searchInput.value = '';
+    var wasHome = !!onHomeView;
     loadTopStations();
+    // Build 544 (Mark): the logo also takes the carousel back to its first slide.
+    try{ if(npHeroTrack && npHeroTrack.scrollLeft > 0) heroScrollTo(0, wasHome); }catch(err){}
   });
 
   function getGenreOrderFromDom(){
