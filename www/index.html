@@ -7008,6 +7008,7 @@
   .font-preview-sub{ font-size:13px; font-weight:600; color:var(--text-dim); margin-top:2px; }
   .font-preview-body{ font-size:14px; line-height:1.45; margin-top:10px; }
   #settingsPanel .set-desc{ font-size:12.5px; line-height:1.4; color:var(--text-dim); font-weight:400; }
+  #settingsPanel .set-desc-block{ display:block; margin:-2px 0 4px; }
   #settingsPanel .set-sub{ margin:18px 0 0; font-size:13px; font-weight:700; letter-spacing:.01em; color:var(--text-dim); }
   #settingsPanel .set-page > .set-sub:first-child{ margin-top:2px; }
   #settingsPanel .set-sub + .settings-row{ border-top:none; }
@@ -8682,6 +8683,11 @@
         <span class="set-cat-text"><span class="set-cat-name">Radio</span><span class="set-cat-sub">Station languages, Stations Near Me, search results</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
+      <button type="button" class="set-cat" data-set-cat="home">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">What shows under Favorites on Home</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
       <button type="button" class="set-cat" data-set-cat="featured">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
         <span class="set-cat-text"><span class="set-cat-name">Featured</span><span class="set-cat-sub">Seasonal card on Home, dates and poster art</span></span>
@@ -8977,6 +8983,12 @@
 
     <!-- Sources -->
     <!-- Build 503 (Mark): Featured seasons: which seasons show on Home, when, and with what poster. -->
+    <!-- Build 545 (Mark): which kinds of favourite show in Home's Favorites tab. -->
+    <section class="set-page" data-set-page="home" data-set-title="Home" hidden>
+      <h3 class="set-sub">Favorites on Home</h3>
+      <div class="set-desc set-desc-block">Choose which favourites show in the Favorites tab on Home. Everything you favourite is always on the Favorites page.</div>
+      <div id="homeFavKindRows"></div>
+    </section>
     <section class="set-page" data-set-page="featured" data-set-title="Featured" hidden>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="featOnLabel">Featured on Home</span><span class="set-desc">A seasonal card under the carousel</span></div>
@@ -19905,7 +19917,7 @@
     updatePlayerMeta(item, 'Loading…');
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
       el.classList.toggle('playing', isOnAirKey(el.dataset.key, item));
-    });
+    }); scheduleHomeFavActive();
     function stillWanted(){ return currentStation === item; }
     function attempt(fresh){
       return findSongPreview(item, fresh).then(function(url){
@@ -22886,6 +22898,13 @@
     // copy kept on the phone replaced it).
     var src = img && (img.getAttribute('src') ? img.src : img.currentSrc);
     src = secureUrl(src);
+    // Build 545 (Mark): art painted as the box's own background (a Zen preset's picture) is the
+    // band's picture too, rather than the grey fallback.
+    if(!src && /url\(/.test(art.style.backgroundImage || '')){
+      wash.style.backgroundImage = art.style.backgroundImage;
+      wash.style.backgroundColor = ''; wash.style.filter = '';
+      return;
+    }
     if(src){
       wash.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
       // Art that arrived late replaces a band that was painted flat, so the flat colour has
@@ -22945,13 +22964,94 @@
   // Build 235 (Mark): the Home row shows only stations, artist radio and favourite playlists;
   // artists, albums, songs, podcasts, Live TV channels, movies and TV shows stay on the
   // Favorites page (the heading) but not in this row.
+  // Build 545 (Mark): which kinds of favourite show in Home's Favorites tab is the listener's
+  // choice (Settings > Home). The ones Home always showed start On; the rest start Off.
+  var HOME_FAV_KINDS = [
+    { id: 'stations', label: 'Radio stations', on: true },
+    { id: 'custom', label: 'Custom stations', on: true },
+    { id: 'artistRadio', label: 'Artist radio', on: true },
+    { id: 'playlists', label: 'Playlists', on: true },
+    { id: 'zen', label: 'Zen mixes', on: true },
+    { id: 'songs', label: 'Songs', on: false },
+    { id: 'artists', label: 'Artists', on: false },
+    { id: 'albums', label: 'Albums', on: false },
+    { id: 'podcasts', label: 'Podcast episodes', on: false },
+    { id: 'channels', label: 'Live TV channels', on: false },
+    { id: 'videos', label: 'Movies, TV and videos', on: false }
+  ];
+  var HOME_FAV_KINDS_KEY = 'radioPlayerHomeFavKinds';
+  var homeFavKinds = {};
+  try{ homeFavKinds = JSON.parse(localStorage.getItem(HOME_FAV_KINDS_KEY) || '{}') || {}; }catch(e){ homeFavKinds = {}; }
+  function homeFavKindOn(id){
+    if(Object.prototype.hasOwnProperty.call(homeFavKinds, id)) return !!homeFavKinds[id];
+    var k = HOME_FAV_KINDS.filter(function(x){ return x.id === id; })[0];
+    return !!(k && k.on);
+  }
+  function setHomeFavKind(id, on){
+    homeFavKinds[id] = !!on;
+    try{ localStorage.setItem(HOME_FAV_KINDS_KEY, JSON.stringify(homeFavKinds)); }catch(e){}
+    renderFavoritesSection();
+    if(typeof favPageOnScreen === 'function' && favPageOnScreen()) renderFavoritesPage();
+  }
+  function homeFavKind(s){
+    if(!s) return '';
+    if(s.type === 'zen') return 'zen';
+    if(isArtistRadio(s)) return 'artistRadio';
+    if(isPlaylistRadio(s)) return 'playlists';
+    if(isCustomStation(s)) return 'custom';
+    if(isArtistFav(s)) return 'artists';
+    if(isAlbumFav(s)) return 'albums';
+    if(isLocalTrack(s) || isChartSong(s)) return 'songs';
+    if(isPodcastTrack(s)) return 'podcasts';
+    if(s.type === 'video') return 'videos';
+    if(s.liveCh || isChannelEntry(s)) return 'channels';
+    if(isLiveStream(s)) return 'stations';
+    return '';
+  }
+  function renderHomeFavKindRows(){
+    var box = document.getElementById('homeFavKindRows');
+    if(!box) return;
+    box.innerHTML = '';
+    HOME_FAV_KINDS.forEach(function(k){
+      var row = document.createElement('div'); row.className = 'settings-row';
+      var lab = document.createElement('span'); lab.className = 'settings-label'; lab.id = 'homeFavKind-' + k.id + '-label'; lab.textContent = k.label;
+      var sel = document.createElement('select'); sel.className = 'settings-select'; sel.id = 'homeFavKind-' + k.id;
+      sel.setAttribute('aria-labelledby', lab.id);
+      sel.innerHTML = '<option value="on">On</option><option value="off">Off</option>';
+      sel.value = homeFavKindOn(k.id) ? 'on' : 'off';
+      sel.addEventListener('change', function(){ setHomeFavKind(k.id, sel.value === 'on'); });
+      row.appendChild(lab); row.appendChild(sel); box.appendChild(row);
+    });
+  }
+  setTimeout(renderHomeFavKindRows, 0);
   function isHomeFavorite(s){
     if(!s) return false;
-    // Build 544 (Mark): favourite Zen presets join the row too.
-    if(s.type === 'zen') return !!(s.zenId && zenPreset(s.zenId));
-    if(isArtistRadio(s) || isPlaylistRadio(s) || isCustomStation(s)) return true;
-    return isLiveStream(s) && !isArtistFav(s) && !isAlbumFav(s) && !isChannelEntry(s);
+    if(s.type === 'zen' && !(s.zenId && zenPreset(s.zenId))) return false;   // an unsaved mix has nothing to replay
+    var k = homeFavKind(s);
+    return !!k && homeFavKindOn(k);
   }
+  // Build 545 (Mark): every card in Home's Favorites tab gets the same playing border when it is
+  // what's on: a station, song, episode or channel by its own key; a radio or playlist by the
+  // queue it started; an artist or album while one of its songs plays; a Zen preset while it plays.
+  function homeFavActive(s){
+    if(!s) return false;
+    if(s.type === 'zen') return !!zenPlaying && !zenDirty && zenCur === s.zenId;
+    var cur = currentStation;
+    if(!cur) return false;
+    if(isArtistFav(s)) return isLocalTrack(cur) && !!cur.artist && artistMatchKey(cur.artist) === s.artistKey;
+    if(isAlbumFav(s)) return isLocalTrack(cur) && albumKeyFor(cur) === s.albumKey;
+    return isOnAirKey(favKey(s), cur);
+  }
+  var homeFavActiveT = 0;
+  function syncHomeFavActive(){
+    homeFavActiveT = 0;
+    if(!favoritesGrid) return;
+    Array.prototype.forEach.call(favoritesGrid.children, function(t){
+      if(t._homeFav) t.classList.toggle('playing', homeFavActive(t._homeFav));
+    });
+  }
+  // After whatever marked the tiles by key has run.
+  function scheduleHomeFavActive(){ if(!homeFavActiveT) homeFavActiveT = setTimeout(syncHomeFavActive, 0); }
   function renderFavoritesSection(){
     favoritesGrid.innerHTML = '';
     var homeFavs = favoritesInOrder().filter(isHomeFavorite);
@@ -22981,10 +23081,12 @@
         // Everything here is a favourite already; the heart only duplicated that.
         var heart = tile.querySelector('.tile-fav');
         if(heart) heart.remove();
+        tile._homeFav = s;
         favoritesGrid.appendChild(asFavoriteCard(tile));
       });
     }
     applyHomeTab();
+    syncHomeFavActive();
     if(renderLandFavs) renderLandFavs();
   }
 
@@ -31122,7 +31224,7 @@
     updatePlayerMeta(t, 'Loading…');
     document.querySelectorAll('.tile, .row-item, .vep-row').forEach(function(el){
       el.classList.toggle('playing', isOnAirKey(el.dataset.key, t));
-    });
+    }); scheduleHomeFavActive();
     function stillWanted(){ return currentStation === t; }
     cancelNextUp();
     var v0 = vlib().byId[t.id];
@@ -33737,6 +33839,7 @@
     var next = p.s.filter(function(x){ return zenSound(x.id); }).map(function(x){ return { id: x.id, v: x.v }; });
     Object.keys(zenVoices).forEach(function(id){ if(!next.some(function(m){ return m.id === id; })) zenStopVoice(id); });
     zenMix = next; zenCur = pid; zenDirty = false;
+    try{ scheduleHomeFavActive(); }catch(e){}
     zenMix.forEach(function(m){ if(zenVoices[m.id]) { zenVoices[m.id].m = m; zenSetVol(m); } });
     if(autoplay){ if(zenPlaying) zenMix.forEach(zenStartVoice); else zenPlay(); }
     if(autoplay || zenPlaying){ try{ zenNote(); }catch(e){} }
@@ -33950,6 +34053,7 @@
   var zenBgKey = '';
   function zenSyncUi(force){
     zenRefreshLists(true);
+    try{ scheduleHomeFavActive(); }catch(e){}
     try{ zenBarSync(); }catch(e){}
     if(!zenEl || !zenOpen) return;
     try{
@@ -39246,7 +39350,7 @@
     updatePlayerMeta(track, 'Loading…');
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
       el.classList.toggle('playing', isOnAirKey(el.dataset.key, track));
-    });
+    }); scheduleHomeFavActive();
 
     // Build 223: a file opened from another app plays from the copy the phone made of it.
     if(track.openedUrl){
@@ -41562,10 +41666,10 @@
       var homeList = all.filter(isHomeFavorite), otherList = all.filter(function(f){ return !isHomeFavorite(f); });
       stationsGrid.appendChild(buildFavGroupHead('Home row', homeList.length
         ? (favOrder === 'az' ? 'Shown at the top of Home.' : 'Shown at the top of Home. You can also long-press a cover there and drag it.')
-        : 'Stations, artist radio, playlists and custom stations you favourite show here.', 'home'));
+        : 'Favourites of the kinds chosen in Settings > Home show here.', 'home'));
       homeList.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
       if(otherList.length){
-        stationsGrid.appendChild(buildFavGroupHead('Other favorites', 'Artists, albums, songs, podcasts and video. These stay on this page.', 'other'));
+        stationsGrid.appendChild(buildFavGroupHead('Other favorites', 'Kinds turned off for Home in Settings > Home. These stay on this page.', 'other'));
         otherList.forEach(function(s){ stationsGrid.appendChild(buildFavEditRow(s)); });
       }
       setResultCount(null); /* build 210: no count (Mark) */
@@ -52865,7 +52969,7 @@
     }
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
       el.classList.toggle('playing', isOnAirKey(el.dataset.key, station));
-    });
+    }); scheduleHomeFavActive();
 
     if(station.stationuuid && !isReconnect){
       API_HOSTS.slice(0,1).forEach(function(host){
@@ -53017,7 +53121,7 @@
     updatePlayerMeta(episode, 'Loading…');
     document.querySelectorAll('.tile, .row-item').forEach(function(el){
       el.classList.toggle('playing', isOnAirKey(el.dataset.key, episode));
-    });
+    }); scheduleHomeFavActive();
 
     var url = episode.episodeUrl;
     if(!url){
@@ -54858,7 +54962,7 @@
       setPlayingUI(!!ev.playWhenReady);
       document.querySelectorAll('.tile, .row-item').forEach(function(el){
         el.classList.toggle('playing', isOnAirKey(el.dataset.key, track));
-      });
+      }); scheduleHomeFavActive();
       syncNpStepVisibility();
       updateStepButtons();
     }
