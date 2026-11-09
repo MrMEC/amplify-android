@@ -1796,11 +1796,14 @@
   .artist-hero-sub{ font-size:13.5px; color:var(--text-dim); max-width:min(560px, 92%); }
   .artist-hero-sub:not(:empty){ margin-bottom:14px; }
   /* Build 503 (Mark): Home's Favorites / Playlists / Top 100 tabs, and the Featured card under the carousel. */
-  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:12px 0 10px; }
+  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:34px 0 10px; }   /* 34px = the gap between every Home section (build 400) */
   .home-group-tabs .home-tab{ flex:0 0 auto; }
   .home-group-all{ margin-left:auto; flex:0 0 auto; background:none; border:0; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; cursor:pointer; }
   body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
-  .featured-home{ margin:4px 0 30px; }
+  /* The Favorites grid carries 42px of room under its tiles (padding for the row's shadow and arrows), so its section gives 22px back: the visible gap under the tiles is the same 34px as everywhere. */
+  body.home-grouped #favoritesSection.in-group{ margin-bottom:12px; }
+  body.home-grouped #playlistsHomeSection.in-group, body.home-grouped #top100Section.in-group{ margin-bottom:28px; }   /* 26px of grid room under the tiles + 28 - 20 overlap = 34 */
+  .featured-home{ margin:0 0 34px; }
   .fh-head{ margin-bottom:12px; }
   .fh-card{ position:relative; display:flex; align-items:center; gap:14px; width:100%; min-height:100px; padding:14px 16px 14px 18px; box-sizing:border-box; border:0; text-align:left;
     border-radius:var(--r-card, 18px); overflow:hidden; color:#fff; font:inherit; cursor:pointer; isolation:isolate;
