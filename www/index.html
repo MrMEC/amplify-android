@@ -54107,22 +54107,22 @@
   }
   // Where each cover sits: the middle one flat and in front, up to three on each side turned
   // toward it and set back; the rest wait out of sight.
-  function layoutHeroFlow(instant){
+  function layoutHeroFlow(instant, at){
     if(!heroFlowOn() || !heroSlides.length) return;
-    var i = heroIndex(), size = CAROUSEL_SIZES[carouselCfg.size] || 200;
+    var i = at == null ? heroIndex() : at, ci = Math.round(i), size = CAROUSEL_SIZES[carouselCfg.size] || 200;
     var reach = Math.min(6, coverFlowReach(npHero.clientWidth || window.innerWidth || 390, size));
     var snap = [];
     heroSlides.forEach(function(sl, k){
-      var o = k - i, far = Math.abs(o) > reach;
+      var o = k - i, far = Math.abs(o) > reach + 0.5;
       var g = coverFlowGeom(far ? (o < 0 ? -reach - 1 : reach + 1) : o, size, carouselCfg.tilt);
       if(instant || !sl._flowPlaced){ sl.style.transition = 'none'; snap.push(sl); }
       sl._flowPlaced = true;
       sl.style.transform = 'translate3d(' + g.x.toFixed(1) + 'px,0,' + g.z.toFixed(1) + 'px) rotateY(' + g.r.toFixed(2) + 'deg)';
-      sl.style.zIndex = String(1000 - Math.abs(o) * 2 - (o < 0 ? 1 : 0));
+      sl.style.zIndex = String(1000 - Math.abs(k - ci) * 2 - (o < 0 ? 1 : 0));
       sl.style.setProperty('--flow-shade', g.shade.toFixed(3));
       sl.classList.toggle('flow-far', far);
       sl.classList.toggle('flow-left', o < 0);
-      sl.setAttribute('aria-current', o === 0 ? 'true' : 'false');
+      sl.setAttribute('aria-current', k === ci ? 'true' : 'false');
     });
     if(snap.length){ void npHeroTrack.offsetWidth; snap.forEach(function(sl){ sl.style.transition = ''; }); }
   }
@@ -54160,27 +54160,79 @@
     if(slideIsPlaying(slide)) return;
     heroPlay(slide);
   }
-  // Swipe: a short one moves one cover, a long one several.
+  // Swipe (build 556, Mark: too much resistance): the covers follow the finger, at Cover Flow's
+  // (landscape Albums) distance per cover; on letting go a flick carries on as far as its speed
+  // takes it, as in Cover Flow, and eases to rest on a whole cover. A mostly up-and-down drag is
+  // left to the page.
   if(npHeroTrack){
-    var flowSwipe = null;
+    var flowDrag = null, flowRaf = 0;
+    function flowPxPerCover(){ return Math.max(16, (CAROUSEL_SIZES[carouselCfg.size] || 200) * 0.2 * 1.05); }
+    function flowRubber(p){
+      var max = heroSlides.length - 1, R = 1.2;
+      if(p < 0) return -R * (1 - Math.exp(p / R));
+      if(p > max) return max + R * (1 - Math.exp(-(p - max) / R));
+      return p;
+    }
+    function flowSetTransition(v){ heroSlides.forEach(function(sl){ sl.style.transition = v; }); }
     npHeroTrack.addEventListener('pointerdown', function(e){
-      if(!heroFlowOn() || (e.pointerType === 'mouse' && e.button !== 0)) return;
-      flowSwipe = { x: e.clientX, y: e.clientY };
+      if(!heroFlowOn() || flowDrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      flowDrag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, pos0: heroIndex(), pos: heroIndex(), moved: false, dead: false, samples: [] };
       heroFlowTouched = Date.now();
     });
-    npHeroTrack.addEventListener('pointercancel', function(){ flowSwipe = null; });
-    window.addEventListener('pointerup', function(e){
-      if(!flowSwipe) return;
-      var d = flowSwipe; flowSwipe = null;
-      if(!heroFlowOn()) return;
-      var dx = e.clientX - d.x, dy = e.clientY - d.y;
-      if(Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy)) return;
-      var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
-      var steps = Math.max(1, Math.min(4, Math.round(Math.abs(dx) / (size * 0.45))));
+    npHeroTrack.addEventListener('pointermove', function(e){
+      var d = flowDrag;
+      if(!d || e.pointerId !== d.id || d.dead) return;
+      var dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+      if(!d.moved){
+        if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        if(Math.abs(dy) > Math.abs(dx)){ d.dead = true; return; }     // a scroll of the page
+        d.moved = true;
+        d.x0 = e.clientX; dx = 0;
+        try{ npHeroTrack.setPointerCapture(e.pointerId); }catch(err){}
+        flowSetTransition('none');
+      }
+      var raw = d.pos0 - dx / flowPxPerCover();
+      d.pos = flowRubber(raw);
+      var now = performance.now();
+      d.samples.push([now, raw]);
+      while(d.samples.length > 2 && now - d.samples[0][0] > 90) d.samples.shift();
       heroFlowTouched = Date.now();
-      heroScrollTo(heroIndex() + (dx < 0 ? steps : -steps), true);
+      if(!flowRaf) flowRaf = requestAnimationFrame(function(){
+        flowRaf = 0;
+        if(!flowDrag) return;
+        layoutHeroFlow(false, flowDrag.pos);   // transitions are off for the drag; layout leaves them so
+        var c = Math.max(0, Math.min(heroSlides.length - 1, Math.round(flowDrag.pos)));
+        if(c !== heroFlowIdx){ heroFlowIdx = c; heroPaintAround(); }
+      });
+    });
+    function flowEnd(e){
+      var d = flowDrag;
+      if(!d || e.pointerId !== d.id) return;
+      flowDrag = null;
+      try{ npHeroTrack.releasePointerCapture(e.pointerId); }catch(err){}
+      if(!d.moved) return;
+      var sm = d.samples, a = sm[0], b = sm[sm.length - 1], v = 0;
+      if(a && b && b[0] - a[0] > 8 && performance.now() - b[0] < 80) v = (b[1] - a[1]) / ((b[0] - a[0]) / 1000);
+      v = Math.max(-40, Math.min(40, v));
+      var reach = 0.42 * (1 + Math.min(Math.abs(v) / 25, 2.5));
+      var target = Math.max(0, Math.min(heroSlides.length - 1, Math.round(d.pos + v * reach)));
+      var dist = Math.abs(target - d.pos);
+      // Carries on from the finger's speed and brakes to a stop on the cover.
+      var dur = Math.max(0.28, Math.min(0.9, 0.24 + dist * 0.09));
+      flowSetTransition('transform ' + dur.toFixed(2) + 's cubic-bezier(.12,.75,.22,1)');
+      heroFlowIdx = target;
+      layoutHeroFlow(false, target);
+      heroPaintAround();
+      setTimeout(function(){ if(!flowDrag) flowSetTransition(''); }, dur * 1000 + 30);
+      heroFlowTouched = Date.now();
       heroSlides.forEach(function(s){ s._swiped = true; });
       setTimeout(function(){ heroSlides.forEach(function(s){ s._swiped = false; }); }, 0);
+    }
+    npHeroTrack.addEventListener('pointerup', flowEnd);
+    npHeroTrack.addEventListener('pointercancel', function(e){
+      var d = flowDrag;
+      if(!d || e.pointerId !== d.id) return;
+      if(d.moved) flowEnd(e); else flowDrag = null;
     });
   }
   // Auto-advance (off unless chosen): only while Home's carousel is on screen and nobody has
