@@ -1702,10 +1702,12 @@
     height:calc(15px + 18px + 4px + 1.08 * clamp(22px, 6.4vw, 30px)); }
   /* Build 555 (Mark): one line for the title in Flow (fitHeroTitle shrinks it to fit). */
   .nph-flow-info .nph-kicker{ line-height:15px; }
-  .nph-flow-info .nph-title{ -webkit-line-clamp:1; white-space:nowrap; }
+  .nph-flow-info .nph-title{ -webkit-line-clamp:1; white-space:nowrap;
+    /* build 560: the title's line is the same height however far a long name is shrunk, so the words never move */
+    line-height:calc(1.08 * clamp(22px, 6.4vw, 30px)); height:calc(1.08 * clamp(22px, 6.4vw, 30px)); flex:0 0 auto; }
   .nph-flow-info .nph-line{ line-height:18px; min-height:18px; }
   .nph-flow-info .nph-line:empty{ display:block; }
-  .nph-flow .nph-flow-info{ transition:transform .25s ease; }   /* build 558: its room is kept, so every cover's words sit at the same height */
+  /* build 558: its room is kept, so every cover's words sit at the same height */
   .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
   .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
   .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
@@ -54114,9 +54116,9 @@
     var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
     var coverBottom = npHeroTrack.getBoundingClientRect().top + size;
     var below = next.getBoundingClientRect().top;
-    // The words shown: down to the song line when there is one, else the title.
-    var t = npHeroFlowInfo.querySelector('.nph-title');
-    var top = k.getBoundingClientRect().top - cur, bottom = (ln.textContent ? ln : t).getBoundingClientRect().bottom - cur;
+    // Build 560 (Mark): the whole block (kind, one-line title, the song line's room) is centred, so
+    // the words stand in the same place for every cover.
+    var top = k.getBoundingClientRect().top - cur, bottom = ln.getBoundingClientRect().bottom - cur;
     if(!(below > coverBottom) || !(bottom > top)) return;
     var dy = Math.round(((coverBottom + below) / 2 - (top + bottom) / 2) * 2) / 2;
     if(dy === cur) return;
