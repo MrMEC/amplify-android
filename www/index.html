@@ -1691,9 +1691,14 @@
     border-radius:var(--r-card, 14px); opacity:var(--flow-shade, 0); background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
   .nph-flow .nph-slide.flow-left::after{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
   .nph-flow-info{ display:none; }
-  /* Build 552 (Mark): tight under the covers and under the words (no space kept for a second title line). */
+  /* Build 553 (Mark): the Flow section is one fixed height whatever the title, so the tabs under it
+     never move: room for the kind, a two-line title (fitHeroTitle keeps every title to two lines)
+     and the song line, and nothing more. */
   .nph-flow .nph-flow-info{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:4px;
-    padding:0 var(--main-pad) 6px; cursor:pointer; }
+    padding:0 var(--main-pad) 6px; cursor:pointer; box-sizing:content-box; overflow:hidden;
+    height:calc(16px + 20px + 8px + 2.16 * clamp(22px, 6.4vw, 30px)); }
+  .nph-flow-info .nph-kicker{ line-height:16px; }
+  .nph-flow-info .nph-line{ line-height:20px; min-height:20px; }
   .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
   .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
   .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
