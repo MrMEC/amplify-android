@@ -1695,10 +1695,12 @@
      never move: room for the kind, a two-line title (fitHeroTitle keeps every title to two lines)
      and the song line, and nothing more. */
   .nph-flow .nph-flow-info{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:4px;
-    padding:0 var(--main-pad) 6px; cursor:pointer; box-sizing:content-box; overflow:hidden;
-    height:calc(16px + 20px + 8px + 2.16 * clamp(22px, 6.4vw, 30px)); }
-  .nph-flow-info .nph-kicker{ line-height:16px; }
-  .nph-flow-info .nph-line{ line-height:20px; min-height:20px; }
+    padding:0 var(--main-pad); cursor:pointer; box-sizing:content-box; overflow:hidden; gap:2px;
+    height:calc(15px + 18px + 4px + 1.08 * clamp(22px, 6.4vw, 30px)); }
+  /* Build 555 (Mark): one line for the title in Flow (fitHeroTitle shrinks it to fit). */
+  .nph-flow-info .nph-kicker{ line-height:15px; }
+  .nph-flow-info .nph-title{ -webkit-line-clamp:1; white-space:nowrap; }
+  .nph-flow-info .nph-line{ line-height:18px; min-height:18px; }
   .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
   .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
   .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
@@ -53869,6 +53871,8 @@
   // smallest size a title still too long ends in an ellipsis -- still on whole words.
   var HERO_TITLE_MIN = 20;
   function fitHeroTitle(slide){
+    // Build 555 (Mark): Flow's title is one line, shrunk as far as it must be (never an ellipsis).
+    var lines = slide && slide._titleLines || 2, minSize = slide && slide._titleMin || HERO_TITLE_MIN;
     var el = slide && slide.querySelector('.nph-title');
     if(!el || !el.textContent) return;
     var w = el.clientWidth;
@@ -53880,7 +53884,7 @@
     el.classList.add('nph-measure');
     var size = parseFloat(getComputedStyle(el).fontSize) || 32;
     var lh = parseFloat(getComputedStyle(el).lineHeight) / size || 1.08;
-    while(size > HERO_TITLE_MIN && (el.scrollWidth > w + 1 || el.scrollHeight > Math.ceil(size * lh * 2) + 2)){
+    while(size > minSize && (el.scrollWidth > w + 1 || el.scrollHeight > Math.ceil(size * lh * lines) + 2)){
       size -= 1;
       el.style.fontSize = size + 'px';
     }
@@ -54078,6 +54082,8 @@
   if(npHero){
     npHeroFlowInfo = document.createElement('div');
     npHeroFlowInfo.className = 'nph-flow-info';
+    npHeroFlowInfo._titleLines = 1;
+    npHeroFlowInfo._titleMin = 11;
     npHeroFlowInfo.innerHTML = '<div class="nph-kicker"></div><h2 class="nph-title"></h2><div class="nph-line"></div>';
     npHero.appendChild(npHeroFlowInfo);
     // A tap on the words does what a tap on the middle cover does.
