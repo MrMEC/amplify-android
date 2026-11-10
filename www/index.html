@@ -53758,6 +53758,7 @@
   function heroFlowOn(){ return carouselCfg.mode === 'flow'; }
   var heroFlowIdx = 0;          // the cover in the middle (Flow)
   var heroFlowTouched = 0;      // last swipe or tap, so auto-advance waits for you
+  var heroFlowPlayKey = null;   // what was playing at the last redraw (build 561)
   var heroSlideByKey = {};   // favKey -> slide, kept between redraws so nothing flickers
   function heroText(html){
     var s = String(html || '');
@@ -53967,6 +53968,11 @@
     var atIdx = heroIndex();
     var shownKey = prevKeys[atIdx] || null;
     var stayFirst = atIdx === 0;
+    // Build 561 (Mark): in Flow, starting something new (from Favorites, anywhere) brings the
+    // covers back to the first, the one now playing.
+    var playKey = currentStation ? favKey(currentStation) : null;
+    if(heroFlowOn() && playKey && playKey !== heroFlowPlayKey && keys[0] === playKey) stayFirst = true;
+    heroFlowPlayKey = playKey;
     if(keys.join('\n') !== prevKeys.join('\n')){
       var keep = {};
       heroSlides = items.map(function(item, i){
@@ -53985,10 +53991,12 @@
       // Someone swiping back through what they played stays on the slide they were looking
       // at; anyone on the first slide sees the new track.
       var target = stayFirst ? 0 : Math.max(0, keys.indexOf(shownKey));
-      if(heroIndex() !== target && npHeroTrack.clientWidth) heroScrollTo(target, false);
+      if(heroIndex() !== target && npHeroTrack.clientWidth) heroScrollTo(target, heroFlowOn() && stayFirst);
     } else {
       heroSlides.forEach(function(slide, i){ fillHeroSlide(slide, items[i]); });
     }
+    // (also when what started was already the first cover, so the list itself didn't change)
+    if(heroFlowOn() && stayFirst && heroIndex() !== 0) heroScrollTo(0, true);
     if(heroFlowOn()) layoutHeroFlow(false);
     syncNpHeroShown();
     heroPaintAround();
