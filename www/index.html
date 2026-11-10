@@ -7261,6 +7261,8 @@
   .tile-grid{ row-gap:calc(24px * var(--dens-sp)); }
   #settingsPanel .set-subcats{ display:flex; flex-direction:column; }
   #settingsPanel .set-subcats .set-cat:last-child{ border-bottom:none; }
+  /* Build 565: on Home the Carousel settings come first; a line sets them apart from Favorites. */
+  #settingsPanel [data-set-page="home"] > .set-subcats{ border-top:1px solid var(--border); }
   .shape-preview{ display:flex; align-items:flex-end; gap:16px; padding:16px; margin:6px 0 0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-card); }
   .shape-preview .sp-tile{ display:flex; flex-direction:column; gap:6px; width:72px; }
   .shape-preview .sp-art{ display:block; width:72px; height:72px; background:linear-gradient(135deg,var(--accent),var(--panel-2)); border-radius:var(--r-tile); }
@@ -8817,7 +8819,7 @@
       <!-- Build 562 (Mark): Home lives here now, below Shape & density. -->
       <button type="button" class="set-cat" data-set-cat="home">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Favorites and the Featured card on Home</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Carousel, Favorites and the Featured card</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       </div>
@@ -8839,43 +8841,6 @@
           <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
           <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
           <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
-        </div>
-      </div>
-      <!-- Build 551 (Mark): Home's carousel as Slides (as it was) or Flow (cover flow); Flow's own settings show only while it is chosen. -->
-      <div class="settings-row settings-row--stack">
-        <span class="settings-label" id="carouselLabel">Carousel</span>
-        <div class="theme-switch" id="carouselSwitch" role="group" aria-labelledby="carouselLabel">
-          <button type="button" class="theme-opt" data-carousel-opt="slides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/></svg><span>Slides</span></button>
-          <button type="button" class="theme-opt" data-carousel-opt="flow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="5" width="8" height="12" rx="1.5"/><path d="M5.5 7l-3 1.5v7l3 1.5M18.5 7l3 1.5v7l-3 1.5"/></svg><span>Flow</span></button>
-          <button type="button" class="theme-opt" data-carousel-opt="none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>None</span></button>
-        </div>
-      </div>
-      <div id="carouselFlowOpts" hidden>
-        <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover size</span></div>
-          <select class="settings-select" id="flowSizeSelect" aria-labelledby="flowSizeLabel">
-            <option value="s">Small</option>
-            <option value="m">Medium</option>
-            <option value="l">Large</option>
-          </select>
-        </div>
-        <div class="settings-row settings-row--stack">
-          <span class="settings-label" id="flowTiltLabel">Tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
-          <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
-        </div>
-        <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowReflectLabel">Reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
-          <select class="settings-select" id="flowReflectSelect" aria-labelledby="flowReflectLabel">
-            <option value="off">Off</option>
-            <option value="on">On</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowAutoLabel">Auto-advance</span><span class="set-desc">Moves to the next cover every few seconds</span></div>
-          <select class="settings-select" id="flowAutoSelect" aria-labelledby="flowAutoLabel">
-            <option value="off">Off</option>
-            <option value="on">On</option>
-          </select>
         </div>
       </div>
       <div class="settings-row">
@@ -9118,6 +9083,43 @@
     <!-- Build 545 (Mark): which kinds of favourite show in Home's Favorites tab. -->
     <!-- Build 546 (Mark): Home is a category with two pages under it, Favorites (what was Home) and Featured. -->
     <section class="set-page" data-set-page="home" data-set-title="Home" data-set-parent="appearance" hidden>
+      <!-- Build 565 (Mark): moved here from Theme & color, above Favorites. Build 551: Home's carousel as Slides (as it was) or Flow (cover flow); Flow's own settings show only while it is chosen. -->
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="carouselLabel">Carousel</span>
+        <div class="theme-switch" id="carouselSwitch" role="group" aria-labelledby="carouselLabel">
+          <button type="button" class="theme-opt" data-carousel-opt="slides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/></svg><span>Slides</span></button>
+          <button type="button" class="theme-opt" data-carousel-opt="flow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="5" width="8" height="12" rx="1.5"/><path d="M5.5 7l-3 1.5v7l3 1.5M18.5 7l3 1.5v7l-3 1.5"/></svg><span>Flow</span></button>
+          <button type="button" class="theme-opt" data-carousel-opt="none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>None</span></button>
+        </div>
+      </div>
+      <div id="carouselFlowOpts" hidden>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover size</span></div>
+          <select class="settings-select" id="flowSizeSelect" aria-labelledby="flowSizeLabel">
+            <option value="s">Small</option>
+            <option value="m">Medium</option>
+            <option value="l">Large</option>
+          </select>
+        </div>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="flowTiltLabel">Tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
+          <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowReflectLabel">Reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
+          <select class="settings-select" id="flowReflectSelect" aria-labelledby="flowReflectLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowAutoLabel">Auto-advance</span><span class="set-desc">Moves to the next cover every few seconds</span></div>
+          <select class="settings-select" id="flowAutoSelect" aria-labelledby="flowAutoLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </div>
+      </div>
       <div class="set-subcats">
       <button type="button" class="set-cat" data-set-cat="home-favorites">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
