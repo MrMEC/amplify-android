@@ -1,4 +1,4 @@
-"""Build 562: the profile picture (top right) fades with Home's logo instead of sliding away.
+"""Build 567: the profile picture (top right) fades with Home's logo instead of sliding away.
 Fades out at the logo's scroll position (past 8px), fades back in on a scroll up, on every page.
 Run: python3 tests/test_avatar_fade.py (screenshots in /tmp/claude-0/t/shots)"""
 import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
@@ -33,8 +33,10 @@ async def page_cycle(pg, cdp, name):
     check(s1[3] > 8 and s1[0] == 0, f'[{name}] scrolled down: the picture has faded out {s1}')
     check(abs(s1[2] - top0) < 1, f'[{name}] it faded where it was, it did not slide ({top0} -> {s1[2]})')
     await pg.screenshot(path=f'{SHOTS}/avfade-{name}-2down.png', clip={'x': 0, 'y': 0, 'width': 390, 'height': 140})
+    await swipe(cdp, -60); s2a = await state(pg)
+    check(s2a[0] == 0, f'[{name}] a small scroll up (60px) does not bring it back {s2a}')
     await swipe(cdp, -60); s2 = await state(pg)
-    check(s2[3] > 8 and s2[0] == 1, f'[{name}] scrolled up a little: the picture fades back in {s2}')
+    check(s2[3] > 8 and s2[0] == 1, f'[{name}] after a longer scroll up (120px) it fades back in {s2}')
     check(abs(s2[2] - top0) < 1, f'[{name}] and it did not slide down from the top ({top0} -> {s2[2]})')
     await pg.screenshot(path=f'{SHOTS}/avfade-{name}-3up.png', clip={'x': 0, 'y': 0, 'width': 390, 'height': 140})
     await swipe(cdp, 120); s3 = await state(pg)

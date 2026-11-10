@@ -5899,7 +5899,7 @@
     /* Builds 184-185: on every page the header (or the floating Menu button, and Now
        Playing's minimise button) slides up out of view while scrolling down and comes
        straight back on any scroll up. See syncHeaderAutoHide. */
-    /* Build 562 (Mark): the profile picture no longer slides with the header; it fades out and in
+    /* Build 567 (Mark): the profile picture no longer slides with the header; it fades out and in
        (see .hb-avatar and hdr-av-off). So the header box itself stays put, and what else lives in it
        (the page's name, the cast button) slides away and back on its own, as before. */
     .sidebar-top .hdr-page-label, .sidebar-top .cast-btn{ transition:transform .28s cubic-bezier(.4,0,.2,1); }
@@ -6834,7 +6834,7 @@
       transition:opacity .2s ease;
     }
     html body.np-open .sidebar-top .hamburger-btn .hb-avatar{ border-color:var(--np-vivid, var(--accent)); transition:opacity .2s ease, border-color .5s ease; }
-    /* Build 562 (Mark): the profile picture fades out at the same scroll position and with the same
+    /* Build 567 (Mark): the profile picture fades out at the same scroll position and with the same
        timing as Home's Amplify logo (see .brand, hdr-scrolled), and fades back in when the page is
        scrolled up, on every page. It never slides. Not tappable while it is faded out. */
     html body.hdr-av-off .sidebar-top .hamburger-btn .hb-avatar{ opacity:0; }
@@ -6848,7 +6848,7 @@
       width:44px; height:44px; border:0; background:none !important; backdrop-filter:none; -webkit-backdrop-filter:none; filter:none; padding:0;
       display:flex; align-items:center; justify-content:center;
     }
-    /* (Build 562: !important because the light theme's own grey disc outranked "no disc" here; it was
+    /* (Build 567: !important because the light theme's own grey disc outranked "no disc" here; it was
        hidden behind the picture until the picture began to fade, when it showed as a ghost circle.) */
   }
   .pf-stat{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 12px; display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -8832,14 +8832,14 @@
         <span class="set-cat-text"><span class="set-cat-name">Shape &amp; density</span><span class="set-cat-sub">Corners, spacing, artist portrait shape</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
-      <!-- Build 562 (Mark): Home lives here now, below Shape & density. -->
+      <!-- Build 567 (Mark): Home lives here now, below Shape & density. -->
       <button type="button" class="set-cat" data-set-cat="home">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
         <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Carousel, Favorites and the Featured card</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       </div>
-      <!-- Build 562 (Mark): the phone's sideways screens can be turned off. -->
+      <!-- Build 567 (Mark): the phone's sideways screens can be turned off. -->
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="landNpLabel">Horizontal Now Playing</span><span class="set-desc">Now Playing fills the screen when the phone is turned sideways</span></div>
         <select class="settings-select" id="landNpSelect" aria-labelledby="landNpLabel"><option value="off">Off</option><option value="on">On</option></select>
@@ -13823,8 +13823,11 @@
   // Playing its Menu and minimise buttons) slides up once the page has moved down a little,
   // and comes back on the first scroll up. Near the top of the page it always shows. Now
   // Playing scrolls inside its own screen, so that is the scroll followed while it is open.
-  var hdrLastY = 0, hdrDownRun = 0;
+  var hdrLastY = 0, hdrDownRun = 0, hdrUpRun = 0;
   var HDR_SHOW_ABOVE = 80, HDR_HIDE_AFTER = 24;
+  // Build 567 (Mark): the profile picture only fades back in after this much continuous scroll up
+  // (px), so a small upward nudge doesn't bring it back by accident. Back at the top it shows at once.
+  var HDR_AV_SHOW_AFTER = 90;
   function hdrAutoHidePage(){
     var b = document.body.classList;
     // Build 255: not while Search is open; its box takes the header's place and stays put.
@@ -13835,7 +13838,7 @@
     return window.scrollY || window.pageYOffset || 0;
   }
   function hdrReset(){
-    hdrDownRun = 0;
+    hdrDownRun = 0; hdrUpRun = 0;
     hdrLastY = hdrScrollY();
     document.body.classList.remove('hdr-hidden');
     document.body.classList.remove('hdr-av-off');
@@ -13850,11 +13853,14 @@
     hdrLastY = y;
     // Build 323: Home's logo fades once the page has moved (the header has no background now).
     document.body.classList.toggle('hdr-scrolled', y > 8);
-    // Build 562 (Mark): the profile picture fades out at the logo's scroll position (past 8px) while
-    // scrolling down, and fades back in on the first scroll up (or at the top). Never a slide.
-    if(!on || y <= 8) document.body.classList.remove('hdr-av-off');
-    else if(dy > 0) document.body.classList.add('hdr-av-off');
-    else if(dy < 0) document.body.classList.remove('hdr-av-off');
+    // Build 567 (Mark): the profile picture fades out at the logo's scroll position (past 8px) while
+    // scrolling down, and fades back in after a deliberate scroll up of HDR_AV_SHOW_AFTER px (or at the top). Never a slide.
+    if(!on || y <= 8){ hdrUpRun = 0; document.body.classList.remove('hdr-av-off'); }
+    else if(dy > 0){ hdrUpRun = 0; document.body.classList.add('hdr-av-off'); }
+    else if(dy < 0){
+      hdrUpRun -= dy;
+      if(hdrUpRun >= HDR_AV_SHOW_AFTER) document.body.classList.remove('hdr-av-off');
+    }
     if(!on || y < HDR_SHOW_ABOVE){ hdrDownRun = 0; document.body.classList.remove('hdr-hidden'); return; }
     if(dy > 0){
       hdrDownRun += dy;
@@ -21986,7 +21992,7 @@
   var renderLandFavs = function(){};
   if(window.matchMedia){
     var rotateLockQuery = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 926px)');
-    // Build 562 (Mark): Settings > Appearance > Horizontal Now Playing and Cover Flow (both on unless turned off).
+    // Build 567 (Mark): Settings > Appearance > Horizontal Now Playing and Cover Flow (both on unless turned off).
     var LANDSCAPE_KEY = 'radioPlayerLandscape';
     var landPrefs = { np: true, cf: true };
     try{
