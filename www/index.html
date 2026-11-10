@@ -1661,6 +1661,9 @@
   .nph-refl{ display:contents; }
   .home-hero.nph-flow{ width:calc(100% + var(--main-pad) * 2); margin-left:calc(var(--main-pad) * -1); margin-right:calc(var(--main-pad) * -1);
     overflow:hidden; padding-top:4px; }
+  /* Build 559: clipped at the sides only (the side covers stop at the screen edges); the words,
+     centred between the cover and the tabs, may sit below the section's own box. */
+  @supports (overflow-x: clip){ .home-hero.nph-flow{ overflow:visible; overflow-x:clip; overflow-y:visible; } }
   /* The perspective and stacking are Cover Flow's (landscape Albums): covers stacked by z-index,
      nearest the middle on top, each darkened the further it sits from the middle. */
   .nph-flow .nph-track{ position:relative; display:block; overflow:visible; scroll-snap-type:none; border-radius:0 !important;
