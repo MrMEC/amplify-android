@@ -5899,8 +5899,12 @@
     /* Builds 184-185: on every page the header (or the floating Menu button, and Now
        Playing's minimise button) slides up out of view while scrolling down and comes
        straight back on any scroll up. See syncHeaderAutoHide. */
-    .sidebar-top{ transition:transform .28s cubic-bezier(.4,0,.2,1); }
-    body.hdr-autohide.hdr-hidden:not(.drawer-open) .sidebar-top{ transform:translateY(calc(-100% - 20px)); }
+    /* Build 562 (Mark): the profile picture no longer slides with the header; it fades out and in
+       (see .hb-avatar and hdr-av-off). So the header box itself stays put, and what else lives in it
+       (the page's name, the cast button) slides away and back on its own, as before. */
+    .sidebar-top .hdr-page-label, .sidebar-top .cast-btn{ transition:transform .28s cubic-bezier(.4,0,.2,1); }
+    body.hdr-autohide.hdr-hidden:not(.drawer-open) .sidebar-top .hdr-page-label,
+    body.hdr-autohide.hdr-hidden:not(.drawer-open) .sidebar-top .cast-btn{ transform:translateY(-80px); }
     body.hdr-autohide.hdr-hidden.np-open:not(.drawer-open) .np-float .np-back{ transform:translateY(-90px); }
   }
 
@@ -6726,7 +6730,7 @@
        syncStickyTabs), filling the top left beside the menu button. It is part of the header, so
        it slides away and back with it. */
     .sidebar-top .hdr-page-label{ display:block; position:absolute; left:0; top:0; margin:0; white-space:nowrap; pointer-events:none;
-      opacity:0; transition:opacity .18s ease; }
+      opacity:0; transition:opacity .18s ease, transform .28s cubic-bezier(.4,0,.2,1); }
     body.stab-on .sidebar-top .hdr-page-label{ opacity:1; }
     body.np-open .sidebar-top .hdr-page-label, body.drawer-open .sidebar-top .hdr-page-label,
     body.search-open .sidebar-top .hdr-page-label, body.home-view .sidebar-top .hdr-page-label{ opacity:0; }
@@ -6827,17 +6831,25 @@
       /* Build 479 (Mark): a thin ring in the theme's primary colour, inside the 36px so the
          picture keeps its size and its place on the right margin. */
       box-sizing:border-box; border:2px solid var(--accent);
+      transition:opacity .2s ease;
     }
-    html body.np-open .sidebar-top .hamburger-btn .hb-avatar{ border-color:var(--np-vivid, var(--accent)); transition:border-color .5s ease; }
+    html body.np-open .sidebar-top .hamburger-btn .hb-avatar{ border-color:var(--np-vivid, var(--accent)); transition:opacity .2s ease, border-color .5s ease; }
+    /* Build 562 (Mark): the profile picture fades out at the same scroll position and with the same
+       timing as Home's Amplify logo (see .brand, hdr-scrolled), and fades back in when the page is
+       scrolled up, on every page. It never slides. Not tappable while it is faded out. */
+    html body.hdr-av-off .sidebar-top .hamburger-btn .hb-avatar{ opacity:0; }
+    html body.hdr-av-off .sidebar-top .hamburger-btn{ pointer-events:none; }
     .hb-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
     .hb-avatar svg{ width:58%; height:58%; }
     /* Just the picture: no disc behind it, on any page. */
     html body .sidebar-top .hamburger-btn,
     html body.album-open .sidebar-top .hamburger-btn, html body.artist-open .sidebar-top .hamburger-btn,
     html body.np-open .sidebar-top .hamburger-btn, html body.np-open.album-open .sidebar-top .hamburger-btn, html body.np-open.artist-open .sidebar-top .hamburger-btn{
-      width:44px; height:44px; border:0; background:none; backdrop-filter:none; -webkit-backdrop-filter:none; filter:none; padding:0;
+      width:44px; height:44px; border:0; background:none !important; backdrop-filter:none; -webkit-backdrop-filter:none; filter:none; padding:0;
       display:flex; align-items:center; justify-content:center;
     }
+    /* (Build 562: !important because the light theme's own grey disc outranked "no disc" here; it was
+       hidden behind the picture until the picture began to fade, when it showed as a ghost circle.) */
   }
   .pf-stat{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 12px; display:flex; flex-direction:column; gap:2px; min-width:0; }
   .pf-stat-v{ font-size:20px; font-weight:800; line-height:1.2; color:var(--text); white-space:nowrap; overflow:hidden; }
@@ -13826,6 +13838,7 @@
     hdrDownRun = 0;
     hdrLastY = hdrScrollY();
     document.body.classList.remove('hdr-hidden');
+    document.body.classList.remove('hdr-av-off');
     document.body.classList.toggle('hdr-autohide', hdrAutoHidePage());
     document.body.classList.toggle('hdr-scrolled', hdrLastY > 8);
   }
@@ -13837,6 +13850,11 @@
     hdrLastY = y;
     // Build 323: Home's logo fades once the page has moved (the header has no background now).
     document.body.classList.toggle('hdr-scrolled', y > 8);
+    // Build 562 (Mark): the profile picture fades out at the logo's scroll position (past 8px) while
+    // scrolling down, and fades back in on the first scroll up (or at the top). Never a slide.
+    if(!on || y <= 8) document.body.classList.remove('hdr-av-off');
+    else if(dy > 0) document.body.classList.add('hdr-av-off');
+    else if(dy < 0) document.body.classList.remove('hdr-av-off');
     if(!on || y < HDR_SHOW_ABOVE){ hdrDownRun = 0; document.body.classList.remove('hdr-hidden'); return; }
     if(dy > 0){
       hdrDownRun += dy;
