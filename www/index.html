@@ -1653,6 +1653,53 @@
     font-size:21px; cursor:pointer; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 6px 18px rgba(0,0,0,.35); }
   .nph-play .fa-play{ margin-left:3px; }
   .nph-play:active{ transform:scale(.95); }
+  /* Build 551 (Mark): Settings > Appearance > Theme & color > Carousel > Flow. The same slides,
+     shown as square covers in a cover flow: the one in the middle faces you, its neighbours tilt
+     back on each side; the kind, title and song sit once under the covers. No Play button: a
+     tap on the middle cover plays it or opens its page; a tap on a side cover brings it to the
+     middle. The row runs to both screen edges. */
+  .nph-refl{ display:contents; }
+  .home-hero.nph-flow{ width:calc(100% + var(--main-pad) * 2); margin-left:calc(var(--main-pad) * -1); margin-right:calc(var(--main-pad) * -1);
+    overflow:hidden; padding-top:4px; }
+  /* The perspective and stacking are Cover Flow's (landscape Albums): covers stacked by z-index,
+     nearest the middle on top, each darkened the further it sits from the middle. */
+  .nph-flow .nph-track{ position:relative; display:block; overflow:visible; scroll-snap-type:none; border-radius:0 !important;
+    background:none; box-shadow:none !important; height:calc(var(--flow-size, 200px) + var(--flow-room, 14px)); touch-action:pan-y;
+    perspective:calc(var(--flow-size, 200px) * 3.3); perspective-origin:50% calc(var(--flow-size, 200px) / 2); }
+  .nph-flow .nph-slide{ position:absolute; left:50%; top:0; width:var(--flow-size, 200px); height:var(--flow-size, 200px); min-height:0;
+    margin-left:calc(var(--flow-size, 200px) / -2); display:block; scroll-snap-align:none; cursor:pointer; overflow:visible;
+    transform-style:flat; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    transition:transform .45s cubic-bezier(.2,.75,.2,1); -webkit-tap-highlight-color:transparent; }
+  .nph-flow .nph-slide.flow-far{ visibility:hidden; pointer-events:none; }
+  .nph-flow .nph-media{ overflow:visible; background:none; }
+  .nph-flow .nph-bg, .nph-flow .nph-body, .nph-flow .nph-progress{ display:none; }
+  .nph-flow .nph-art{ inset:0; overflow:hidden; border-radius:var(--r-card, 14px); background:#15161a; -webkit-mask-image:none; mask-image:none;
+    box-shadow:0 -4px 18px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.05); }
+  .nph-flow .nph-art img{ object-position:center; }
+  /* The reflection: the cover's lower 40%, mirrored, under it, fading out (a mask, so it suits
+     any page colour: light, dark or AMOLED). */
+  .nph-flow .nph-refl{ display:none; }
+  .nph-flow.nph-reflect .nph-refl{ display:block; position:absolute; left:0; right:0; top:calc(100% + 2px); height:40%; overflow:hidden;
+    border-radius:var(--r-card, 14px) var(--r-card, 14px) 0 0;
+    -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.42) 0%, rgba(0,0,0,.16) 45%, transparent 88%);
+    mask-image:linear-gradient(to bottom, rgba(0,0,0,.42) 0%, rgba(0,0,0,.16) 45%, transparent 88%); }
+  .nph-flow.nph-reflect .nph-mid{ inset:auto; left:0; right:0; top:0; height:250%; filter:none; transform:scaleY(-1); transform-origin:50% 50%;
+    -webkit-mask-image:none; mask-image:none; }
+  .nph-flow.nph-reflect .nph-mid img{ object-position:center; }
+  /* Cover Flow's shade: the further from the middle, the darker, a little more on the outer edge. */
+  .nph-flow .nph-slide::after{ content:''; position:absolute; left:0; right:0; top:0; height:100%; z-index:3; pointer-events:none;
+    border-radius:var(--r-card, 14px); opacity:var(--flow-shade, 0); background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
+  .nph-flow .nph-slide.flow-left::after{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
+  .nph-flow-info{ display:none; }
+  /* Room for a two-line title always, so Home doesn't jump as covers with longer names come round. */
+  .nph-flow .nph-flow-info{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:4px;
+    padding:2px var(--main-pad) 18px; cursor:pointer; min-height:calc(18px + 2.16 * clamp(22px, 6.4vw, 30px) + 24px); box-sizing:content-box; }
+  .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
+  .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
+  .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
+  #settingsPanel #carouselSwitch{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  #settingsPanel .theme-opt svg{ flex-shrink:0; width:15px; height:15px; }
+  @media (max-width: 360px){ #settingsPanel .theme-opt svg{ display:none; } }
   /* ---------- Artist page hero ---------- */
   /* The same page as an album's: one picture at size, centred, on a colour read out of it,
      with the identity and controls stacked under it. The art sizing and the control styling
@@ -8739,6 +8786,42 @@
           <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
           <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
           <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
+        </div>
+      </div>
+      <!-- Build 551 (Mark): Home's carousel as Slides (as it was) or Flow (cover flow); Flow's own settings show only while it is chosen. -->
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="carouselLabel">Carousel</span>
+        <div class="theme-switch" id="carouselSwitch" role="group" aria-labelledby="carouselLabel">
+          <button type="button" class="theme-opt" data-carousel-opt="slides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/></svg><span>Slides</span></button>
+          <button type="button" class="theme-opt" data-carousel-opt="flow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="5" width="8" height="12" rx="1.5"/><path d="M5.5 7l-3 1.5v7l3 1.5M18.5 7l3 1.5v7l-3 1.5"/></svg><span>Flow</span></button>
+        </div>
+      </div>
+      <div id="carouselFlowOpts" hidden>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover size</span></div>
+          <select class="settings-select" id="flowSizeSelect" aria-labelledby="flowSizeLabel">
+            <option value="s">Small</option>
+            <option value="m">Medium</option>
+            <option value="l">Large</option>
+          </select>
+        </div>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="flowTiltLabel">Tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
+          <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowReflectLabel">Reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
+          <select class="settings-select" id="flowReflectSelect" aria-labelledby="flowReflectLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowAutoLabel">Auto-advance</span><span class="set-desc">Moves to the next cover every few seconds</span></div>
+          <select class="settings-select" id="flowAutoSelect" aria-labelledby="flowAutoLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
         </div>
       </div>
       <div class="settings-row">
@@ -21027,6 +21110,24 @@
   // Only the covers that can be on screen exist in the DOM (a recycled pool), and their art
   // is drawn once into small JPEG thumbnails held in a capped cache, so a library of several
   // hundred albums costs the same as one of twenty.
+  // Build 551: where a cover sits, d covers from the middle (fractional while moving), for covers
+  // S px square turned in by rot degrees -- shared by the landscape Albums and Home's carousel
+  // (Settings > Carousel > Flow), so the two look and stack the same.
+  function coverFlowGeom(d, S, rot){
+    var ad = Math.abs(d), sgn = d < 0 ? -1 : 1, near = Math.min(ad, 1);
+    var C = S * 0.64, G = S * 0.2, D = S * 0.62;
+    return {
+      x: ad < 1 ? d * C : sgn * (C + (ad - 1) * G),
+      z: -near * D,
+      r: -sgn * near * rot,
+      shade: Math.min(0.62, near * 0.2 + Math.max(0, ad - 1) * 0.085)
+    };
+  }
+  // How many covers fit on each side of the middle one in a row W px wide.
+  function coverFlowReach(W, S){
+    var C = S * 0.64, G = S * 0.2;
+    return Math.max(2, Math.min(G > 0 ? Math.ceil((W / 2 - C) / G) + 1 : 4, 14));
+  }
   function createCoverFlow(host, hooks){
     hooks = hooks || {};
     var ROT = 66;                 // degrees a side cover is turned in
@@ -21117,17 +21218,14 @@
     }
     // Where album i sits for the current pos.
     function place(el, i){
-      var d = i - pos, ad = Math.abs(d), sgn = d < 0 ? -1 : 1;
-      var near = Math.min(ad, 1);
-      var x = ad < 1 ? d * C : sgn * (C + (ad - 1) * G);
-      var z = -near * D;
-      var r = -sgn * near * ROT;
+      var d = i - pos, ad = Math.abs(d);
+      var g = coverFlowGeom(d, S, ROT), x = g.x, z = g.z, r = g.r;
       el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,' + z.toFixed(1) + 'px) rotateY(' + r.toFixed(2) + 'deg)';
       // Stacking only changes when a cover passes the halfway point, so it is written then
       // and not on every frame (a z-index change restacks every layer).
       var zi = 1000 - Math.abs(i - Math.round(pos)) * 2 - (d < 0 ? 1 : 0);
       if(el._z !== zi){ el._z = zi; el.style.zIndex = String(zi); }
-      var shade = Math.min(0.62, near * 0.2 + Math.max(0, ad - 1) * 0.085);
+      var shade = g.shade;
       if(el._sh === undefined || Math.abs(el._sh - shade) > 0.004){ el._sh = shade; el._shade.style.opacity = shade.toFixed(3); }
       var side = ad < 0.5 ? 'c' : (d < 0 ? 'l' : 'r');
       if(el._side !== side){
@@ -21139,8 +21237,7 @@
 
     // ---------- the pool ----------
     function visibleRange(){
-      var reach = G > 0 ? Math.ceil((W / 2 - C) / G) + 1 : 4;
-      reach = Math.max(2, Math.min(reach, 14));
+      var reach = coverFlowReach(W, S);
       var c = Math.round(pos);
       return [Math.max(0, c - reach), Math.min(albums.length - 1, c + reach)];
     }
@@ -53626,6 +53723,27 @@
   var npHeroTrack = document.getElementById('npHeroTrack');
   var npHeroProgress = document.getElementById('npHeroProgress');
   var heroSlides = [];       // the slides on screen, in order
+  // Build 551 (Mark): the carousel's look (Settings > Appearance > Theme & color > Carousel).
+  var CAROUSEL_KEY = 'radioPlayerCarousel';
+  var CAROUSEL_SIZES = { s: 170, m: 200, l: 230 };
+  function carouselLoad(){
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, auto: false };
+    try{
+      var v = JSON.parse(localStorage.getItem(CAROUSEL_KEY) || 'null');
+      if(v && typeof v === 'object'){
+        if(v.mode === 'flow') d.mode = 'flow';
+        if(CAROUSEL_SIZES[v.size]) d.size = v.size;
+        if(typeof v.tilt === 'number' && v.tilt >= 30 && v.tilt <= 80) d.tilt = v.tilt;
+        if(typeof v.reflect === 'boolean') d.reflect = v.reflect;
+        if(typeof v.auto === 'boolean') d.auto = v.auto;
+      }
+    }catch(e){}
+    return d;
+  }
+  var carouselCfg = carouselLoad();
+  function heroFlowOn(){ return carouselCfg.mode === 'flow'; }
+  var heroFlowIdx = 0;          // the cover in the middle (Flow)
+  var heroFlowTouched = 0;      // last swipe or tap, so auto-advance waits for you
   var heroSlideByKey = {};   // favKey -> slide, kept between redraws so nothing flickers
   function heroText(html){
     var s = String(html || '');
@@ -53702,7 +53820,7 @@
   function buildHeroSlide(item){
     var slide = document.createElement('div');
     slide.className = 'nph-slide';
-    slide.innerHTML = '<div class="nph-media" aria-hidden="true"><div class="nph-bg"></div><div class="nph-mid"></div><div class="nph-art"></div><div class="nph-scrim"></div></div>'
+    slide.innerHTML = '<div class="nph-media" aria-hidden="true"><div class="nph-bg"></div><div class="nph-refl"><div class="nph-mid"></div></div><div class="nph-art"></div><div class="nph-scrim"></div></div>'
       + '<div class="nph-body"><div class="nph-text"><div class="nph-kicker"></div><h2 class="nph-title"></h2><div class="nph-line"></div><div class="nph-desc"></div></div>'
       + '<button type="button" class="nph-play" aria-label="Play"><i class="fa-solid fa-play" aria-hidden="true"></i></button></div>';
     slide._play = slide.querySelector('.nph-play');
@@ -53715,6 +53833,12 @@
     // and like a station, a tap on the one already playing leaves it playing.
     slide.addEventListener('click', function(){
       if(slide._swiped) return;
+      if(heroFlowOn()){
+        heroFlowTouched = Date.now();
+        var k = heroSlides.indexOf(slide);
+        if(k !== heroIndex()) heroScrollTo(k, true); else heroFlowTap(slide);
+        return;
+      }
       if(slide._item && slide._item.type === 'zen'){ zenOpenScreen(slide._item.zenId && zenCur !== slide._item.zenId ? slide._item.zenId : null, false); return; }
       if(slide._entry){ openArtistPage(slide._entry.key); return; }
       if(heroIsStation(slide._item)){ heroPlayStation(slide); return; }
@@ -53757,7 +53881,10 @@
     }
     el.classList.remove('nph-measure');
   }
-  function fitHeroTitles(){ heroSlides.forEach(function(sl){ sl._fitKey = ''; fitHeroTitle(sl); }); }
+  function fitHeroTitles(){
+    heroSlides.forEach(function(sl){ sl._fitKey = ''; fitHeroTitle(sl); });
+    if(typeof npHeroFlowInfo !== 'undefined' && npHeroFlowInfo){ npHeroFlowInfo._fitKey = ''; fitHeroTitle(npHeroFlowInfo); }
+  }
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ if(typeof heroSlides !== 'undefined') fitHeroTitles(); });
   // Pictures (and an artist's bio from the web) only for the slide on screen and its
   // neighbours, so 50 slides don't ask for 50 covers at once.
@@ -53772,9 +53899,10 @@
       return;
     }
     renderStationArt(slide.querySelector('.nph-art'), item);
-    renderStationArt(slide.querySelector('.nph-bg'), item);
-    renderStationArt(slide.querySelector('.nph-mid'), item);
-    if(entry){
+    // Flow shows the cover (and its reflection, drawn in .nph-mid); the blurred backdrop is Slides' only.
+    if(!heroFlowOn()) renderStationArt(slide.querySelector('.nph-bg'), item);
+    if(!heroFlowOn() || carouselCfg.reflect) renderStationArt(slide.querySelector('.nph-mid'), item);
+    if(entry && !heroFlowOn()){
       Promise.resolve(ensureArtistMeta(entry)).then(function(){
         if(slide._item === item) slide.querySelector('.nph-desc').textContent = heroArtistBio(entry);
       })['catch'](function(){});
@@ -53782,7 +53910,7 @@
   }
   function repaintHeroSlideArt(slide){
     if(!slide || !slide._item || slide._item.type === 'zen') return;
-    ['.nph-art', '.nph-bg', '.nph-mid'].forEach(function(sel){
+    (heroFlowOn() ? (carouselCfg.reflect ? ['.nph-art', '.nph-mid'] : ['.nph-art']) : ['.nph-art', '.nph-bg', '.nph-mid']).forEach(function(sel){
       var box = slide.querySelector(sel), cur = box && box.querySelector('img');
       var want = lastSongCoverFor(slide._item);
       if(cur && want && cur.getAttribute('data-song-src') === want) return;
@@ -53790,13 +53918,17 @@
     });
   }
   function heroIndex(){
+    if(heroFlowOn()) return Math.max(0, Math.min(heroSlides.length - 1, heroFlowIdx));
     if(!npHeroTrack || !npHeroTrack.clientWidth) return 0;
     return Math.max(0, Math.min(heroSlides.length - 1, Math.round(npHeroTrack.scrollLeft / npHeroTrack.clientWidth)));
   }
   function heroPaintAround(){
     var i = heroIndex();
-    for(var j = i - 1; j <= i + 1; j++) paintHeroSlide(heroSlides[j]);
-    syncHeroProgress();
+    // Flow: the covers that can be seen each side; Slides: the neighbours.
+    var r = heroFlowOn() ? Math.min(6, coverFlowReach(npHero.clientWidth || window.innerWidth || 390, CAROUSEL_SIZES[carouselCfg.size] || 200)) : 1;
+    for(var j = i - r; j <= i + r; j++) paintHeroSlide(heroSlides[j]);
+    if(heroFlowOn()) syncHeroFlowInfo();
+    else syncHeroProgress();
   }
   // The bar fills as you swipe: slide 1 of 50 shows 1/50, the last fills it. It follows the
   // finger (the scroll position), not just the slide it settles on.
@@ -53839,11 +53971,18 @@
     } else {
       heroSlides.forEach(function(slide, i){ fillHeroSlide(slide, items[i]); });
     }
+    if(heroFlowOn()) layoutHeroFlow(false);
     syncNpHeroShown();
     heroPaintAround();
     syncNpHeroPlay();
   }
   function heroScrollTo(i, smooth){
+    if(heroFlowOn()){
+      heroFlowIdx = Math.max(0, Math.min(heroSlides.length - 1, i));
+      layoutHeroFlow(!smooth);
+      heroPaintAround();
+      return;
+    }
     var x = i * npHeroTrack.clientWidth;
     try{ npHeroTrack.scrollTo({ left: x, behavior: smooth ? 'smooth' : 'instant' }); }catch(e){ npHeroTrack.scrollLeft = x; }
   }
@@ -53915,6 +54054,7 @@
         if(slide._artDone) repaintHeroSlideArt(slide);
       }
     });
+    if(heroFlowOn()) syncHeroFlowInfo();
   }
   function heroPlay(slide){
     var item = slide._item;
@@ -53927,6 +54067,191 @@
     if(isChartSong(item)){ openChartSong([item], 0, 'Top 100', slide.querySelector('.nph-art')); return; }
     startNpTarget(item);
   }
+  // ---------- Carousel: Flow (build 551) ----------
+  // The kind, title and song of the middle cover, once, under the covers.
+  var npHeroFlowInfo = null;
+  if(npHero){
+    npHeroFlowInfo = document.createElement('div');
+    npHeroFlowInfo.className = 'nph-flow-info';
+    npHeroFlowInfo.innerHTML = '<div class="nph-kicker"></div><h2 class="nph-title"></h2><div class="nph-line"></div>';
+    npHero.appendChild(npHeroFlowInfo);
+    // A tap on the words does what a tap on the middle cover does.
+    npHeroFlowInfo.addEventListener('click', function(e){
+      e.stopPropagation();
+      var sl = heroSlides[heroIndex()];
+      if(sl){ heroFlowTouched = Date.now(); heroFlowTap(sl); }
+    });
+  }
+  function syncHeroFlowInfo(){
+    if(!npHeroFlowInfo) return;
+    var sl = heroSlides[heroIndex()];
+    var kicker = sl ? sl.querySelector('.nph-kicker').textContent : '';
+    var title = sl ? sl.querySelector('.nph-title').textContent : '';
+    var line = sl ? sl.querySelector('.nph-line').textContent : '';
+    npHeroFlowInfo.querySelector('.nph-kicker').textContent = kicker;
+    var t = npHeroFlowInfo.querySelector('.nph-title');
+    if(t.textContent !== title){ t.textContent = title; npHeroFlowInfo._fitKey = ''; }
+    npHeroFlowInfo.querySelector('.nph-line').textContent = line;
+    fitHeroTitle(npHeroFlowInfo);
+  }
+  // Where each cover sits: the middle one flat and in front, up to three on each side turned
+  // toward it and set back; the rest wait out of sight.
+  function layoutHeroFlow(instant){
+    if(!heroFlowOn() || !heroSlides.length) return;
+    var i = heroIndex(), size = CAROUSEL_SIZES[carouselCfg.size] || 200;
+    var reach = Math.min(6, coverFlowReach(npHero.clientWidth || window.innerWidth || 390, size));
+    var snap = [];
+    heroSlides.forEach(function(sl, k){
+      var o = k - i, far = Math.abs(o) > reach;
+      var g = coverFlowGeom(far ? (o < 0 ? -reach - 1 : reach + 1) : o, size, carouselCfg.tilt);
+      if(instant || !sl._flowPlaced){ sl.style.transition = 'none'; snap.push(sl); }
+      sl._flowPlaced = true;
+      sl.style.transform = 'translate3d(' + g.x.toFixed(1) + 'px,0,' + g.z.toFixed(1) + 'px) rotateY(' + g.r.toFixed(2) + 'deg)';
+      sl.style.zIndex = String(1000 - Math.abs(o) * 2 - (o < 0 ? 1 : 0));
+      sl.style.setProperty('--flow-shade', g.shade.toFixed(3));
+      sl.classList.toggle('flow-far', far);
+      sl.classList.toggle('flow-left', o < 0);
+      sl.setAttribute('aria-current', o === 0 ? 'true' : 'false');
+    });
+    if(snap.length){ void npHeroTrack.offsetWidth; snap.forEach(function(sl){ sl.style.transition = ''; }); }
+  }
+  function clearHeroFlow(){
+    heroSlides.forEach(function(sl){
+      sl.style.transform = ''; sl.style.zIndex = ''; sl.style.transition = ''; sl.style.removeProperty('--flow-shade');
+      sl._flowPlaced = false;
+      sl.classList.remove('flow-far', 'flow-left');
+      sl.removeAttribute('aria-current');
+    });
+  }
+  // The middle cover, tapped: a song or station plays (one already playing keeps playing); a
+  // library song opens its artist (or, with none known, its album); a podcast its show; a movie
+  // or TV episode its page.
+  function heroFlowTap(slide){
+    var item = slide._item, entry = slide._entry;
+    if(!item) return;
+    if(item.type === 'zen'){ zenOpenScreen(item.zenId && zenCur !== item.zenId ? item.zenId : null, false); return; }
+    if(entry){ openArtistPage(entry.key); return; }
+    if(isLocalTrack(item) && item.album){
+      var ak = null;
+      try{ ak = albumKeyFor(item); }catch(e){}
+      if(ak){ openAlbumPage(ak, null); window.scrollTo(0, 0); return; }
+    }
+    if(isLocalVideo(item) && item.videoKind !== 'music'){
+      pushView();
+      if(item.videoKind === 'episode' && item.showKey) openVideoShow(item.showKey); else openVideoMovie(item.id);
+      window.scrollTo(0, 0);
+      return;
+    }
+    if(isPodcastTrack(item) && !isAudiobookGuid(item.guid) && item.collectionId){
+      pushView(); openShowPage(item.collectionId); return;
+    }
+    if(heroIsStation(item)){ heroPlayStation(slide); return; }
+    if(slideIsPlaying(slide)) return;
+    heroPlay(slide);
+  }
+  // Swipe: a short one moves one cover, a long one several.
+  if(npHeroTrack){
+    var flowSwipe = null;
+    npHeroTrack.addEventListener('pointerdown', function(e){
+      if(!heroFlowOn() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      flowSwipe = { x: e.clientX, y: e.clientY };
+      heroFlowTouched = Date.now();
+    });
+    npHeroTrack.addEventListener('pointercancel', function(){ flowSwipe = null; });
+    window.addEventListener('pointerup', function(e){
+      if(!flowSwipe) return;
+      var d = flowSwipe; flowSwipe = null;
+      if(!heroFlowOn()) return;
+      var dx = e.clientX - d.x, dy = e.clientY - d.y;
+      if(Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy)) return;
+      var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
+      var steps = Math.max(1, Math.min(4, Math.round(Math.abs(dx) / (size * 0.45))));
+      heroFlowTouched = Date.now();
+      heroScrollTo(heroIndex() + (dx < 0 ? steps : -steps), true);
+      heroSlides.forEach(function(s){ s._swiped = true; });
+      setTimeout(function(){ heroSlides.forEach(function(s){ s._swiped = false; }); }, 0);
+    });
+  }
+  // Auto-advance (off unless chosen): only while Home's carousel is on screen and nobody has
+  // touched it for ten seconds; after the last cover it goes back to the first.
+  var heroFlowTimer = 0;
+  function heroFlowTimerSync(){
+    var want = heroFlowOn() && carouselCfg.auto;
+    if(want && !heroFlowTimer){
+      heroFlowTimer = setInterval(function(){
+        if(!heroFlowOn() || document.hidden || !npHero || npHero.style.display === 'none' || heroSlides.length < 2) return;
+        if(Date.now() - heroFlowTouched < 10000) return;
+        var n = heroIndex() + 1;
+        heroScrollTo(n >= heroSlides.length ? 0 : n, true);
+      }, 6000);
+    } else if(!want && heroFlowTimer){ clearInterval(heroFlowTimer); heroFlowTimer = 0; }
+  }
+  function applyCarousel(prevMode){
+    if(!npHero || !npHeroTrack) return;
+    var was = prevMode || (npHero.classList.contains('nph-flow') ? 'flow' : 'slides');
+    var at = was === 'flow' ? heroFlowIdx : (npHeroTrack.clientWidth ? Math.round(npHeroTrack.scrollLeft / npHeroTrack.clientWidth) : 0);
+    var flow = heroFlowOn();
+    var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
+    var reflWas = npHero.classList.contains('nph-reflect');
+    npHero.classList.toggle('nph-flow', flow);
+    npHero.classList.toggle('nph-reflect', flow && carouselCfg.reflect);
+    npHero.style.setProperty('--flow-size', size + 'px');
+    npHero.style.setProperty('--flow-room', (carouselCfg.reflect ? Math.round(size * 0.42) : 14) + 'px');
+    if(was !== carouselCfg.mode || reflWas !== npHero.classList.contains('nph-reflect')){
+      heroSlides.forEach(function(sl){ sl._artDone = false; sl._fitKey = ''; });
+    }
+    if(was !== carouselCfg.mode){
+      if(flow){ heroFlowIdx = Math.max(0, Math.min(heroSlides.length - 1, at)); }
+      else {
+        clearHeroFlow();
+        requestAnimationFrame(function(){ heroScrollTo(at, false); fitHeroTitles(); heroPaintAround(); });
+      }
+    }
+    if(flow){ layoutHeroFlow(true); requestAnimationFrame(function(){ fitHeroTitles(); }); }
+    heroPaintAround();
+    heroFlowTimerSync();
+  }
+  // Settings > Appearance > Theme & color > Carousel.
+  (function(){
+    var sw = document.getElementById('carouselSwitch');
+    var opts = document.getElementById('carouselFlowOpts');
+    var sizeSel = document.getElementById('flowSizeSelect');
+    var tilt = document.getElementById('flowTiltRange'), tiltVal = document.getElementById('flowTiltVal');
+    var refl = document.getElementById('flowReflectSelect'), auto = document.getElementById('flowAutoSelect');
+    if(!sw) return;
+    function save(){ try{ localStorage.setItem(CAROUSEL_KEY, JSON.stringify(carouselCfg)); }catch(e){} }
+    function show(){
+      Array.prototype.forEach.call(sw.querySelectorAll('.theme-opt'), function(b){
+        var on = b.dataset.carouselOpt === carouselCfg.mode;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      if(opts) opts.hidden = !heroFlowOn();
+      if(sizeSel) sizeSel.value = carouselCfg.size;
+      if(tilt) tilt.value = String(carouselCfg.tilt);
+      if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
+      if(refl) refl.value = carouselCfg.reflect ? 'on' : 'off';
+      if(auto) auto.value = carouselCfg.auto ? 'on' : 'off';
+    }
+    Array.prototype.forEach.call(sw.querySelectorAll('.theme-opt'), function(b){
+      b.addEventListener('click', function(){
+        var prev = carouselCfg.mode;
+        if(prev === b.dataset.carouselOpt) return;
+        carouselCfg.mode = b.dataset.carouselOpt === 'flow' ? 'flow' : 'slides';
+        save(); show(); applyCarousel(prev);
+      });
+    });
+    if(sizeSel) sizeSel.addEventListener('change', function(){ if(CAROUSEL_SIZES[sizeSel.value]){ carouselCfg.size = sizeSel.value; save(); applyCarousel(); } });
+    if(tilt) tilt.addEventListener('input', function(){
+      carouselCfg.tilt = Math.max(30, Math.min(80, parseInt(tilt.value, 10) || 66));
+      if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
+      save(); layoutHeroFlow(false);
+    });
+    if(refl) refl.addEventListener('change', function(){ carouselCfg.reflect = refl.value === 'on'; save(); applyCarousel(); });
+    if(auto) auto.addEventListener('change', function(){ carouselCfg.auto = auto.value === 'on'; save(); heroFlowTimerSync(); });
+    show();
+    applyCarousel('slides');
+  })();
   // Build 226: a tap in the space under the slides (the progress bar and the gap down to the
   // next heading) goes back to the first slide.
   if(npHero) npHero.addEventListener('click', function(e){
@@ -53942,6 +54267,7 @@
     // A drag with the mouse (desktop) pages too; a tap that started a drag doesn't open anything.
     var drag = null;
     npHeroTrack.addEventListener('pointerdown', function(e){
+      if(heroFlowOn()) return;     // Flow has its own swipe (below)
       if(e.pointerType !== 'mouse' || e.button !== 0) return;
       drag = { x: e.clientX, left: npHeroTrack.scrollLeft, moved: false };
     });
