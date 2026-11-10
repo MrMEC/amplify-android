@@ -5870,6 +5870,29 @@
   .cf-track.playing .cf-track-title{ color:var(--accent, #fff); font-weight:600; }
   .cf-track-artist{ display:block; font-size:12px; line-height:16px; color:rgba(255,255,255,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cf-track-time{ flex:0 0 auto; font-size:12.5px; color:rgba(255,255,255,.45); font-variant-numeric:tabular-nums; }
+  /* Build 564 (Mark): Cover Flow in Light mode -- the page's own background, the reflections fading
+     into it, far covers washing out toward it (instead of darkening), dark text and a light tracklist. */
+  html[data-theme="light"] body.rotate-lock .now-playing-screen.la-open{ background:var(--bg) !important; }
+  html[data-theme="light"] .cf-refl-fade{ background:linear-gradient(to bottom, color-mix(in srgb, var(--bg) 45%, transparent) 0%, color-mix(in srgb, var(--bg) 80%, transparent) 42%, var(--bg) 84%); }
+  html[data-theme="light"] .cf-face{ box-shadow:0 -2px 14px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06); }
+  html[data-theme="light"] .cf-shade{ background:linear-gradient(90deg, color-mix(in srgb, var(--bg) 45%, transparent), color-mix(in srgb, var(--bg) 85%, transparent)); }
+  html[data-theme="light"] .cf-cover.cf-left .cf-shade{ background:linear-gradient(90deg, color-mix(in srgb, var(--bg) 85%, transparent), color-mix(in srgb, var(--bg) 45%, transparent)); }
+  html[data-theme="light"] .cf-cap{ text-shadow:0 0 6px var(--bg), 0 0 12px var(--bg); }
+  html[data-theme="light"] .cf-cap-title{ color:#17191c; }
+  html[data-theme="light"] .cf-cap-artist, html[data-theme="light"] .cf-empty{ color:rgba(23,25,28,.6); }
+  html[data-theme="light"] .cf-panel{ background:#fff; box-shadow:0 18px 50px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.08); }
+  html[data-theme="light"] .cf-panel-head{ border-bottom-color:rgba(0,0,0,.08); }
+  html[data-theme="light"] .cf-panel-thumb{ background:#e6e7ea; }
+  html[data-theme="light"] .cf-panel-shuffle, html[data-theme="light"] .cf-panel-title, html[data-theme="light"] .cf-track{ color:#17191c; }
+  html[data-theme="light"] .cf-panel-shuffle:active{ background:rgba(0,0,0,.06); }
+  html[data-theme="light"] .cf-panel-artist, html[data-theme="light"] .cf-track-artist{ color:rgba(23,25,28,.6); }
+  html[data-theme="light"] .cf-track{ border-bottom-color:rgba(0,0,0,.06); }
+  html[data-theme="light"] .cf-track:active{ background:rgba(0,0,0,.05); }
+  html[data-theme="light"] .cf-track-no, html[data-theme="light"] .cf-track-time{ color:rgba(0,0,0,.45); }
+  /* (Now Playing sets light text for its own dark look, so Cover Flow's text uses fixed dark colours.)
+     The round Now Playing / Albums and favourites buttons over Cover Flow: dark on light. */
+  html[data-theme="light"] body.rotate-lock:not(.np-video-full) .now-playing-screen.la-open .np-land-albums-btn,
+  html[data-theme="light"] body.rotate-lock:not(.np-video-full) .now-playing-screen.la-open .np-land-toggle{ background:rgba(23,25,28,.08); color:#17191c; }
   @media (max-width: 900px){
     body.rotate-lock .now-playing-screen{ position:fixed !important; }
     body.rotate-lock .sidebar-top{ display:none !important; }
