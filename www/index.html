@@ -5787,6 +5787,8 @@
      stage plane would sit in front of the pushed-back covers and swallow their taps. */
   .cf-stage{ position:absolute; left:0; right:0; top:0; height:0; pointer-events:none; }
   .cf-cover{ pointer-events:auto; }
+  /* Build 563: Cover Flow on its own (Horizontal Now Playing off) has no Now Playing to go back to. */
+  body.cf-only #npLandAlbumsBtn{ display:none !important; }
   .cf-cover{
     position:absolute; left:50%; top:0; transform-style:flat; will-change:transform;
     backface-visibility:hidden; -webkit-backface-visibility:hidden; contain:layout style;
@@ -21949,26 +21951,37 @@
       // A YouTube video playing over the app (build 126) just gets bigger when the phone turns;
       // the landscape layout takes over once it is closed.
       if(document.body.classList.contains('yt-open')) return;
-      var active = rotateLockQuery.matches && landPrefs.np;
+      // Build 563 (Mark): Horizontal Now Playing off still lets Albums and Artists turn into Cover
+      // Flow sideways (as it always has); only the sideways Now Playing itself stays away.
+      var matches = rotateLockQuery.matches;
       var wasActive = document.body.classList.contains('rotate-lock');
+      var cfOnlyWas = document.body.classList.contains('cf-only');
+      var active = matches && (landPrefs.np || (wasActive && cfOnlyWas && landPrefs.cf));
+      var cfOnly = active && !landPrefs.np;
       var coverFlowFromLibrary = null;
       // Build 244 (Mark): turned sideways on Live TV with nothing playing, the guide grid alone fills
       // the screen (no header, heading, tabs, player bar or tab bar) instead of Now Playing. Once
       // something plays (Now Playing opens), the usual landscape Now Playing takes over.
       var epgLand = document.body.classList.contains('epg-land');
       if(epgLand){
-        if(!active){ document.body.classList.remove('epg-land'); return; }
+        if(!matches){ document.body.classList.remove('epg-land'); return; }
         if(nowPlayingScreen.style.display !== 'flex' && epgLandGridShowing()) return;
         document.body.classList.remove('epg-land');
+        if(!landPrefs.np) return;
         rotateLockOpenedNp = false;
         document.body.classList.add('rotate-lock');
         return;
       }
-      if(active && !wasActive && !document.body.classList.contains('np-open') && !uiIsPlaying && epgLandGridShowing()){
+      if(matches && !wasActive && !document.body.classList.contains('np-open') && !uiIsPlaying && epgLandGridShowing()){
         document.body.classList.add('epg-land');
         var eg = stationsGrid.querySelector(':scope > .epg');
         if(eg) eg.scrollTop = 0;
         return;
+      }
+      // Horizontal Now Playing off: sideways on Albums or Artists (or an album or artist page) still
+      // opens Cover Flow, with no Now Playing behind it.
+      if(matches && !wasActive && !landPrefs.np && landPrefs.cf && !document.body.classList.contains('np-open') && libraryDirectoryInView()){
+        active = true; cfOnly = true;
       }
       if(active && !wasActive){
         if(document.body.classList.contains('np-open')){
@@ -21999,6 +22012,7 @@
         }
       }
       document.body.classList.toggle('rotate-lock', active);
+      document.body.classList.toggle('cf-only', active && cfOnly);
       if(coverFlowFromLibrary){
         setLandAlbumsOpen(true, coverFlowFromLibrary.key || null, coverFlowFromLibrary);
       }
@@ -22157,6 +22171,7 @@
     var syncLandAlbumsBtn = function(){
       npLandAlbumsBtn.style.display = landPrefs.cf ? '' : 'none';
       if(!landPrefs.cf && nowPlayingScreen.classList.contains('la-open')) setLandAlbumsOpen(false);
+      syncRotateLock();
     };
     (function(){
       var npSel = document.getElementById('landNpSelect'), cfSel = document.getElementById('landCfSelect');
