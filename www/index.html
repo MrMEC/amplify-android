@@ -54201,7 +54201,7 @@
     npHero.classList.toggle('nph-flow', flow);
     npHero.classList.toggle('nph-reflect', flow && carouselCfg.reflect);
     npHero.style.setProperty('--flow-size', size + 'px');
-    npHero.style.setProperty('--flow-room', (carouselCfg.reflect ? Math.max(8, Math.round(size * 0.42) - 40) : 8) + 'px');   // build 552: 40px less
+    npHero.style.setProperty('--flow-room', (carouselCfg.reflect ? Math.max(8, Math.round(size * 0.42) - 60) : 8) + 'px');   // build 552: 40px less; 554: 20px more
     if(was !== carouselCfg.mode || reflWas !== npHero.classList.contains('nph-reflect')){
       heroSlides.forEach(function(sl){ sl._artDone = false; sl._fitKey = ''; });
     }
