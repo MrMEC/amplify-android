@@ -1660,6 +1660,7 @@
      middle. The row runs to both screen edges. */
   .nph-refl{ display:contents; }
   .home-hero.nph-flow{ width:calc(100% + var(--main-pad) * 2); margin-left:calc(var(--main-pad) * -1); margin-right:calc(var(--main-pad) * -1);
+    margin-bottom:10px;   /* build 562 (Mark): 10px more under the carousel */
     overflow:hidden; padding-top:4px; }
   /* Build 559: clipped at the sides only (the side covers stop at the screen edges); the words,
      centred between the cover and the tabs, may sit below the section's own box. */
@@ -1711,7 +1712,7 @@
   .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
   .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
   .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
-  #settingsPanel #carouselSwitch{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  #settingsPanel #carouselSwitch{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
   #settingsPanel .theme-opt svg{ flex-shrink:0; width:15px; height:15px; }
   @media (max-width: 360px){ #settingsPanel .theme-opt svg{ display:none; } }
   /* ---------- Artist page hero ---------- */
@@ -5792,6 +5793,7 @@
   }
   .cf-face{
     position:absolute; inset:0; overflow:hidden; background-size:cover; background-position:center;
+    border-radius:var(--r-tile, 8.5px);   /* build 562: Settings > Shape & density > Corner radius */
     /* Static (every cover has it), so moving into the middle never repaints a large blur. */
     box-shadow:0 -4px 18px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
   }
@@ -5799,7 +5801,8 @@
   /* The reflection is a real element rather than -webkit-box-reflect with a mask, which
      re-rasterised on every frame of a scroll on phones. Only the part that shows (the 40%
      nearest the cover) exists; it fades into the black floor with a plain overlay. */
-  .cf-refl{ position:absolute; left:0; right:0; top:calc(100% + 1px); height:40%; overflow:hidden; pointer-events:none; }
+  .cf-refl{ position:absolute; left:0; right:0; top:calc(100% + 1px); height:40%; overflow:hidden; pointer-events:none;
+    border-radius:var(--r-tile, 8.5px) var(--r-tile, 8.5px) 0 0; }   /* the mirrored cover's corners match */
   .cf-refl-img{ position:absolute; left:0; right:0; top:0; height:250%; transform:scaleY(-1); transform-origin:50% 50%;
     background-size:cover; background-position:center; }
   /* The mirrored picture stops short of the reflection's bottom edge and the fade is solid
@@ -5811,6 +5814,7 @@
   /* Darkens a cover and its reflection the further it sits from the middle, a little more
      on its outer edge. */
   .cf-shade{ position:absolute; left:0; right:0; top:0; height:calc(140% + 1px); pointer-events:none; opacity:0;
+    border-radius:var(--r-tile, 8.5px);
     background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
   .cf-cover.cf-left .cf-shade{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
   .cf-caption{ position:absolute; left:50%; width:min(52%, 440px); transform:translateX(-50%); height:44px; pointer-events:none; text-align:center; }
@@ -8726,7 +8730,7 @@
     <nav class="set-home" id="setHome" aria-label="Settings categories">
       <button type="button" class="set-cat" data-set-cat="appearance">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11.2" r="1.1"/><circle cx="10.4" cy="7.4" r="1.1"/><circle cx="15" cy="7.7" r="1.1"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, colors, sizes, fonts, shape</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Appearance</span><span class="set-cat-sub">Theme, colors, sizes, fonts, shape, Home</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="playback">
@@ -8742,11 +8746,6 @@
       <button type="button" class="set-cat" data-set-cat="radio">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="10.5" r="1.8"/><path d="M8.4 6.9a5.1 5.1 0 0 0 0 7.2M15.6 6.9a5.1 5.1 0 0 1 0 7.2M5.6 4.1a9 9 0 0 0 0 12.8M18.4 4.1a9 9 0 0 1 0 12.8M12 12.3v8.2"/></svg></span>
         <span class="set-cat-text"><span class="set-cat-name">Radio</span><span class="set-cat-sub">Station languages, Stations Near Me, search results</span></span>
-        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="set-cat" data-set-cat="home">
-        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Favorites and the Featured card on Home</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="sources">
@@ -8790,6 +8789,21 @@
         <span class="set-cat-text"><span class="set-cat-name">Shape &amp; density</span><span class="set-cat-sub">Corners, spacing, artist portrait shape</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
+      <!-- Build 562 (Mark): Home lives here now, below Shape & density. -->
+      <button type="button" class="set-cat" data-set-cat="home">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Favorites and the Featured card on Home</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      </div>
+      <!-- Build 562 (Mark): the phone's sideways screens can be turned off. -->
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="landNpLabel">Horizontal Now Playing</span><span class="set-desc">Now Playing fills the screen when the phone is turned sideways</span></div>
+        <select class="settings-select" id="landNpSelect" aria-labelledby="landNpLabel"><option value="off">Off</option><option value="on">On</option></select>
+      </div>
+      <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="landCfLabel">Cover Flow</span><span class="set-desc">Albums as Cover Flow on the sideways Now Playing screen</span></div>
+        <select class="settings-select" id="landCfSelect" aria-labelledby="landCfLabel"><option value="off">Off</option><option value="on">On</option></select>
       </div>
     </section>
 
@@ -8808,6 +8822,7 @@
         <div class="theme-switch" id="carouselSwitch" role="group" aria-labelledby="carouselLabel">
           <button type="button" class="theme-opt" data-carousel-opt="slides"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/></svg><span>Slides</span></button>
           <button type="button" class="theme-opt" data-carousel-opt="flow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="5" width="8" height="12" rx="1.5"/><path d="M5.5 7l-3 1.5v7l3 1.5M18.5 7l3 1.5v7l-3 1.5"/></svg><span>Flow</span></button>
+          <button type="button" class="theme-opt" data-carousel-opt="none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>None</span></button>
         </div>
       </div>
       <div id="carouselFlowOpts" hidden>
@@ -8909,7 +8924,7 @@
         <div class="shape-preview" id="shapePreview" aria-hidden="true"><div class="sp-tile"><span class="sp-art"></span><span class="sp-line"></span></div><div class="sp-tile"><span class="sp-art sp-artist"></span><span class="sp-line"></span></div><span class="sp-play"><i class="fa-solid fa-play" aria-hidden="true"></i></span><span class="sp-btn">Button</span></div>
       </div>
       <div class="settings-row">
-        <div class="set-text"><span class="settings-label" id="shapeRadiusLabel">Corner radius</span><span class="set-desc">Covers, tiles, cards, buttons and the Home carousel</span></div>
+        <div class="set-text"><span class="settings-label" id="shapeRadiusLabel">Corner radius</span><span class="set-desc">Covers, tiles, cards, buttons, the Home carousel and Cover Flow</span></div>
         <select class="settings-select" id="shapeRadiusSelect" aria-labelledby="shapeRadiusLabel"><option value="square">Square</option><option value="soft">Soft</option><option value="round">Round</option></select>
       </div>
       <div class="settings-row">
@@ -9077,7 +9092,7 @@
     <!-- Build 503 (Mark): Featured seasons: which seasons show on Home, when, and with what poster. -->
     <!-- Build 545 (Mark): which kinds of favourite show in Home's Favorites tab. -->
     <!-- Build 546 (Mark): Home is a category with two pages under it, Favorites (what was Home) and Featured. -->
-    <section class="set-page" data-set-page="home" data-set-title="Home" hidden>
+    <section class="set-page" data-set-page="home" data-set-title="Home" data-set-parent="appearance" hidden>
       <div class="set-subcats">
       <button type="button" class="set-cat" data-set-cat="home-favorites">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
@@ -21919,6 +21934,13 @@
   var renderLandFavs = function(){};
   if(window.matchMedia){
     var rotateLockQuery = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 926px)');
+    // Build 562 (Mark): Settings > Appearance > Horizontal Now Playing and Cover Flow (both on unless turned off).
+    var LANDSCAPE_KEY = 'radioPlayerLandscape';
+    var landPrefs = { np: true, cf: true };
+    try{
+      var lpo = JSON.parse(localStorage.getItem(LANDSCAPE_KEY) || 'null');
+      if(lpo && typeof lpo === 'object'){ if(lpo.np === false) landPrefs.np = false; if(lpo.cf === false) landPrefs.cf = false; }
+    }catch(e){}
     var rotateLockOpenedNp = false;
     var epgLandGridShowing = function(){
       return !!(onVideoView && videoTab === 'channels' && !videoChannelsEditing && stationsGrid.querySelector(':scope > .epg'));
@@ -21927,7 +21949,7 @@
       // A YouTube video playing over the app (build 126) just gets bigger when the phone turns;
       // the landscape layout takes over once it is closed.
       if(document.body.classList.contains('yt-open')) return;
-      var active = rotateLockQuery.matches;
+      var active = rotateLockQuery.matches && landPrefs.np;
       var wasActive = document.body.classList.contains('rotate-lock');
       var coverFlowFromLibrary = null;
       // Build 244 (Mark): turned sideways on Live TV with nothing playing, the guide grid alone fills
@@ -21955,7 +21977,7 @@
           // Turning the phone while looking at My Library's Albums or Artists goes straight to
           // Cover Flow, starting where the top of the list was: albums in album order, or in
           // artist order on that artist's first album.
-          coverFlowFromLibrary = libraryDirectoryInView();
+          coverFlowFromLibrary = landPrefs.cf ? libraryDirectoryInView() : null;
           // The position noted while upright, as long as it is from the list on screen now (a
           // list drawn again since, for another visit, starts from the top).
           var seenUpright = albumInViewPortrait;
@@ -22131,6 +22153,24 @@
       if(!rotateLockQuery.matches) setLandFavsOpen(false);
       renderLandFavs();
     });
+    // Settings > Appearance: the two switches take effect at once, even with the phone sideways.
+    var syncLandAlbumsBtn = function(){
+      npLandAlbumsBtn.style.display = landPrefs.cf ? '' : 'none';
+      if(!landPrefs.cf && nowPlayingScreen.classList.contains('la-open')) setLandAlbumsOpen(false);
+    };
+    (function(){
+      var npSel = document.getElementById('landNpSelect'), cfSel = document.getElementById('landCfSelect');
+      function save(){ try{ localStorage.setItem(LANDSCAPE_KEY, JSON.stringify(landPrefs)); }catch(e){} }
+      if(npSel){
+        npSel.value = landPrefs.np ? 'on' : 'off';
+        npSel.addEventListener('change', function(){ landPrefs.np = npSel.value === 'on'; save(); syncRotateLock(); });
+      }
+      if(cfSel){
+        cfSel.value = landPrefs.cf ? 'on' : 'off';
+        cfSel.addEventListener('change', function(){ landPrefs.cf = cfSel.value === 'on'; save(); syncLandAlbumsBtn(); });
+      }
+    })();
+    syncLandAlbumsBtn();
     syncRotateLock();
     renderLandFavs();
     if(rotateLockQuery.addEventListener) rotateLockQuery.addEventListener('change', syncRotateLock);
@@ -53745,7 +53785,7 @@
     try{
       var v = JSON.parse(localStorage.getItem(CAROUSEL_KEY) || 'null');
       if(v && typeof v === 'object'){
-        if(v.mode === 'flow') d.mode = 'flow';
+        if(v.mode === 'flow' || v.mode === 'none') d.mode = v.mode;   // build 562: None, no carousel at all
         if(CAROUSEL_SIZES[v.size]) d.size = v.size;
         if(typeof v.tilt === 'number' && v.tilt >= 30 && v.tilt <= 80) d.tilt = v.tilt;
         if(typeof v.reflect === 'boolean') d.reflect = v.reflect;
@@ -53962,6 +54002,7 @@
   }
   function renderNpHero(){
     if(!npHero || !npHeroTrack) return;
+    if(carouselCfg.mode === 'none'){ npHero.style.display = 'none'; return; }   // build 562
     var items = heroItems();
     var keys = items.map(favKey);
     var prevKeys = heroSlides.map(function(s){ return favKey(s._item); });
@@ -54037,7 +54078,7 @@
   }
   function syncNpHeroShown(){
     if(!npHero) return;
-    var show = heroSlides.length > 0 && document.body.classList.contains('home-stacked') && onHomeView;
+    var show = carouselCfg.mode !== 'none' && heroSlides.length > 0 && document.body.classList.contains('home-stacked') && onHomeView;
     var was = npHero.style.display !== 'none';
     npHero.style.display = show ? '' : 'none';
     if(show && !was) requestAnimationFrame(function(){ fitHeroTitles(); heroPaintAround(); });
@@ -54304,6 +54345,22 @@
   }
   function applyCarousel(prevMode){
     if(!npHero || !npHeroTrack) return;
+    if(carouselCfg.mode === 'none'){
+      // None: no carousel. Flow's placing is undone so either look starts clean when it comes back.
+      clearHeroFlow();
+      heroSlides.forEach(function(sl){ sl._artDone = false; sl._fitKey = ''; });
+      npHero.classList.remove('nph-flow', 'nph-reflect');
+      if(npHeroFlowInfo){ npHeroFlowInfo._dy = 0; npHeroFlowInfo.style.transform = ''; }
+      npHero.style.display = 'none';
+      heroFlowTimerSync();
+      return;
+    }
+    if(prevMode === 'none'){
+      // Back from None: the carousel is built afresh in the chosen look.
+      npHero.classList.toggle('nph-flow', heroFlowOn());
+      prevMode = heroFlowOn() ? 'flow' : 'slides';
+      renderNpHero();
+    }
     var was = prevMode || (npHero.classList.contains('nph-flow') ? 'flow' : 'slides');
     var at = was === 'flow' ? heroFlowIdx : (npHeroTrack.clientWidth ? Math.round(npHeroTrack.scrollLeft / npHeroTrack.clientWidth) : 0);
     var flow = heroFlowOn();
@@ -54354,7 +54411,7 @@
       b.addEventListener('click', function(){
         var prev = carouselCfg.mode;
         if(prev === b.dataset.carouselOpt) return;
-        carouselCfg.mode = b.dataset.carouselOpt === 'flow' ? 'flow' : 'slides';
+        carouselCfg.mode = b.dataset.carouselOpt === 'flow' || b.dataset.carouselOpt === 'none' ? b.dataset.carouselOpt : 'slides';
         save(); show(); applyCarousel(prev);
       });
     });
