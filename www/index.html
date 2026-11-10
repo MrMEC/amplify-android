@@ -1701,6 +1701,8 @@
   .nph-flow-info .nph-kicker{ line-height:15px; }
   .nph-flow-info .nph-title{ -webkit-line-clamp:1; white-space:nowrap; }
   .nph-flow-info .nph-line{ line-height:18px; min-height:18px; }
+  .nph-flow-info .nph-line:empty{ display:block; }
+  .nph-flow .nph-flow-info{ transition:transform .25s ease; }   /* build 558: its room is kept, so every cover's words sit at the same height */
   .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
   .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
   .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
@@ -54095,6 +54097,39 @@
       if(sl){ heroFlowTouched = Date.now(); heroFlowTap(sl); }
     });
   }
+  // Build 558 (Mark): the words sit exactly halfway between the bottom of the middle cover and
+  // the top of whatever comes next on Home (the tabs), measured, and moved with a transform so
+  // neither the covers nor the section's height change. The block measured is the kind, title
+  // and song line (or the title when there is no song line), gliding when the next cover differs.
+  function centerHeroFlowInfo(){
+    if(!npHeroFlowInfo || !heroFlowOn() || !npHero || npHero.style.display === 'none') return;
+    var k = npHeroFlowInfo.querySelector('.nph-kicker'), ln = npHeroFlowInfo.querySelector('.nph-line');
+    var next = npHero.nextElementSibling;
+    while(next && (getComputedStyle(next).display === 'none' || !next.getBoundingClientRect().height)) next = next.nextElementSibling;
+    if(!k || !ln || !next) return;
+    var cur = npHeroFlowInfo._dy || 0;
+    var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
+    var coverBottom = npHeroTrack.getBoundingClientRect().top + size;
+    var below = next.getBoundingClientRect().top;
+    // The words shown: down to the song line when there is one, else the title.
+    var t = npHeroFlowInfo.querySelector('.nph-title');
+    var top = k.getBoundingClientRect().top - cur, bottom = (ln.textContent ? ln : t).getBoundingClientRect().bottom - cur;
+    if(!(below > coverBottom) || !(bottom > top)) return;
+    var dy = Math.round(((coverBottom + below) / 2 - (top + bottom) / 2) * 2) / 2;
+    if(dy === cur) return;
+    npHeroFlowInfo._dy = dy;
+    npHeroFlowInfo.style.transform = dy ? 'translateY(' + dy + 'px)' : '';
+  }
+  var heroFlowCenterRaf = 0;
+  function centerHeroFlowInfoSoon(){
+    if(heroFlowCenterRaf) return;
+    heroFlowCenterRaf = requestAnimationFrame(function(){ heroFlowCenterRaf = 0; centerHeroFlowInfo(); });
+  }
+  // Whatever moves the tabs (the Featured card coming or going, a resize, a font change) moves the words with them.
+  if(npHero && window.ResizeObserver){
+    try{ new ResizeObserver(centerHeroFlowInfoSoon).observe(npHero.parentElement || document.body); }catch(e){}
+  }
+  window.addEventListener('resize', centerHeroFlowInfoSoon);
   function syncHeroFlowInfo(){
     if(!npHeroFlowInfo) return;
     var sl = heroSlides[heroIndex()];
@@ -54106,6 +54141,7 @@
     if(t.textContent !== title){ t.textContent = title; npHeroFlowInfo._fitKey = ''; }
     npHeroFlowInfo.querySelector('.nph-line').textContent = line;
     fitHeroTitle(npHeroFlowInfo);
+    centerHeroFlowInfoSoon();
   }
   // Where each cover sits: the middle one flat and in front, up to three on each side turned
   // toward it and set back; the rest wait out of sight.
@@ -54271,10 +54307,11 @@
       if(flow){ heroFlowIdx = Math.max(0, Math.min(heroSlides.length - 1, at)); }
       else {
         clearHeroFlow();
+        if(npHeroFlowInfo){ npHeroFlowInfo._dy = 0; npHeroFlowInfo.style.transform = ''; }
         requestAnimationFrame(function(){ heroScrollTo(at, false); fitHeroTitles(); heroPaintAround(); });
       }
     }
-    if(flow){ layoutHeroFlow(true); requestAnimationFrame(function(){ fitHeroTitles(); }); }
+    if(flow){ layoutHeroFlow(true); requestAnimationFrame(function(){ fitHeroTitles(); centerHeroFlowInfo(); }); }
     heroPaintAround();
     heroFlowTimerSync();
   }
