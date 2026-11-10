@@ -6793,6 +6793,10 @@
   .pf-close{ width:38px; height:38px; border-radius:50%; border:0; background:var(--panel-2); color:var(--text);
     display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; margin-top:0; }
   .pf-close:active{ transform:scale(.94); }
+  .pf-back{ width:52px; height:52px; padding:0; margin:0 auto 0 0; border:0; background:none; box-shadow:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:flex-start; font-size:24px; color:var(--text);
+    transition:opacity .15s ease, transform .15s ease; -webkit-tap-highlight-color:transparent; }
+  .pf-back:active{ transform:scale(.92); }
   .pf-hero{ display:flex; flex-direction:column; align-items:center; text-align:center; padding-top:2px; }
   .pf-avatar-ring{ position:relative; display:block; width:124px; height:124px; border-radius:50%; border:3px solid var(--accent); padding:5px; box-sizing:border-box;
     background:none; margin:0; cursor:pointer; font:inherit; color:inherit; -webkit-tap-highlight-color:transparent; }
@@ -9278,6 +9282,8 @@
 <div class="profile-overlay" id="profileOverlay" role="dialog" aria-modal="true" aria-labelledby="pfName">
   <div class="profile-page" id="profilePage">
     <div class="pf-top">
+      <!-- Build 566 (Mark): the app's back arrow, top left, as well as the close button. -->
+      <button type="button" class="pf-back" id="profileBackBtn" aria-label="Back" title="Back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
       <button type="button" class="pf-close" id="pfTopSettingsBtn" aria-label="Settings" title="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9 1.65 1.65 0 0 0 20.83 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <button type="button" class="pf-close" id="profileCloseBtn" aria-label="Close" title="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
@@ -13307,6 +13313,7 @@
     hamburgerBtn.setAttribute('aria-expanded', 'false');
   }
   document.getElementById('profileCloseBtn').addEventListener('click', closeProfile);
+  document.getElementById('profileBackBtn').addEventListener('click', closeProfile);
   // Going somewhere from the profile while Zen is open puts Zen away; just closing the profile does not.
   profileOverlay.addEventListener('click', function(e){
     if(e.target.closest && e.target.closest('.pf-link, .pf-fav, #pfFavAll, .pf-stat') && typeof zenOpen !== 'undefined' && zenOpen && !e.target.closest('.pf-stat[data-pf-go="stats"]')) zenClose();
