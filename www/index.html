@@ -53884,7 +53884,9 @@
     el.classList.add('nph-measure');
     var size = parseFloat(getComputedStyle(el).fontSize) || 32;
     var lh = parseFloat(getComputedStyle(el).lineHeight) / size || 1.08;
-    while(size > minSize && (el.scrollWidth > w + 1 || el.scrollHeight > Math.ceil(size * lh * lines) + 2)){
+    // Build 557: a one-line title can't wrap (nowrap), so only its width is checked; a font whose
+    // line runs taller than 1.08 had made short titles shrink to the minimum.
+    while(size > minSize && (el.scrollWidth > w + 1 || (lines > 1 && el.scrollHeight > Math.ceil(size * lh * lines) + 2))){
       size -= 1;
       el.style.fontSize = size + 'px';
     }
@@ -54166,7 +54168,9 @@
   // left to the page.
   if(npHeroTrack){
     var flowDrag = null, flowRaf = 0;
-    function flowPxPerCover(){ return Math.max(16, (CAROUSEL_SIZES[carouselCfg.size] || 200) * 0.2 * 1.05); }
+    // Build 557 (Mark: too fast now): about a third of a cover's width of travel per cover (between
+    // build 551's 90px and 556's 42px at Medium).
+    function flowPxPerCover(){ return Math.max(24, (CAROUSEL_SIZES[carouselCfg.size] || 200) * 0.33); }
     function flowRubber(p){
       var max = heroSlides.length - 1, R = 1.2;
       if(p < 0) return -R * (1 - Math.exp(p / R));
@@ -54213,9 +54217,9 @@
       if(!d.moved) return;
       var sm = d.samples, a = sm[0], b = sm[sm.length - 1], v = 0;
       if(a && b && b[0] - a[0] > 8 && performance.now() - b[0] < 80) v = (b[1] - a[1]) / ((b[0] - a[0]) / 1000);
-      v = Math.max(-40, Math.min(40, v));
-      var reach = 0.42 * (1 + Math.min(Math.abs(v) / 25, 2.5));
-      var target = Math.max(0, Math.min(heroSlides.length - 1, Math.round(d.pos + v * reach)));
+      // A flick carries on, but no more than three covers past where the finger left it.
+      var carry = Math.max(-3, Math.min(3, v * 0.12));
+      var target = Math.max(0, Math.min(heroSlides.length - 1, Math.round(d.pos + carry)));
       var dist = Math.abs(target - d.pos);
       // Carries on from the finger's speed and brakes to a stop on the cover.
       var dur = Math.max(0.28, Math.min(0.9, 0.24 + dist * 0.09));
