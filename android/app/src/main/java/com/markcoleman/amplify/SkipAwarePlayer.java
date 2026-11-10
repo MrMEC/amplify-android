@@ -65,12 +65,6 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
   private boolean nextEnabled;
   private StreamTitle onAir;
   private String onAirFor;
-  // Build 549: the last song a station named, kept through the empty titles some stations send
-  // when you connect (Epic Classical sends StreamTitle='' until its next song starts).
-  private static final long SONG_HOLD_MS = 10 * 60 * 1000L;
-  private StreamTitle lastSong;
-  private String lastSongStation;
-  private long lastSongAt;
   private OnAirListener onAirListener;
   private Runnable onNativeModeStart;
   private Runnable onPodcastChanged;
@@ -311,26 +305,7 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     this.lastVerdict = streamTitle == null ? "not a song" : "shown: " + streamTitle.display();
     String str3 = this.onAirFor;
     boolean z = str3 != null && str3.equals(currentMediaItem.mediaId);
-    long now = SystemClock.elapsedRealtime();
-    if (streamTitle == null && str2.replace("\u0000", "").trim().isEmpty()) {
-      // An empty title says nothing about the song: it is not a new "not a song". The song the
-      // station last named stays (or comes back after a reconnect) for up to ten minutes.
-      String name = stationName();
-      boolean fresh = this.lastSong != null && now - this.lastSongAt < SONG_HOLD_MS;
-      if (fresh && getOnAir() != null) {
-        this.lastVerdict = "held: the stream sent an empty title, " + this.onAir.display() + " stays";
-        return;
-      }
-      if (fresh && name != null && name.equals(this.lastSongStation)) {
-        this.onAir = this.lastSong;
-        this.onAirFor = currentMediaItem.mediaId;
-        this.lastVerdict = "restored: the stream sent an empty title, " + this.onAir.display() + " was the last song";
-        announceOnAir();
-        return;
-      }
-    }
     if (z && streamTitle != null && streamTitle.sameSong(this.onAir)) {
-      this.lastSongAt = now;
       return;
     }
     if (z && streamTitle == null && this.onAir == null) {
@@ -342,11 +317,6 @@ public final class SkipAwarePlayer extends ForwardingPlayer {
     } else {
       this.onAir = streamTitle;
       this.onAirFor = currentMediaItem.mediaId;
-      if (streamTitle != null) {
-        this.lastSong = streamTitle;
-        this.lastSongStation = stationName();
-        this.lastSongAt = now;
-      }
       announceOnAir();
     }
   }
