@@ -74,6 +74,7 @@ async def run_dock(p, theme):
     s6 = await pg.evaluate(STATE)
     check(s6['land'] and not s6['rot'], f'{T} sideways: the Live TV layout, not the landscape Now Playing {s6["land"]} {s6["rot"]}')
     check(s6['art']['l'] < s6['grid']['l'] and s6['grid']['w'] > 300 and s6['art']['w'] > 380, f'{T} the video left, the guide right {s6["art"]} {s6["grid"]}')
+    print('COVER', await pg.evaluate("(()=>{var a=document.getElementById('npArtWrap').getBoundingClientRect(); var out=[]; [[.1,.1],[.5,.5],[.9,.5],[.5,.9],[.9,.9]].forEach(function(p){ var el=document.elementFromPoint(a.left+a.width*p[0], a.top+a.height*p[1]); out.push(el?(el.tagName+'#'+el.id+'.'+String(el.className).split(' ')[0]):'none'); }); return [Math.round(a.left),Math.round(a.top),Math.round(a.width),Math.round(a.height),out]; })()"))
     print('KIDS', await pg.evaluate("Array.from(document.getElementById('npCollection').children).map(function(e){ var b=e.getBoundingClientRect(); return [e.id||e.className, Math.round(b.top), Math.round(b.height), getComputedStyle(e).display]; })"))
     print('CHAIN', await pg.evaluate("['.np-hero','.np-below','#npCollection','#npCollectionGrid','#npCollection .epg'].map(function(q){ var e=document.querySelector(q), b=e.getBoundingClientRect(), cs=getComputedStyle(e); return [q, Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height), cs.marginTop, cs.marginLeft, cs.paddingTop, cs.paddingLeft]; })"))
     print('LAND', s6['art'], s6['foot'], s6['grid'], s6['tabs'], s6['slot'])
