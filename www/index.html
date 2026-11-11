@@ -25195,6 +25195,7 @@
       npCollection.style.display = gridList.length ? '' : 'none';
       npCollectionGrid.appendChild(buildEpgGrid(gridList, { np: true }));
       restoreEpgPlace(kept);
+      epgRevealPlaying(npCollectionGrid);
       guideRefresh(mineList.filter(function(ch){ return !!guideSource(ch); }));
       return;
     }
@@ -26363,6 +26364,29 @@
     }
     put();
     requestAnimationFrame(put);
+  }
+  // Build 580 (Mark): the channel playing is on screen when the guide comes up: if its row is
+  // above or below what shows (under the times bar, above the tab bar), the guide scrolls to it.
+  // A row already in view leaves the guide where it is.
+  function epgRevealPlaying(host){
+    function go(){
+      var cell = host && host.querySelector('.epg-ch.playing'), row = cell && cell.closest('.epg-row');
+      if(!row || !row.isConnected || !row.offsetParent) return;
+      var head = host.querySelector('.epg-head'), nav = document.querySelector('.mobile-nav');
+      var r = row.getBoundingClientRect();
+      for(var el = row.parentElement; el && el !== document.body && el !== document.documentElement; el = el.parentElement){
+        var cs = getComputedStyle(el);
+        if(!/(auto|scroll)/.test(cs.overflowY) || el.scrollHeight <= el.clientHeight + 1) continue;
+        var b = el.getBoundingClientRect();
+        var top = Math.max(b.top, head ? head.getBoundingClientRect().bottom : b.top);
+        var bottom = Math.min(b.bottom, window.innerHeight);
+        if(nav && nav.offsetParent && getComputedStyle(nav).display !== 'none'){ var nt = nav.getBoundingClientRect().top; if(nt > top) bottom = Math.min(bottom, nt); }
+        if(r.top >= top - 1 && r.bottom <= bottom + 1) return;
+        el.scrollTop += r.top - top - 6;
+        return;
+      }
+    }
+    go(); requestAnimationFrame(go); setTimeout(go, 350);
   }
   function buildEpgGrid(channels, opts){
     opts = opts || {};
