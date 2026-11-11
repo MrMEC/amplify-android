@@ -3713,6 +3713,8 @@
       padding-top:var(--ltv-tabs-h); min-height:calc(var(--ltv-tabs-h) + min(56.25vw, 52vh)); }
     body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art{ top:var(--ltv-tabs-h); }
     body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap > .vctl{ top:var(--ltv-tabs-h); }
+    body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel.np-vplayer .np-hero-foot{ padding-top:10px; padding-bottom:10px; }
+    body.ltv-dock .now-playing-screen.np-channel #npCollection > .np-coll-head{ display:none !important; }
     body.np-video-full .ltv-tabs{ display:none !important; }
     /* Sideways: tabs across the top, the video on the left, the guide on the right. */
     body.ltv-land{ --ltv-tabs-h:calc(env(safe-area-inset-top, 0px) + 46px); }
@@ -3733,17 +3735,17 @@
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel #npCollection #npCollectionGrid{ margin:0 !important; padding:0 !important; }
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel #npCollection .epg.epg-np{ margin:0 !important; }
   }
-  .vctl-top{ position:absolute; top:10px; right:10px; z-index:1; display:flex; align-items:center; gap:8px; }
-  .vctl-ico-btn{ width:30px; height:30px; padding:0; border:none; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; cursor:pointer;
+  .vctl-top{ position:absolute; top:10px; right:10px; z-index:1; display:flex; align-items:center; gap:10px; }
+  .vctl-ico-btn{ width:40px; height:40px; padding:0; border:none; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; cursor:pointer;
     display:flex; align-items:center; justify-content:center; }
-  .vctl-ico-btn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .vctl-ico-btn svg{ width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .vctl-mute .vm-off, .vctl-mute.is-muted .vm-on{ display:none; }
   .vctl-mute.is-muted .vm-off{ display:block; }
   .vctl-cast:not([hidden]){ display:flex; }
   body.cast-on .vctl-cast{ color:var(--np-vivid, var(--accent)); }
   .vctl-stop{
-    position:static; z-index:1; height:30px; padding:0 13px; border-radius:var(--r-pill, 999px); border:none; cursor:pointer;
-    background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:13px; font-weight:700; letter-spacing:.02em; line-height:30px;
+    position:static; z-index:1; height:40px; padding:0 13px; border-radius:var(--r-pill, 999px); border:none; cursor:pointer;
+    background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:14px; font-weight:700; letter-spacing:.02em; line-height:40px;
   }
   body.np-video-full .vctl-top{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
   .vctl-play{

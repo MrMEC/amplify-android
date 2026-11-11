@@ -39,6 +39,8 @@ async def run_dock(p, theme):
     check(s['muted'], f'{T} it starts muted')
     check(abs(s['art']['h'] - s['tabs']['h'] - round(390 * 9 / 16)) <= 2 and s['art']['t'] + s['art']['h'] <= s['grid']['t'], f'{T} the video right under the tabs, the guide under it {s["art"]} {s["grid"]}')
     check(s['corner'] and s['corner']['vis'], f'{T} the arrow at the grid\'s top left is showing {s["corner"]}')
+    print('G2', await pg.evaluate("['.np-hero','.np-hero-foot','.np-hero-top','.np-below','#npCollection','#npCollectionGrid','#npCollection .epg'].map(function(q){var e=document.querySelector(q),b=e.getBoundingClientRect(),c=getComputedStyle(e);return [q,Math.round(b.top),Math.round(b.bottom),c.marginTop,c.marginBottom,c.paddingTop,c.paddingBottom]})"))
+    print('GAP', await pg.evaluate("(()=>{var f=document.querySelector('.np-hero-foot'),g=document.querySelector('#npCollection .epg'),t=document.querySelector('.np-details'); return [Math.round(t.getBoundingClientRect().bottom), Math.round(f.getBoundingClientRect().bottom), Math.round(g.getBoundingClientRect().top)]})()"))
     await pg.screenshot(path=f'{SHOTS}/ltv-portrait-{theme}.png')
     # paused: the arrow stays
     await pg.evaluate("document.getElementById('npPlayBtn').click()"); await pg.wait_for_timeout(600)
