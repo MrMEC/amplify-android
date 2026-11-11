@@ -3843,6 +3843,17 @@
   @media (max-width: 900px){ .tile-grid > .grid-section-label.ch-row-label{ margin:-6px 0 -18px; } .tile-grid > .grid-section-label.ch-row-label:first-child{ margin-top:-4px; } }
   .tile.tile-row.ch-item .tile-art{ border-radius:5px; }
   .clear-search-btn .hdr-svg{ width:13px; height:12px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.8; stroke-linecap:round; stroke-linejoin:round; }
+  /* Build 583: Add or Manage Channels, a full-width button row under the guide on the video screen. */
+  .epg-manage{ padding:12px 8px calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .epg-manage-btn{
+    display:flex; align-items:center; justify-content:center; gap:10px; width:100%; margin:0;
+    min-height:52px; padding:0 16px; border-radius:14px; box-sizing:border-box; cursor:pointer;
+    border:1px solid color-mix(in srgb, currentColor 18%, transparent);
+    background:color-mix(in srgb, currentColor 8%, transparent); color:inherit;
+    font:inherit; font-size:16px; font-weight:600;
+  }
+  .epg-manage-btn svg{ width:20px; height:20px; flex:none; fill:none; stroke:var(--accent); stroke-width:2.4; stroke-linecap:round; }
+  .epg-manage-btn:active{ transform:scale(.99); opacity:.85; }
   .ch-sort-menu{
     position:fixed; z-index:420; min-width:180px; padding:6px; border-radius:12px;
     background:var(--panel); border:1px solid var(--border); box-shadow:var(--shadow);
@@ -25211,6 +25222,17 @@
       npCollectionHeading.textContent = '';
       npCollection.style.display = gridList.length ? '' : 'none';
       npCollectionGrid.appendChild(buildEpgGrid(gridList, { np: true }));
+      // Build 583 (Mark): with the Watch heading gone from Live TV, adding and arranging channels
+      // (and the guide's layout and order) are a button under the guide.
+      var mg = document.createElement('button');
+      mg.type = 'button'; mg.className = 'epg-manage-btn'; mg.id = 'npManageChannels';
+      mg.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add or Manage Channels</span>';
+      mg.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(channelSortMenu && channelSortMenu.id === 'guideMenu') closeChannelSortMenu(); else openGuideMenu(mg);
+      });
+      var mgRow = document.createElement('div'); mgRow.className = 'epg-manage'; mgRow.appendChild(mg);
+      npCollectionGrid.appendChild(mgRow);
       restoreEpgPlace(kept);
       epgRevealPlaying(npCollectionGrid);
       guideRefresh(mineList.filter(function(ch){ return !!guideSource(ch); }));
@@ -28224,8 +28246,12 @@
     b.classList.add('text-only');
     b.setAttribute('aria-label', b.title);
   }
-  function openGuideMenu(){
+  function openGuideMenu(anchor){
     closeChannelSortMenu();
+    var fromNp = !!(anchor && anchor.closest && anchor.closest('#nowPlayingScreen'));
+    // Build 583: from the guide under the video (Live TV), Add Channels and Arrange Channels are
+    // pages of their own, so the video screen closes first.
+    function leaveNp(){ if(fromNp && nowPlayingScreen.style.display === 'flex'){ try{ closeNowPlaying(false, false); }catch(e){} } }
     var m = document.createElement('div');
     m.className = 'ch-sort-menu';
     m.id = 'guideMenu';
@@ -28242,8 +28268,8 @@
       b.addEventListener('click', function(e){ e.stopPropagation(); closeChannelSortMenu(); fn(); });
       m.appendChild(b);
     }
-    opt('Add Channels', false, function(){ pushView(); openAddChannelsPage(); }, 'fa-solid fa-plus');   // build 409
-    opt('Arrange Channels', false, function(){ setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
+    opt('Add Channels', false, function(){ leaveNp(); pushView(); openAddChannelsPage(); }, 'fa-solid fa-plus');   // build 409
+    opt('Arrange Channels', false, function(){ leaveNp(); setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
     var sep = document.createElement('div'); sep.className = 'ch-menu-sep'; m.appendChild(sep);
     label('Layout');
     [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
@@ -28258,6 +28284,17 @@
       opt(o[1], cur === o[0], function(){ setGuideOrder(o[0]); });
     });
     document.body.appendChild(m);
+    if(fromNp){
+      // Over the video screen, opening upwards from the button when there's no room below it.
+      m.style.zIndex = '6000';
+      var ar = anchor.getBoundingClientRect(), mh = m.offsetHeight;
+      m.style.left = Math.max(8, Math.round(ar.left)) + 'px';
+      m.style.maxHeight = Math.round(window.innerHeight - 16) + 'px'; m.style.overflowY = 'auto';
+      var below = window.innerHeight - ar.bottom - 8;
+      m.style.top = Math.max(8, Math.round(below >= mh + 8 ? ar.bottom + 8 : ar.top - 8 - mh)) + 'px';
+      channelSortMenu = m;
+      return;
+    }
     var r = videoReorderHeaderBtnEl.getBoundingClientRect();
     m.style.top = Math.round(r.bottom + 8) + 'px';
     m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
