@@ -27003,14 +27003,32 @@
     // Watch Now: what's on now, on a channel that isn't already the one playing.
     var st = channelToStation(ch);
     var playingIt = !!(isOnAirItem(st));
-    document.getElementById('epgInfoWatch').hidden = !(onNow && !playingIt);
+    // Build 585 (Mark): on a channel of your own (shows and movies from your library or Plex, or
+    // Archive.org), any show in the guide has Watch Now: that episode or film, on its own, at once.
+    epgInfoItem = epgOwnContent(ch, it);
+    document.getElementById('epgInfoWatch').hidden = !(epgInfoItem || (onNow && !playingIt));
     epgInfoOverlay.classList.add('open');
     epgInfoOverlay.querySelector('.epg-info-panel').scrollTop = 0;
   }
-  function closeEpgInfo(){ epgInfoOverlay.classList.remove('open'); epgInfoCh = null; }
+  var epgInfoItem = null;
+  function epgOwnContent(ch, it){
+    if(!ch || !it) return null;
+    if(isLiveChUrl(ch.url) && it.vid){
+      var v = null; try{ v = vlib().byId[it.vid]; }catch(e){}
+      return v ? { video: v } : null;
+    }
+    if(isArchiveChUrl(ch.url) && it.ai && it.ai.id) return { archive: it.ai };
+    return null;
+  }
+  function closeEpgInfo(){ epgInfoOverlay.classList.remove('open'); epgInfoCh = null; epgInfoItem = null; }
   document.getElementById('epgInfoClose').addEventListener('click', closeEpgInfo);
   epgInfoOverlay.addEventListener('click', function(e){ if(e.target === epgInfoOverlay) closeEpgInfo(); });
-  document.getElementById('epgInfoWatch').addEventListener('click', function(){ var ch = epgInfoCh; closeEpgInfo(); if(ch) playChannel(ch); });
+  document.getElementById('epgInfoWatch').addEventListener('click', function(){
+    var ch = epgInfoCh, own = epgInfoItem; closeEpgInfo();
+    if(own && own.video){ playVideo(own.video); return; }
+    if(own && own.archive){ playArchiveItem(own.archive); return; }
+    if(ch) playChannel(ch);
+  });
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && epgInfoOverlay.classList.contains('open')){ e.stopImmediatePropagation(); closeEpgInfo(); }
   }, true);
@@ -49829,6 +49847,7 @@
         var pic = archiveArtUrl(it.id);
         cur = { s: slot.s, e: slot.e, t: it.title || '', sub: [it.year, it.creator].filter(Boolean).join(' · '), code: '', d: '', r: '',
           im: pic, sq: pic, raw: true, vid: slot.u.id, item: it.id };
+        Object.defineProperty(cur, 'ai', { value: it, enumerable: false });   // build 585: Watch Now plays it
         out.push(cur);
       }
       slot = archiveChSlot(ch, slot.e);
