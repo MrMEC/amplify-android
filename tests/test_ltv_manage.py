@@ -20,7 +20,7 @@ async def go(p, vw, vh, theme, label):
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(3000)
     await pg.evaluate("document.getElementById('npManageChannels').scrollIntoView({block:'end'})"); await pg.wait_for_timeout(500)
     r = await pg.evaluate("""(()=>{ var b=document.getElementById('npManageChannels'); if(!b) return null; var x=b.getBoundingClientRect(), g=document.querySelector('#npCollection .epg').getBoundingClientRect();
-      var nav=document.querySelector('.mobile-nav'), nt=(nav&&getComputedStyle(nav).display!=='none')?nav.getBoundingClientRect().top:innerHeight;
+      var nav=document.querySelector('.mobile-nav'), nb=nav&&nav.getBoundingClientRect(), nt=(nav&&getComputedStyle(nav).display!=='none'&&nb.height<120)?nb.top:innerHeight;
       var hit=document.elementFromPoint(x.left+x.width/2, x.top+x.height/2);
       return {t:Math.round(x.top), b:Math.round(x.bottom), w:Math.round(x.width), h:Math.round(x.height), gb:Math.round(g.bottom), nt:Math.round(nt), text:b.textContent, hit: !!(hit && b.contains(hit))}; })()""")
     check(r and r['text'] == 'Add or Manage Channels' and r['h'] >= 44 and r['t'] >= r['gb'] and r['b'] <= r['nt'] + 1 and r['hit'], f'{T} the button sits under the guide, on screen and tappable {r}')

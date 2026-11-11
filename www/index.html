@@ -7775,6 +7775,139 @@
   .tile-grid.mv-grid > .grid-section-label, .tile-grid.mv-grid > .mv-artists-head{ margin-top:10px !important; margin-bottom:-8px !important; }
   .tile-grid.mv-grid > .mv-top, .tile-grid.mv-grid > .artist-videos{ margin-top:0 !important; margin-bottom:0 !important; }
   #sectionHeadingRow .section-heading-right.tb-pending{ visibility:hidden; }
+
+  /* ---------- Build 586 (Mark): phone on its side -- the tab bar becomes a rail down the left ----------
+     The bottom bar and the header took a third of a sideways phone's height. Sideways (a phone,
+     not a tablet), Home / Library / Podcasts / Watch / Search stand in a column on the left, the
+     profile picture (and Cast) at its foot, and the header is gone, so pages start at the top.
+     body.phone-land is set from the same media query (see syncPhoneLand) for what scripts need. */
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px){
+    :root{
+      --rail-w: calc(76px + env(safe-area-inset-left, 0px));
+      --mnav-h: 0px; --mnav-total: 0px; --player-bar-bottom: 8px;
+    }
+    .mobile-nav{
+      top:0; bottom:0; left:0; right:auto; width:var(--rail-w); height:auto;
+      flex-direction:column; justify-content:flex-start; gap:2px;
+      padding:10px 0 0 env(safe-area-inset-left, 0px); box-sizing:border-box;
+      border-top:0; border-right:1px solid var(--glass-edge);
+    }
+    .mobile-nav-btn{ flex:0 0 58px; width:64px; margin:0 auto; border-radius:14px; gap:4px; }
+    .mobile-nav-btn.active{ background:color-mix(in srgb, var(--accent) 15%, transparent); }
+    body.np-immersive .mobile-nav{ transform:translateX(calc(-100% - 8px)); }
+    /* The header: only its buttons stay, at the foot of the rail (profile picture, Cast above it). */
+    body:not(.rotate-lock):not(.np-video-full) .sidebar-top{
+      top:auto; bottom:calc(10px + env(safe-area-inset-bottom, 0px)); left:env(safe-area-inset-left, 0px); right:auto;
+      width:76px; height:auto; padding:0; justify-content:center; background:transparent !important;
+      border:0 !important; box-shadow:none !important; z-index:320; visibility:visible;
+    }
+    .sidebar-top .brand, .sidebar-top .hdr-page-label{ display:none !important; }
+    .sidebar-top .top-actions{ flex-direction:column-reverse; align-items:center; gap:10px; }
+    body.hdr-autohide.hdr-stuck:not(.drawer-open) .sidebar-top .cast-btn{ transform:none; }
+    .sidebar-top .hb-avatar{ opacity:1 !important; transform:none !important; }
+    html body.hdr-av-off .sidebar-top .hamburger-btn{ pointer-events:auto; }
+    html body.hdr-av-off .sidebar-top .hamburger-btn .hb-avatar{ opacity:1; }
+    /* Pages: beside the rail, from the top. */
+    .layout{ padding-left:var(--rail-w); box-sizing:border-box; }
+    .browse-view, body:not(.home-view):not(.search-view):not(.search-open) .browse-view{ padding-top:10px; }
+    .player-bar{ left:calc(var(--rail-w) + 8px); }
+    .mobile-scroll-fade{ left:var(--rail-w); }
+  }
+
+  /* The filter button is only for Watch sideways. */
+  #wlFilterBtn, #wlManageBtn{ display:none !important; }
+  #wlFilterBtn .wl-ico-close{ display:none; }
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px){
+    .sidebar-top .top-actions{ width:76px; justify-content:center; margin:0; }
+    /* Tab rows stick to the very top (no header above them now). */
+    #stationsGrid > .lib-tabs, #stationsGrid > .watch-tabs, #podcastTabs,
+    body.hdr-autohide.hdr-stuck #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs,
+    body.hdr-autohide.hdr-stuck #podcastTabs{ top:0; }
+    #stationsGrid > .watch-tabs ~ .epg > .epg-head,
+    body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head{ top:var(--stab-h, 34px); }
+    #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
+    #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading,
+    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
+    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }
+    .az-rail{ top:calc(var(--stab-h, 34px) + 16px); }
+
+    /* Search: its box at the top beside the rail, without the heading row (more room for results). */
+    :root{ --search-sheet-h: 62px; }
+    .search-sheet{ left:var(--rail-w); }
+    .search-sheet-title{ display:none; }
+    .search-sheet-inner{ padding-top:10px; }
+    /* Typing doesn't take the rail away (the keyboard covers the bottom, not the side). */
+    body.kb-open .mobile-nav{ display:flex; }
+    /* Live TV sideways keeps the rail too: the tabs and the video screen start beside it. */
+    html body.ltv-land:not(.np-video-full) .mobile-nav{ display:flex !important; z-index:1150; }
+    html body.ltv-dock.ltv-land:not(.np-video-full) .sidebar-top{ display:flex !important; z-index:1160; }
+    body.ltv-land .ltv-tabs{ left:var(--rail-w); }
+    html body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel{ padding-left:0 !important; }
+    /* Now Playing (when it isn't the sideways full-screen player) opens beside the rail, as it opens above the tab bar upright. */
+    body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ left:var(--rail-w); width:auto; }
+    body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .mobile-nav{ z-index:1150; }
+
+    /* ---- Watch: one line -- the tabs on the left, the count and round buttons on the right ---- */
+    body.watch-land #stationsHeading, body.watch-land #detailBackBtn{ display:none !important; }
+    body.watch-land .browse-view{ padding-top:8px !important; }
+    body.watch-land #stationsGrid > .watch-tabs, body.watch-land.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs{ top:8px; }
+    body.watch-land #sectionHeadingRow{ position:fixed; top:8px; right:var(--main-pad); left:auto; margin:0; min-height:0; height:34px; z-index:40; pointer-events:none; display:flex; align-items:center; }
+    body.watch-land[data-vtab="channels"] #wlManageBtn{ display:inline-flex !important; }
+    body.watch-land #stationsGrid > .watch-tabs ~ .epg > .epg-head, body.watch-land.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head{ top:calc(8px + var(--stab-h, 34px)); }
+    body.watch-land #wlManageBtn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+    body.watch-land #sectionHeadingRow > *{ pointer-events:auto; }
+    body.watch-land #stationsGrid > .watch-tabs{ grid-row:1; padding-right:calc(var(--wl-tb-w, 0px) + 8px); margin-bottom:0; }
+    body.watch-land #stationsGrid > .page-toolbar{
+      grid-row:1; grid-column:1/-1; justify-self:end; align-self:center; position:sticky; top:8px; z-index:22;
+      margin:0 !important; min-height:0; height:var(--stab-h, 34px); background:var(--main-bg);
+      box-shadow:-14px 0 12px -2px var(--main-bg);
+    }
+    body.watch-land #stationsGrid > .page-toolbar > .section-heading-right{ flex-wrap:nowrap; gap:6px; }
+    body.watch-land #stationsGrid > .page-toolbar #resultCount{ margin-right:4px; font-size:12px; }
+    body.watch-land .page-toolbar .clear-search-btn:not(.text-only),
+    body.watch-land #sectionHeadingRow .clear-search-btn:not(.text-only){
+      width:36px; height:36px; min-width:36px; padding:0; border-radius:50%; justify-content:center; gap:0; flex:0 0 36px;
+    }
+    body.watch-land .page-toolbar .clear-search-btn:not(.text-only) .btn-text, body.watch-land #sectionHeadingRow .clear-search-btn:not(.text-only) .btn-text,
+    body.watch-land .page-toolbar .lib-sort-cur{ display:none; }
+    body.watch-land #sectionHeadingRow .section-heading-right{ gap:6px; }
+    body.watch-land .page-toolbar .clear-search-btn i, body.watch-land .page-toolbar .clear-search-btn svg{ margin:0 !important; }
+    body.watch-land.wl-has-filter #wlFilterBtn{ display:inline-flex !important; }
+    body.watch-land.wl-filter #wlFilterBtn{ background:var(--accent); border-color:var(--accent); color:var(--accent-text, #111); }
+    body.watch-land.wl-filter #wlFilterBtn .wl-ico-find{ display:none; }
+    body.watch-land.wl-filter #wlFilterBtn .wl-ico-close{ display:block; }
+    body.watch-land #wlFilterBtn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+    /* The filter box: away until asked for, then over the tabs (the count and buttons stay). */
+    body.watch-land:not(.wl-filter) #stationsGrid > #secFilter, body.watch-land[data-vtab="channels"] #stationsGrid > #secFilter{ display:none !important; }
+    body.watch-land.wl-filter #stationsGrid > #secFilter{
+      grid-row:1; grid-column:1/-1; position:sticky; top:8px; z-index:23; align-self:center;
+      margin:0 calc(var(--wl-tb-w, 0px) + 8px) 0 0 !important; background:var(--main-bg);
+    }
+    body.watch-land.wl-filter #stationsGrid > #secFilter input{ height:36px; padding-top:0; padding-bottom:0; border-radius:999px; }
+    body.watch-land.wl-filter #stationsGrid > #secFilter .sf-ico{ top:50%; transform:translateY(-50%); }
+    body.watch-land.wl-filter #stationsGrid > .watch-tabs{ visibility:hidden; }
+    /* Room for the A to Z letters beside the covers. */
+    body.watch-land.az-on #stationsGrid{ padding-right:22px; }
+    /* Movies and TV Shows: seven posters across. */
+    body.watch-land #stationsGrid.tile-grid:has(> .tile.vposter){ grid-template-columns:repeat(7, minmax(0, 1fr)); column-gap:12px; }
+    /* Continue: cards, four across, the picture on top with its progress, the menu in its corner. */
+    body.watch-land[data-vtab="continue"] #stationsGrid{ display:grid !important; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px 12px; align-items:start; }
+    body.watch-land[data-vtab="continue"] #stationsGrid > :not(.cw-row){ grid-column:1/-1; }
+    body.watch-land[data-vtab="continue"] #stationsGrid > .watch-tabs{ grid-row:1; }
+    body.watch-land[data-vtab="continue"] #stationsGrid > .cw-row{
+      grid-column:auto !important; width:auto !important; position:relative; flex-direction:column; align-items:stretch; gap:7px; padding:0; margin:0; min-height:0; height:auto; border:0; background:none;
+    }
+    body.watch-land[data-vtab="continue"] .cw-row > .cw-art{ width:100%; height:auto; aspect-ratio:16/9; flex:none; border-radius:10px; }
+    body.watch-land[data-vtab="continue"] .cw-row > .cw-art img{ width:100%; height:100%; object-fit:cover; }
+    body.watch-land[data-vtab="continue"] .cw-row > .cw-art .v-progress{ left:8px; right:8px; bottom:7px; width:auto; }
+    body.watch-land[data-vtab="continue"] .cw-row > .song-row-body{ padding:0; min-width:0; }
+    body.watch-land[data-vtab="continue"] .cw-row > .row-more-btn{
+      position:absolute; top:8px; right:8px; width:32px; height:32px; min-height:0; margin:0; transform:none; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; opacity:1;
+    }
+    body.watch-land[data-vtab="music"] #stationsGrid > .grid-section-label{ font-size:17px; margin-top:2px; }
+    /* Music Videos and Continue: smaller pictures, so more of each row shows. */
+    body.watch-land{ --w-video:168px; }
+  }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -8153,6 +8286,14 @@
         <input type="text" class="section-heading-input" id="stationsHeadingInput" style="display:none;">
         <div class="section-heading-right">
           <span class="result-count" id="resultCount" style="display:none;"></span>
+          <!-- Build 586: sideways, Live TV's guide (no heading to tap) has its menu here. -->
+          <button type="button" class="clear-search-btn wl-manage-btn" id="wlManageBtn" title="Add or manage channels" aria-label="Add or manage channels">
+            <svg class="hdr-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="btn-text">Channels</span>
+          </button>
+          <!-- Build 586 (Mark): sideways on Watch, the filter box hides behind this button. -->
+          <button type="button" class="clear-search-btn wl-filter-btn" id="wlFilterBtn" title="Filter" aria-label="Filter" aria-pressed="false">
+            <svg class="hdr-svg wl-ico-find" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><svg class="hdr-svg wl-ico-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span class="btn-text">Filter</span>
+          </button>
           <!-- Build 489 (Mark): on Artists, Albums and Songs the count gives way to a sort menu. -->
           <button type="button" class="clear-search-btn lib-sort-btn" id="libSortBtn" style="display:none;" aria-haspopup="menu" aria-expanded="false">
             <svg class="hdr-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h4"/><path d="M18 5v14M15 16l3 3 3-3"/></svg><span class="lib-sort-cur">Recent</span><svg class="lib-sort-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
@@ -30739,9 +30880,16 @@
         if(!h) return;
         if(h !== stabLastH){ stabLastH = h; document.documentElement.style.setProperty('--stab-h', h + 'px'); }
         if(!('IntersectionObserver' in window)) return;
-        if(!stabObserver) stabObserver = new IntersectionObserver(function(entries){
-          entries.forEach(function(en){ stabSetStuck(en.target, en.boundingClientRect.height > 0 && en.boundingClientRect.top < 60.5); });
-        }, { rootMargin: '-61px 0px 0px 0px', threshold: [0, 0.25, 0.5, 0.75, 0.99, 1] });
+        // Build 586: sideways on a phone there is no header, so a row is stuck once at the very top.
+        var land = document.body.classList.contains('phone-land');
+        if(stabObserver && stabObserver._land !== land){ stabObserver.disconnect(); stabObserver = null; }
+        if(!stabObserver){
+          var edge = land ? 9 : 61;
+          stabObserver = new IntersectionObserver(function(entries){
+            entries.forEach(function(en){ stabSetStuck(en.target, en.boundingClientRect.height > 0 && en.boundingClientRect.top < edge - 0.5); });
+          }, { rootMargin: '-' + edge + 'px 0px 0px 0px', threshold: [0, 0.25, 0.5, 0.75, 0.99, 1] });
+          stabObserver._land = land;
+        }
         stabObserver.disconnect();
         stabCopyHeading();
         stabObserver.observe(r);
@@ -56677,6 +56825,69 @@
     }
     window.__secFilter = { sync: sync, input: input, bar: bar, recount: function(){ if(curKey && tokens.length) schedule(); } };
     schedule();
+  })();
+
+  // ---------- Build 586 (Mark): a phone on its side ----------
+  // body.phone-land mirrors the stylesheet's sideways-phone query (the rail down the left). On
+  // Watch (not a film's or show's own page) body.watch-land puts the tabs, the count and the
+  // buttons on one line at the top, and the filter box behind a button (body.wl-filter).
+  (function(){
+    var mq = window.matchMedia ? window.matchMedia('(max-width: 900px) and (orientation: landscape) and (max-height: 500px)') : null;
+    var btn = document.getElementById('wlFilterBtn');
+    var filterOpen = false;
+    function sfInput(){ return document.getElementById('secFilterInput'); }
+    function setFilter(on, focus, keepText){
+      filterOpen = !!on;
+      document.body.classList.toggle('wl-filter', filterOpen);
+      if(btn){ btn.setAttribute('aria-pressed', filterOpen ? 'true' : 'false'); btn.title = filterOpen ? 'Close filter' : 'Filter'; btn.setAttribute('aria-label', btn.title); }
+      var inp = sfInput();
+      if(!filterOpen && !keepText && inp && inp.value){
+        inp.value = '';
+        try{ inp.dispatchEvent(new Event('input', { bubbles: true })); }catch(e){}
+      }
+      if(filterOpen && focus && inp) setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 30);
+    }
+    if(btn) btn.addEventListener('click', function(e){ e.stopPropagation(); setFilter(!filterOpen, true); });
+    var mgBtn = document.getElementById('wlManageBtn');
+    if(mgBtn) mgBtn.addEventListener('click', function(e){ e.stopPropagation(); try{ openLtvManageSheet(function(){}); }catch(err){} });
+    var lastTab = null;
+    function sync(){
+      var land = !!(mq && mq.matches);
+      var wasLand = document.body.classList.contains('phone-land');
+      document.body.classList.toggle('phone-land', land);
+      if(wasLand !== land){ var sr = stationsGrid.querySelector(':scope > .lib-tabs, :scope > .watch-tabs') || document.getElementById('podcastTabs'); if(sr) try{ syncStickyTabs(sr); }catch(e){} }
+      var wl = land && typeof onVideoView !== 'undefined' && onVideoView && !onVideoDetailView && !videoChannelsEditing;
+      document.body.classList.toggle('watch-land', wl);
+      if(wl) document.body.dataset.vtab = videoTab; else delete document.body.dataset.vtab;
+      // A tab with no filter box (Continue) or leaving Watch closes it; a remembered filter shows open.
+      var bar = document.getElementById('secFilter');
+      var hasBox = !!(bar && bar.parentNode === stationsGrid) && videoTab !== 'channels';
+      document.body.classList.toggle('wl-has-filter', wl && hasBox);
+      if(!wl || !hasBox){ if(filterOpen) setFilter(false, false, !wl); }
+      else {
+        var inp = sfInput();
+        if(lastTab !== videoTab && filterOpen && !(inp && inp.value)) setFilter(false);
+        if(inp && inp.value && !filterOpen) setFilter(true);
+      }
+      lastTab = wl ? videoTab : null;
+      if(wl){
+        var tb = stationsGrid.querySelector(':scope > .page-toolbar');
+        var w = tb && !tb.hidden ? tb.offsetWidth : 0;
+        // Live TV keeps its buttons in the heading row (top right): the tabs leave room for them too.
+        if(!w && hdrRight && hdrRight.parentNode === sectionHeadingRow) w = hdrRight.offsetWidth;
+        stationsGrid.style.setProperty('--wl-tb-w', w + 'px');
+      }
+    }
+    var t = 0;
+    function soon(){ if(!t) t = setTimeout(function(){ t = 0; try{ sync(); }catch(e){} }, 40); }
+    if(mq){ if(mq.addEventListener) mq.addEventListener('change', soon); else if(mq.addListener) mq.addListener(soon); }
+    window.addEventListener('resize', soon);
+    if(window.MutationObserver){
+      new MutationObserver(soon).observe(stationsGrid, { childList: true });
+      new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+      if(hdrRight) new MutationObserver(soon).observe(hdrRight, { subtree: true, attributes: true, attributeFilter: ['style', 'hidden'] });
+    }
+    sync();
   })();
 
   if(!storageWorks) setStatus('Heads up: this browser is blocking local storage, so Favorites / Recent / volume won\'t be remembered next time you open this file.', true);

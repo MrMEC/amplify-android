@@ -120,7 +120,7 @@ async def run_dock(p, theme):
     check(c2['fh'] <= 2 and (abs(c2['v'][3] - c2['a'][3]) <= 1 or abs(c2['v'][2] - c2['a'][2]) <= 1) and c2['v'][3] > c43['v'][3] and abs(c2['v'][2] - c2['v'][3] * 4 / 3) <= 2, f'{T} sideways, details hidden: the picture grows to the full height {c2}')
     await pg.screenshot(path=f'{SHOTS}/ltv-land-collapsed-{theme}.png')
     await pg.evaluate("document.querySelector('#npCollection .epg .epg-corner').click()"); await pg.wait_for_timeout(700)
-    check(not (s6['nav'] and s6['nav']['vis']), f'{T} no tab bar sideways')
+    check(s6['nav'] and s6['nav']['vis'] and s6['nav']['h'] > 300 and s6['nav']['w'] < 120 and s6['art']['l'] >= s6['nav']['w'], f'{T} sideways: the tab bar is a rail down the left, the video beside it {s6["nav"]} {s6["art"]}')
     await pg.screenshot(path=f'{SHOTS}/ltv-land-{theme}.png')
     await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(1500)
     s7 = await pg.evaluate(STATE)
