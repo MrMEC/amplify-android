@@ -3844,6 +3844,26 @@
   .tile.tile-row.ch-item .tile-art{ border-radius:5px; }
   .clear-search-btn .hdr-svg{ width:13px; height:12px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.8; stroke-linecap:round; stroke-linejoin:round; }
   /* Build 583: Add or Manage Channels, a full-width button row under the guide on the video screen. */
+
+  /* Build 584: Add or Manage Channels, the artist menu's sheet (it sits over the video screen). */
+  #ltvManageSheet{
+    position:fixed; left:0; right:0; bottom:0; top:auto; z-index:6100; display:block; visibility:hidden; transform:translateY(100%);
+    transition:transform .38s cubic-bezier(.22,.8,.24,1), visibility 0s linear .38s;
+    min-width:0; width:auto; max-height:88%; overflow-y:auto; box-sizing:border-box;
+    padding:22px 20px calc(env(safe-area-inset-bottom, 0px) + 14px); border:0; border-radius:24px 24px 0 0;
+    background:#0f1218; box-shadow:0 -8px 30px rgba(0,0,0,.4);
+  }
+  #ltvManageSheet.open{ visibility:visible; transform:none; transition:transform .38s cubic-bezier(.22,.8,.24,1), visibility 0s; }
+  #ltvManageSheet.dragging{ transition:none !important; }
+  #ltvManageSheet .artist-menu-title{ display:block; font-size:20px; font-weight:600; line-height:1.3; margin:0 0 8px; color:#fff; }
+  #ltvManageSheet .np-menu-item{ display:flex; align-items:center; width:100%; gap:16px; padding:16px 2px; font-size:17px; border-radius:0; border:0; border-top:1px solid rgba(255,255,255,.1); justify-content:flex-start; text-align:left; background:none; color:#f5f6f8; }
+  #ltvManageSheet .artist-menu-title + .np-menu-item, #ltvManageSheet .ltv-sheet-label + .np-menu-item{ border-top:0; }
+  #ltvManageSheet .np-menu-item i{ flex:0 0 24px; width:24px; font-size:19px; text-align:center; }
+  #ltvManageSheet .np-menu-item.on{ font-weight:600; }
+  #ltvManageSheet .np-menu-item.on i, #ltvManageSheet .np-menu-item .fa-plus, #ltvManageSheet .np-menu-item .fa-grip-vertical{ color:var(--accent); }
+  #ltvManageSheet .ltv-sheet-label{ font-size:13px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.55); padding:18px 2px 4px; border-top:1px solid rgba(255,255,255,.1); margin-top:2px; }
+  .ltv-manage-scrim{ display:block !important; position:fixed; inset:0; z-index:6090; background:rgba(0,0,0,.55); opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s linear .38s; }
+  .ltv-manage-scrim.open{ opacity:1; visibility:visible; transition:opacity .3s ease, visibility 0s; }
   .epg-manage{ padding:12px 8px calc(18px + env(safe-area-inset-bottom, 0px)); }
   .epg-manage-btn{
     display:flex; align-items:center; justify-content:center; gap:10px; width:100%; margin:0;
@@ -25229,7 +25249,7 @@
       mg.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add or Manage Channels</span>';
       mg.addEventListener('click', function(e){
         e.stopPropagation();
-        if(channelSortMenu && channelSortMenu.id === 'guideMenu') closeChannelSortMenu(); else openGuideMenu(mg);
+        if(ltvSheet && ltvSheet.classList.contains('open')) closeLtvManageSheet(); else openGuideMenu(mg);
       });
       var mgRow = document.createElement('div'); mgRow.className = 'epg-manage'; mgRow.appendChild(mg);
       npCollectionGrid.appendChild(mgRow);
@@ -26721,7 +26741,9 @@
     // Build 280 (Mark): on the Live TV page the logo opens the channel's options (Watch Now, Edit,
     // Favorite, Move, Remove); under a playing channel it still just plays it.
     cell.addEventListener('click', function(){
-      if(cell.closest('#stationsGrid') && onVideoView) openChSheet(ch); else playChannel(ch);
+      if(cell.closest('#stationsGrid') && onVideoView) openChSheet(ch);
+      else if(cell.closest('#npCollection')) openChSheet(ch, { np: true });   // build 584 (Mark): a logo opens its menu
+      else playChannel(ch);
     });
     row.appendChild(cell);
     // Build 306 (Mark): a music video channel is one block all the way across, "Music Videos"
@@ -28174,7 +28196,13 @@
   function closeChSheet(){ chSheetOverlay.classList.remove('open'); }
   chSheetOverlay.addEventListener('click', function(e){ if(e.target === chSheetOverlay) closeChSheet(); });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && chSheetOverlay.classList.contains('open')){ e.stopImmediatePropagation(); closeChSheet(); } }, true);
-  function openChSheet(ch){
+  function openChSheet(ch, opts){
+    opts = opts || {};
+    // Build 584 (Mark): the guide under the video opens this too (a tap on a logo). There, the
+    // pages (Edit Channel, Move) close the video screen first and the rest refresh its guide.
+    var fromNp = !!opts.np;
+    function leaveNp(){ if(fromNp && nowPlayingScreen.style.display === 'flex'){ try{ closeNowPlaying(false, false); }catch(e){} } }
+    function npRefresh(){ if(fromNp){ try{ refreshChannelGrids(); }catch(e){} } }
     var mine = isLiveChUrl(ch.url);
     var def = mine ? liveChDefById(ch.url.slice('amplify-live:'.length)) : null;
     var st = mine ? liveChStationOf(ch) : channelToStation(ch);
@@ -28200,19 +28228,20 @@
       b.addEventListener('click', function(){ closeChSheet(); fn(); });
       box.appendChild(b);
     }
-    if(!ch.empty) item('fa-solid fa-play', 'Watch Now', function(){ playChannel(ch); });
-    if(mine && def) item('fa-solid fa-pen', 'Edit Channel', function(){ openLiveChEditor(def.id); });
-    else if(!mine) item('fa-solid fa-pen', 'Rename', function(){ var c = findVideoChannel(ch.url); if(c) promptRenameVideoChannel(c); });
+    if(!ch.empty) item('fa-solid fa-play', 'Watch Now', function(){ playChannel(ch, fromNp ? { still: true } : undefined); });
+    if(mine && def) item('fa-solid fa-pen', 'Edit Channel', function(){ leaveNp(); openLiveChEditor(def.id); });
+    else if(!mine) item('fa-solid fa-pen', 'Rename', function(){ var c = findVideoChannel(ch.url); if(c) promptRenameVideoChannel(c); npRefresh(); });
     if(!ch.empty){
       var fav = isFavorite(st);
-      item(fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart', fav ? 'Remove from Favorites' : 'Add to Favorites', function(){ toggleFavorite(st); if(onVideoView) rerenderVideoKeepingScroll(); });
+      item(fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart', fav ? 'Remove from Favorites' : 'Add to Favorites', function(){ toggleFavorite(st); if(onVideoView) rerenderVideoKeepingScroll(); npRefresh(); });
     }
-    item('fa-solid fa-grip-vertical', 'Move', function(){ setChannelsArranging(true); });
+    item('fa-solid fa-grip-vertical', 'Move', function(){ leaveNp(); setChannelsArranging(true); });
     item('fa-solid fa-trash', 'Remove from Live TV', function(){
       var name = ch.name || 'this channel';
       confirmThen({ title: 'Remove ' + quoteName(name) + ' from Live TV?', message: mine ? 'The shows and movies stay in your library.' : '', ok: 'Remove' }, function(){
         if(mine && def) deleteLiveChannel(def.id); else removeVideoChannel(ch.url);
         if(onVideoView) rerenderVideoKeepingScroll();
+        npRefresh();
       });
     }, 'danger');
     chSheetOverlay.classList.add('open');
@@ -28246,12 +28275,63 @@
     b.classList.add('text-only');
     b.setAttribute('aria-label', b.title);
   }
+  // Build 584 (Mark): Add or Manage Channels slides up from the bottom, full width, in the same
+  // design as the artist page's menu (title, then rows with an icon, divided by lines).
+  var ltvSheet = null, ltvSheetScrim = null;
+  function closeLtvManageSheet(){
+    if(ltvSheet) ltvSheet.classList.remove('open');
+    if(ltvSheetScrim) ltvSheetScrim.classList.remove('open');
+  }
+  function openLtvManageSheet(leaveNp){
+    if(!ltvSheet){
+      ltvSheet = document.createElement('div');
+      ltvSheet.className = 'np-menu artist-menu ltv-manage-sheet'; ltvSheet.id = 'ltvManageSheet';
+      ltvSheet.setAttribute('role', 'menu');
+      ltvSheetScrim = document.createElement('div'); ltvSheetScrim.className = 'artist-menu-scrim ltv-manage-scrim';
+      ltvSheetScrim.addEventListener('click', closeLtvManageSheet);
+      document.body.appendChild(ltvSheetScrim); document.body.appendChild(ltvSheet);
+      if(typeof zenAttachSheetSwipe === 'function') try{ zenAttachSheetSwipe(ltvSheet, ltvSheet, closeLtvManageSheet); }catch(e){}
+      void ltvSheet.offsetHeight;
+    }
+    var m = ltvSheet;
+    m.innerHTML = '<div class="artist-menu-title">Channels</div>';
+    function label(t){ var l = document.createElement('div'); l.className = 'ltv-sheet-label'; l.textContent = t; m.appendChild(l); }
+    function opt(text, icon, on, fn){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'np-menu-item' + (on ? ' on' : '');
+      b.setAttribute('role', on == null ? 'menuitem' : 'menuitemradio');
+      if(on != null) b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.innerHTML = '<i class="' + (icon || '') + '" aria-hidden="true"></i><span></span>';
+      b.lastChild.textContent = text;
+      b.addEventListener('click', function(e){ e.stopPropagation(); closeLtvManageSheet(); fn(); });
+      m.appendChild(b);
+    }
+    opt('Add Channels', 'fa-solid fa-plus', null, function(){ leaveNp(); pushView(); openAddChannelsPage(); });
+    opt('Arrange Channels', 'fa-solid fa-grip-vertical', null, function(){ leaveNp(); setChannelsArranging(true); });
+    label('Layout');
+    [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
+      var on = channelLayout === o[0];
+      opt(o[1], on ? 'fa-solid fa-check' : '', on, function(){
+        if(channelLayout === o[0]) return;
+        channelLayout = o[0]; chPrefSet(CHANNEL_LAYOUT_KEY, o[0]); refreshChannelGrids(); renderVideoHome();
+      });
+    });
+    label('Order');
+    var cur = channelLayout === 'mixed' ? channelMixOrder : (liveChOrder === 'az' && channelOrder === 'az' ? 'az' : 'manual');
+    ORDER_OPTS.forEach(function(o){
+      var on = cur === o[0];
+      opt(o[1], on ? 'fa-solid fa-check' : '', on, function(){ setGuideOrder(o[0]); });
+    });
+    m.scrollTop = 0;
+    requestAnimationFrame(function(){ m.classList.add('open'); ltvSheetScrim.classList.add('open'); });
+  }
   function openGuideMenu(anchor){
     closeChannelSortMenu();
     var fromNp = !!(anchor && anchor.closest && anchor.closest('#nowPlayingScreen'));
     // Build 583: from the guide under the video (Live TV), Add Channels and Arrange Channels are
     // pages of their own, so the video screen closes first.
     function leaveNp(){ if(fromNp && nowPlayingScreen.style.display === 'flex'){ try{ closeNowPlaying(false, false); }catch(e){} } }
+    if(fromNp){ openLtvManageSheet(leaveNp); return; }
     var m = document.createElement('div');
     m.className = 'ch-sort-menu';
     m.id = 'guideMenu';
@@ -28284,17 +28364,6 @@
       opt(o[1], cur === o[0], function(){ setGuideOrder(o[0]); });
     });
     document.body.appendChild(m);
-    if(fromNp){
-      // Over the video screen, opening upwards from the button when there's no room below it.
-      m.style.zIndex = '6000';
-      var ar = anchor.getBoundingClientRect(), mh = m.offsetHeight;
-      m.style.left = Math.max(8, Math.round(ar.left)) + 'px';
-      m.style.maxHeight = Math.round(window.innerHeight - 16) + 'px'; m.style.overflowY = 'auto';
-      var below = window.innerHeight - ar.bottom - 8;
-      m.style.top = Math.max(8, Math.round(below >= mh + 8 ? ar.bottom + 8 : ar.top - 8 - mh)) + 'px';
-      channelSortMenu = m;
-      return;
-    }
     var r = videoReorderHeaderBtnEl.getBoundingClientRect();
     m.style.top = Math.round(r.bottom + 8) + 'px';
     m.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';

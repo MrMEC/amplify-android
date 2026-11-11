@@ -33,7 +33,7 @@ async def run_dock(p, theme):
     await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(2500)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(2800)
     check(not await pg.evaluate("document.getElementById('vctl').classList.contains('show')"), f'{T} the controls are not up as the channel starts')
-    await pg.evaluate("document.querySelectorAll('#npCollection .epg-block')[1] && document.querySelectorAll('#npCollection .epg-ch')[1].click()"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("document.querySelectorAll('#npCollection .epg-ch')[1].click(); Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).find(function(e){return e.textContent==='Watch Now';}).click()"); await pg.wait_for_timeout(1200)
     check(not await pg.evaluate("document.getElementById('vctl').classList.contains('show')"), f'{T} nor after changing channel')
     s = await pg.evaluate(STATE)
     check(s['dock'] and s['np'] == 'flex', f'{T} opening Live TV starts a channel by itself and docks it {s["dock"]} {s["np"]}')
@@ -127,7 +127,7 @@ async def run_dock(p, theme):
     check(s7['dock'] and not s7['land'], f'{T} upright again {s7["dock"]} {s7["land"]}')
     # the channel picked last is the one Live TV comes back to
     picked = await pg.evaluate("document.querySelectorAll('#npCollection .epg-row')[2].dataset.chUrl")
-    await pg.evaluate("document.querySelectorAll('#npCollection .epg-ch')[2].click()"); await pg.wait_for_timeout(1200)
+    await pg.evaluate("document.querySelectorAll('#npCollection .epg-ch')[2].click(); Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).find(function(e){return e.textContent==='Watch Now';}).click()"); await pg.wait_for_timeout(1200)
     await pg.evaluate("document.querySelector('#ltvTabs .home-tab[data-vtab=movies]').click()"); await pg.wait_for_timeout(1200)
     await pg.evaluate("document.querySelector('.watch-tabs .home-tab[data-vtab=channels]').click()"); await pg.wait_for_timeout(2500)
     now = await pg.evaluate("(()=>{var c=document.querySelector('#npCollection .epg-ch.playing'); return c?c.closest('.epg-row').dataset.chUrl:null; })()")
