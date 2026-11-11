@@ -26659,7 +26659,9 @@
     row.dataset.chUrl = ch.url;
     if(src) row.dataset.guideKey = src.key;
     var st = channelToStation(ch);
-    var playing = !!(isOnAirItem(st));
+    // Build 582 (Mark): an Archive.org channel plays one of its films / episodes, whose own key isn't
+    // the channel's, so the outline went missing; the channel the playing item belongs to counts too.
+    var playing = !!(isOnAirItem(st)) || !!(currentStation && vctlChannelUrl(currentStation) === ch.url && isNpChannel(currentStation));
     // the channel: its logo (or name), a heart if it's a favourite
     var cell = document.createElement('button');
     cell.type = 'button';
