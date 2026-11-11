@@ -53513,6 +53513,15 @@
     try{ var v = JSON.parse(localStorage.getItem(STATION_SONG_KEY) || '{}'); stationSongs = (v && typeof v === 'object') ? v : {}; }catch(e){ stationSongs = {}; }
     return stationSongs;
   }
+  // Build 569 (Mark): some stations send one text, "Armando's Rhumba by Chick Corea", with no artist
+  // of its own, so no cover could be looked up. Split on the last " by ": the song and its artist.
+  function splitTitleByArtist(text){
+    var m = String(text || '').trim().match(/^(.{2,})\s+by\s+(.{2,})$/i);
+    if(!m) return null;
+    var t = m[1].trim(), a = m[2].trim();
+    if(t.length < 2 || a.length < 2 || a.length > 70) return null;
+    return { t: t, a: a };
+  }
   function noteStationSong(st, title, artist){
     var m = stationSongMap(), k = favKey(st);
     m[k] = { t: title, a: artist || '', at: Date.now() };
@@ -53571,8 +53580,11 @@
   function lastSongItem(st){
     if(!st || !isLiveStream(st) || isChannelEntry(st) || isArtistRadio(st)) return null;
     var r = stationSongMap()[favKey(st)];
-    if(!r || !r.t || !r.a) return null;
-    return { artist: r.a, name: r.t, songKey: songKeyOf(r.a, r.t) };
+    if(!r || !r.t) return null;
+    var rt = r.t, ra = r.a;
+    if(!ra){ var bp = splitTitleByArtist(rt); if(bp){ rt = bp.t; ra = bp.a; } }   // build 569: songs saved before the split
+    if(!ra) return null;
+    return { artist: ra, name: rt, songKey: songKeyOf(ra, rt) };
   }
   function lastSongCoverFor(st){
     var it = lastSongItem(st);
@@ -53620,6 +53632,7 @@
       onAir = null;
     } else {
       var artist = ev.artist ? String(ev.artist).trim() : '';
+      if(!artist){ var byParts = splitTitleByArtist(title); if(byParts){ title = byParts.t; artist = byParts.a; } }
       var key = favKey(st);
       if(prev && prev.key === key && prev.title === title && prev.artist === artist) return;
       onAir = { key: key, title: title, artist: artist, at: Date.now() };
