@@ -89,11 +89,15 @@ async def run_dock(p, theme):
     CEN = """(()=>{var h=document.querySelector('#nowPlayingScreen .np-hero').getBoundingClientRect(), a=document.getElementById('npArtWrap').getBoundingClientRect(), v=document.getElementById('npVideo').getBoundingClientRect(), f=document.querySelector('.np-hero-foot').getBoundingClientRect();
       return {hc:(h.top+h.bottom)/2, ac:(a.top+a.bottom)/2, a:[a.left,a.top,a.width,a.height].map(Math.round), v:[v.left,v.top,v.width,v.height].map(Math.round), fh:Math.round(f.height), gc:(a.top+(f.height>2?f.bottom:a.bottom))/2}; })()"""
     c1 = await pg.evaluate(CEN)
-    check(abs(c1['gc'] - c1['hc']) <= 3, f'{T} sideways: video and details in the middle of the height {c1}')
-    check(abs(c1['v'][2] - c1['a'][2]) <= 1 and abs(c1['v'][3] - c1['a'][3]) <= 1, f'{T} sideways: the video fills its 16:9 box {c1}')
+    check(abs(c1['v'][3] - c1['a'][3]) <= 1 or abs(c1['v'][2] - c1['a'][2]) <= 1, f'{T} sideways: widescreen picture as big as fits {c1}')
+    await pg.evaluate("document.getElementById('npVideo').style.setProperty('--vid-ar','1.3333')"); await pg.wait_for_timeout(300)
+    c43 = await pg.evaluate(CEN)
+    check(abs(c43['v'][3] - c43['a'][3]) <= 1 and abs(c43['v'][2] - c43['v'][3] * 4 / 3) <= 2 and abs((c43['v'][0] + c43['v'][2] / 2) - (c43['a'][0] + c43['a'][2] / 2)) <= 2, f'{T} sideways: a 4:3 channel fills the height, centred {c43}')
+    check(c43['a'][1] + c43['a'][3] <= 390 and c43['a'][1] >= 40, f'{T} sideways: between the tabs and the bottom {c43}')
+    await pg.screenshot(path=f'{SHOTS}/ltv-land-43-{theme}.png')
     await pg.evaluate("document.querySelector('#npCollection .epg .epg-corner').click()"); await pg.wait_for_timeout(700)
     c2 = await pg.evaluate(CEN)
-    check(c2['fh'] <= 2 and abs(c2['ac'] - c2['hc']) <= 3, f'{T} sideways, details hidden: the video in the middle {c2}')
+    check(c2['fh'] <= 2 and (abs(c2['v'][3] - c2['a'][3]) <= 1 or abs(c2['v'][2] - c2['a'][2]) <= 1) and c2['v'][3] > c43['v'][3] and abs(c2['v'][2] - c2['v'][3] * 4 / 3) <= 2, f'{T} sideways, details hidden: the picture grows to the full height {c2}')
     await pg.screenshot(path=f'{SHOTS}/ltv-land-collapsed-{theme}.png')
     await pg.evaluate("document.querySelector('#npCollection .epg .epg-corner').click()"); await pg.wait_for_timeout(700)
     check(not (s6['nav'] and s6['nav']['vis']), f'{T} no tab bar sideways')
