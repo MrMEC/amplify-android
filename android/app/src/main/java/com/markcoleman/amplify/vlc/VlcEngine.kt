@@ -111,6 +111,9 @@ object VlcEngine {
     private var ignoreStop = false
     private var voutCount = 0
     private var hardware = true
+    // Build 578: the volume asked for (0..100). VLC ignores a volume set before its audio output
+    // exists, so a muted start played at full volume; it is applied again once sound starts.
+    private var wantVolume = 100
     private var triedSoftware = false
     private var sourceUri: Uri? = null
     private var subtitleUris: List<Uri> = emptyList()
@@ -201,7 +204,8 @@ object VlcEngine {
             }
             subtitleUris.forEach { addSubtitle(p, it) }
             p.rate = rate
-            p.setVolume((volume * 100).roundToInt().coerceIn(0, 100))
+            wantVolume = (volume * 100).roundToInt().coerceIn(0, 100)
+            p.setVolume(wantVolume)
             p.setAspectRatio(null)
             p.scale = 0f
             if (play) {
@@ -288,7 +292,7 @@ object VlcEngine {
         playWhenReady = true
         if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
             // Played to the end (or stopped): from the start again.
-            val vol = p.getVolume().coerceAtLeast(0) / 100f
+            val vol = wantVolume / 100f
             start(0L, true, vol)
             return
         }
@@ -315,7 +319,7 @@ object VlcEngine {
         val target = ms.coerceAtLeast(0L).let { if (lengthMs > 0) it.coerceAtMost(lengthMs) else it }
         lastTimeMs = target
         if (playbackState == Player.STATE_ENDED) {
-            start(target, playWhenReady, p.getVolume().coerceAtLeast(0) / 100f)
+            start(target, playWhenReady, wantVolume / 100f)
             return
         }
         if (!p.isSeekable || lengthMs <= 0) {
@@ -336,9 +340,14 @@ object VlcEngine {
         notifyState(false)
     }
 
+    private fun keepVolume(p: MediaPlayer) {
+        if (p.getVolume() != wantVolume) p.setVolume(wantVolume)
+    }
+
     @JvmStatic
     fun setVolume(v: Float) {
-        player?.setVolume((v * 100).roundToInt().coerceIn(0, 100))
+        wantVolume = (v * 100).roundToInt().coerceIn(0, 100)
+        player?.setVolume(wantVolume)
     }
 
     @JvmStatic
@@ -487,6 +496,7 @@ object VlcEngine {
                 }
                 applyTrackChoices(p)
                 readVideoTrack(p)
+                keepVolume(p)
                 notifyState(false)
             }
             MediaPlayer.Event.Paused -> {
@@ -513,7 +523,7 @@ object VlcEngine {
                     triedSoftware = true
                     hardware = false
                     val at = positionMs()
-                    val vol = p.getVolume().coerceAtLeast(0) / 100f
+                    val vol = wantVolume / 100f
                     main.post { start(at, true, vol) }
                     return
                 }
@@ -525,6 +535,7 @@ object VlcEngine {
             }
             MediaPlayer.Event.TimeChanged -> {
                 lastTimeMs = e.timeChanged
+                keepVolume(p)
                 if (!firstFrameSent) {
                     firstFrameSent = true
                     listener?.onVlcFirstFrame()
@@ -544,6 +555,7 @@ object VlcEngine {
                 if (voutCount > 0) readVideoTrack(p)
             }
             MediaPlayer.Event.ESAdded, MediaPlayer.Event.ESSelected -> {
+                keepVolume(p)
                 if (e.esChangedType == IMedia.Track.Type.Video) readVideoTrack(p)
             }
         }

@@ -3729,6 +3729,12 @@
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap{
       padding-top:0; min-height:0; height:auto; aspect-ratio:16/9; width:100%; }
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art{ top:0; height:100%; bottom:auto; }
+    /* Build 578 (Mark): the video sits in the middle of the height, at the full width of its column
+       (the picture is fitted inside the 16:9 box, natively too). */
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-hero{ justify-content:center; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap{ flex:0 0 auto; position:relative; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-video-wrap{ position:absolute; inset:0; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-video{ width:100%; height:100%; max-height:none; aspect-ratio:auto !important; }
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap > .vctl{ top:0; }
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-hero-foot{ padding-left:0; padding-top:8px; padding-bottom:6px; }
     body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-below{
@@ -24818,8 +24824,12 @@
     }
     return st;
   }
+  // Build 578 (Mark): the channel last played is where Live TV picks up again.
+  var LTV_LAST_KEY = 'radioPlayerLtvLastCh';
+  function ltvRememberChannel(url){ if(url){ try{ localStorage.setItem(LTV_LAST_KEY, url); }catch(e){} } }
   function playChannel(ch, opts){
     opts = opts || {};
+    if(ch && ch.url) ltvRememberChannel(ch.url);
     if(ch && isLiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true, still: !!opts.still }); return; }
     if(ch && isArchiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true, still: !!opts.still }); return; }
     var st = channelToStation(ch);
@@ -26569,11 +26579,17 @@
     try{ if(localStorage.getItem('radioPlayerLtvAuto') === '0') return; }catch(e){}   // off: Live TV opens on the guide alone
     if(!ltvPhone() || !onVideoView || videoTab !== 'channels' || videoChannelsEditing) return;
     if(nowPlayingScreen.style.display === 'flex') return;
-    if(uiIsPlaying || attemptInProgress) return;      // something is playing: it carries on
+    if(uiIsPlaying || attemptInProgress){
+      // A channel still playing (its sound left on) comes back up on the video; anything else carries on.
+      try{ if(currentStation && isNpChannel(currentStation)) openNowPlaying(currentStation, false); }catch(e){}
+      return;
+    }
     var list = epgAllChannels(visibleVideoChannels());
     if(!list.length) return;
-    var pick = null, last = lastPlayedStation();
-    if(last){
+    var pick = null, last = lastPlayedStation(), saved = '';
+    try{ saved = localStorage.getItem(LTV_LAST_KEY) || ''; }catch(e){}
+    if(saved) list.forEach(function(c){ if(!pick && c.url === saved) pick = c; });
+    if(!pick && last){
       var lu = last.liveCh || last.urlToResolve || last.url_resolved || last.url || '';
       list.forEach(function(c){ if(!pick && c.url && c.url === lu) pick = c; });
     }
@@ -53332,6 +53348,7 @@
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
     if(!miniAutoAdvance && miniHidden){ miniHidden = false; try{ applyMiniBar(); }catch(e){} }   // build 571: playing brings the mini player back
+    if(track && (track.liveCh || track.videoChannel)) ltvRememberChannel(track.liveCh || track.urlToResolve || (track.channel && track.channel.url));
     if(ltvMutedByUs && track && !(track.liveCh || track.archiveCh || track.videoChannel || isLocalVideo(track))){ try{ ltvLeaveSound(); }catch(e){} }   // build 573: the muted channel's sound doesn't follow you to a radio station
     if(track && track.type === 'zen'){ if(track.zenId && zenPreset(track.zenId)) zenSelect(track.zenId, true); return; }
     // Build 262: one of your own channels (a favourite, Continue Watching, the hero, the last
