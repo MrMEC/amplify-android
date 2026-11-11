@@ -3709,6 +3709,9 @@
     body.ltv-dock .ltv-tabs::-webkit-scrollbar{ display:none; }
     body.ltv-dock .ltv-tabs .home-tab{ flex:0 0 auto; }
     body.ltv-dock .np-float, body.ltv-dock .sidebar-top{ display:none !important; }
+    /* Build 577: the (empty) top strip of the hero sat over the top of the sideways video, so the
+       app saw the picture as covered and never drew it. Nothing lives in it on Live TV. */
+    body.ltv-dock .now-playing-screen.np-channel .np-hero-top{ display:none !important; }
     body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap{
       padding-top:var(--ltv-tabs-h); min-height:calc(var(--ltv-tabs-h) + min(56.25vw, 52vh)); }
     body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art{ top:var(--ltv-tabs-h); }

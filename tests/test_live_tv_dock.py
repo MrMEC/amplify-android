@@ -74,9 +74,17 @@ async def run_dock(p, theme):
     s6 = await pg.evaluate(STATE)
     check(s6['land'] and not s6['rot'], f'{T} sideways: the Live TV layout, not the landscape Now Playing {s6["land"]} {s6["rot"]}')
     check(s6['art']['l'] < s6['grid']['l'] and s6['grid']['w'] > 300 and s6['art']['w'] > 380, f'{T} the video left, the guide right {s6["art"]} {s6["grid"]}')
-    print('COVER', await pg.evaluate("(()=>{var a=document.getElementById('npArtWrap').getBoundingClientRect(); var out=[]; [[.1,.1],[.5,.5],[.9,.5],[.5,.9],[.9,.9]].forEach(function(p){ var el=document.elementFromPoint(a.left+a.width*p[0], a.top+a.height*p[1]); out.push(el?(el.tagName+'#'+el.id+'.'+String(el.className).split(' ')[0]):'none'); }); return [Math.round(a.left),Math.round(a.top),Math.round(a.width),Math.round(a.height),out]; })()"))
-    print('KIDS', await pg.evaluate("Array.from(document.getElementById('npCollection').children).map(function(e){ var b=e.getBoundingClientRect(); return [e.id||e.className, Math.round(b.top), Math.round(b.height), getComputedStyle(e).display]; })"))
-    print('CHAIN', await pg.evaluate("['.np-hero','.np-below','#npCollection','#npCollectionGrid','#npCollection .epg'].map(function(q){ var e=document.querySelector(q), b=e.getBoundingClientRect(), cs=getComputedStyle(e); return [q, Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height), cs.marginTop, cs.marginLeft, cs.paddingTop, cs.paddingLeft]; })"))
+    vp = await pg.evaluate("""(()=>{
+      var ns=document.getElementById('nowPlayingScreen'), w=document.getElementById('npVideoWrap'), v=document.getElementById('npVideo'), c=document.getElementById('vctl');
+      ns.classList.add('np-video-on','np-video-stream'); w.hidden=false; if(c.parentNode!==w) w.appendChild(c);
+      var r=v.getBoundingClientRect(), out=[]; var vw=innerWidth, vh=innerHeight;
+      var xs=[r.left+2,r.left+r.width/2,r.right-2], ys=[r.top+2,r.top+r.height/2,r.bottom-2];
+      xs.forEach(function(x){ys.forEach(function(y){ var el=document.elementFromPoint(x,y); out.push(el?(w.contains(el)||el.contains(w)?'ok':el.tagName+'#'+el.id+'.'+String(el.className).split(' ')[0]):'none'); });});
+      var tb=document.getElementById('ltvTabs'); var tr=tb?tb.getBoundingClientRect():null;
+      return {body:document.body.className, ns:ns.className, disp:ns.style.display, rect:[r.left,r.top,r.width,r.height].map(Math.round), wrap:[w.getBoundingClientRect().left,w.getBoundingClientRect().top,w.getBoundingClientRect().width,w.getBoundingClientRect().height].map(Math.round), pts:out, tabs:tr?[tr.top,tr.height,getComputedStyle(tb).display]:null};
+    })()""")
+    check(all(x=='ok' for x in vp['pts']), f'{T} sideways: nothing of the page sits on the video box {vp["pts"]}')
+    await pg.screenshot(path='/tmp/claude-0/t/shots/ltv_land_probe_'+theme+'.png')
     print('LAND', s6['art'], s6['foot'], s6['grid'], s6['tabs'], s6['slot'])
     check(not (s6['nav'] and s6['nav']['vis']), f'{T} no tab bar sideways')
     await pg.screenshot(path=f'{SHOTS}/ltv-land-{theme}.png')
