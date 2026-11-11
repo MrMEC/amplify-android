@@ -3914,6 +3914,8 @@
     padding:0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
   body.epg-land #stationsGrid > .epg > .epg-head{ top:0 !important; padding-top:env(safe-area-inset-top, 0px); height:auto; }
   body.epg-land{ overflow:hidden; }
+  /* Build 572 (Mark): no gradient over the sideways guide (the tab bar's scroll fade). */
+  body.epg-land .mobile-scroll-fade{ display:none !important; }
   /* Under a playing channel: no heading, the grid runs edge to edge. */
   .np-related.np-epg > .np-related-heading{ display:none; }
   .np-related.np-epg{ padding-left:0; padding-right:0; }
@@ -6743,10 +6745,10 @@
     body.search-open .sidebar-top .hdr-page-label, body.home-view .sidebar-top .hdr-page-label{ opacity:0; }
     #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
-    #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(66px + var(--stab-h, 34px)); }
+    #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(60px + var(--stab-h, 34px)); }   /* build 572: flush under the tabs (was 66px: a 6px gap) */
     body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
-    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(14px + var(--stab-h, 34px)); }
+    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(8px + var(--stab-h, 34px)); }   /* build 572: flush under the tabs (was 14px) */
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
