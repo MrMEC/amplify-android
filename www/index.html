@@ -15418,6 +15418,9 @@
   // Build 316 (Mark): watching full screen, the next video (a shuffle of music videos, a channel
   // moving on) starts without the controls popping up; a tap still shows them.
   function vctlQuiet(){
+    // Build 575 (Mark): a Live TV channel (as the page opens, or changing channel in the guide) starts with the
+    // picture clear: the controls come up only when it's tapped.
+    if(ltvPhone() && nowPlayingScreen.classList.contains('np-channel')) return true;
     return !!(npVideoFull || (npFullCarry && Date.now() - npFullCarry.at < 12000));
   }
   function vctlPushNative(){
