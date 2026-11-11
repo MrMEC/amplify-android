@@ -15361,8 +15361,19 @@
   function vctlPlaying(){ return !!npTarget() && npIsCurrent() && uiIsPlaying; }
   // Build 303: a video of your own playing as part of a queue (a shuffle, an artist's videos, Play
   // All) gets Previous / Next on the picture.
+  // Build 581 (Mark): on a channel from the guide, Previous / Next go to the channel above / below
+  // it in the guide (round from the last to the first).
+  function vctlChannelUrl(st){ return st ? (st.liveCh || st.archiveCh || st.urlToResolve || (st.channel && st.channel.url) || st.url || '') : ''; }
+  function vctlChannelList(){
+    var st = npTarget();
+    if(!st || !npIsCurrent() || !isNpChannel(st)) return null;
+    var list = epgAllChannels(visibleVideoChannels()), url = vctlChannelUrl(st), at = -1;
+    list.forEach(function(c, i){ if(at < 0 && c.url === url) at = i; });
+    return (at >= 0 && list.length > 1) ? { list: list, at: at } : null;
+  }
   function vctlSteps(){
     var st = npTarget();
+    if(vctlChannelList()) return { on: true, prev: true, next: true };
     if(!st || !isLocalVideo(st) || !npIsCurrent()) return { on: false, prev: false, next: false };
     var inQueue = isQueueCurrent(st) && playQueue.length > 1;
     if(!inQueue && !upNext.length) return { on: false, prev: false, next: false };
@@ -15371,6 +15382,12 @@
   function vctlStep(dir){
     var st = currentStation;
     if(!st) return;
+    var chs = vctlChannelList();
+    if(chs){
+      var n = chs.list.length, ch = chs.list[((chs.at + (dir < 0 ? -1 : 1)) % n + n) % n];
+      playChannel(ch, { still: true });
+      return;
+    }
     if(dir < 0){
       if((audio.currentTime || 0) > 3){ try{ audio.currentTime = 0; }catch(e){} return; }
       if(queueHasPrev()) playQueueStep(-1);

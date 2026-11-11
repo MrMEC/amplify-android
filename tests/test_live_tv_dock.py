@@ -63,6 +63,26 @@ async def run_dock(p, theme):
     check(s4['mute'] and s4['mute']['vis'] and s4['stop'] and s4['stop']['vis'], f'{T} Mute beside Stop on the controls {s4["mute"]} {s4["stop"]}')
     await pg.evaluate("document.getElementById('vctlMute').click()"); await pg.wait_for_timeout(300)
     check(not (await pg.evaluate(STATE))['muted'], f'{T} Mute turns the sound on')
+    # Previous / Next move between channels in the guide's order
+    await pg.evaluate("document.getElementById('vctl').classList.add('show')"); await pg.wait_for_timeout(300)
+    stp = await pg.evaluate("(()=>{var v=document.getElementById('vctl'),p=document.getElementById('vctlPrev'),n=document.getElementById('vctlNext'),r=function(e){var b=e.getBoundingClientRect();return [Math.round(b.width),Math.round(b.height),getComputedStyle(e).opacity,e.disabled];};return [v.classList.contains('steps'),r(p),r(n)];})()")
+    check(stp[0] and stp[1][0] > 20 and stp[2][0] > 20 and not stp[1][3] and not stp[2][3], f'{T} Previous and Next on the channel\'s controls {stp}')
+    await pg.screenshot(path=f'{SHOTS}/ltv-steps-{theme}.png')
+    rows = await pg.evaluate("Array.from(document.querySelectorAll('#npCollection .epg-row')).map(function(r){return r.dataset.chUrl;})")
+    cur = await pg.evaluate("(()=>{var c=document.querySelector('#npCollection .epg-ch.playing'); return c?c.closest('.epg-row').dataset.chUrl:null; })()"); i = rows.index(cur)
+    await pg.evaluate("document.getElementById('vctlNext').click()"); await pg.wait_for_timeout(1000)
+    n1 = await pg.evaluate("(()=>{var c=document.querySelector('#npCollection .epg-ch.playing'); return c?c.closest('.epg-row').dataset.chUrl:null; })()")
+    check(n1 == rows[(i + 1) % len(rows)], f'{T} Next: the channel below {cur} -> {n1}')
+    await pg.evaluate("document.getElementById('vctlPrev').click()"); await pg.wait_for_timeout(1000)
+    p1 = await pg.evaluate("(()=>{var c=document.querySelector('#npCollection .epg-ch.playing'); return c?c.closest('.epg-row').dataset.chUrl:null; })()")
+    check(p1 == cur, f'{T} Previous: back to the channel above {p1}')
+    check(await pg.evaluate("document.getElementById('nowPlayingScreen').style.display") == 'flex' and await pg.evaluate("document.body.classList.contains('ltv-dock')"), f'{T} still on Live TV after changing channel')
+    for _ in range(i + 1):
+        await pg.evaluate("document.getElementById('vctlPrev').click()"); await pg.wait_for_timeout(700)
+    w = await pg.evaluate("(()=>{var c=document.querySelector('#npCollection .epg-ch.playing'); return c?c.closest('.epg-row').dataset.chUrl:null; })()")
+    check(w == rows[-1], f'{T} Previous on the first channel goes round to the last {w} vs {rows[-1]}')
+    await pg.evaluate("document.getElementById('vctl').classList.add('show')")
+    if not (await pg.evaluate("document.getElementById('vctlMute').classList.contains('is-muted')")): pass
     # a tab: Movies leaves, Live TV back starts again
     await pg.evaluate("document.querySelector('#ltvTabs .home-tab[data-vtab=movies]').click()"); await pg.wait_for_timeout(1200)
     s5 = await pg.evaluate(STATE)
