@@ -6134,6 +6134,13 @@
       opacity:0; pointer-events:none;
     }
     body.np-open .mobile-nav-btn.active{ color:var(--np-vivid, var(--accent)); }
+    /* Build 571 (Mark): tapping the tab bar's active icon slides the mini player down out of the way
+       (the same slide as Now Playing and Search use) and back up. See toggleMiniBar. */
+    body.mini-hidden .player-bar{
+      transform:translateY(calc(100% + var(--player-bar-bottom) + 24px));
+      opacity:0; pointer-events:none;
+    }
+    body.mini-hidden .mobile-scroll-fade{ height:calc(var(--mnav-total) + 56px); transition:height .3s ease; }
     body.np-open .sidebar-top .hamburger-btn span,
     body.np-open.album-open .sidebar-top .hamburger-btn span,
     body.np-open.artist-open .sidebar-top .hamburger-btn span{ background:var(--np-vivid, #fff); transition: background-color .5s ease; }
@@ -39859,7 +39866,10 @@
   audio.addEventListener('durationchange', syncSeekBar);
   // A local track runs out; a stream never does. Stopping cleanly beats leaving the UI
   // showing a paused track at its own end. A real next/previous queue is Phase 3.
+  var miniAutoAdvance = false;
   audio.addEventListener('ended', function(){
+    // Build 571: the next track starting by itself is not a reason to bring a hidden mini player back.
+    miniAutoAdvance = true; setTimeout(function(){ miniAutoAdvance = false; }, 0);
     // Build 230: the sleep timer's "end of song": stop here instead of going on.
     if(sleepTakeEnd()){
       if(currentStation && isLocalVideo(currentStation)){ onLocalVideoEnded(true); return; }
@@ -51781,6 +51791,17 @@
   // goes through exactly the same handler (history, refresh-on-revisit and all).
   var mobileNav = document.getElementById('mobileNav');
   var mobileNavBtns = mobileNav ? mobileNav.querySelectorAll('.mobile-nav-btn') : [];
+  // Build 571 (Mark): the mini player can be hidden by tapping the active tab (miniHidden), and stays
+  // hidden from page to page until it is tapped again or something is played. Under Watch it starts
+  // hidden every time Watch is entered; tapping the active tab there shows it (watchMiniShown).
+  var miniHidden = false, watchMiniShown = false, miniLastSec = null;
+  function miniEffectiveHidden(){ return miniLastSec === 'video' ? !watchMiniShown : miniHidden; }
+  function applyMiniBar(){ document.body.classList.toggle('mini-hidden', isPhoneLayout() && miniEffectiveHidden()); }
+  function toggleMiniBar(){
+    if(miniLastSec === 'video') watchMiniShown = !watchMiniShown; else miniHidden = !miniHidden;
+    applyMiniBar();
+  }
+  window.addEventListener('resize', applyMiniBar);
   function currentNavSection(){
     if(document.body.classList.contains('search-open')) return 'search';
     if(onPodcastsView || activeShowCollectionId) return 'podcasts';
@@ -51797,6 +51818,8 @@
   function updateMobileNav(){
     if(!mobileNav) return;
     var cur = currentNavSection();
+    if(cur && cur !== 'search' && cur !== miniLastSec){ miniLastSec = cur; if(cur === 'video') watchMiniShown = false; }
+    applyMiniBar();
     Array.prototype.forEach.call(mobileNavBtns, function(b){
       var on = b.dataset.nav === cur;
       b.classList.toggle('active', on);
@@ -51809,6 +51832,11 @@
       var btn = e.target.closest('.mobile-nav-btn');
       if(!btn) return;
       var dest = btn.dataset.nav;
+      // Build 571 (Mark): the tab of the page you are on doesn't reload it; it slides the mini player away or back.
+      if(dest !== 'search' && btn.classList.contains('active') && !document.body.classList.contains('np-open') && !searchSheet.classList.contains('open')){
+        toggleMiniBar();
+        return;
+      }
       // The tab bar shows over Now Playing: any tab but Search leaves it for that section.
       // Search opens its box over Now Playing; running the search is what leaves it.
       if(document.body.classList.contains('np-open') && dest !== 'search') closeNowPlaying(false);
@@ -53092,6 +53120,7 @@
   // so a stream keeps the directory click-ping and the .m3u/.pls fallback below while a
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
+    if(!miniAutoAdvance && miniHidden){ miniHidden = false; try{ applyMiniBar(); }catch(e){} }   // build 571: playing brings the mini player back
     if(track && track.type === 'zen'){ if(track.zenId && zenPreset(track.zenId)) zenSelect(track.zenId, true); return; }
     // Build 262: one of your own channels (a favourite, Continue Watching, the hero, the last
     // thing played): tuned in to what's on it now.
