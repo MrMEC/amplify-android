@@ -225,6 +225,7 @@ public final class VideoOverlay {
   private double ctlPos, ctlDur;
   private String ctlAccent = "";
   private boolean ctlSteps, ctlHasPrev, ctlHasNext;
+  private boolean ctlMuted, ctlCastAvail, ctlCastOn;
 
   VideoOverlay(Activity activity, View webView, Listener listener) {
     this.activity = activity;
@@ -378,6 +379,14 @@ public final class VideoOverlay {
     } catch (Exception e) {
       return false;
     }
+  }
+
+  /** Build 573: Mute and Cast on the picture. */
+  void setExtras(boolean muted, boolean castAvail, boolean castOn) {
+    ctlMuted = muted;
+    ctlCastAvail = castAvail;
+    ctlCastOn = castOn;
+    if (controls != null) controls.setExtras(muted, castAvail, castOn);
   }
 
   /** Build 303: Previous / Next on the picture while the video is part of a queue. */
@@ -537,6 +546,7 @@ public final class VideoOverlay {
     controls.setQuiet(ctlQuiet);
     controls.update(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
     controls.setSteps(ctlSteps, ctlHasPrev, ctlHasNext);
+    controls.setExtras(ctlMuted, ctlCastAvail, ctlCastOn);
     // Posted: resizing the picture from inside a layout pass can be dropped until something else
     // asks for layout, which left a shrunk box drawing nothing.
     box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> box.post(this::fit));

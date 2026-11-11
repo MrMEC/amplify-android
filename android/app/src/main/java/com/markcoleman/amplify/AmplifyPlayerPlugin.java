@@ -2946,6 +2946,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   private double ctlPos, ctlDur;
   private String ctlAccent = "";
   private boolean ctlSteps, ctlHasPrev, ctlHasNext;
+  private boolean ctlMuted, ctlCastAvail, ctlCastOn;
 
   /**
    * What the controls on the picture show: {enabled (false on the floating window), playing,
@@ -2967,6 +2968,10 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     final boolean steps = Boolean.TRUE.equals(call.getBoolean("steps", false));
     final boolean hasPrev = Boolean.TRUE.equals(call.getBoolean("hasPrev", false));
     final boolean hasNext = Boolean.TRUE.equals(call.getBoolean("hasNext", false));
+    // Build 573: Mute and Cast beside Stop.
+    final boolean muted = Boolean.TRUE.equals(call.getBoolean("muted", false));
+    final boolean castAvail = Boolean.TRUE.equals(call.getBoolean("castAvail", false));
+    final boolean castOn = Boolean.TRUE.equals(call.getBoolean("castOn", false));
     // Build 316: a video following on from the last one: don't show the controls as it starts.
     final boolean quiet = Boolean.TRUE.equals(call.getBoolean("quiet", false));
     // Build 503: whether the page's own controls are showing (a Chromebook draws to match).
@@ -2984,10 +2989,14 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
           ctlSteps = steps;
           ctlHasPrev = hasPrev;
           ctlHasNext = hasNext;
+          ctlMuted = muted;
+          ctlCastAvail = castAvail;
+          ctlCastOn = castOn;
           if (video != null) {
             video.setQuiet(quiet);
             video.setControls(enabled, playing, pos, dur, live, full, ctlAccent);
             video.setSteps(steps, hasPrev, hasNext);
+            video.setExtras(muted, castAvail, castOn);
             if (shownOnPage != null) video.showControlsFromPage(shownOnPage);
           }
           call.resolve();
@@ -3089,6 +3098,7 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
             video.setQuiet(ctlQuiet);
             video.setControls(ctlEnabled, ctlPlaying, ctlPos, ctlDur, ctlLive, ctlFull, ctlAccent);
             video.setSteps(ctlSteps, ctlHasPrev, ctlHasNext);
+            video.setExtras(ctlMuted, ctlCastAvail, ctlCastOn);
           }
           if (show && hasVideo) {
             if (VlcEngine.isActive()) video.show(VlcEngine.getTarget(), x, y, w, h);

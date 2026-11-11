@@ -2,9 +2,11 @@
 # written before that load this so a finished import's outcome and any notice are put away at
 # once, and they go on tapping the page as they always did. (The message text is still in the
 # hidden #statusLineText, which some of them read.)
+# Build 573: Live TV starts a channel by itself (muted); the older tests expect the guide page as it was, so they start with that off.
 # Build 489: Artists, Albums and Songs now open sorted by Recent; tests written before that expect
 # the A-Z order (letters, the A-Z rail), so they start with A-Z picked unless a test sets its own.
-AUTO_NOTICE = """try{ if(!localStorage.getItem('radioPlayerLibSort')) localStorage.setItem('radioPlayerLibSort', JSON.stringify({ artists: 'az', albums: 'az', songs: 'az' })); }catch(e){}
+AUTO_NOTICE = """try{ if(localStorage.getItem('radioPlayerLtvAuto') === null) localStorage.setItem('radioPlayerLtvAuto', '0'); }catch(e){}
+try{ if(!localStorage.getItem('radioPlayerLibSort')) localStorage.setItem('radioPlayerLibSort', JSON.stringify({ artists: 'az', albums: 'az', songs: 'az' })); }catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   function watch(id, close){
     var o = document.getElementById(id);

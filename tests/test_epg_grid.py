@@ -319,12 +319,12 @@ async def run(p, theme, width, big):
     await pg.evaluate("(()=>{ var r=Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(x=>x.dataset.chUrl.indexOf('%s')>=0); r.querySelector('.epg-prog.now').click(); })()" % BUZZR); await pg.wait_for_timeout(1800)
     f3 = await pg.evaluate(FOOT)
     check(c3['arrow'] == 'down' and c3['hidden'] and f3['collapsed'] and f3['h'] == 0, f'{T} after a restart: still hidden (no arrow until something plays) {c3} {f3}')
-    # paused (a channel loaded but not playing, as when the app comes back to one): no arrow; playing again: back
+    # build 573 (Mark: the arrow went missing): paused, the arrow under a channel is still there; playing again: the same
     await pg.evaluate("document.getElementById('npPlayBtn').click()"); await pg.wait_for_timeout(500)
     cp = await corner(pg, '#npCollection .epg-corner')
     await pg.evaluate("document.getElementById('npPlayBtn').click()"); await pg.wait_for_timeout(900)
     cq = await corner(pg, '#npCollection .epg-corner')
-    check(cp['hidden'] and not cq['hidden'] and not cq['disabled'], f'{T} paused: no arrow; playing: it’s back {cp["hidden"]} {cq["hidden"]}')
+    check(not cp['hidden'] and not cp['disabled'] and not cq['hidden'] and not cq['disabled'], f'{T} paused: the arrow is still there; playing: it stays {cp["hidden"]} {cq["hidden"]}')
     await pg.evaluate("document.querySelector('#npCollection .epg-corner').click()"); await pg.wait_for_timeout(600)
     check((await pg.evaluate(FOOT))['h'] > 40, f'{T} and shown again')
     # the menu still plays other channels from the grid under the player

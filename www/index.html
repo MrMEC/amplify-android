@@ -3681,9 +3681,9 @@
     background:linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 46%), rgba(0,0,0,.18);
     opacity:0; transition:opacity .22s ease;
   }
-  .vctl-play, .vctl-bar, .vctl-stop, .vctl-step{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
+  .vctl-play, .vctl-bar, .vctl-top, .vctl-step{ opacity:0; visibility:hidden; transition:opacity .22s ease, visibility 0s linear .22s; }
   .vctl.show::before{ opacity:1; }
-  .vctl.show .vctl-play, .vctl.show .vctl-bar, .vctl.show .vctl-stop, .vctl.show.steps .vctl-step{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
+  .vctl.show .vctl-play, .vctl.show .vctl-bar, .vctl.show .vctl-top, .vctl.show.steps .vctl-step{ opacity:1; visibility:visible; transition:opacity .22s ease, visibility 0s; }
   .vctl-step{ display:none; position:absolute; top:50%; left:50%; width:48px; height:48px; margin:-24px 0 0 -24px; border-radius:50%; border:none; padding:0;
     background:rgba(0,0,0,.45); color:#fff; cursor:pointer; align-items:center; justify-content:center; }
   .vctl.steps .vctl-step{ display:flex; }
@@ -3693,11 +3693,59 @@
   .vctl.show.steps .vctl-step:disabled{ opacity:.4; cursor:default; }
   /* Build 246 (Mark): Stop, top right of the controls: ends the video and goes back to where it came
      from (the Live TV guide, or the movie's / show's page). */
+
+  /* ---------- Build 573 (Mark): Live TV, video first ----------
+     A channel from My Channels is the Live TV page: the Watch tabs at the very top (no Watch
+     heading or profile picture), the video right under them, the guide under that. Sideways: the
+     video on the left, the guide with its whole timeline on the right. */
+  .ltv-tabs{ display:none; }
+  @media (max-width: 900px){
+    body.ltv-dock{ --ltv-tabs-h:calc(env(safe-area-inset-top, 0px) + 52px); }
+    body.ltv-dock .ltv-tabs{
+      display:flex; position:fixed; top:0; left:0; right:0; z-index:1100; box-sizing:border-box; height:var(--ltv-tabs-h);
+      margin:0; gap:6px; padding:calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px; align-items:center; flex-wrap:nowrap;
+      overflow-x:auto; scrollbar-width:none; background:var(--bg);
+    }
+    body.ltv-dock .ltv-tabs::-webkit-scrollbar{ display:none; }
+    body.ltv-dock .ltv-tabs .home-tab{ flex:0 0 auto; }
+    body.ltv-dock .np-float, body.ltv-dock .sidebar-top{ display:none !important; }
+    body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap{
+      padding-top:var(--ltv-tabs-h); min-height:calc(var(--ltv-tabs-h) + min(56.25vw, 52vh)); }
+    body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art{ top:var(--ltv-tabs-h); }
+    body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap > .vctl{ top:var(--ltv-tabs-h); }
+    body.np-video-full .ltv-tabs{ display:none !important; }
+    /* Sideways: tabs across the top, the video on the left, the guide on the right. */
+    body.ltv-land{ --ltv-tabs-h:calc(env(safe-area-inset-top, 0px) + 46px); }
+    body.ltv-land .ltv-tabs{ padding-top:calc(env(safe-area-inset-top, 0px) + 6px); padding-bottom:6px; }
+    body.ltv-land:not(.np-video-full) .mobile-nav{ display:none !important; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel{
+      flex-direction:row; align-items:stretch; bottom:0 !important; padding:var(--ltv-tabs-h) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px) !important; overflow:hidden; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-hero{ flex:0 0 52%; width:52%; min-width:0; padding-left:10px; box-sizing:border-box; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap{
+      padding-top:0; min-height:0; height:auto; aspect-ratio:16/9; width:100%; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art{ top:0; height:100%; bottom:auto; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-art-wrap > .vctl{ top:0; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-hero-foot{ padding-left:0; padding-top:8px; padding-bottom:6px; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-below{
+      flex:1 1 0; min-width:0; height:100%; padding:0 !important; margin:0 !important; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel #npCollection{ margin-top:0 !important; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel #npCollection > .np-coll-head{ display:none !important; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel #npCollection #npCollectionGrid{ margin:0 !important; padding:0 !important; }
+    body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel #npCollection .epg.epg-np{ margin:0 !important; }
+  }
+  .vctl-top{ position:absolute; top:10px; right:10px; z-index:1; display:flex; align-items:center; gap:8px; }
+  .vctl-ico-btn{ width:30px; height:30px; padding:0; border:none; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; }
+  .vctl-ico-btn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .vctl-mute .vm-off, .vctl-mute.is-muted .vm-on{ display:none; }
+  .vctl-mute.is-muted .vm-off{ display:block; }
+  .vctl-cast:not([hidden]){ display:flex; }
+  body.cast-on .vctl-cast{ color:var(--np-vivid, var(--accent)); }
   .vctl-stop{
-    position:absolute; top:10px; right:10px; z-index:1; height:30px; padding:0 13px; border-radius:var(--r-pill, 999px); border:none; cursor:pointer;
+    position:static; z-index:1; height:30px; padding:0 13px; border-radius:var(--r-pill, 999px); border:none; cursor:pointer;
     background:rgba(0,0,0,.5); color:#fff; font:inherit; font-size:13px; font-weight:700; letter-spacing:.02em; line-height:30px;
   }
-  body.np-video-full .vctl-stop{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
+  body.np-video-full .vctl-top{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
   .vctl-play{
     position:absolute; left:50%; top:50%; width:64px; height:64px; margin:-32px 0 0 -32px; border-radius:50%;
     display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
@@ -8337,6 +8385,9 @@
       <div class="az-bubble" id="azBubble" aria-hidden="true"></div>
     </div>
 
+    <!-- Build 573 (Mark): Live TV is the video and the guide. The Watch tabs sit at the very top of
+         it (no Watch heading, no profile picture) while a channel with its guide is up. -->
+    <div class="home-tabs scroll-tabs ltv-tabs" id="ltvTabs" role="tablist" aria-label="Watch"></div>
     <div class="now-playing-screen" id="nowPlayingScreen">
       <!-- The close button floats: pinned to the top left of the screen however far it is
            scrolled (a zero-height sticky layer, as .np-backdrop is -- position:fixed would
@@ -8374,7 +8425,17 @@
                (so full screen carries them along). Where the phone draws the picture itself, it
                draws the same controls on it (VideoControls.java). -->
           <div class="vctl" id="vctl">
-            <button type="button" class="vctl-stop" id="vctlStop" aria-label="Stop">Stop</button>
+            <!-- Build 573 (Mark): Cast and Mute beside Stop, top right. -->
+            <div class="vctl-top">
+              <button type="button" class="vctl-ico-btn vctl-cast" id="vctlCast" aria-label="Cast" hidden>
+                <svg class="cast-ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><path d="M2 12a9 9 0 0 1 8 8M2 16a5 5 0 0 1 4 4"/><circle cx="2.4" cy="19.6" r="1.1" fill="currentColor" stroke="none"/></svg>
+              </button>
+              <button type="button" class="vctl-ico-btn vctl-mute" id="vctlMute" aria-label="Mute">
+                <svg class="vm-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.6 6a9 9 0 0 1 0 12"/></svg>
+                <svg class="vm-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m22 9-6 6M16 9l6 6"/></svg>
+              </button>
+              <button type="button" class="vctl-stop" id="vctlStop" aria-label="Stop">Stop</button>
+            </div>
             <!-- Build 303: Previous / Next either side of Play while the video is part of a queue. -->
             <button type="button" class="vctl-step vctl-prev" id="vctlPrev" aria-label="Previous">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="6" width="2.5" height="12" rx="1"/><path d="M18.5 6L9.5 12l9 6z"/></svg>
@@ -15374,17 +15435,18 @@
     var msg = { enabled: on, playing: vctlPlaying(), live: !npSeekApplies(), full: !!npVideoFull,
       pos: Math.round(t.pos * 10) / 10, dur: Math.round(t.dur * 10) / 10, accent: vctlAccent,
       steps: stp.on, hasPrev: stp.prev, hasNext: stp.next, quiet: vctlQuiet(),
-      shown: vctl.classList.contains('show') };
+      shown: vctl.classList.contains('show'),
+      muted: vctlMuted(), castAvail: document.body.classList.contains('cast-avail'), castOn: document.body.classList.contains('cast-on') };
     // The phone counts the time along by itself; the position is sent again only when it moves
     // on by a couple of seconds or jumps (so a timeupdate a few times a second isn't a message each).
-    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext, msg.quiet, msg.shown].join('|');
+    var key = [msg.enabled, msg.playing, msg.live, msg.full, msg.dur, Math.floor(msg.pos / 2), msg.accent, msg.steps, msg.hasPrev, msg.hasNext, msg.quiet, msg.shown, msg.muted, msg.castAvail, msg.castOn].join('|');
     if(key === vctlNativeKey) return;
     vctlNativeKey = key;
     videoPlugin.setVideoControls(msg)['catch'](function(){});
   }
   vctl.addEventListener('click', function(e){
     e.stopPropagation();
-    if(e.target.closest('.vctl-play, .vctl-bar, .vctl-stop, .vctl-step')){ vctlShow(true); return; }
+    if(e.target.closest('.vctl-play, .vctl-bar, .vctl-top, .vctl-step')){ vctlShow(true); return; }
     vctlShow(!vctl.classList.contains('show'));
   });
   // Any button or the bar touched keeps them up for another 3 seconds.
@@ -15395,6 +15457,23 @@
   document.getElementById('vctlPrev').addEventListener('click', function(e){ e.stopPropagation(); vctlShow(true); vctlStep(-1); });
   document.getElementById('vctlNext').addEventListener('click', function(e){ e.stopPropagation(); vctlShow(true); vctlStep(1); });
   document.getElementById('vctlStop').addEventListener('click', function(e){ e.stopPropagation(); npStopVideo(); });
+  // Build 573 (Mark): Mute and Cast on the picture. A channel started from Live TV begins muted
+  // (it plays by itself as the page opens); Mute here turns the sound on or off for any video.
+  function vctlMuted(){ try{ return !!audio.muted; }catch(e){ return false; } }
+  function vctlToggleMute(){
+    try{ audio.muted = !audio.muted; }catch(e){}
+    try{ npVideo.muted = !!audio.muted; }catch(e){}
+    vctlSyncExtras();
+  }
+  function vctlSyncExtras(){
+    var m = vctlMuted(), mb = document.getElementById('vctlMute'), cb = document.getElementById('vctlCast');
+    if(mb){ mb.classList.toggle('is-muted', m); mb.setAttribute('aria-label', m ? 'Unmute' : 'Mute'); mb.setAttribute('aria-pressed', m ? 'true' : 'false'); }
+    if(cb){ cb.hidden = !document.body.classList.contains('cast-avail'); }
+    try{ if(nowPlayingScreen.classList.contains('np-vplayer')) vctlPushNative(); }catch(e){}
+  }
+  document.getElementById('vctlMute').addEventListener('click', function(e){ e.stopPropagation(); vctlShow(true); vctlToggleMute(); });
+  document.getElementById('vctlCast').addEventListener('click', function(e){ e.stopPropagation(); vctlShow(true); var b = document.getElementById('castBtn'); if(b) b.click(); });
+  try{ new MutationObserver(vctlSyncExtras).observe(document.body, { attributes: true, attributeFilter: ['class'] }); }catch(e){}
   // Build 246 (Mark): Stop on the video. The video stops and closes, Now Playing closes, and the page
   // under it is where the video came from: the Live TV guide for a channel, the movie's or the
   // show's page for a video on the phone (or from Plex).
@@ -15414,6 +15493,7 @@
       videoChannelsEditing = false;
       if(onVideoView){ renderVideoHome(); } else { pushView(); openVideoHome(); }
       window.scrollTo(0, 0);
+      ltvDisarm(); ltvLeaveSound();   // build 573: Stop leaves the guide as it is: no channel starts by itself
     } else if(vid){
       var where = vid.videoKind === 'episode' && vid.showKey ? 's:' + vid.showKey : 'm:' + vid.id;
       if(!(onVideoDetailView && videoDetailWhere === where)) pushView();
@@ -15461,6 +15541,10 @@
         npVideoFullBtn.click();
       } else if(a === 'stop'){
         npStopVideo();
+      } else if(a === 'mute'){
+        vctlToggleMute();
+      } else if(a === 'cast'){
+        var cbn = document.getElementById('castBtn'); if(cbn) cbn.click();
       } else if(a === 'prev' || a === 'next'){
         vctlStep(a === 'prev' ? -1 : 1);
       }
@@ -22024,6 +22108,15 @@
       var matches = rotateLockQuery.matches;
       var wasActive = document.body.classList.contains('rotate-lock');
       var cfOnlyWas = document.body.classList.contains('cf-only');
+      // Build 573 (Mark): Live TV turned sideways keeps its own layout (tabs, the video on the left, the
+      // whole guide on the right) instead of the landscape Now Playing.
+      if(matches && document.body.classList.contains('ltv-dock')){
+        document.body.classList.remove('epg-land');
+        if(wasActive){ rotateLockOpenedNp = false; document.body.classList.remove('rotate-lock', 'cf-only'); }
+        document.body.classList.add('ltv-land');
+        return;
+      }
+      document.body.classList.remove('ltv-land');
       var active = matches && (landPrefs.np || (wasActive && cfOnlyWas && landPrefs.cf));
       var cfOnly = active && !landPrefs.np;
       var coverFlowFromLibrary = null;
@@ -24714,12 +24807,13 @@
     }
     return st;
   }
-  function playChannel(ch){
-    if(ch && isLiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true }); return; }
-    if(ch && isArchiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true }); return; }
+  function playChannel(ch, opts){
+    opts = opts || {};
+    if(ch && isLiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true, still: !!opts.still }); return; }
+    if(ch && isArchiveChUrl(ch.url)){ tuneLiveChannel(ch.url, { open: true, still: !!opts.still }); return; }
     var st = channelToStation(ch);
     playStation(st);
-    openNowPlaying(st, true);
+    openNowPlaying(st, !opts.still);
   }
   function addVideoChannel(ch){
     if(!ch || !ch.url || findVideoChannel(ch.url)) return false;
@@ -24817,6 +24911,7 @@
     libraryShuffleBtn.style.display = 'none';
     setResultCount(null);
     videoAddHeaderBtnEl.style.display = '';
+    if(videoTab === 'channels') ltvArm();   // build 573: Live TV starts a channel by itself
     renderVideoHome();
   }
   // The Video page: Continue Watching (anything part-watched on the phone), then three tabs --
@@ -24892,6 +24987,7 @@
     // fill in as they arrive.
     stationsGrid.appendChild(buildEpgGrid(epgAllChannels(mine)));
     guideRefresh(mine.filter(function(ch){ return !!guideSource(ch); }));
+    ltvAutoplaySoon();
     return;
     var split = splitFavChannels(mine);
     if(split.favs.length){
@@ -25542,7 +25638,7 @@
     adFails = 0;
     var t = adTrack(ch, { ch: ch.url, showId: slot.v.id, slotEnd: slot.e }, ad);
     playStation(t);
-    if(opts.open) openNowPlaying(t, true);
+    if(opts.open) openNowPlaying(t, !opts.still);
     else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
     return true;
   }
@@ -25603,7 +25699,7 @@
     t._liveItemStart = slot.s;
     Object.defineProperty(t, '_liveTuned', { value: true, enumerable: false });
     playStation(t);
-    if(opts.open) openNowPlaying(t, true);
+    if(opts.open) openNowPlaying(t, !opts.still);
     else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
     return true;
   }
@@ -26202,15 +26298,17 @@
   // 1.75 half hours across a phone held upright (it was a fixed 124px), 2.25 sideways, so a
   // 22-minute show is a readable block. Worked out each time a guide is drawn, and the guides
   // are drawn again when the phone turns.
-  function epgSlotWidth(){
+  function epgSlotWidth(np){
     var vw = window.innerWidth || 390, land = vw > (window.innerHeight || 0);
-    return Math.round(Math.min(360, Math.max(170, (vw - EPG_CH_W) / (land ? 2.25 : 1.75))));
+    // Build 573: sideways under a channel the guide has the right half (the video is on the left).
+    if(np && land && vw <= 900) vw = Math.round(vw * 0.46);
+    return Math.round(Math.min(360, Math.max(150, (vw - EPG_CH_W) / (land ? 2.25 : 1.75))));
   }
   var epgResizeTimer = 0;
   window.addEventListener('resize', function(){
     clearTimeout(epgResizeTimer);
     epgResizeTimer = setTimeout(function(){
-      if(epgSlotWidth() === EPG_SLOT_W || !document.querySelector('.epg')) return;
+      if(epgSlotWidth(!!document.querySelector('#npCollection .epg-np')) === EPG_SLOT_W || !document.querySelector('.epg')) return;
       try{
         if(typeof onVideoView !== 'undefined' && onVideoView && stationsGrid.querySelector(':scope > .epg')) rerenderVideoKeepingScroll();
         refreshChannelGrids();
@@ -26241,7 +26339,7 @@
   }
   function buildEpgGrid(channels, opts){
     opts = opts || {};
-    EPG_SLOT_W = epgSlotWidth();
+    EPG_SLOT_W = epgSlotWidth(!!opts.np);
     var now = Date.now(), t0 = epgStart(now), t1 = t0 + EPG_SLOTS * EPG_SLOT_MS;
     var wrap = document.createElement('div');
     wrap.className = 'epg' + (opts.np ? ' epg-np' : '');
@@ -26320,6 +26418,9 @@
     // all (its place kept, so the times stay where they are). A station merely remembered from
     // last time (shown in the player bar, not playing) doesn't count.
     var on = !!currentStation && (uiIsPlaying || attemptInProgress);
+    // Build 573 (Mark: the arrow went missing): in the guide under a channel it is always there,
+    // playing, paused or between channels; it only hid itself when the channel wasn't playing.
+    if(!on && b.closest && b.closest('#npCollection') && nowPlayingScreen.classList.contains('np-channel')) on = true;
     b.disabled = !on;
     b.classList.toggle('off', !on);
     var want = npFootCollapsed ? 'down' : 'up';
@@ -26374,6 +26475,102 @@
       ['height', 'paddingTop', 'paddingBottom', 'opacity', 'overflow', 'transition', 'boxSizing'].forEach(function(k){ foot.style[k] = ''; });
       nowPlayingScreen.classList.toggle('np-foot-collapsed', npFootCollapsed);
     }, 360);
+  }
+
+  // ---- Build 573 (Mark): Live TV is the video and the guide
+  // A channel from My Channels with its guide under it is the Live TV page: the Watch tabs at the
+  // very top (the tabs strip in the page, body.ltv-dock), the video under them, the guide under
+  // that. Opening Live TV starts a channel by itself, muted, when nothing else is playing.
+  var ltvAutoArmed = false, ltvAutoTimer = 0, ltvMutedByUs = false;
+  var LTV_TABS = [['channels', 'Live TV'], ['movies', 'Movies'], ['shows', 'TV Shows'], ['music', 'Music Videos'], ['continue', 'Continue']];
+  function ltvPhone(){ return (window.innerWidth || 0) <= 900; }
+  function ltvTabsSync(){
+    var host = document.getElementById('ltvTabs');
+    if(!host) return;
+    if(!host.firstChild){
+      LTV_TABS.forEach(function(t){
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'home-tab';
+        b.textContent = t[1];
+        b.dataset.vtab = t[0];
+        b.setAttribute('role', 'tab');
+        b.addEventListener('click', function(){
+          if(videoTab === t[0]) return;
+          videoTab = t[0];
+          vsave(VIDEO_TAB_KEY, videoTab);
+          videoChannelsEditing = false;
+          try{ closeNowPlaying(true, false); }catch(e){}
+          if(onVideoView){ renderVideoHome(); } else { pushView(); openVideoHome(); }
+          window.scrollTo(0, 0);
+        });
+        host.appendChild(b);
+      });
+    }
+    Array.prototype.forEach.call(host.children, function(b){
+      var on = b.dataset.vtab === videoTab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+  function syncLtvDock(){
+    var on = ltvPhone() && nowPlayingScreen.style.display === 'flex' && nowPlayingScreen.classList.contains('np-tv') &&
+      npCollection.classList.contains('np-epg') && npCollection.style.display !== 'none';
+    var was = document.body.classList.contains('ltv-dock');
+    if(on === was) return;
+    document.body.classList.toggle('ltv-dock', on);
+    if(on) ltvTabsSync();
+    // Left (the screen closed, another kind of thing playing): what the page started muted stops with it.
+    if(!on && ltvMutedByUs && vctlMuted()){ try{ stopPlayback(); }catch(e){} }
+    if(!on) ltvLeaveSound();
+    setTimeout(function(){ try{ if(typeof syncRotateLock === 'function') syncRotateLock(); }catch(e){} }, 0);
+    setTimeout(syncEpgFootBtns, 0);
+  }
+  // A channel the page started muted: once the person has left it (or played something else), the
+  // sound is back for whatever plays next.
+  function ltvLeaveSound(){
+    if(!ltvMutedByUs) return;
+    ltvMutedByUs = false;
+    try{ audio.muted = false; }catch(e){}
+    try{ npVideo.muted = false; }catch(e){}
+    try{ vctlSyncExtras(); }catch(e){}
+  }
+  (function(){
+    var sync = function(){ try{ syncLtvDock(); }catch(e){} };
+    try{
+      var mo = new MutationObserver(sync);
+      mo.observe(nowPlayingScreen, { attributes: true, attributeFilter: ['style', 'class'] });
+      mo.observe(npCollection, { attributes: true, attributeFilter: ['style', 'class'] });
+    }catch(e){}
+    window.addEventListener('resize', sync);
+  })();
+  function ltvArm(){ ltvAutoArmed = true; }
+  function ltvDisarm(){ ltvAutoArmed = false; clearTimeout(ltvAutoTimer); ltvAutoTimer = 0; }
+  // Called as the Live TV page is drawn.
+  function ltvAutoplaySoon(){
+    if(!ltvAutoArmed || ltvAutoTimer) return;
+    ltvAutoTimer = setTimeout(ltvAutoplayNow, 60);
+  }
+  function ltvAutoplayNow(){
+    ltvAutoTimer = 0;
+    if(!ltvAutoArmed) return;
+    ltvAutoArmed = false;
+    try{ if(localStorage.getItem('radioPlayerLtvAuto') === '0') return; }catch(e){}   // off: Live TV opens on the guide alone
+    if(!ltvPhone() || !onVideoView || videoTab !== 'channels' || videoChannelsEditing) return;
+    if(nowPlayingScreen.style.display === 'flex') return;
+    if(uiIsPlaying || attemptInProgress) return;      // something is playing: it carries on
+    var list = epgAllChannels(visibleVideoChannels());
+    if(!list.length) return;
+    var pick = null, last = lastPlayedStation();
+    if(last){
+      var lu = last.liveCh || last.urlToResolve || last.url_resolved || last.url || '';
+      list.forEach(function(c){ if(!pick && c.url && c.url === lu) pick = c; });
+    }
+    if(!pick) pick = list[0];
+    ltvMutedByUs = true;
+    try{ audio.muted = true; }catch(e){}
+    try{ playChannel(pick, { still: true }); }catch(e){ ltvLeaveSound(); }
+    try{ vctlSyncExtras(); }catch(e){}
   }
   function placeEpgNow(wrap, now){
     var t0 = Number(wrap.dataset.t0), line = wrap.querySelector('.epg-now'), mark = wrap.querySelector('.epg-now-mark');
@@ -30311,6 +30508,7 @@
         if(videoTab === t[0]) return;
         videoTab = t[0];
         vsave(VIDEO_TAB_KEY, videoTab);
+        if(videoTab === 'channels') ltvArm();
         renderVideoHome();
       });
       tabs.appendChild(b);
@@ -49496,7 +49694,7 @@
     var t = archiveUnitTrack(ch, slot.u);
     t._liveItemStart = slot.s;
     playStation(t);
-    if(opts.open) openNowPlaying(t, true);
+    if(opts.open) openNowPlaying(t, !opts.still);
     else if(opts.follow && nowPlayingScreen.style.display === 'flex' && npStation && npStation.liveCh === ch.url) openNowPlaying(t);
     return true;
   }
@@ -53123,6 +53321,7 @@
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
     if(!miniAutoAdvance && miniHidden){ miniHidden = false; try{ applyMiniBar(); }catch(e){} }   // build 571: playing brings the mini player back
+    if(ltvMutedByUs && track && !(track.liveCh || track.archiveCh || track.videoChannel || isLocalVideo(track))){ try{ ltvLeaveSound(); }catch(e){} }   // build 573: the muted channel's sound doesn't follow you to a radio station
     if(track && track.type === 'zen'){ if(track.zenId && zenPreset(track.zenId)) zenSelect(track.zenId, true); return; }
     // Build 262: one of your own channels (a favourite, Continue Watching, the hero, the last
     // thing played): tuned in to what's on it now.
