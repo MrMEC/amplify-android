@@ -1,4 +1,4 @@
-"""Build 567: the profile picture (top right) fades with Home's logo instead of sliding away.
+"""Build 570: the profile picture (top right) fades with Home's logo, and stays out (as the tabs stay stuck) until the page is back at the top.
 Fades out at the logo's scroll position (past 8px), fades back in on a scroll up, on every page.
 Run: python3 tests/test_avatar_fade.py (screenshots in /tmp/claude-0/t/shots)"""
 import sys as _nsys, os as _nos; _nsys.path.insert(0, _nos.path.dirname(_nos.path.abspath(__file__))); from notice_auto import AUTO_NOTICE
@@ -33,11 +33,14 @@ async def page_cycle(pg, cdp, name):
     check(s1[3] > 8 and s1[0] == 0, f'[{name}] scrolled down: the picture has faded out {s1}')
     check(abs(s1[2] - top0) < 1, f'[{name}] it faded where it was, it did not slide ({top0} -> {s1[2]})')
     await pg.screenshot(path=f'{SHOTS}/avfade-{name}-2down.png', clip={'x': 0, 'y': 0, 'width': 390, 'height': 140})
+    tabs = "(function(){ var t = Array.prototype.slice.call(document.querySelectorAll('.lib-tabs, .watch-tabs, #podcastTabs')).filter(function(e){ return e.offsetParent !== null; })[0]; return t && t.offsetParent !== null ? Math.round(t.getBoundingClientRect().top) : null; })()"
+    tb1 = await pg.evaluate(tabs)
     await swipe(cdp, -60); s2a = await state(pg)
-    check(s2a[0] == 0, f'[{name}] a small scroll up (60px) does not bring it back {s2a}')
-    await swipe(cdp, -60); s2 = await state(pg)
-    check(s2[3] > 8 and s2[0] == 1, f'[{name}] after a longer scroll up (120px) it fades back in {s2}')
-    check(abs(s2[2] - top0) < 1, f'[{name}] and it did not slide down from the top ({top0} -> {s2[2]})')
+    check(s2a[0] == 0, f'[{name}] scrolling up (60px) does not bring the picture back {s2a}')
+    await swipe(cdp, -120); s2 = await state(pg)
+    check(s2[3] > 8 and s2[0] == 0, f'[{name}] nor a longer scroll up (180px) {s2}')
+    tb2 = await pg.evaluate(tabs)
+    check(tb1 == tb2, f'[{name}] sticky tabs have not moved on the scroll up ({tb1} -> {tb2})')
     await pg.screenshot(path=f'{SHOTS}/avfade-{name}-3up.png', clip={'x': 0, 'y': 0, 'width': 390, 'height': 140})
     await swipe(cdp, 120); s3 = await state(pg)
     check(s3[0] == 0, f'[{name}] down again: faded out again {s3}')
@@ -62,7 +65,7 @@ async def run(B, theme):
         if await btn.count():
             await btn.tap(); await pg.wait_for_timeout(900)
             # these pages are short on an empty library: give the page height so it can scroll (the header logic is the same)
-            await pg.evaluate("(function(){ var d = document.getElementById('avSpacer') || document.createElement('div'); d.id = 'avSpacer'; d.style.cssText = 'height:2600px;pointer-events:none'; document.getElementById('browseView').appendChild(d); window.scrollTo(0,0); })()"); await pg.wait_for_timeout(300)
+            await pg.evaluate("(function(){ var d = document.getElementById('avSpacer') || document.createElement('div'); d.id = 'avSpacer'; d.style.cssText = 'height:2600px;pointer-events:none'; (document.getElementById('stationsGrid') || document.getElementById('browseView')).appendChild(d); window.scrollTo(0,0); })()"); await pg.wait_for_timeout(300)
             await page_cycle(pg, cdp, f'{theme}-{tab}')
     check(not errs, f'[{theme}] no page errors {errs[:2]}')
     await c.close()

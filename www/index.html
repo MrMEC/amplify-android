@@ -1109,7 +1109,7 @@
     }
   }
   /* Build 185: with the header slid away, the tabs ride up to the top of the screen. */
-  @media (max-width: 900px){ body.hdr-autohide.hdr-hidden.search-view #searchTabs{ top:0; } }
+  @media (max-width: 900px){ body.hdr-autohide.hdr-stuck.search-view #searchTabs{ top:0; } }
   /* Build 228: the Podcasts page's date headings stay at the top while their episodes scroll
      under them (phones), the next date pushing the last one away. They sit under the header,
      and follow it up when it hides on the way down, like the search tabs. Full width, on the
@@ -1123,7 +1123,7 @@
     }
     .tile-grid > .podcast-date-heading::after{ content:''; position:absolute; left:var(--main-pad); right:var(--main-pad); bottom:-1px; border-bottom:1px solid var(--border); }
     .tile-grid > .podcast-date-heading{ border-bottom:0; }
-    body.hdr-autohide.hdr-hidden .tile-grid > .podcast-date-heading{ top:0; }
+    body.hdr-autohide.hdr-stuck .tile-grid > .podcast-date-heading{ top:0; }
   }
   .clear-search-btn.search-save-btn{ padding:7px 14px; }
   .recent-searches-head{ grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; }
@@ -3820,7 +3820,7 @@
   .epg-head{ position:sticky; top:0; z-index:5; display:flex; height:34px; background:var(--epg-bg); }
   @media (max-width: 900px){
     .tile-grid > .epg > .epg-head{ top:60px; transition:top .28s cubic-bezier(.4,0,.2,1); }
-    body.hdr-autohide.hdr-hidden .tile-grid > .epg > .epg-head{ top:0; }
+    body.hdr-autohide.hdr-stuck .tile-grid > .epg > .epg-head{ top:0; }
   }
   .epg-corner{ flex:none; width:80px; height:34px; display:flex; align-items:center; justify-content:center;
     background:var(--epg-bg); border:0; color:var(--text-dim); cursor:pointer; padding:0; }
@@ -5067,7 +5067,7 @@
     body.kb-open .mobile-scroll-fade{ display:none !important; }
     /* Build 329's :has() rule for the mini Now Playing is gone (build 485): the global
        body.kb-open .player-bar rule (build 404) already hides it for every input. */
-    body.hdr-autohide.hdr-hidden.search-open.search-view #searchTabs{ top:var(--search-sheet-h); }
+    body.hdr-autohide.hdr-stuck.search-open.search-view #searchTabs{ top:var(--search-sheet-h); }
 
     /* Content clears the tab bar plus the player bar above it. */
     .main, body.album-open .main, body.artist-open .main{
@@ -5903,8 +5903,8 @@
        (see .hb-avatar and hdr-av-off). So the header box itself stays put, and what else lives in it
        (the page's name, the cast button) slides away and back on its own, as before. */
     .sidebar-top .hdr-page-label, .sidebar-top .cast-btn{ transition:transform .28s cubic-bezier(.4,0,.2,1); }
-    body.hdr-autohide.hdr-hidden:not(.drawer-open) .sidebar-top .hdr-page-label,
-    body.hdr-autohide.hdr-hidden:not(.drawer-open) .sidebar-top .cast-btn{ transform:translateY(-80px); }
+    body.hdr-autohide.hdr-stuck:not(.drawer-open) .sidebar-top .hdr-page-label,
+    body.hdr-autohide.hdr-stuck:not(.drawer-open) .sidebar-top .cast-btn{ transform:translateY(-80px); }
     body.hdr-autohide.hdr-hidden.np-open:not(.drawer-open) .np-float .np-back{ transform:translateY(-90px); }
   }
 
@@ -6723,8 +6723,8 @@
     #stationsGrid > .lib-tabs.stab-stuck, #stationsGrid > .watch-tabs.stab-stuck, #podcastTabs.stab-stuck{
       box-shadow:0 -30px 0 var(--main-bg), 0 -45px 0 var(--main-bg), 0 -60px 0 var(--main-bg), 0 6px 0 var(--main-bg);
     }
-    body.hdr-autohide.hdr-hidden #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs,
-    body.hdr-autohide.hdr-hidden #podcastTabs{ top:8px; }
+    body.hdr-autohide.hdr-stuck #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs,
+    body.hdr-autohide.hdr-stuck #podcastTabs{ top:8px; }
     /* Build 476 (Mark): while the tabs are stuck, the page's name fades in where its heading sits
        at the top of the page (same place, size and colour, copied from the heading by
        syncStickyTabs), filling the top left beside the menu button. It is part of the header, so
@@ -6737,9 +6737,9 @@
     #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
     #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(66px + var(--stab-h, 34px)); }
-    body.hdr-autohide.hdr-hidden #stationsGrid > .watch-tabs ~ .epg > .epg-head,
-    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
-    body.hdr-autohide.hdr-hidden #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(14px + var(--stab-h, 34px)); }
+    body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head,
+    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
+    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(14px + var(--stab-h, 34px)); }
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
@@ -13823,11 +13823,12 @@
   // Playing its Menu and minimise buttons) slides up once the page has moved down a little,
   // and comes back on the first scroll up. Near the top of the page it always shows. Now
   // Playing scrolls inside its own screen, so that is the scroll followed while it is open.
-  var hdrLastY = 0, hdrDownRun = 0, hdrUpRun = 0;
+  var hdrLastY = 0, hdrDownRun = 0, hdrStuckRun = 0;
   var HDR_SHOW_ABOVE = 80, HDR_HIDE_AFTER = 24;
   // Build 567 (Mark): the profile picture only fades back in after this much continuous scroll up
   // (px), so a small upward nudge doesn't bring it back by accident. Back at the top it shows at once.
-  var HDR_AV_SHOW_AFTER = 90;
+  // Build 570 (Mark): no scroll-up-to-show. Once the page has been scrolled down, the profile picture
+  // stays faded out and the tabs stay stuck at the top (hdr-stuck) until the page is back at the top.
   function hdrAutoHidePage(){
     var b = document.body.classList;
     // Build 255: not while Search is open; its box takes the header's place and stays put.
@@ -13838,10 +13839,11 @@
     return window.scrollY || window.pageYOffset || 0;
   }
   function hdrReset(){
-    hdrDownRun = 0; hdrUpRun = 0;
+    hdrDownRun = 0; hdrStuckRun = 0;
     hdrLastY = hdrScrollY();
     document.body.classList.remove('hdr-hidden');
-    document.body.classList.remove('hdr-av-off');
+    document.body.classList.remove('hdr-stuck');
+    document.body.classList.toggle('hdr-av-off', hdrAutoHidePage() && hdrLastY > 8);
     document.body.classList.toggle('hdr-autohide', hdrAutoHidePage());
     document.body.classList.toggle('hdr-scrolled', hdrLastY > 8);
   }
@@ -13853,13 +13855,14 @@
     hdrLastY = y;
     // Build 323: Home's logo fades once the page has moved (the header has no background now).
     document.body.classList.toggle('hdr-scrolled', y > 8);
-    // Build 567 (Mark): the profile picture fades out at the logo's scroll position (past 8px) while
-    // scrolling down, and fades back in after a deliberate scroll up of HDR_AV_SHOW_AFTER px (or at the top). Never a slide.
-    if(!on || y <= 8){ hdrUpRun = 0; document.body.classList.remove('hdr-av-off'); }
-    else if(dy > 0){ hdrUpRun = 0; document.body.classList.add('hdr-av-off'); }
-    else if(dy < 0){
-      hdrUpRun -= dy;
-      if(hdrUpRun >= HDR_AV_SHOW_AFTER) document.body.classList.remove('hdr-av-off');
+    // Build 567/570 (Mark): the profile picture fades out at the logo's scroll position (past 8px) and
+    // stays out until the page is back at the top; the tabs likewise stay stuck (hdr-stuck): set once
+    // the page has been scrolled down a little, cleared only back at the top. Nothing returns on a scroll up.
+    document.body.classList.toggle('hdr-av-off', on && y > 8);
+    if(!on || y <= 8){ hdrStuckRun = 0; document.body.classList.remove('hdr-stuck'); }
+    else if(y >= HDR_SHOW_ABOVE && dy > 0){
+      hdrStuckRun += dy;
+      if(hdrStuckRun >= HDR_HIDE_AFTER) document.body.classList.add('hdr-stuck');
     }
     if(!on || y < HDR_SHOW_ABOVE){ hdrDownRun = 0; document.body.classList.remove('hdr-hidden'); return; }
     if(dy > 0){
