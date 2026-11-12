@@ -35,14 +35,28 @@ async def main():
                 if await pg.evaluate("(js)=>window.__h.ev(js)", 'libraryTracks.length') >= len(files): break
             await pg.evaluate("(js)=>window.__h.ev(js)", "runLibrarySection('songs'); 1"); await pg.wait_for_timeout(800)
             await pg.tap('#stationsGrid .song-row:not(.shuffle-all-row)'); await pg.wait_for_timeout(1200)
+            # Build 590: the sideways Now Playing is for Now Playing itself (other pages keep the rail).
+            await pg.evaluate("(js)=>window.__h.ev(js)", "if(nowPlayingScreen.style.display!=='flex') openNowPlaying(); 1"); await pg.wait_for_timeout(1000)
             await pg.set_viewport_size({'width': size[0], 'height': size[1]}); await pg.wait_for_timeout(1500)
             g = await pg.evaluate(GEO)
             T = '[%s %dx%d]' % (theme, size[0], size[1])
             check(g['rot'], T + ' sideways Now Playing')
             check(g['waveT'] >= g['subB'] + 2, T + ' the wave clears the artist / album line (%.1f below %.1f)' % (g['waveT'], g['subB']))
             check(g['playT'] >= g['seekB'] and g['playB'] <= g['vh'] - 4, T + ' controls below the bar and on screen (%.1f..%.1f of %d)' % (g['playT'], g['playB'], g['vh']))
-            check(g['radius'] in ('50%',) or abs(float(g['radius'].replace('px', '') or 0) - g['playW'] / 2) < 1, T + ' Play / Pause is a circle (%s, %.0fx%.0f)' % (g['radius'], g['playW'], g['playH']))
+            check(g['radius'] in ('50%', '999px') or abs(float(g['radius'].replace('px', '') or 0) - g['playW'] / 2) < 1, T + ' Play / Pause is a circle (%s, %.0fx%.0f)' % (g['radius'], g['playW'], g['playH']))
             await pg.screenshot(path='%s/land-np-spacing-%s.png' % (shots, theme))
+            # Build 590: Now Playing closed sideways gives the page (and the rail) back; opened sideways
+            # it fills the screen again; a page turned sideways with Now Playing closed keeps the rail.
+            RAIL = "(()=>{ var n=document.getElementById('mobileNav'), e=document.elementFromPoint(30, innerHeight/2); return [document.body.classList.contains('rotate-lock'), !!(n && n.contains(e))]; })()"
+            await pg.evaluate("(js)=>window.__h.ev(js)", "closeNowPlaying(true); 1"); await pg.wait_for_timeout(1200)
+            r = await pg.evaluate(RAIL); check(r == [False, True], T + ' Now Playing closed sideways: page with the rail %s' % r)
+            await pg.screenshot(path='%s/land-np-closed-%s.png' % (shots, theme))
+            await pg.evaluate("document.getElementById('playerNowTrigger').click()"); await pg.wait_for_timeout(1500)
+            r = await pg.evaluate(RAIL); check(r == [True, False], T + ' Now Playing opened sideways fills the screen %s' % r)
+            await pg.evaluate("(js)=>window.__h.ev(js)", "closeNowPlaying(true); 1"); await pg.wait_for_timeout(1000)
+            await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(1200)
+            await pg.set_viewport_size({'width': size[0], 'height': size[1]}); await pg.wait_for_timeout(1500)
+            r = await pg.evaluate(RAIL); check(r == [False, True], T + ' turned with Now Playing closed (music playing): the rail %s' % r)
             check(not errs, T + ' no page errors %s' % errs[:2])
             await b.close()
     print('ALL PASSED' if not fails else 'FAILED %s' % fails)

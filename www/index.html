@@ -22644,7 +22644,19 @@
         return;
       }
       document.body.classList.remove('ltv-land');
-      var active = matches && (landPrefs.np || (wasActive && cfOnlyWas && landPrefs.cf));
+      // Build 590 (Mark: the rail often went missing sideways, with a black screen): since the rail
+      // (build 586) every page keeps its own layout on its side. The sideways Now Playing takes the
+      // whole screen only while Now Playing itself is showing (open when the phone turned, or
+      // opened sideways), and Cover Flow still opens from Albums and Artists. It used to open
+      // Now Playing over any page that turned -- and again whenever something else asked (leaving
+      // Live TV, say), so the rail vanished behind a Now Playing (black, for a channel's stopped
+      // video) that couldn't be closed; and Now Playing closed while sideways left the screen up.
+      var npShown = nowPlayingScreen.style.display === 'flex' && !npClosing();
+      // (Cover Flow on its own, Horizontal Now Playing off, shows without Now Playing being opened.)
+      var cfShown = cfOnlyWas && nowPlayingScreen.classList.contains('la-open');
+      var active = matches && wasActive && (npShown || cfShown) && (landPrefs.np || (cfOnlyWas && landPrefs.cf));
+      var enterNp = matches && !wasActive && npShown && landPrefs.np;
+      if(enterNp) active = true;
       var cfOnly = active && !landPrefs.np;
       var coverFlowFromLibrary = null;
       // Build 244 (Mark): turned sideways on Live TV with nothing playing, the guide grid alone fills
@@ -22669,11 +22681,11 @@
       }
       // Horizontal Now Playing off: sideways on Albums or Artists (or an album or artist page) still
       // opens Cover Flow, with no Now Playing behind it.
-      if(matches && !wasActive && !landPrefs.np && landPrefs.cf && !document.body.classList.contains('np-open') && libraryDirectoryInView()){
-        active = true; cfOnly = true;
+      if(matches && !wasActive && !npShown && landPrefs.cf && libraryDirectoryInView()){
+        active = true; cfOnly = !landPrefs.np;
       }
       if(active && !wasActive){
-        if(document.body.classList.contains('np-open')){
+        if(npShown){
           rotateLockOpenedNp = false;
         } else {
           // Turning the phone while looking at My Library's Albums or Artists goes straight to
@@ -22695,9 +22707,10 @@
           openNowPlaying();
         }
       } else if(!active && wasActive){
+        try{ setLandAlbumsOpen(false); }catch(e){}
         if(rotateLockOpenedNp){
           rotateLockOpenedNp = false;
-          closeNowPlaying(true);
+          if(npShown) closeNowPlaying(true);
         }
       }
       document.body.classList.toggle('rotate-lock', active);
@@ -22877,6 +22890,15 @@
     syncLandAlbumsBtn();
     syncRotateLock();
     renderLandFavs();
+    // Now Playing opening or closing while sideways brings the sideways screen in or takes it away
+    // (a moment later, so Live TV's own layout is settled first).
+    if(window.MutationObserver){
+      var rlT = 0;
+      new MutationObserver(function(){
+        clearTimeout(rlT);
+        rlT = setTimeout(function(){ try{ if(rotateLockQuery.matches || document.body.classList.contains('rotate-lock')) syncRotateLock(); }catch(e){} }, 120);
+      }).observe(nowPlayingScreen, { attributes: true, attributeFilter: ['style'] });
+    }
     if(rotateLockQuery.addEventListener) rotateLockQuery.addEventListener('change', syncRotateLock);
     else if(rotateLockQuery.addListener) rotateLockQuery.addListener(syncRotateLock); // older Safari
   }
