@@ -135,7 +135,7 @@
      all the way down -- including the strip below a short page that the column's own box would
      stop short of. The left panel takes --bg back below, which is what keeps the two apart. */
   html,body{
-    margin:0; padding:0; background:var(--main-bg); color:var(--text);
+    margin:0; padding:0; background:var(--main-fill, var(--main-bg)); color:var(--text);
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     /* Nothing on the page is meant to scroll sideways -- every legitimate horizontal scroller
        (a home row of covers, the search-result tabs) carries its own overflow-x:auto and
@@ -1102,7 +1102,7 @@
   /* The tabs stay put under the header while the results scroll (build 119). */
   @media (max-width: 900px){
     body.search-view #searchTabs{
-      position:sticky; top:60px; z-index:20; background:var(--main-bg);
+      position:sticky; top:60px; z-index:20; background:var(--main-fill, var(--main-bg));
       transition:top .28s cubic-bezier(.4,0,.2,1);
       margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
       padding:10px var(--main-pad); margin-top:-10px; margin-bottom:14px;
@@ -1116,7 +1116,7 @@
      page colour, so rows pass cleanly beneath. */
   @media (max-width: 900px){
     .tile-grid > .podcast-date-heading{
-      position:sticky; top:60px; z-index:6; background:var(--main-bg);
+      position:sticky; top:60px; z-index:6; background:var(--main-fill, var(--main-bg));
       margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad));
       padding:10px calc(var(--main-pad) + 2px) 7px; background-clip:padding-box;
       transition:top .28s cubic-bezier(.4,0,.2,1);
@@ -1896,9 +1896,9 @@
   .se-date-row #seSM, .se-date-row #seEM{ flex:1.6 1 0; }
   /* Build 543 (Mark): Edit season is a full page (like Settings): a back arrow and title at the top,
      the fields scrolling in the middle, and the banner's preview and the buttons fixed at the bottom. */
-  #seasonEditOverlay{ padding:0; background:var(--main-bg, var(--bg)); align-items:stretch; justify-content:stretch; }
+  #seasonEditOverlay{ padding:0; background:var(--main-fill, var(--main-bg, var(--bg))); align-items:stretch; justify-content:stretch; }
   #seasonEditPanel{ display:flex; flex-direction:column; box-sizing:border-box; width:100%; max-width:none; height:100%; max-height:none;
-    margin:0; border:0; border-radius:0; box-shadow:none; background:var(--main-bg, var(--bg));
+    margin:0; border:0; border-radius:0; box-shadow:none; background:var(--main-fill, var(--main-bg, var(--bg)));
     padding:env(safe-area-inset-top, 0px) max(var(--main-pad, 18px), calc((100% - 640px) / 2)) calc(12px + env(safe-area-inset-bottom, 0px)); }
   #seasonEditPanel .se-header{ flex:none; justify-content:flex-start; gap:6px; height:56px; margin:0; padding-top:4px; box-sizing:border-box; }
   #seasonEditPanel .se-header h2{ font-size:20px; font-weight:800; letter-spacing:-.01em; }
@@ -3704,7 +3704,7 @@
     body.ltv-dock .ltv-tabs{
       display:flex; position:fixed; top:0; left:0; right:0; z-index:1100; box-sizing:border-box; height:var(--ltv-tabs-h);
       margin:0; gap:6px; padding:calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px; align-items:center; flex-wrap:nowrap;
-      overflow-x:auto; scrollbar-width:none; background:var(--bg);
+      overflow-x:auto; scrollbar-width:none; background:var(--main-fill, var(--bg));
     }
     body.ltv-dock .ltv-tabs::-webkit-scrollbar{ display:none; }
     body.ltv-dock .ltv-tabs .home-tab{ flex:0 0 auto; }
@@ -5136,7 +5136,7 @@
     .search-sheet{
       top:0; bottom:auto; left:0; right:0; width:auto; margin:0; height:60px; box-sizing:border-box;
       z-index:300; border:0; border-radius:0; box-shadow:none;
-      background:var(--main-bg, var(--bg));
+      background:var(--main-fill, var(--main-bg, var(--bg)));
       -webkit-backdrop-filter:none; backdrop-filter:none;
       transform:none; transition:opacity .16s ease;
     }
@@ -6821,7 +6821,7 @@
        the tabs. Drawn as shadows -- the row scrolls sideways, which would clip anything inside it --
        so its size and spacing on the page stay exactly as they were. */
     #stationsGrid > .lib-tabs, #stationsGrid > .watch-tabs, #podcastTabs{
-      position:sticky; top:60px; z-index:20; background:var(--main-bg);
+      position:sticky; top:60px; z-index:20; background:var(--main-fill, var(--main-bg));
       box-shadow:0 -30px 0 transparent, 0 -45px 0 transparent, 0 -60px 0 transparent, 0 6px 0 transparent;
       transition:top .28s cubic-bezier(.4,0,.2,1), box-shadow .18s ease;
     }
@@ -6883,7 +6883,7 @@
   .tile.station-tile:not(.tile-row):not(.fav-card) .tile-sub{ font-size:11.5px; margin-top:2px; }
   /* ---------- Build 360 (Mark): the profile, in place of the menu on a phone ---------- */
   .profile-overlay{ display:block; visibility:hidden; pointer-events:none; transform:translateX(100%); transition:transform .32s cubic-bezier(.22,.8,.24,1), visibility 0s linear .32s;
-    position:fixed; inset:0; z-index:1400; background:var(--main-bg, var(--bg)); }
+    position:fixed; inset:0; z-index:1400; background:var(--main-fill, var(--main-bg, var(--bg))); }
   .profile-overlay.open{ visibility:visible; pointer-events:auto; transform:none; transition:transform .32s cubic-bezier(.22,.8,.24,1), visibility 0s; }
   @media (prefers-reduced-motion:reduce){ .profile-overlay, .profile-overlay.open{ transition:none; } }
   /* Over the Zen screen (which sits above everything else) the profile and what opens from it stay on top. */
@@ -7140,7 +7140,7 @@
      saying what is inside. The column keeps the page's left edge on a phone and is centred,
      640px wide, on a wider screen. */
   #settingsOverlay.settings-full{
-    z-index:1500; padding:0; background:var(--main-bg, var(--bg)); align-items:stretch; justify-content:stretch;
+    z-index:1500; padding:0; background:var(--main-fill, var(--main-bg, var(--bg))); align-items:stretch; justify-content:stretch;
   }
   body.yt-open #settingsOverlay.settings-full{ z-index:3020; }
   /* Dialogs Settings opens (accent colour, export/import notes...) come up over it. */
@@ -7149,13 +7149,13 @@
   #settingsOverlay #settingsPanel{
     --set-pad:var(--main-pad);
     width:100%; max-width:none; height:100%; max-height:none; margin:0; border:0; border-radius:0; box-shadow:none;
-    background:var(--main-bg, var(--bg)); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    background:var(--main-fill, var(--main-bg, var(--bg))); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
     padding:0 max(var(--set-pad), calc((100% - 640px) / 2)) calc(40px + env(safe-area-inset-bottom, 0px));
   }
   #settingsOverlay .settings-header{
     position:sticky; top:0; z-index:3; display:flex; align-items:center; justify-content:flex-start;
     margin:0 calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))); padding:4px max(var(--set-pad), calc((100vw - 640px) / 2)) 0;
-    height:56px; box-sizing:border-box; background:var(--main-bg, var(--bg));
+    height:56px; box-sizing:border-box; background:var(--main-fill, var(--main-bg, var(--bg)));
   }
   #settingsOverlay .settings-back{
     width:52px; height:52px; padding:0; margin:0; border:0; background:none; box-shadow:none; cursor:pointer;
@@ -7274,7 +7274,7 @@
   .cl-bar{
     position:sticky; bottom:0; z-index:3; display:flex; justify-content:flex-end; gap:10px;
     margin:12px calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))) 0; padding:12px max(var(--set-pad), calc((100vw - 640px) / 2)) calc(12px + env(safe-area-inset-bottom, 0px));
-    background:var(--main-bg, var(--bg)); border-top:1px solid var(--border);
+    background:var(--main-fill, var(--main-bg, var(--bg))); border-top:1px solid var(--border);
   }
   .cl-bar[hidden]{ display:none; }
   .cl-bar button{ flex:1; max-width:220px; min-height:44px; border-radius:10px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
@@ -7403,7 +7403,7 @@
   body.home-stacked .recent-split{ gap:34px; }
   body.home-stacked #madeForYouSection{ padding-bottom:6px; }
   /* Build 400 (Mark): the Typography and Shape & density previews stay at the top while the page scrolls. */
-  #settingsOverlay .set-sticky-preview{ position:sticky; top:56px; z-index:2; background:var(--main-bg, var(--bg));
+  #settingsOverlay .set-sticky-preview{ position:sticky; top:56px; z-index:2; background:var(--main-fill, var(--main-bg, var(--bg)));
     margin:0 calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))); padding:4px max(var(--set-pad), calc((100vw - 640px) / 2)) 10px;
     border-bottom:1px solid var(--border); }
   #settingsOverlay .set-sticky-preview > .font-preview, #settingsOverlay .set-sticky-preview > .shape-preview{ margin:0; }
@@ -7895,7 +7895,7 @@
     body.watch-land #stationsGrid > .watch-tabs{ grid-row:1; padding-right:calc(var(--wl-tb-w, 0px) + 8px); margin-bottom:0; }
     body.watch-land #stationsGrid > .page-toolbar{
       grid-row:1; grid-column:1/-1; justify-self:end; align-self:center; position:sticky; top:8px; z-index:22;
-      margin:0 !important; min-height:0; height:var(--stab-h, 34px); background:var(--main-bg);
+      margin:0 !important; min-height:0; height:var(--stab-h, 34px); background:var(--main-fill, var(--main-bg));
       box-shadow:-14px 0 12px -2px var(--main-bg);
     }
     body.watch-land #stationsGrid > .page-toolbar > .section-heading-right{ flex-wrap:nowrap; gap:6px; }
@@ -7917,7 +7917,7 @@
     body.watch-land:not(.wl-filter) #stationsGrid > #secFilter, body.watch-land[data-vtab="channels"] #stationsGrid > #secFilter{ display:none !important; }
     body.watch-land.wl-filter #stationsGrid > #secFilter{
       grid-row:1; grid-column:1/-1; position:sticky; top:8px; z-index:23; align-self:center;
-      margin:0 calc(var(--wl-tb-w, 0px) + 8px) 0 0 !important; background:var(--main-bg);
+      margin:0 calc(var(--wl-tb-w, 0px) + 8px) 0 0 !important; background:var(--main-fill, var(--main-bg));
     }
     body.watch-land.wl-filter #stationsGrid > #secFilter input{ height:36px; padding-top:0; padding-bottom:0; border-radius:999px; }
     body.watch-land.wl-filter #stationsGrid > #secFilter .sf-ico{ top:50%; transform:translateY(-50%); }
@@ -7943,6 +7943,39 @@
     body.watch-land[data-vtab="music"] #stationsGrid > .grid-section-label{ font-size:17px; margin-top:2px; }
     /* Music Videos and Continue: smaller pictures, so more of each row shows. */
     body.watch-land{ --w-video:168px; }
+  }
+
+  /* ---------- Build 589 (Mark): background colour and gradient settings ---------- */
+  .bg-swatches{ display:grid; grid-template-columns:repeat(auto-fill, minmax(44px, 1fr)); gap:10px; width:100%; }
+  .bg-sw{ height:44px; border-radius:12px; border:1.5px solid var(--border); padding:0; cursor:pointer; position:relative;
+    box-shadow:inset 0 0 0 1px rgba(128,128,128,.25); -webkit-tap-highlight-color:transparent; }
+  .bg-sw[aria-pressed="true"]{ outline:2.5px solid var(--accent); outline-offset:2px; }
+  .bg-sw-accent::after{ content:''; position:absolute; right:6px; bottom:6px; width:10px; height:10px; border-radius:50%; background:var(--accent); }
+  .bg-sw-custom{ background:var(--panel-2); color:var(--text); display:flex; align-items:center; justify-content:center; }
+  .bg-sw-custom svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+  .bg-sw-custom.has-color svg{ display:none; }
+  .bg-chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .bg-chip{ min-height:40px; padding:0 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--panel-2); color:var(--text);
+    font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .bg-chip[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:var(--accent-text); }
+  .bg-pos{ display:grid; grid-template-columns:repeat(3, 32px); grid-template-rows:repeat(3, 32px); gap:4px; padding:6px; border-radius:12px;
+    border:1.5px solid var(--border); background:var(--panel-2); flex:none; }
+  .bg-pos-btn{ width:32px; height:32px; padding:0; border:0; border-radius:8px; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .bg-pos-dot{ width:8px; height:8px; border-radius:50%; background:var(--text-faint); }
+  .bg-pos-btn[aria-pressed="true"]{ background:color-mix(in srgb, var(--accent) 22%, transparent); }
+  .bg-pos-btn[aria-pressed="true"] .bg-pos-dot{ width:14px; height:14px; background:var(--accent); }
+  .bg-pos-btn:disabled{ cursor:default; }
+  .bg-pos-btn:disabled .bg-pos-dot{ width:4px; height:4px; opacity:.35; }
+  .bg-c2-none{ background:repeating-linear-gradient(45deg, var(--panel-2) 0 5px, var(--border) 5px 10px) !important; }
+  /* Over a gradient: the bars that used flat page colour above the tabs, and the fade above the
+     tab bar, would show as stripes of plain colour; the gradient (fixed) shows through instead. */
+  body.bg-grad #stationsGrid > .lib-tabs, body.bg-grad #stationsGrid > .watch-tabs, body.bg-grad #podcastTabs{ box-shadow:none !important; }
+  body.bg-grad .mobile-scroll-fade{ opacity:0 !important; }
+  /* The colour picker on a phone on its side: it scrolls within the screen (Set stays reachable). */
+  @media (max-height: 500px){
+    #accentOverlay{ align-items:center; padding:8px; }
+    #accentOverlay .accent-panel{ max-height:calc(100vh - 16px); max-height:calc(100dvh - 16px); overflow-y:auto; overscroll-behavior:contain; }
+    #accentOverlay .accent-actions{ position:sticky; bottom:-1px; background:inherit; padding-bottom:4px; }
   }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
@@ -9171,6 +9204,57 @@
           <button type="button" class="accent-color-input accent-swatch-btn" id="accentColorInput" aria-label="Accent color" aria-haspopup="dialog"></button>
           <button class="accent-reset-btn" id="accentResetBtn">Reset</button>
         </div>
+      </div>
+      <!-- Build 589 (Mark): the background -- the theme's own, a colour, or a gradient from the accent. -->
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="bgModeLabel">Background</span>
+        <div class="theme-switch" id="bgModeSwitch" role="group" aria-labelledby="bgModeLabel">
+          <button type="button" class="theme-opt" data-bg-mode="default"><span>Default</span></button>
+          <button type="button" class="theme-opt" data-bg-mode="solid"><span>Color</span></button>
+          <button type="button" class="theme-opt" data-bg-mode="gradient"><span>Gradient</span></button>
+        </div>
+      </div>
+      <div id="bgSolidRows" hidden>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="bgSolidLabel">Color</span>
+          <div class="bg-swatches" id="bgSolidSwatches" role="group" aria-labelledby="bgSolidLabel"></div>
+        </div>
+      </div>
+      <div id="bgGradRows" hidden>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="bgStyleLabel">Style</span>
+          <div class="bg-chips" id="bgStyleChips" role="group" aria-labelledby="bgStyleLabel"></div>
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="bgPosLabel">Position</span><span class="set-desc">Where the first color is strongest</span></div>
+          <div class="bg-pos" id="bgPosGrid" role="group" aria-labelledby="bgPosLabel"></div>
+        </div>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="bgIntLabel">Intensity <span class="font-size-val" id="bgIntVal">35%</span></span>
+          <input type="range" class="font-range" id="bgIntRange" min="5" max="100" step="5" value="35" aria-labelledby="bgIntLabel">
+        </div>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="bgSizeLabel">Size <span class="font-size-val" id="bgSizeVal">70%</span></span>
+          <input type="range" class="font-range" id="bgSizeRange" min="20" max="100" step="5" value="70" aria-labelledby="bgSizeLabel">
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label">First color</span><span class="set-desc" id="bgC1Desc">Accent</span></div>
+          <div class="accent-picker-wrap">
+            <button type="button" class="accent-color-input accent-swatch-btn" id="bgC1Btn" aria-label="First gradient color" aria-haspopup="dialog"></button>
+            <button type="button" class="accent-reset-btn" id="bgC1Reset">Use accent</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label">Second color</span><span class="set-desc" id="bgC2Desc">Fades into the background</span></div>
+          <div class="accent-picker-wrap">
+            <button type="button" class="accent-color-input accent-swatch-btn" id="bgC2Btn" aria-label="Second gradient color" aria-haspopup="dialog"></button>
+            <button type="button" class="accent-reset-btn" id="bgC2Reset">None</button>
+          </div>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Reset background</span>
+        <button type="button" class="accent-reset-btn" id="bgResetBtn">Reset</button>
       </div>
     </section>
 
@@ -11495,6 +11579,7 @@
     accentColorInput.value = hex;
     accentColorInput.style.background = hex;
     if(typeof presetSync === 'function') presetSync();
+    bgApply();
   }
   function restoreAccentForTheme(theme){
     var custom = loadCustomAccent();
@@ -11511,6 +11596,7 @@
       accentColorInput.style.background = '';
       if(typeof presetSync === 'function') presetSync();
     }
+    bgApply();
   }
   // Build 169: our own picker sheet (swatches + hue/saturation/brightness on one screen).
   var accentPick = (function(){
@@ -11558,8 +11644,12 @@
     [hue, sat, val].forEach(function(r){
       r.addEventListener('input', function(){ cur = { h: +hue.value, s: +sat.value, v: +val.value }; exact = null; paint(); });
     });
-    function open(){
-      exact = (accentColorInput.value || getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e8464a').toLowerCase();
+    // Build 589: open({ hex, title, onSet }) picks any colour (the background's); with nothing, the accent.
+    var target = null, titleEl = document.getElementById('accentTitle');
+    function open(opts){
+      target = (opts && typeof opts.onSet === 'function') ? opts : null;
+      titleEl.textContent = (target && target.title) || 'Accent Color';
+      exact = ((target && target.hex) || accentColorInput.value || getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e8464a').toLowerCase();
       cur = hexToHsv(exact);
       paint(); ov.classList.add('open');
     }
@@ -11568,11 +11658,200 @@
     document.getElementById('accentCancelBtn').addEventListener('click', close);
     ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
     document.getElementById('accentSetBtn').addEventListener('click', function(){
-      var x = hex(); applyAccent(x); saveCustomAccent(currentTheme, x); close();
+      var x = hex();
+      if(target){ var t = target; close(); t.onSet(x); return; }
+      applyAccent(x); saveCustomAccent(currentTheme, x); close();
     });
     return { open: open, close: close, isOpen: function(){ return ov.classList.contains('open'); } };
   })();
   accentColorInput.addEventListener('click', function(){ accentPick.open(); });
+
+
+  // ---------- Build 589 (Mark): the background -- a colour of your own, or a gradient ----------
+  // Kept per theme, like the accent. A colour replaces the page colour (cards and lines are
+  // worked out from it, and the text turns dark on a light colour); a gradient is painted over
+  // the page colour, fixed to the screen so sticky bars (tabs, headers) show the same piece of
+  // it as the page behind them. Every surface that paints the page reads --main-fill.
+  var BG_KEY = 'radioPlayerBackground';
+  var BG_DEFAULT_GRAD = { style: 'radial', pos: 't', intensity: 35, size: 70, c1: 'accent', c2: 'base' };
+  var BG_STYLES = [
+    { id: 'radial', name: 'Radial', pos: ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'], def: 't' },
+    { id: 'vertical', name: 'Vertical', pos: ['t', 'c', 'b'], def: 't' },
+    { id: 'horizontal', name: 'Horizontal', pos: ['l', 'c', 'r'], def: 'l' },
+    { id: 'diagonal', name: 'Diagonal', pos: ['tl', 'tr', 'bl', 'br'], def: 'tl' },
+    { id: 'sweep', name: 'Sweep', pos: ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'], def: 'c' }
+  ];
+  var BG_POS = { tl: ['0% 0%', 'Top left', 'to bottom right'], t: ['50% 0%', 'Top', 'to bottom'], tr: ['100% 0%', 'Top right', 'to bottom left'],
+                 l: ['0% 50%', 'Left', 'to right'], c: ['50% 50%', 'Center', ''], r: ['100% 50%', 'Right', 'to left'],
+                 bl: ['0% 100%', 'Bottom left', 'to top right'], b: ['50% 100%', 'Bottom', 'to top'], br: ['100% 100%', 'Bottom right', 'to top left'] };
+  var BG_SOLIDS = {
+    dark: [['accent', 'Accent tint'], ['#000000', 'Black'], ['#121417', 'Graphite'], ['#0b1020', 'Midnight'], ['#0d1b2a', 'Navy'], ['#1b1024', 'Plum'], ['#0d1a14', 'Forest'], ['#1f0d12', 'Wine']],
+    light: [['accent', 'Accent tint'], ['#ffffff', 'White'], ['#f6f4ef', 'Paper'], ['#eef2f6', 'Mist'], ['#fbeff1', 'Blush'], ['#eef7f1', 'Mint'], ['#f2effa', 'Lavender'], ['#fdf6e3', 'Cream']]
+  };
+  var BG_VARS = ['--main-fill', '--main-bg', '--bg', '--panel', '--panel-2', '--border', '--art-bg', '--glass', '--text', '--text-dim', '--text-faint'];
+  function bgLoadAll(){ try{ var o = JSON.parse(localStorage.getItem(BG_KEY) || 'null'); return (o && typeof o === 'object') ? o : {}; }catch(e){ return {}; } }
+  function bgStyle(id){ for(var i = 0; i < BG_STYLES.length; i++) if(BG_STYLES[i].id === id) return BG_STYLES[i]; return BG_STYLES[0]; }
+  function bgGet(theme){
+    var p = bgLoadAll()[theme] || {}, g = {}, k;
+    for(k in BG_DEFAULT_GRAD) g[k] = BG_DEFAULT_GRAD[k];
+    if(p.grad && typeof p.grad === 'object') for(k in p.grad) if(p.grad[k] != null) g[k] = p.grad[k];
+    var st = bgStyle(g.style); g.style = st.id;
+    if(st.pos.indexOf(g.pos) < 0) g.pos = st.def;
+    g.intensity = Math.max(5, Math.min(100, +g.intensity || 35)); g.size = Math.max(20, Math.min(100, +g.size || 70));
+    return { mode: (p.mode === 'solid' || p.mode === 'gradient') ? p.mode : 'default', color: p.color || null, grad: g };
+  }
+  function bgSave(theme, p){ var all = bgLoadAll(); all[theme] = p; try{ localStorage.setItem(BG_KEY, JSON.stringify(all)); }catch(e){} }
+  function bgAccentHex(){
+    var v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : DEFAULT_ACCENTS[currentTheme || 'dark'].accent;
+  }
+  function bgMix(a, b, t){   // a toward b by t (0..1)
+    var x = hexToRgb(a), y = hexToRgb(b);
+    function m(u, v){ return Math.round(u + (v - u) * t).toString(16).padStart(2, '0'); }
+    return '#' + m(x.r, y.r) + m(x.g, y.g) + m(x.b, y.b);
+  }
+  function bgRgba(hex, a){ var c = hexToRgb(hex); return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + (+a).toFixed(3) + ')'; }
+  function bgBase(theme){ return theme === 'light' ? '#ffffff' : '#000000'; }
+  function bgSolidHex(color, theme){ return color === 'accent' ? bgMix(bgAccentHex(), bgBase(theme), theme === 'light' ? 0.9 : 0.86) : color; }
+  function bgGradCss(g, theme){
+    var a = g.intensity / 100, S = g.size;
+    var c1 = bgRgba(g.c1 === 'accent' || !g.c1 ? bgAccentHex() : g.c1, a);
+    var c2 = (!g.c2 || g.c2 === 'base') ? 'rgba(0,0,0,0)' : bgRgba(g.c2, a);
+    var P = BG_POS[g.pos] || BG_POS.t, img;
+    if(g.style === 'radial') img = 'radial-gradient(ellipse at ' + P[0] + ', ' + c1 + ' 0%, ' + c2 + ' ' + S + '%)';
+    else if(g.style === 'sweep'){
+      var d = (S * 1.8).toFixed(0);
+      img = 'conic-gradient(from 0deg at ' + P[0] + ', ' + c1 + ' 0deg, ' + c2 + ' ' + d + 'deg, ' + c2 + ' ' + (360 - d) + 'deg, ' + c1 + ' 360deg)';
+    } else if(g.pos === 'c'){
+      var dir = g.style === 'horizontal' ? 'to right' : 'to bottom';
+      img = 'linear-gradient(' + dir + ', ' + c2 + ' ' + (50 - S / 2) + '%, ' + c1 + ' 50%, ' + c2 + ' ' + (50 + S / 2) + '%)';
+    } else img = 'linear-gradient(' + P[2] + ', ' + c1 + ' 0%, ' + c2 + ' ' + S + '%)';
+    return img + ' fixed ' + bgBase(theme);
+  }
+  function bgApply(){
+    var root = document.documentElement, st = root.style, theme = (typeof currentTheme !== 'undefined' && currentTheme) || 'dark';
+    BG_VARS.forEach(function(v){ st.removeProperty(v); });
+    document.body.classList.remove('bg-grad', 'bg-solid');
+    var p = bgGet(theme);
+    if(p.mode === 'solid' && p.color){
+      var c = bgSolidHex(p.color, theme), dark = relativeLuminance(c) < 0.3;
+      st.setProperty('--main-bg', c);
+      st.setProperty('--bg', dark ? shadeHex(c, 10) : shadeHex(c, -8));
+      st.setProperty('--panel', dark ? shadeHex(c, 18) : bgMix(c, '#ffffff', 0.6));
+      st.setProperty('--panel-2', dark ? shadeHex(c, 26) : shadeHex(c, -12));
+      st.setProperty('--border', dark ? shadeHex(c, 38) : shadeHex(c, -26));
+      st.setProperty('--art-bg', dark ? shadeHex(c, 30) : shadeHex(c, -16));
+      st.setProperty('--glass', bgRgba(dark ? shadeHex(c, 18) : bgMix(c, '#ffffff', 0.6), 0.62));
+      if(dark && theme === 'light'){ st.setProperty('--text', '#e8eaed'); st.setProperty('--text-dim', '#9aa1ac'); st.setProperty('--text-faint', '#676e79'); }
+      if(!dark && theme === 'dark'){ st.setProperty('--text', '#201d17'); st.setProperty('--text-dim', '#5c584e'); st.setProperty('--text-faint', '#8f8a7c'); }
+      document.body.classList.add('bg-solid');
+    } else if(p.mode === 'gradient'){
+      st.setProperty('--main-fill', bgGradCss(p.grad, theme));
+      document.body.classList.add('bg-grad');
+    }
+    if(typeof bgUiSync === 'function') bgUiSync();
+  }
+  var bgUiSync = (function(){
+    var modeSw = document.getElementById('bgModeSwitch'), solidRows = document.getElementById('bgSolidRows'), gradRows = document.getElementById('bgGradRows');
+    var swWrap = document.getElementById('bgSolidSwatches'), styleWrap = document.getElementById('bgStyleChips'), posWrap = document.getElementById('bgPosGrid');
+    var intR = document.getElementById('bgIntRange'), intV = document.getElementById('bgIntVal'), sizeR = document.getElementById('bgSizeRange'), sizeV = document.getElementById('bgSizeVal');
+    var c1Btn = document.getElementById('bgC1Btn'), c2Btn = document.getElementById('bgC2Btn'), c1Desc = document.getElementById('bgC1Desc'), c2Desc = document.getElementById('bgC2Desc');
+    if(!modeSw) return null;
+    function theme(){ return currentTheme || 'dark'; }
+    function edit(fn){ var p = bgGet(theme()); fn(p); bgSave(theme(), p); bgApply(); }
+    Array.prototype.forEach.call(modeSw.querySelectorAll('[data-bg-mode]'), function(b){
+      b.addEventListener('click', function(){
+        edit(function(p){
+          p.mode = b.dataset.bgMode;
+          if(p.mode === 'solid' && !p.color) p.color = 'accent';
+        });
+      });
+    });
+    BG_STYLES.forEach(function(stl){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'bg-chip'; b.dataset.style = stl.id; b.textContent = stl.name;
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', function(){ edit(function(p){ p.grad.style = stl.id; if(stl.pos.indexOf(p.grad.pos) < 0) p.grad.pos = stl.def; }); });
+      styleWrap.appendChild(b);
+    });
+    ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'].forEach(function(k){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'bg-pos-btn'; b.dataset.pos = k;
+      b.setAttribute('aria-label', BG_POS[k][1]); b.setAttribute('aria-pressed', 'false');
+      b.innerHTML = '<span class="bg-pos-dot" aria-hidden="true"></span>';
+      b.addEventListener('click', function(){ edit(function(p){ p.grad.pos = k; }); });
+      posWrap.appendChild(b);
+    });
+    function solidChoose(v){ edit(function(p){ p.mode = 'solid'; p.color = v; }); }
+    function buildSwatches(){
+      swWrap.innerHTML = '';
+      BG_SOLIDS[theme()].forEach(function(o){
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'bg-sw'; b.dataset.color = o[0];
+        b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', o[1]); b.title = o[1];
+        b.style.background = bgSolidHex(o[0], theme());
+        if(o[0] === 'accent') b.classList.add('bg-sw-accent');
+        b.addEventListener('click', function(){ solidChoose(o[0]); });
+        swWrap.appendChild(b);
+      });
+      var cb = document.createElement('button'); cb.type = 'button'; cb.className = 'bg-sw bg-sw-custom'; cb.dataset.color = 'custom';
+      cb.setAttribute('aria-label', 'Pick a color'); cb.title = 'Pick a color'; cb.setAttribute('aria-haspopup', 'dialog');
+      cb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+      cb.addEventListener('click', function(){
+        var p = bgGet(theme());
+        accentPick.open({ title: 'Background Color', hex: (p.color && p.color !== 'accent') ? p.color : bgSolidHex('accent', theme()), onSet: solidChoose });
+      });
+      swWrap.appendChild(cb);
+      swWrap.dataset.theme = theme() + '|' + bgAccentHex();
+    }
+    intR.addEventListener('input', function(){ intV.textContent = intR.value + '%'; edit(function(p){ p.grad.intensity = +intR.value; }); });
+    sizeR.addEventListener('input', function(){ sizeV.textContent = sizeR.value + '%'; edit(function(p){ p.grad.size = +sizeR.value; }); });
+    c1Btn.addEventListener('click', function(){
+      var g = bgGet(theme()).grad;
+      accentPick.open({ title: 'First Color', hex: g.c1 === 'accent' ? bgAccentHex() : g.c1, onSet: function(x){ edit(function(p){ p.grad.c1 = x; }); } });
+    });
+    c2Btn.addEventListener('click', function(){
+      var g = bgGet(theme()).grad;
+      accentPick.open({ title: 'Second Color', hex: (g.c2 && g.c2 !== 'base') ? g.c2 : bgAccentHex(), onSet: function(x){ edit(function(p){ p.grad.c2 = x; }); } });
+    });
+    document.getElementById('bgC1Reset').addEventListener('click', function(){ edit(function(p){ p.grad.c1 = 'accent'; }); });
+    document.getElementById('bgC2Reset').addEventListener('click', function(){ edit(function(p){ p.grad.c2 = 'base'; }); });
+    document.getElementById('bgResetBtn').addEventListener('click', function(){
+      var all = bgLoadAll(); delete all[theme()];
+      try{ localStorage.setItem(BG_KEY, JSON.stringify(all)); }catch(e){}
+      bgApply();
+    });
+    return function(){
+      var p = bgGet(theme()), g = p.grad, stl = bgStyle(g.style);
+      Array.prototype.forEach.call(modeSw.querySelectorAll('[data-bg-mode]'), function(b){ b.classList.toggle('active', b.dataset.bgMode === p.mode); b.setAttribute('aria-pressed', b.dataset.bgMode === p.mode ? 'true' : 'false'); });
+      solidRows.hidden = p.mode !== 'solid'; gradRows.hidden = p.mode !== 'gradient';
+      if(swWrap.dataset.theme !== theme() + '|' + bgAccentHex()) buildSwatches();
+      var known = false;
+      Array.prototype.forEach.call(swWrap.children, function(b){
+        var on = p.mode === 'solid' && b.dataset.color === p.color; if(on) known = true;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      var cb = swWrap.querySelector('.bg-sw-custom');
+      if(cb){
+        var custom = p.mode === 'solid' && p.color && !known;
+        cb.setAttribute('aria-pressed', custom ? 'true' : 'false');
+        cb.style.background = custom ? p.color : '';
+        cb.classList.toggle('has-color', !!custom);
+      }
+      Array.prototype.forEach.call(styleWrap.children, function(b){ b.setAttribute('aria-pressed', b.dataset.style === g.style ? 'true' : 'false'); });
+      Array.prototype.forEach.call(posWrap.children, function(b){
+        var ok = stl.pos.indexOf(b.dataset.pos) >= 0;
+        b.disabled = !ok; b.setAttribute('aria-pressed', ok && b.dataset.pos === g.pos ? 'true' : 'false');
+      });
+      intR.value = g.intensity; intV.textContent = g.intensity + '%';
+      sizeR.value = g.size; sizeV.textContent = g.size + '%';
+      var h1 = g.c1 === 'accent' ? bgAccentHex() : g.c1;
+      c1Btn.style.background = h1; c1Desc.textContent = g.c1 === 'accent' ? 'Accent' : h1;
+      document.getElementById('bgC1Reset').hidden = g.c1 === 'accent';
+      var base = !g.c2 || g.c2 === 'base';
+      c2Btn.style.background = base ? '' : g.c2; c2Btn.classList.toggle('bg-c2-none', base);
+      c2Desc.textContent = base ? 'Fades into the background' : g.c2;
+      document.getElementById('bgC2Reset').hidden = base;
+    };
+  })();
+  bgApply();
 
   // ---------- Build 392 (Mark): colour presets and AMOLED black ----------
   // A preset is a pair of accents, a bright one for the dark theme and a deeper one for the light,
