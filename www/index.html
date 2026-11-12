@@ -7831,6 +7831,28 @@
     body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }
     .az-rail{ top:calc(var(--stab-h, 34px) + 16px); }
 
+
+    /* ---- Build 587 (Mark) ---- */
+    /* The rail's buttons share the height left above the profile picture (and Cast), so none is
+       ever hidden under it, whatever the text size. */
+    .mobile-nav{ padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px)); gap:0; }
+    body.cast-avail:not(.ltv-dock) .mobile-nav{ padding-bottom:calc(112px + env(safe-area-inset-bottom, 0px)); }
+    .mobile-nav-btn{ flex:1 1 0; min-height:0; max-height:64px; height:auto; }
+    /* Live TV: Cast is on the video's controls, not the rail as well. */
+    html body.ltv-dock .sidebar-top .cast-btn{ display:none !important; }
+    /* Movies, TV Shows, Music Videos: no count. */
+    body.watch-land #resultCount{ display:none !important; }
+    /* A to Z: under the tabs, above the player; every other letter drawn as a dot so the letters
+       never overlap (sliding along it still goes through every letter). */
+    .az-rail{ top:calc(var(--stab-h, 34px) + 18px); width:22px; padding:6px 0; }
+    .az-letter{ font-size:9px; }
+    .az-letter:nth-child(even){ font-size:0; }
+    .az-letter:nth-child(even)::after{ content:''; width:3px; height:3px; border-radius:50%; background:currentColor; opacity:.7; }
+    /* Favorite Artists: seven across. */
+    .fav-artists-row{ gap:14px; }
+    .fav-artists-row > .tile, .lib-fav-row > .tile{ --fa-w:calc((100vw - var(--rail-w) - 2 * var(--main-pad, 21px) - 6 * 14px) / 7); flex:0 0 var(--fa-w); width:var(--fa-w); }
+    /* Albums (and an artist's albums): seven across. */
+    body .tile-grid:has(> .tile[data-entity="album"]), body .artist-albums{ grid-template-columns:repeat(7, minmax(0, 1fr)); column-gap:12px; }
     /* Search: its box at the top beside the rail, without the heading row (more room for results). */
     :root{ --search-sheet-h: 62px; }
     .search-sheet{ left:var(--rail-w); }
@@ -22345,7 +22367,8 @@
         document.body.classList.add('rotate-lock');
         return;
       }
-      if(matches && !wasActive && !document.body.classList.contains('np-open') && !uiIsPlaying && epgLandGridShowing()){
+      // Build 587 (Mark): not any more -- sideways on a phone the guide stays beside the rail, with its tabs.
+      if(false && matches && !wasActive && !document.body.classList.contains('np-open') && !uiIsPlaying && epgLandGridShowing()){
         document.body.classList.add('epg-land');
         var eg = stationsGrid.querySelector(':scope > .epg');
         if(eg) eg.scrollTop = 0;

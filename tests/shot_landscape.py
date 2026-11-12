@@ -42,6 +42,7 @@ async def shots(pg, prefix):
     await pg.evaluate("try{ localStorage.setItem('radioPlayerLtvAuto','1'); }catch(e){}")
     await pg.evaluate("document.querySelector('#stationsGrid > .watch-tabs .home-tab[data-vtab=movies]').click()"); await pg.wait_for_timeout(800)
     await pg.evaluate("document.querySelector('#stationsGrid > .watch-tabs .home-tab[data-vtab=channels]').click()"); await pg.wait_for_timeout(3000)
+    await pg.evaluate("document.body.classList.add('cast-avail')")
     await pg.screenshot(path=f'{OUT}/{TAG}-{prefix}-ltv-docked.png'); res['ltv-docked'] = await pg.evaluate(GEO)
     await pg.evaluate("document.getElementById('vctlMute').click()"); await pg.wait_for_timeout(300)
     await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=library]').click()"); await pg.wait_for_timeout(1500)
