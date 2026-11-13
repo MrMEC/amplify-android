@@ -8147,6 +8147,14 @@
     body.phone-land:is(.artist-open, .album-open) :is(.artist-hero-actions, .album-hero-actions) .album-circle-btn{
       width:40px; height:40px; flex:0 0 40px; }
     body.phone-land:is(.artist-open, .album-open) :is(.artist-hero-actions, .album-hero-actions) .album-circle-btn svg{ width:19px; height:19px; }
+    /* Build 607 (Mark): the right column's sections -- album covers ~100px (three across), music
+       videos and stations sized to match, headings close to what they head. */
+    body.phone-land.artist-open #stationsGrid .artist-albums{ grid-template-columns:repeat(3, minmax(0, 1fr)) !important; gap:14px 12px; }
+    body.phone-land.artist-open #stationsGrid .artist-yt-row > .yt-tile{ flex:0 0 168px !important; }
+    body.phone-land.artist-open #stationsGrid > .tile.station-tile{ width:100px; max-width:100px; }
+    body.phone-land:is(.artist-open, .album-open) #stationsGrid > .grid-section-label{ margin-top:-12px !important; margin-bottom:-36px !important; }
+    body.phone-land:is(.artist-open, .album-open) #stationsGrid > .grid-section-label:first-child{ margin-top:-6px !important; }
+    body.phone-land.artist-open #stationsGrid > .grid-section-label.artist-yt-label{ margin-bottom:-18px !important; }
     /* menus open upward from the foot, on screen */
     body.phone-land:is(.artist-open, .album-open) :is(.artist-hero, .album-hero) .artist-menu{ top:auto; bottom:calc(100% + 6px); max-height:calc(100dvh - 70px); overflow-y:auto; }
   }
