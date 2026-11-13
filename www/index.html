@@ -5923,7 +5923,7 @@
     border-radius:var(--r-tile, 8.5px);
     background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
   .cf-cover.cf-left .cf-shade{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
-  .cf-caption{ position:absolute; left:50%; width:min(52%, 440px); transform:translateX(-50%); height:44px; pointer-events:none; text-align:center; }
+  .cf-caption{ position:absolute; left:50%; width:min(52%, 440px); transform:translateX(-50%); height:44px; pointer-events:auto; cursor:pointer; text-align:center; z-index:2; }
   .cf-cap{ position:absolute; inset:0; opacity:0; transition:opacity .22s ease; will-change:opacity; }
   .cf-cap.on{ opacity:1; }
   .cf-cap-title, .cf-cap-artist{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -7910,6 +7910,8 @@
     .fav-artists-row > .tile, .lib-fav-row > .tile{ --fa-w:var(--w-artist); flex:0 0 var(--fa-w); width:var(--fa-w); }
     /* Build 610 (Mark): Zen sideways sits beside the rail, so its back arrow and words aren't under it. */
     body.phone-land .zen-screen{ left:var(--rail-w) !important; }
+    /* Build 612 (Mark): no profile photo on Zen sideways (it's already at the foot of the rail). */
+    body.phone-land .zen-screen .zen-avatar{ display:none !important; }
     /* Albums (and an artist's albums): seven across. */
     body .tile-grid:has(> .tile[data-entity="album"]), body .artist-albums{ grid-template-columns:repeat(7, minmax(0, 1fr)); column-gap:12px; }
     /* Search: its box at the top beside the rail, without the heading row (more room for results). */
@@ -22429,6 +22431,13 @@
     function clampIndex(i){ return Math.max(0, Math.min(albums.length - 1, i)); }
 
     // ---------- caption ----------
+    // Build 612 (Mark): the words under the middle cover open its page -- the artist's when Cover
+    // Flow came from Artists, the album's when it came from Albums.
+    caption.addEventListener('click', function(e){
+      e.stopPropagation();
+      var al = albums[capIndex];
+      if(al && hooks.onCaptionTap) hooks.onCaptionTap(al, order);
+    });
     function setCaption(i){
       if(i === capIndex || !albums[i]) return;
       capIndex = i;
@@ -22662,6 +22671,7 @@
     root.addEventListener('pointerdown', function(e){
       if(!isOpen || e.button > 0) return;
       if(panel.contains(e.target)) return;
+      if(caption.contains(e.target)) return;   // build 612: a tap on the words opens the page
       if(drag) return;
       drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, pos0: pos, moved: false,
                samples: [[performance.now(), pos]] };
@@ -23231,7 +23241,17 @@
       // been opened by hand before the turn.
       rotateLockOpenedNp = true;
     };
-    coverFlow = createCoverFlow(npLandAlbums, { onAlbumOpened: openAlbumBehind });
+    var openFromCaption = function(al, ord){
+      var artistKey = ord === 'artist' ? artistMatchKey(al.artist) : null;
+      if(ord === 'artist' && (!artistKey || al.artist === VARIOUS_ARTISTS || !findArtistEntry(artistKey))) artistKey = null;
+      var go = function(){
+        if(artistKey) openArtistPage(artistKey);
+        else openAlbumPage(al.key, null);
+      };
+      if(cfBtnMode){ closeCoverFlowToPage(); setTimeout(go, 380); }
+      else go();
+    };
+    coverFlow = createCoverFlow(npLandAlbums, { onAlbumOpened: openAlbumBehind, onCaptionTap: function(al, ord){ openFromCaption(al, ord); } });
     var _cfSetArt = setCustomArtUrl, _cfClearArt = clearCustomArtUrl;
     setCustomArtUrl = function(){ var r = _cfSetArt.apply(this, arguments); coverFlow.artChanged(); return r; };
     clearCustomArtUrl = function(){ var r = _cfClearArt.apply(this, arguments); coverFlow.artChanged(); return r; };
