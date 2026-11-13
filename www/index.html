@@ -1700,18 +1700,19 @@
      and the song line, and nothing more. */
   .nph-flow .nph-flow-info{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:4px;
     padding:0 var(--main-pad); cursor:pointer; box-sizing:content-box; overflow:hidden; gap:2px;
-    height:calc(15px + 18px + 4px + 1.08 * clamp(22px, 6.4vw, 30px)); }
+    height:calc(15px + 18px + 4px + 1.08 * 18px); }
   /* Build 555 (Mark): one line for the title in Flow (fitHeroTitle shrinks it to fit). */
   .nph-flow-info .nph-kicker{ line-height:15px; }
   .nph-flow-info .nph-title{ -webkit-line-clamp:1; white-space:nowrap;
     /* build 560: the title's line is the same height however far a long name is shrunk, so the words never move */
-    line-height:calc(1.08 * clamp(22px, 6.4vw, 30px)); height:calc(1.08 * clamp(22px, 6.4vw, 30px)); flex:0 0 auto; }
+    line-height:calc(1.08 * 18px); height:calc(1.08 * 18px); flex:0 0 auto; }
   .nph-flow-info .nph-line{ line-height:18px; min-height:18px; }
   .nph-flow-info .nph-line:empty{ display:block; }
   /* build 558: its room is kept, so every cover's words sit at the same height */
   .nph-flow-info .nph-kicker{ color:var(--text-dim); margin-bottom:0; text-shadow:none; }
-  .nph-flow-info .nph-title{ color:var(--text); font-size:clamp(22px, 6.4vw, 30px); width:100%; text-shadow:none; }
+  .nph-flow-info .nph-title{ color:var(--text); font-size:18px; width:100%; text-shadow:none; }
   .nph-flow-info .nph-line{ color:var(--text-dim); font-weight:600; margin-top:0; max-width:100%; text-shadow:none; }
+  .nph-flow-info .nph-line{ font-size:14px; }
   #settingsPanel #carouselSwitch{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
   #settingsPanel .theme-opt svg{ flex-shrink:0; width:15px; height:15px; }
   @media (max-width: 360px){ #settingsPanel .theme-opt svg{ display:none; } }
@@ -5927,8 +5928,10 @@
   .cf-cap-title, .cf-cap-artist{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* A soft shadow keeps the caption readable over the reflections that now run behind it. */
   .cf-cap{ text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 10px rgba(0,0,0,.75); }
-  .cf-cap-title{ color:#fff; font-weight:700; font-size:15px; line-height:20px; }
-  .cf-cap-artist{ color:rgba(255,255,255,.6); font-size:13px; line-height:18px; margin-top:2px; }
+  /* Build 603 (Mark): the same words as Home's Flow carousel (title 18px, the line under it 14px). */
+  .cf-cap-title{ color:#fff; font-weight:700; font-size:18px; line-height:23px; }
+  .cf-cap-artist{ color:rgba(255,255,255,.6); font-size:14px; line-height:19px; margin-top:2px; }
+  .cf.cf-norefl .cf-refl{ display:none; }
   .cf-empty{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     color:rgba(255,255,255,.55); font-size:14px; pointer-events:none; }
   /* The back of the centre cover: its tracklist. */
@@ -6242,7 +6245,8 @@
       transform:translateY(calc(100% + var(--player-bar-bottom) + 24px));
       opacity:0; pointer-events:none;
     }
-    body.mini-hidden .mobile-scroll-fade{ height:calc(var(--mnav-total) + 56px); transition:height .3s ease; }
+    /* Build 603 (Mark): the bottom shadow goes with the mini player. */
+    body.mini-hidden .mobile-scroll-fade{ opacity:0; transition:opacity .3s ease; }
     body.np-open .sidebar-top .hamburger-btn span,
     body.np-open.album-open .sidebar-top .hamburger-btn span,
     body.np-open.artist-open .sidebar-top .hamburger-btn span{ background:var(--np-vivid, #fff); transition: background-color .5s ease; }
@@ -9609,7 +9613,7 @@
       </div>
       <div id="carouselFlowOpts" hidden>
         <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover size</span></div>
+          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover size</span><span class="set-desc">Home&rsquo;s Flow carousel and Cover Flow</span></div>
           <select class="settings-select" id="flowSizeSelect" aria-labelledby="flowSizeLabel">
             <option value="s">Small</option>
             <option value="m">Medium</option>
@@ -9623,13 +9627,6 @@
         <div class="settings-row">
           <div class="set-text"><span class="settings-label" id="flowReflectLabel">Reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
           <select class="settings-select" id="flowReflectSelect" aria-labelledby="flowReflectLabel">
-            <option value="off">Off</option>
-            <option value="on">On</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowAutoLabel">Auto-advance</span><span class="set-desc">Moves to the next cover every few seconds</span></div>
-          <select class="settings-select" id="flowAutoSelect" aria-labelledby="flowAutoLabel">
             <option value="off">Off</option>
             <option value="on">On</option>
           </select>
@@ -22128,6 +22125,7 @@
     var C = S * 0.64, G = S * 0.2;
     return Math.max(2, Math.min(G > 0 ? Math.ceil((W / 2 - C) / G) + 1 : 4, 14));
   }
+  function flowCfg(){ return (typeof carouselCfg !== 'undefined' && carouselCfg) || { size: 'l', tilt: 66, reflect: true }; }
   function createCoverFlow(host, hooks){
     hooks = hooks || {};
     var ROT = 66;                 // degrees a side cover is turned in
@@ -22199,6 +22197,11 @@
       // reflection between them and the caption as before.
       var capTop = top0 + S0 * 1.4 + 4;
       S = Math.round(Math.min(S0 * COVER_SCALE, (capTop - 8) / (1 + REFL_GAP)));
+      // Build 603 (Mark): Settings > Home's cover size, tilt and reflection apply here too.
+      // Large is the most the screen has room for; Medium and Small in the carousel's proportions.
+      var cfg = flowCfg();
+      S = Math.round(S * (CAROUSEL_SIZES[cfg.size] || 230) / 230);
+      root.classList.toggle('cf-norefl', !cfg.reflect);
       C = S * 0.64;               // centre to first side cover
       G = S * 0.2;                // between consecutive side covers
       D = S * 0.62;               // how far back the sides sit
@@ -22219,7 +22222,7 @@
     // Where album i sits for the current pos.
     function place(el, i){
       var d = i - pos, ad = Math.abs(d);
-      var g = coverFlowGeom(d, S, ROT), x = g.x, z = g.z, r = g.r;
+      var g = coverFlowGeom(d, S, flowCfg().tilt || ROT), x = g.x, z = g.z, r = g.r;
       el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,' + z.toFixed(1) + 'px) rotateY(' + r.toFixed(2) + 'deg)';
       // Stacking only changes when a cover passes the halfway point, so it is written then
       // and not on every frame (a z-index change restacks every layer).
@@ -55142,7 +55145,7 @@
   var CAROUSEL_KEY = 'radioPlayerCarousel';
   var CAROUSEL_SIZES = { s: 170, m: 200, l: 230 };
   function carouselLoad(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, auto: false };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true };
     try{
       var v = JSON.parse(localStorage.getItem(CAROUSEL_KEY) || 'null');
       if(v && typeof v === 'object'){
@@ -55150,7 +55153,6 @@
         if(CAROUSEL_SIZES[v.size]) d.size = v.size;
         if(typeof v.tilt === 'number' && v.tilt >= 30 && v.tilt <= 80) d.tilt = v.tilt;
         if(typeof v.reflect === 'boolean') d.reflect = v.reflect;
-        if(typeof v.auto === 'boolean') d.auto = v.auto;
       }
     }catch(e){}
     return d;
@@ -55694,7 +55696,7 @@
   // touched it for ten seconds; after the last cover it goes back to the first.
   var heroFlowTimer = 0;
   function heroFlowTimerSync(){
-    var want = heroFlowOn() && carouselCfg.auto;
+    var want = false;   // build 603 (Mark): auto-advance removed
     if(want && !heroFlowTimer){
       heroFlowTimer = setInterval(function(){
         if(!heroFlowOn() || document.hidden || !npHero || npHero.style.display === 'none' || heroSlides.length < 2) return;
@@ -55752,7 +55754,7 @@
     var opts = document.getElementById('carouselFlowOpts');
     var sizeSel = document.getElementById('flowSizeSelect');
     var tilt = document.getElementById('flowTiltRange'), tiltVal = document.getElementById('flowTiltVal');
-    var refl = document.getElementById('flowReflectSelect'), auto = document.getElementById('flowAutoSelect');
+    var refl = document.getElementById('flowReflectSelect');
     if(!sw) return;
     function save(){ try{ localStorage.setItem(CAROUSEL_KEY, JSON.stringify(carouselCfg)); }catch(e){} }
     function show(){
@@ -55761,12 +55763,12 @@
         b.classList.toggle('active', on);
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
-      if(opts) opts.hidden = !heroFlowOn();
+      // Build 603 (Mark): these are Cover Flow's settings too, so they always show.
+      if(opts) opts.hidden = false;
       if(sizeSel) sizeSel.value = carouselCfg.size;
       if(tilt) tilt.value = String(carouselCfg.tilt);
       if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
       if(refl) refl.value = carouselCfg.reflect ? 'on' : 'off';
-      if(auto) auto.value = carouselCfg.auto ? 'on' : 'off';
     }
     Array.prototype.forEach.call(sw.querySelectorAll('.theme-opt'), function(b){
       b.addEventListener('click', function(){
@@ -55783,7 +55785,7 @@
       save(); layoutHeroFlow(false);
     });
     if(refl) refl.addEventListener('change', function(){ carouselCfg.reflect = refl.value === 'on'; save(); applyCarousel(); });
-    if(auto) auto.addEventListener('change', function(){ carouselCfg.auto = auto.value === 'on'; save(); heroFlowTimerSync(); });
+    // (Build 603: auto-advance removed.)
     show();
     applyCarousel('slides');
   })();
