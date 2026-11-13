@@ -55062,7 +55062,7 @@
   // What has been played, for the slides: radioPlayerPlayedHistory, newest first, max 50,
   // every kind (songs, stations, channels, podcasts, videos, Top 100 songs since build 225). Library
   // songs and videos are kept by id and looked up again, so a removed one drops out.
-  var HERO_MAX = 50;
+  var HERO_MAX = 100;   // build 605 (Mark): up to 100 covers (was 50)
   var HERO_HIST_KEY = 'radioPlayerPlayedHistory';
   var heroHist = null;
   function heroHistLoad(){
