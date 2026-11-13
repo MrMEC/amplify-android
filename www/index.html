@@ -5273,6 +5273,9 @@
        The orbs: soft circles of light that rise slowly from random places, at random sizes,
        and fade away. All of it only in Immersive View, and only transform and opacity move. */
     .np-imm-reflect, .np-imm-orbs{ display:none; }
+    .np-imm-viz{ display:none; position:fixed; left:0; z-index:4; pointer-events:none; opacity:0; transition:opacity .6s ease; }
+    body.np-imm-viz-on .np-imm-viz{ display:block; }
+    body.np-imm-viz-on.np-imm-viz-shown .np-imm-viz{ opacity:1; }
     body.np-immersive:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen:not(.np-channel) :is(.np-imm-reflect, .np-imm-orbs){
       display:block; position:fixed; left:0; right:0; bottom:0; z-index:2; pointer-events:none; overflow:hidden;
     }
@@ -9033,6 +9036,8 @@
            orbs of light drifting up the lower half of the screen. -->
       <div class="np-imm-reflect" id="npImmReflect" aria-hidden="true"><canvas id="npImmReflectCv" width="128" height="128"></canvas></div>
       <div class="np-imm-orbs" id="npImmOrbs" aria-hidden="true"></div>
+      <!-- Build 599 (Mark): Immersive View upright - bars in the cover's colour, moving while music plays. -->
+      <canvas class="np-imm-viz" id="npImmViz" aria-hidden="true"></canvas>
       <div class="np-imm-glaze" aria-hidden="true"></div>
     </div>
   </main>
@@ -14703,6 +14708,121 @@
     if(on){ try{ closeNpMenu(); }catch(e){} startImmersiveMotion(); nativeVideoUi({ awake: true }); }
     else { stopImmersiveMotion(); nativeVideoUi({}); }
   }
+  // ---------- Build 599 (Mark): the visualizer (Immersive View, upright) ----------
+  // Bars in the cover's own colour (--np-vivid, the colour Play takes), centred in the space
+  // between Play and the bottom of the screen, clear of Play. The phone plays the sound itself,
+  // so there are no levels to read: the bars move to a lively, beat-like pattern while music
+  // plays and settle low when it pauses. Drawn only while it is on screen (~30 frames a second).
+  (function(){
+    var cv = document.getElementById('npImmViz');
+    if(!cv || !cv.getContext) return;
+    var ctx = cv.getContext('2d'), raf = 0, last = 0, t0 = performance.now();
+    var N = 0, lv = [], ph = [], sp = [], kick = 0, nextKick = 0, box = null;
+    function wanted(){
+      var b = document.body.classList;
+      if(!b.contains('np-immersive') || b.contains('npl') || b.contains('rotate-lock') || b.contains('np-video-full')) return false;
+      if(nowPlayingScreen.style.display !== 'flex' || nowPlayingScreen.classList.contains('np-channel')) return false;
+      return window.innerHeight > window.innerWidth;
+    }
+    function layout(){
+      var pb = document.getElementById('npPlayBtn').getBoundingClientRect();
+      var vh = window.innerHeight, vw = window.innerWidth;
+      var top = pb.bottom + 28, bottom = vh - 24, room = bottom - top;
+      if(room < 60) return null;
+      var h = Math.min(room, 190), y = top + (room - h) / 2;
+      var pad = 20, w = vw - pad * 2;
+      var n = Math.max(16, Math.min(44, Math.floor(w / 9)));
+      return { x: pad, y: y, w: w, h: h, n: n };
+    }
+    function setup(){
+      var nb = layout();
+      if(!nb){ box = null; return false; }
+      // Unchanged: leave the canvas alone (resizing it wipes what is drawn, which flickers).
+      if(box && Math.round(nb.y) === Math.round(box.y) && Math.round(nb.w) === Math.round(box.w) && Math.round(nb.h) === Math.round(box.h)) return true;
+      box = nb;
+      var dpr = Math.min(window.devicePixelRatio || 1, 3);
+      cv.style.top = box.y + 'px'; cv.style.left = box.x + 'px';
+      cv.style.width = box.w + 'px'; cv.style.height = box.h + 'px';
+      cv.width = Math.round(box.w * dpr); cv.height = Math.round(box.h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); lastCol = '';
+      if(N !== box.n){
+        N = box.n; lv = []; ph = []; sp = [];
+        for(var i = 0; i < N; i++){ lv.push(.08); ph.push(Math.random() * 6.28); sp.push(1.4 + Math.random() * 2.6); }
+      }
+      return true;
+    }
+    var lastCol = '', grad = null, mixCv = null;
+    function mixWhite(c, k){
+      try{
+        if(!mixCv){ mixCv = document.createElement('canvas').getContext('2d'); }
+        mixCv.fillStyle = '#000'; mixCv.fillStyle = c; var hx = mixCv.fillStyle;
+        var m = /^#([0-9a-f]{6})$/i.exec(hx); if(!m) return c;
+        var n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+        return 'rgb(' + Math.round(r + (255 - r) * k) + ',' + Math.round(g + (255 - g) * k) + ',' + Math.round(b + (255 - b) * k) + ')';
+      }catch(e){ return c; }
+    }
+    function colour(){
+      var c = '';
+      try{ c = getComputedStyle(nowPlayingScreen).getPropertyValue('--np-vivid').trim(); }catch(e){}
+      return c || '#ffffff';
+    }
+    function draw(now){
+      var playing = document.body.classList.contains('ui-playing');
+      var t = (now - t0) / 1000;
+      if(playing && now > nextKick){ kick = .55 + Math.random() * .45; nextKick = now + 380 + Math.random() * 260; }
+      kick *= .9;
+      var w = box.w, h = box.h, bw = w / N, barW = Math.max(3, bw * .48), col = colour();
+      ctx.clearRect(0, 0, w, h);
+      // A light tint of the cover's colour, brightest across the middle, with a soft glow of
+      // the colour itself, so the bars stand out from a background made of the same colour.
+      if(col !== lastCol){
+        lastCol = col;
+        grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, mixWhite(col, .25)); grad.addColorStop(.5, mixWhite(col, .72)); grad.addColorStop(1, mixWhite(col, .25));
+      }
+      ctx.fillStyle = grad; ctx.shadowColor = col; ctx.shadowBlur = 14;
+      for(var i = 0; i < N; i++){
+        var c = (i + .5) / N, env = .35 + .65 * Math.sin(Math.PI * c);
+        var target = playing
+          ? Math.min(1, env * (.22 + .3 * (.5 + .5 * Math.sin(t * sp[i] + ph[i])) + .25 * (.5 + .5 * Math.sin(t * sp[i] * 2.3 + ph[i] * 1.7)) + kick * (.25 + .4 * Math.random())))
+          : .06 * env + .02;
+        lv[i] += (target - lv[i]) * (playing ? .35 : .12);
+        var bh = Math.max(barW, lv[i] * h), x = i * bw + (bw - barW) / 2, y = (h - bh) / 2;
+        ctx.globalAlpha = .55 + .45 * lv[i];
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(x, y, barW, bh, barW / 2); else ctx.rect(x, y, barW, bh);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      return playing || lv.some(function(v){ return v > .1; });
+    }
+    function frame(now){
+      raf = 0;
+      if(!wanted() || !box){ stop(); return; }
+      if(now - last >= 32){ last = now; if(!draw(now) && !document.body.classList.contains('ui-playing')) return; }
+      raf = requestAnimationFrame(frame);
+    }
+    function stop(){
+      if(raf) cancelAnimationFrame(raf); raf = 0;
+      document.body.classList.remove('np-imm-viz-shown');
+      setTimeout(function(){ if(!wanted()) document.body.classList.remove('np-imm-viz-on'); }, 650);
+    }
+    function sync(){
+      if(!wanted()){ if(document.body.classList.contains('np-imm-viz-on')) stop(); return; }
+      document.body.classList.add('np-imm-viz-on');
+      requestAnimationFrame(function(){
+        if(!wanted() || !setup()){ stop(); return; }
+        document.body.classList.add('np-imm-viz-shown');
+        if(reducedMotion()){ draw(performance.now()); return; }
+        if(!raf) raf = requestAnimationFrame(frame);
+      });
+    }
+    var st = 0;
+    function soon(){ if(!st) st = setTimeout(function(){ st = 0; sync(); }, 60); }
+    new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('resize', soon);
+    window.__immViz = { sync: sync, box: function(){ return box; } };
+  })();
   // Build 173: in Immersive View the section under the controls is hidden until the page is
   // scrolled; back at the top it fades out again after IMM_BELOW_HIDE_MS.
   var immBelowTimer = 0, IMM_BELOW_HIDE_MS = 3000;
@@ -54936,7 +55056,11 @@
       if(!t || out.length >= HERO_MAX || isBlacklisted(t)) return;
       var k = favKey(t);
       if(!k || seen[k]) return;
-      seen[k] = true; out.push(t);
+      // Build 599 (Mark): songs by one artist all lead to the same artist page, so that artist
+      // shows once (the first, most recent of them).
+      var ent = heroArtistEntry(t), ak = ent ? 'artist:' + ent.key : null;
+      if(ak && seen[ak]) return;
+      seen[k] = true; if(ak) seen[ak] = true; out.push(t);
     }
     if(zenBarActive && typeof zenHeroItem === 'function') add(zenHeroItem());
     add(currentStation);
