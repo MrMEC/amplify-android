@@ -18,11 +18,15 @@ GEO = """(()=>{ function r(q){ var e = typeof q==='string' ? document.querySelec
   var o = {}; ids.forEach(function(i){ o[i] = r(i); });
   return { g:o, npl: document.body.classList.contains('npl'), rot: document.body.classList.contains('rotate-lock'), vw: innerWidth, vh: innerHeight }; })()"""
 def overlap(a, b): return a and b and a[0] < b[2] - 1 and b[0] < a[2] - 1 and a[1] < b[3] - 1 and b[1] < a[3] - 1
+CASES = [('dark', (678, 297), False), ('light', (678, 297), False), ('dark', (700, 310), False), ('dark', (891, 411), False)]  # Mark's S26 Ultra sideways is ~678x297 CSS px at dpr ~3.3
+if os.environ.get('ONLY'): CASES = CASES[:int(os.environ['ONLY'])]
+ZOOM = """(()=>{ var els = Array.from(document.querySelectorAll('body *')); var fs = els.map(function(e){ return parseFloat(getComputedStyle(e).fontSize); });
+  els.forEach(function(e, i){ if(fs[i]) e.style.setProperty('font-size', (fs[i] * 1.3) + 'px', 'important'); }); })()"""
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
-        for theme, size, big in (('dark', (891, 411), False), ('light', (780, 360), False), ('dark', (891, 411), True)):
-            ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, color_scheme=theme)
+        for theme, size, big in CASES:
+            ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=3.3, is_mobile=True, has_touch=True, color_scheme=theme)
             await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
             await ctx.add_init_script("localStorage.setItem('radioPlayerTheme', '%s')" % theme)
             pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -34,10 +38,10 @@ async def main():
                 if await pg.evaluate("(js)=>window.__h.ev(js)", 'libraryTracks.length') >= len(files): break
             await pg.evaluate("(js)=>window.__h.ev(js)", "runLibrarySection('songs'); 1"); await pg.wait_for_timeout(800)
             await pg.tap('#stationsGrid .song-row:not(.shuffle-all-row)'); await pg.wait_for_timeout(1200)
-            if big: await pg.evaluate("document.documentElement.style.fontSize='130%'; document.body.style.zoom='1'; var st=document.createElement('style'); st.textContent='body.npl .np-name{font-size:39px!important} body.npl .np-sub{font-size:20px!important} .npl-from-v{font-size:17px!important} .np-seek-times{font-size:16px!important}'; document.head.appendChild(st)")
             await pg.evaluate("document.body.classList.add('cast-avail'); var cb=document.querySelector('.sidebar-top .cast-btn'); if(cb) cb.hidden=false;")
             await pg.set_viewport_size({'width': size[0], 'height': size[1]}); await pg.wait_for_timeout(1200)
             await pg.evaluate("document.getElementById('playerNowTrigger').click()"); await pg.wait_for_timeout(1500)
+            if big: await pg.evaluate(ZOOM); await pg.wait_for_timeout(300)
             T = '[%s %dx%d%s]' % (theme, size[0], size[1], ' big' if big else '')
             r = await pg.evaluate(GEO); g = r['g']
             await pg.screenshot(path='/tmp/claude-0/t/shots/npl-%s-%d%s.png' % (theme, size[0], '-big' if big else ''))

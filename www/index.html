@@ -7971,6 +7971,29 @@
     body.npl .npl-btn[hidden]{ display:none; }
     body.npl .npl-btn svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
     body.npl .npl-btn.spin svg{ animation:queueShuffleSpin .5s ease; }
+    /* Build 596 (Mark: far too tight on his phone, ~678x297 CSS px sideways): rows never squeeze
+       into each other, and a short screen gets a compact set of sizes. */
+    body.npl .np-details{ grid-template-rows:44px auto auto auto auto minmax(4px, 1fr) auto auto auto; align-content:stretch; }
+    body.npl .np-details > *{ min-height:min-content; }
+    @media (max-height: 360px){
+      body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 32px), 40vw); --np-float-top:16px; }
+      body.npl .np-hero{ padding:16px 20px 16px 22px; gap:26px; }
+      body.npl .np-float .np-back{ top:16px !important; left:calc(22px + var(--npl-art) + 26px) !important; }
+      body.npl .np-details{ grid-template-rows:40px auto auto auto auto minmax(2px, 1fr) auto auto auto; }
+      body.npl .npl-from{ display:none !important; }
+      body.npl .np-menu-wrap{ height:40px; display:flex; align-items:center; }
+      body.npl .np-name{ margin-top:4px; font-size:22px; line-height:1.15; }
+      body.npl .np-sub{ margin-top:3px; font-size:14px; }
+      body.npl .np-cast-note, body.npl .np-video-toggle{ margin-top:4px; }
+      body.npl .np-seek{ margin:0 0 4px; }
+      body.npl .np-seek-wave{ height:22px; }
+      body.npl #npPlayBtn{ width:52px; height:52px; font-size:20px; }
+      body.npl .np-step-btn, body.npl .np-skip-btn{ width:40px; height:40px; }
+      body.npl .npl-btn{ width:40px; height:40px; }
+      body.npl .npl-btn svg{ width:20px; height:20px; }
+      body.npl #npFavBtn{ width:40px; height:40px; }
+      body.npl #npFavBtn, body.npl .npl-row > *{ margin-top:4px; }
+    }
     /* The queue and lyrics take half the screen sideways, beside the rail rather than under it. */
     body.phone-land .queue-panel:not(.lyrics-panel){ width:50%; }
     body.phone-land .lyrics-panel{ left:var(--rail-w); width:calc((100% - var(--rail-w)) / 2); }
