@@ -89,8 +89,19 @@ jobs:
           for i in 1 2 3 4 5 6; do
             code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://github.com/${{ github.repository }}/releases/download/latest/Amplify.apk")
             echo "APK link: $code"
-            [ "$code" = "200" ] && exit 0
+            [ "$code" = "200" ] && break
             sleep 10
           done
+          # Build 608: GitHub has been seen to put the release back to a draft a little after it was
+          # published (the link then gives a 404). Look again a while later, and re-publish if so.
+          for i in 1 2 3 4 5 6; do
+            sleep 20
+            d=$(gh api repos/${{ github.repository }}/releases --jq '.[] | select(.tag_name=="latest") | .draft' | head -1)
+            code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://github.com/${{ github.repository }}/releases/download/latest/Amplify.apk")
+            echo "check $i: draft=$d link=$code"
+            if [ "$d" = "true" ] || [ "$code" != "200" ]; then gh release edit latest --draft=false || true; fi
+          done
+          code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://github.com/${{ github.repository }}/releases/download/latest/Amplify.apk")
+          [ "$code" = "200" ] && exit 0
           echo "The APK link isn't answering" >&2
           exit 1
