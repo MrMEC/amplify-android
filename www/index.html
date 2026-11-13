@@ -7796,7 +7796,7 @@
     .mobile-nav-btn.active{ background:color-mix(in srgb, var(--accent) 15%, transparent); }
     body.np-immersive .mobile-nav{ transform:translateX(calc(-100% - 8px)); }
     /* The header: only its buttons stay, at the foot of the rail (profile picture, Cast above it). */
-    body:not(.rotate-lock):not(.np-video-full) .sidebar-top{
+    body:not(.rotate-lock):not(.np-video-full) .sidebar-top, body.cf-btn.rotate-lock .sidebar-top{
       top:auto; bottom:calc(10px + env(safe-area-inset-bottom, 0px)); left:env(safe-area-inset-left, 0px); right:auto;
       width:76px; height:auto; padding:0; justify-content:center; background:transparent !important;
       border:0 !important; box-shadow:none !important; z-index:320; visibility:visible;
@@ -7824,7 +7824,16 @@
   /* Build 591 (Mark): the Cover Flow button, sideways on Albums and Artists; white in dark, black in light. */
   #cfOpenBtn{ display:none !important; }
   body.cf-avail:not(.rotate-lock) #cfOpenBtn{ display:inline-flex !important; align-items:center; justify-content:center;
-    width:44px; height:44px; padding:0; border:none; background:transparent; color:#fff; box-shadow:none; margin-left:auto; flex:0 0 auto; align-self:center; }
+    width:44px; height:44px; padding:0; border:none; background:transparent; color:#fff; box-shadow:none;
+    position:absolute; right:-8px; top:50%; margin-top:-22px; }
+  /* Build 592 (Mark): the button takes no room, so the heading and the tabs sit exactly where they do without it. */
+  body.cf-avail #sectionHeadingRow{ position:relative; }
+  /* Build 592 (Mark): Cover Flow slides up over the page (which keeps its rail and player bar
+     underneath) and back down when closed. */
+  body.cf-btn.rotate-lock .mobile-nav{ display:flex !important; }
+  body.cf-btn.rotate-lock .player-bar{ display:block !important; }
+  body.cf-btn.rotate-lock .sidebar-top{ display:flex !important; }
+  body.cf-sliding .np-land-albums{ transition:none !important; }
   html[data-theme="light"] body.cf-avail #cfOpenBtn{ color:#000; }
   #cfOpenBtn svg{ width:30px; height:30px; display:block; }
   .cf-close-btn{ display:none; }
@@ -22725,6 +22734,7 @@
         }
       } else if(!active && wasActive){
         try{ setLandAlbumsOpen(false); }catch(e){}
+        if(cfBtnMode){ try{ cfSlideEnd(); }catch(e){} document.body.classList.remove('cf-btn'); }
         cfBtnMode = false;
         if(rotateLockOpenedNp){
           rotateLockOpenedNp = false;
@@ -22888,19 +22898,48 @@
     window.__cfAvailable = function(){
       try{ return rotateLockQuery.matches && !nowPlayingScreen.classList.contains('la-open') && nowPlayingScreen.style.display !== 'flex' && !!libraryDirectoryInView(); }catch(e){ return false; }
     };
+    var cfSlideT = 0;
+    var cfSlideEnd = function(){
+      clearTimeout(cfSlideT); cfSlideT = 0;
+      nowPlayingScreen.style.removeProperty('transform'); nowPlayingScreen.style.removeProperty('transition');
+      document.body.classList.remove('cf-sliding');
+    };
+    var cfMotion = function(){ try{ return !window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return true; } };
     var openCoverFlowFromPage = function(){
-      if(!rotateLockQuery.matches || document.body.classList.contains('rotate-lock')) return;
+      if(!rotateLockQuery.matches || document.body.classList.contains('rotate-lock') || cfSlideT) return;
       var lib = libraryDirectoryInView();
       if(!lib) return;
       if(!lib.fromPage) lib.atTop = lib.atTop || window.scrollY < 40;
+      var y = window.scrollY;
       cfBtnMode = true; rotateLockOpenedNp = false;
-      document.body.classList.add('rotate-lock', 'cf-only');
+      var anim = cfMotion();
+      if(anim){
+        document.body.classList.add('cf-sliding');
+        nowPlayingScreen.style.transition = 'none';
+        nowPlayingScreen.style.transform = 'translateY(100%)';
+      }
+      document.body.classList.add('rotate-lock', 'cf-only', 'cf-btn');
       setLandAlbumsOpen(true, lib.key || null, lib);
+      if(window.scrollY !== y) window.scrollTo(0, y);
+      if(!anim) return;
+      void nowPlayingScreen.offsetHeight;
+      nowPlayingScreen.style.transition = 'transform .38s cubic-bezier(.22,.8,.24,1)';
+      nowPlayingScreen.style.transform = 'translateY(0)';
+      cfSlideT = setTimeout(cfSlideEnd, 420);
     };
     var closeCoverFlowToPage = function(){
-      setLandAlbumsOpen(false);
-      cfBtnMode = false; rotateLockOpenedNp = false;
-      document.body.classList.remove('rotate-lock', 'cf-only');
+      if(cfSlideT) return;
+      var done = function(){
+        cfSlideEnd();
+        setLandAlbumsOpen(false);
+        cfBtnMode = false; rotateLockOpenedNp = false;
+        document.body.classList.remove('rotate-lock', 'cf-only', 'cf-btn');
+      };
+      if(!cfMotion()){ done(); return; }
+      document.body.classList.add('cf-sliding');
+      nowPlayingScreen.style.transition = 'transform .32s cubic-bezier(.4,0,.7,.4)';
+      nowPlayingScreen.style.transform = 'translateY(100%)';
+      cfSlideT = setTimeout(done, 340);
     };
     document.getElementById('cfOpenBtn').addEventListener('click', function(e){ e.stopPropagation(); openCoverFlowFromPage(); });
     document.getElementById('cfCloseBtn').addEventListener('click', function(e){ e.stopPropagation(); closeCoverFlowToPage(); });
