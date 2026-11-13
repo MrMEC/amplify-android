@@ -80,6 +80,8 @@ STATE = """(()=>{ var s = document.getElementById('nowPlayingScreen'), la = docu
     channel: s.classList.contains('np-channel'), vplayer: s.classList.contains('np-vplayer'), videoOn: s.classList.contains('np-video-on'),
     top: top ? (top.closest('#npLandAlbums') ? 'coverflow' : (top.id || top.className || top.tagName)) : null }; })()"""
 
+BTN = """(()=>{ var b=document.getElementById('cfOpenBtn'); var r=b.getBoundingClientRect(), cs=getComputedStyle(b); return {vis: cs.display!=='none' && r.width>0, right: Math.round(r.right), top: Math.round(r.top), color: cs.color}; })()"""
+CLOSE = """(()=>{ var b=document.getElementById('cfCloseBtn'); var r=b.getBoundingClientRect(); return getComputedStyle(b).display==='none'?null:{left: Math.round(r.left), bottom: Math.round(r.bottom)}; })()"""
 async def rotate(pg, land):
     await pg.set_viewport_size({'width': 844, 'height': 390} if land else {'width': 390, 'height': 844})
     await pg.wait_for_timeout(1400)
@@ -118,9 +120,27 @@ async def main():
                 await pg.evaluate("window.scrollTo(0,0)")
                 await rotate(pg, True)
                 s = await pg.evaluate(STATE)
+                # Build 591: turning the phone leaves the page (with the rail); the button opens Cover Flow.
+                check(not s['rot'] and not s['la'], '%s, %s: turning the phone keeps the page %s' % (case, section, s))
+                bt = await pg.evaluate(BTN)
+                check(bt and bt['vis'] and bt['right'] > 780 and bt['top'] < 80 and bt['color'] == 'rgb(255, 255, 255)', '%s, %s: Cover Flow button top right, white %s' % (case, section, bt))
+                await pg.screenshot(path=f'{shots}/cfb-page-{section}-{case.split()[0]}.png')
+                await pg.click('#cfOpenBtn'); await pg.wait_for_timeout(1200)
+                s = await pg.evaluate(STATE)
                 check(s['rot'] and s['la'] and s['covers'] > 0 and s['top'] == 'coverflow' and s['laOp'] == '1' and not s['videoOn'],
-                      '%s, %s: turning the phone opens Cover Flow %s' % (case, section, s))
+                      '%s, %s: the button opens Cover Flow %s' % (case, section, s))
+                cl = await pg.evaluate(CLOSE)
+                check(cl and cl['left'] < 80 and cl['bottom'] > 330, '%s, %s: Close bottom left %s' % (case, section, cl))
                 await pg.screenshot(path=f'{shots}/cfv-{section}-{case.split()[0]}.png')
+                if section == 'albums' and case == 'upright stop':
+                    # turning over the middle album must not leave a page behind
+                    await pg.evaluate("var c=document.querySelector('#npLandAlbums .cf-cover.cf-center, #npLandAlbums .cf-cover'); if(c) c.click()"); await pg.wait_for_timeout(1200)
+                await pg.click('#cfCloseBtn'); await pg.wait_for_timeout(900)
+                s = await pg.evaluate(STATE)
+                rail = await pg.evaluate("(()=>{ var n=document.getElementById('mobileNav'), e=document.elementFromPoint(30, innerHeight/2); return !!(n&&n.contains(e)); })()")
+                tiles = await pg.evaluate("!!document.querySelector(\".tile[data-entity='%s']\") && !document.body.classList.contains('album-open')" % section[:-1])
+                check(not s['rot'] and not s['la'] and rail and tiles, '%s, %s: Close returns to the list with the rail %s %s %s' % (case, section, s, rail, tiles))
+                await pg.click('#cfOpenBtn'); await pg.wait_for_timeout(1000)
                 await rotate(pg, False)
                 back = await pg.evaluate("[document.getElementById('nowPlayingScreen').style.display, !!document.querySelector(\".tile[data-entity='%s']\")]" % section[:-1])
                 check(back[0] != 'flex' and back[1], '%s, %s: upright again, back on the list %s' % (case, section, back))

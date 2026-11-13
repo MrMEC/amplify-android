@@ -7821,6 +7821,20 @@
 
   /* The filter button is only for Watch sideways. */
   #wlFilterBtn, #wlManageBtn{ display:none !important; }
+  /* Build 591 (Mark): the Cover Flow button, sideways on Albums and Artists; white in dark, black in light. */
+  #cfOpenBtn{ display:none !important; }
+  body.cf-avail:not(.rotate-lock) #cfOpenBtn{ display:inline-flex !important; align-items:center; justify-content:center;
+    width:44px; height:44px; padding:0; border:none; background:transparent; color:#fff; box-shadow:none; margin-left:auto; flex:0 0 auto; align-self:center; }
+  html[data-theme="light"] body.cf-avail #cfOpenBtn{ color:#000; }
+  #cfOpenBtn svg{ width:30px; height:30px; display:block; }
+  .cf-close-btn{ display:none; }
+  body.rotate-lock.cf-only:not(.np-video-full) .now-playing-screen.la-open .cf-close-btn{
+    display:flex; align-items:center; justify-content:center;
+    position:absolute; left:calc(18px + env(safe-area-inset-left, 0px)); bottom:18px; z-index:3;
+    width:44px; height:44px; padding:0; border:none; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; cursor:pointer; }
+  html[data-theme="light"] body.rotate-lock.cf-only .now-playing-screen.la-open .cf-close-btn{ background:rgba(23,25,28,.08); color:#17191c; }
+  .cf-close-btn svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; }
   #wlFilterBtn .wl-ico-close{ display:none; }
   @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px){
     .sidebar-top .top-actions{ width:76px; justify-content:center; margin:0; }
@@ -8353,6 +8367,10 @@
         <!-- Only on the Top Artists page: the way to every artist in the library. -->
         <button type="button" class="heading-side-link" id="allArtistsLink" style="display:none;">All Artists</button>
         <input type="text" class="section-heading-input" id="stationsHeadingInput" style="display:none;">
+        <!-- Build 591 (Mark): sideways on Albums and Artists, opens Cover Flow. -->
+          <button type="button" class="clear-search-btn cf-open-btn" id="cfOpenBtn" title="Cover Flow" aria-label="Cover Flow">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><defs><mask id="cfIcoMask"><rect width="24" height="24" fill="#fff"/><path fill="#000" d="M10.6 8.2l4.6-1.1v6.6a1.7 1.5 0 1 1-1-1.35V9.4l-2.6.65v4.85a1.7 1.5 0 1 1-1-1.35z"/></mask></defs><rect x="6.6" y="5" width="10.8" height="14" rx="1" fill="currentColor" mask="url(#cfIcoMask)"/><rect x="3.6" y="6.6" width="1.8" height="10.8" fill="currentColor"/><rect x="18.6" y="6.6" width="1.8" height="10.8" fill="currentColor"/><rect x="1" y="8.4" width="1.5" height="7.2" fill="currentColor"/><rect x="21.5" y="8.4" width="1.5" height="7.2" fill="currentColor"/></svg>
+          </button>
         <div class="section-heading-right">
           <span class="result-count" id="resultCount" style="display:none;"></span>
           <!-- Build 586: sideways, Live TV's guide (no heading to tap) has its menu here. -->
@@ -8882,6 +8900,10 @@
         <span class="la-ico-np" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
       </button>
       <div class="np-land-albums" id="npLandAlbums" aria-hidden="true"></div>
+      <!-- Build 591 (Mark): Cover Flow opened from Albums / Artists closes back to the page. -->
+      <button type="button" class="cf-close-btn" id="cfCloseBtn" aria-label="Close Cover Flow" title="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
 
       <!-- Everything below the artwork sits on the tint the artwork faded into. -->
       <div class="np-below">
@@ -9171,10 +9193,6 @@
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="landNpLabel">Horizontal Now Playing</span><span class="set-desc">Now Playing fills the screen when the phone is turned sideways</span></div>
         <select class="settings-select" id="landNpSelect" aria-labelledby="landNpLabel"><option value="off">Off</option><option value="on">On</option></select>
-      </div>
-      <div class="settings-row">
-        <div class="set-text"><span class="settings-label" id="landCfLabel">Cover Flow</span><span class="set-desc">Albums as Cover Flow on the sideways Now Playing screen</span></div>
-        <select class="settings-select" id="landCfSelect" aria-labelledby="landCfLabel"><option value="off">Off</option><option value="on">On</option></select>
       </div>
     </section>
 
@@ -22620,9 +22638,10 @@
     var landPrefs = { np: true, cf: true };
     try{
       var lpo = JSON.parse(localStorage.getItem(LANDSCAPE_KEY) || 'null');
-      if(lpo && typeof lpo === 'object'){ if(lpo.np === false) landPrefs.np = false; if(lpo.cf === false) landPrefs.cf = false; }
+      if(lpo && typeof lpo === 'object'){ if(lpo.np === false) landPrefs.np = false; }  /* Build 591: Cover Flow always available (opened by its button) */
     }catch(e){}
     var rotateLockOpenedNp = false;
+    var cfBtnMode = false;
     var epgLandGridShowing = function(){
       return !!(onVideoView && videoTab === 'channels' && !videoChannelsEditing && stationsGrid.querySelector(':scope > .epg'));
     };
@@ -22657,7 +22676,7 @@
       var active = matches && wasActive && (npShown || cfShown) && (landPrefs.np || (cfOnlyWas && landPrefs.cf));
       var enterNp = matches && !wasActive && npShown && landPrefs.np;
       if(enterNp) active = true;
-      var cfOnly = active && !landPrefs.np;
+      var cfOnly = active && !npShown;
       var coverFlowFromLibrary = null;
       // Build 244 (Mark): turned sideways on Live TV with nothing playing, the guide grid alone fills
       // the screen (no header, heading, tabs, player bar or tab bar) instead of Now Playing. Once
@@ -22681,9 +22700,7 @@
       }
       // Horizontal Now Playing off: sideways on Albums or Artists (or an album or artist page) still
       // opens Cover Flow, with no Now Playing behind it.
-      if(matches && !wasActive && !npShown && landPrefs.cf && libraryDirectoryInView()){
-        active = true; cfOnly = !landPrefs.np;
-      }
+      // Build 591 (Mark): turning the phone no longer opens Cover Flow; its button does (cfOpenBtn).
       if(active && !wasActive){
         if(npShown){
           rotateLockOpenedNp = false;
@@ -22708,6 +22725,7 @@
         }
       } else if(!active && wasActive){
         try{ setLandAlbumsOpen(false); }catch(e){}
+        cfBtnMode = false;
         if(rotateLockOpenedNp){
           rotateLockOpenedNp = false;
           if(npShown) closeNowPlaying(true);
@@ -22814,6 +22832,8 @@
     var coverFlowPageKey = null;
     var openAlbumBehind = function(al){
       if(!al || !document.body.classList.contains('rotate-lock')) return;
+      // Opened by its button: Close goes back to the page it came from, so nothing opens behind.
+      if(cfBtnMode) return;
       var replacing = !!coverFlowPageKey && activeAlbumKey === coverFlowPageKey;
       if(replacing && activeAlbumKey === al.key) return;
       // Already on this album's page (Cover Flow was opened from it): nothing to open, and
@@ -22864,6 +22884,26 @@
       setLandAlbumsOpen(open);
     });
     npLandAlbums.addEventListener('click', function(e){ e.stopPropagation(); });
+    // Build 591 (Mark): the Cover Flow button (sideways, on Albums and Artists) and its Close.
+    window.__cfAvailable = function(){
+      try{ return rotateLockQuery.matches && !nowPlayingScreen.classList.contains('la-open') && nowPlayingScreen.style.display !== 'flex' && !!libraryDirectoryInView(); }catch(e){ return false; }
+    };
+    var openCoverFlowFromPage = function(){
+      if(!rotateLockQuery.matches || document.body.classList.contains('rotate-lock')) return;
+      var lib = libraryDirectoryInView();
+      if(!lib) return;
+      if(!lib.fromPage) lib.atTop = lib.atTop || window.scrollY < 40;
+      cfBtnMode = true; rotateLockOpenedNp = false;
+      document.body.classList.add('rotate-lock', 'cf-only');
+      setLandAlbumsOpen(true, lib.key || null, lib);
+    };
+    var closeCoverFlowToPage = function(){
+      setLandAlbumsOpen(false);
+      cfBtnMode = false; rotateLockOpenedNp = false;
+      document.body.classList.remove('rotate-lock', 'cf-only');
+    };
+    document.getElementById('cfOpenBtn').addEventListener('click', function(e){ e.stopPropagation(); openCoverFlowFromPage(); });
+    document.getElementById('cfCloseBtn').addEventListener('click', function(e){ e.stopPropagation(); closeCoverFlowToPage(); });
     rotateLockQuery.addEventListener && rotateLockQuery.addEventListener('change', function(){
       setLandAlbumsOpen(false);
       if(!rotateLockQuery.matches) setLandFavsOpen(false);
@@ -57206,6 +57246,7 @@
       var land = !!(mq && mq.matches);
       var wasLand = document.body.classList.contains('phone-land');
       document.body.classList.toggle('phone-land', land);
+      document.body.classList.toggle('cf-avail', !!(land && window.__cfAvailable && window.__cfAvailable()));
       railFit(land);
       if(wasLand !== land){ var sr = stationsGrid.querySelector(':scope > .lib-tabs, :scope > .watch-tabs') || document.getElementById('podcastTabs'); if(sr) try{ syncStickyTabs(sr); }catch(e){} }
       var wl = land && typeof onVideoView !== 'undefined' && onVideoView && !onVideoDetailView && !videoChannelsEditing;
