@@ -6331,6 +6331,7 @@
   .np-upnext-chev{ width:16px; height:16px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; opacity:.8; }
   body.rotate-lock .np-upnext{ display:none !important; }
 
+  .npl-from, .npl-btn, .npl-row{ display:none; }
   .queue-panel{
     --text:#f5f6f8; --text-dim:rgba(255,255,255,.72); --text-faint:rgba(255,255,255,.5);
     --border:rgba(255,255,255,.14); --panel-2:rgba(255,255,255,.10);
@@ -7912,6 +7913,67 @@
     html body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel{ padding-left:0 !important; }
     /* Now Playing (when it isn't the sideways full-screen player) opens beside the rail, as it opens above the tab bar upright. */
     body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ left:var(--rail-w); width:auto; }
+    /* ---------- Build 595 (Mark): the sideways Now Playing, layout A ----------
+       body.npl (set by script: sideways phone, Now Playing showing, not a channel or a video).
+       The cover on the left at almost full height; title, seek bar, transport and a row of
+       actions on the right; behind it all the cover blurred further, so nothing sharp sits
+       behind the text. */
+    body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 48px), 46vw); overflow:hidden !important; padding:0 !important; }
+    body.npl .np-below, body.npl .np-next-up, body.npl .np-upnext, body.npl .np-hero-top,
+    body.npl .np-hero-fade, body.npl .np-art-bleed, body.npl #npEpThumb, body.npl .np-art-edit{ display:none !important; }
+    body.npl .np-backdrop{ position:absolute; inset:0; height:auto; }
+    body.npl .np-backdrop-clip{ height:100% !important; }
+    body.npl .np-backdrop-img{ inset:-40%; filter:blur(140px) saturate(1.5) brightness(.5); }
+    body.npl .np-backdrop-scrim{ background:rgba(0,0,0,.22); }
+    body.npl .np-float{ position:absolute; top:0; left:0; width:0; height:0; }
+    body.npl .now-playing-screen{ --np-float-top:24px; --np-float-left:calc(28px + var(--npl-art) + 36px); }
+    body.npl .np-hero{ flex-direction:row; align-items:center; gap:36px; height:100%; width:100%; padding:24px 28px; box-sizing:border-box; }
+    body.npl .np-art-wrap{ width:var(--npl-art); height:var(--npl-art); flex:0 0 var(--npl-art); aspect-ratio:1/1; }
+    body.npl .np-art{ -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
+      border-radius:14px; overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,.45); }
+    body.npl .np-hero-foot{ position:relative; top:auto; left:auto; right:auto; flex:1 1 0; min-width:0; height:100%; padding:0; margin:0; }
+    body.npl .np-hero-foot::before{ display:none; }
+    body.npl .np-details{
+      display:grid; grid-template-columns:repeat(20, minmax(0, 1fr));
+      grid-template-rows:44px auto auto auto auto minmax(0, 1fr) auto auto auto;
+      align-items:center; width:100%; max-width:none; height:100%; margin:0; text-align:left;
+    }
+    body.npl .np-details > *{ grid-column:1 / -1; margin:0; }
+    body.npl .np-controls, body.npl .npl-row{ display:contents; }
+    body.npl .npl-from{ display:flex; flex-direction:column; align-items:center; grid-row:1; grid-column:5 / 17; min-width:0; text-align:center; }
+    body.npl .npl-from[hidden]{ display:none; }
+    .npl-from-k{ font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--text-faint); }
+    .npl-from-v{ font-size:13px; font-weight:500; color:var(--text); max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body.npl .np-menu-wrap{ grid-row:1; grid-column:18 / 21; justify-self:end; }
+    body.npl .np-name{ grid-row:2; align-self:end; margin-top:14px; font-size:30px; line-height:1.12; text-align:left;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    body.npl .now-playing-screen .np-name{ text-shadow:0 1px 3px rgba(0,0,0,.3); }
+    body.npl .np-float .np-back{ top:24px !important; left:calc(28px + var(--npl-art) + 36px) !important; }
+    body.npl .np-menu{ top:calc(100% + 4px); bottom:auto; max-height:calc(100dvh - 96px); overflow-y:auto; overscroll-behavior:contain; }
+    body.npl .np-onair{ grid-row:3; text-align:left; justify-self:start; }
+    body.npl .np-sub{ grid-row:4; margin-top:6px; text-align:left; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body.npl .np-cast-note, body.npl .np-video-toggle{ grid-row:5; justify-self:start; margin-top:8px; }
+    body.npl .np-seek{ grid-row:7; max-width:none; width:100%; margin:0 0 14px; }
+    body.npl .np-details > .np-controls > *{ grid-row:8; justify-self:center; margin:0; }
+    body.npl #nplShuffleBtn{ grid-column:1 / 5; justify-self:start; }
+    body.npl #npPrevBtn, body.npl #npSkipBackBtn{ grid-column:5 / 9; }
+    body.npl #npPlayBtn{ grid-column:9 / 13; }
+    body.npl #npNextBtn, body.npl #npSkipFwdBtn{ grid-column:13 / 17; }
+    body.npl #nplQueueBtn{ grid-column:17 / 21; justify-self:end; }
+    body.npl .np-details > .np-controls > .np-menu-wrap{ grid-row:1; grid-column:18 / 21; justify-self:end; }
+    body.npl #npFavBtn, body.npl .npl-row > *{ grid-row:9; margin-top:10px; }
+    body.npl #npFavBtn{ grid-column:1 / 6; justify-self:start; }
+    body.npl #nplLyricsBtn{ grid-column:6 / 11; justify-self:center; }
+    body.npl #nplAddBtn{ grid-column:11 / 16; justify-self:center; }
+    body.npl #nplSleepBtn{ grid-column:16 / 21; justify-self:end; }
+    body.npl .npl-btn{ display:flex; align-items:center; justify-content:center; width:44px; height:44px; padding:0; border:none;
+      border-radius:50%; background:transparent; color:var(--text); opacity:.88; cursor:pointer; }
+    body.npl .npl-btn[hidden]{ display:none; }
+    body.npl .npl-btn svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    body.npl .npl-btn.spin svg{ animation:queueShuffleSpin .5s ease; }
+    /* The queue and lyrics take half the screen sideways, beside the rail rather than under it. */
+    body.phone-land .queue-panel:not(.lyrics-panel){ width:50%; }
+    body.phone-land .lyrics-panel{ left:var(--rail-w); width:calc((100% - var(--rail-w)) / 2); }
     body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .mobile-nav{ z-index:1150; }
 
     /* ---- Watch: one line -- the tabs on the left, the count and round buttons on the right ---- */
@@ -8764,6 +8826,8 @@
           <div class="np-details">
             <!-- Build 248: what's on a playing channel: its picture (tap for the details). -->
             <button type="button" class="np-ep-thumb" id="npEpThumb" hidden aria-label="Program details"><img alt="" referrerpolicy="no-referrer"></button>
+            <!-- Build 595 (Mark): sideways Now Playing (layout A) - where the song is playing from. -->
+            <div class="npl-from" id="nplFrom" hidden><span class="npl-from-k">Playing from album</span><span class="npl-from-v" id="nplFromV"></span></div>
             <div class="np-name" id="npName"></div>
             <!-- What a live station is playing, when its stream names it. Hidden otherwise. -->
             <div class="np-onair" id="npOnAir" hidden></div>
@@ -8779,6 +8843,7 @@
             <button type="button" class="np-video-toggle np-yt-btn" id="npYouTubeBtn" hidden><svg viewBox="0 0 28 20" aria-hidden="true" focusable="false"><rect x="0.5" y="0.5" width="27" height="19" rx="5.5" fill="#FF0000" stroke="none"/><path d="M11.2 5.6v8.8l7.4-4.4z" fill="#fff" stroke="none"/></svg><span>Watch on YouTube</span></button>
             <div class="np-controls">
               <button class="np-fav-btn" id="npFavBtn" title="Toggle favorite"><i class="fa-regular fa-heart"></i></button>
+              <button type="button" class="npl-btn" id="nplShuffleBtn" aria-label="Shuffle what's coming up" title="Shuffle"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7h3.2c1.3 0 2.5.6 3.2 1.7l4.2 6.6c.7 1.1 1.9 1.7 3.2 1.7H21"/><path d="M3 17h3.2c1.3 0 2.5-.6 3.2-1.7l.9-1.4"/><path d="M13.7 9.1l.9-1.4c.7-1.1 1.9-1.7 3.2-1.7H21"/><path d="M18.5 4 21 6l-2.5 2M18.5 15 21 17l-2.5 2"/></svg></button>
               <button class="np-step-btn" id="npPrevBtn" title="Previous track" aria-label="Previous track">
                 <span class="icon-step-back" aria-hidden="true"></span>
               </button>
@@ -8796,6 +8861,7 @@
               <button class="np-step-btn" id="npNextBtn" title="Next track" aria-label="Next track">
                 <span class="icon-step-fwd" aria-hidden="true"></span>
               </button>
+              <button type="button" class="npl-btn" id="nplQueueBtn" aria-label="Up Next" title="Up Next"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h12M4 11h12M4 16h7"/><path d="M16 14v6l4.5-3z" fill="currentColor"/></svg></button>
               <!-- The secondary actions sit at the end of the transport row, so everything
                    you can do to what is playing is in one place. -->
               <div class="np-menu-wrap">
@@ -8871,6 +8937,11 @@
                   </button>
                 </div>
               </div>
+            </div>
+            <div class="npl-row" id="nplRow">
+              <button type="button" class="npl-btn" id="nplLyricsBtn" aria-label="Lyrics" title="Lyrics"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/></svg></button>
+              <button type="button" class="npl-btn" id="nplAddBtn" aria-label="Add to playlist" title="Add to playlist"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h12M4 11h12M4 16h7"/><path d="M18 13.5v7M14.5 17h7"/></svg></button>
+              <button type="button" class="npl-btn" id="nplSleepBtn" aria-label="Sleep timer" title="Sleep timer"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
             </div>
             <div class="np-seek" id="npSeek" style="display:none;">
               <div class="np-seek-track">
@@ -9207,10 +9278,6 @@
       </button>
       </div>
       <!-- Build 567 (Mark): the phone's sideways screens can be turned off. -->
-      <div class="settings-row">
-        <div class="set-text"><span class="settings-label" id="landNpLabel">Horizontal Now Playing</span><span class="set-desc">Now Playing fills the screen when the phone is turned sideways</span></div>
-        <select class="settings-select" id="landNpSelect" aria-labelledby="landNpLabel"><option value="off">Off</option><option value="on">On</option></select>
-      </div>
     </section>
 
     <section class="set-page" data-set-page="appearance-theme" data-set-title="Theme &amp; color" data-set-parent="appearance" hidden>
@@ -14616,6 +14683,8 @@
   // a video of your own, which have their own full-screen layouts.
   function setNpImmersive(on){
     on = !!on;
+    // Build 595: the sideways layout A has no Immersive View.
+    if(on && document.body.classList.contains('npl')) on = false;
     var was = document.body.classList.contains('np-immersive');
     document.body.classList.toggle('np-immersive', on);
     if(on === was) return;
@@ -22691,7 +22760,9 @@
       // (Cover Flow on its own, Horizontal Now Playing off, shows without Now Playing being opened.)
       var cfShown = cfOnlyWas && nowPlayingScreen.classList.contains('la-open');
       var active = matches && wasActive && (npShown || cfShown) && (landPrefs.np || (cfOnlyWas && landPrefs.cf));
-      var enterNp = matches && !wasActive && npShown && landPrefs.np;
+      // Build 595 (Mark): layout A (beside the rail) is the sideways Now Playing now; the full-screen
+      // one is no longer entered.
+      var enterNp = false;
       if(enterNp) active = true;
       var cfOnly = active && !npShown;
       var coverFlowFromLibrary = null;
@@ -57289,11 +57360,47 @@
       var limit = nav.getBoundingClientRect().bottom - parseFloat(getComputedStyle(nav).paddingBottom || 0);
       if(last && last.getBoundingClientRect().bottom > limit + 0.5) document.body.classList.add('rail-compact');
     }
+    // Layout A's own bits: where the song is from, and which actions apply to it (the same as
+    // the More menu's, which already knows -- each button follows its menu item).
+    var nplFrom = document.getElementById('nplFrom'), nplFromV = document.getElementById('nplFromV');
+    var nplPairs = [['nplLyricsBtn', 'npLyricsMenuBtn'], ['nplAddBtn', 'npPlaylistBtn'], ['nplSleepBtn', 'npSleepBtn'], ['nplQueueBtn', 'npQueueMenuBtn']];
+    function nplSync(){
+      var t = null; try{ t = npTarget(); }catch(e){}
+      var local = false; try{ local = !!(t && isLocalTrack(t)); }catch(e){}
+      var al = local && t.album ? String(t.album) : '';
+      nplFrom.hidden = !al; nplFromV.textContent = al;
+      nplPairs.forEach(function(p){
+        var b = document.getElementById(p[0]), m = document.getElementById(p[1]);
+        if(b && m) b.hidden = m.hidden || m.style.display === 'none';
+      });
+      var sh = document.getElementById('nplShuffleBtn');
+      if(sh) sh.hidden = !local;
+    }
+    nplPairs.forEach(function(p){
+      var b = document.getElementById(p[0]), m = document.getElementById(p[1]);
+      if(b && m) b.addEventListener('click', function(e){ e.stopPropagation(); m.click(); });
+    });
+    (function(){
+      var sh = document.getElementById('nplShuffleBtn');
+      if(!sh) return;
+      sh.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(!(window.__amplifyShuffleUpcoming && window.__amplifyShuffleUpcoming())) return;
+        sh.classList.remove('spin'); void sh.offsetWidth; sh.classList.add('spin');
+        clearTimeout(sh._t); sh._t = setTimeout(function(){ sh.classList.remove('spin'); }, 600);
+      });
+    })();
     function sync(){
       var land = !!(mq && mq.matches);
       var wasLand = document.body.classList.contains('phone-land');
       document.body.classList.toggle('phone-land', land);
       document.body.classList.toggle('cf-avail', !!(land && window.__cfAvailable && window.__cfAvailable()));
+      // Build 595: the sideways Now Playing (layout A) -- not for a channel, a video, or Cover Flow.
+      var B = document.body.classList, npS = nowPlayingScreen;
+      var npl = land && npS.style.display === 'flex' && !B.contains('rotate-lock') && !B.contains('np-video-full') &&
+        !npS.classList.contains('np-channel') && !npS.classList.contains('np-video-on');
+      B.toggle('npl', npl);
+      if(npl) nplSync();
       railFit(land);
       if(wasLand !== land){ var sr = stationsGrid.querySelector(':scope > .lib-tabs, :scope > .watch-tabs') || document.getElementById('podcastTabs'); if(sr) try{ syncStickyTabs(sr); }catch(e){} }
       var wl = land && typeof onVideoView !== 'undefined' && onVideoView && !onVideoDetailView && !videoChannelsEditing;
@@ -57325,6 +57432,8 @@
     if(window.MutationObserver){
       new MutationObserver(soon).observe(stationsGrid, { childList: true });
       new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+      new MutationObserver(soon).observe(nowPlayingScreen, { attributes: true, attributeFilter: ['class', 'style'] });
+      new MutationObserver(function(){ if(document.body.classList.contains('npl')) soon(); }).observe(document.getElementById('npName'), { childList: true, characterData: true, subtree: true });
       if(hdrRight) new MutationObserver(soon).observe(hdrRight, { subtree: true, attributes: true, attributeFilter: ['style', 'hidden'] });
     }
     sync();

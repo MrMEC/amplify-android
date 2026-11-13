@@ -114,7 +114,7 @@ async def main():
                 # landscape keeps its own two-line clamp with the whole title
                 await pg.set_viewport_size({'width': 900, 'height': 412}); await pg.wait_for_timeout(1200)
                 s = await pg.evaluate(STATE)
-                rl = await pg.evaluate("document.body.classList.contains('rotate-lock')")
+                rl = await pg.evaluate("document.body.classList.contains('npl')")
                 check(rl and s['more'] is None and s['text'] == LONG + ' Two', f'landscape: whole title under its own clamp, no More {s["more"]} rl={rl}')
                 await pg.screenshot(path=f'{OUT}/nplong-landscape.png')
                 await pg.set_viewport_size({'width': 412, 'height': 900}); await pg.wait_for_timeout(1200)
