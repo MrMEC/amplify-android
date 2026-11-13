@@ -7801,6 +7801,12 @@
       width:76px; height:auto; padding:0; justify-content:center; background:transparent !important;
       border:0 !important; box-shadow:none !important; z-index:320; visibility:visible;
     }
+    /* Build 594 (Mark): over Now Playing the rail is lifted (z 1150) above the screen; the profile
+       picture and Cast at its foot go above it too, or the rail's glass covers them. */
+    body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .sidebar-top{ z-index:1160; }
+    html[data-theme] body.cast-avail:not(.ltv-dock) .sidebar-top .cast-btn{ width:32px; height:32px; flex:0 0 32px; }
+    html[data-theme] body.cast-avail:not(.ltv-dock) .sidebar-top .hamburger-btn,
+    html[data-theme] body.cast-avail:not(.ltv-dock) .sidebar-top .hamburger-btn .hb-avatar{ width:34px; height:34px; }
     .sidebar-top .brand, .sidebar-top .hdr-page-label{ display:none !important; }
     .sidebar-top .top-actions{ flex-direction:row; align-items:center; justify-content:center; gap:4px; }
     /* Build 588: Cast sits beside the profile picture (not above it), both a little smaller, so the
