@@ -7841,7 +7841,9 @@
     display:flex; align-items:center; justify-content:center;
     position:absolute; left:calc(18px + env(safe-area-inset-left, 0px)); bottom:18px; z-index:3;
     width:44px; height:44px; padding:0; border:none; border-radius:50%;
-    background:rgba(255,255,255,.16); color:#fff; cursor:pointer; }
+    background:rgba(255,255,255,.16); color:#fff; cursor:pointer; transition:bottom .34s var(--lf-ease, ease); }
+  /* Build 593 (Mark): with the favourites row open, Close rides up above it, as the arrow does. */
+  body.rotate-lock.cf-only .now-playing-screen.la-open.lf-open .cf-close-btn{ bottom:calc(18px + var(--lf-size) + 18px); }
   html[data-theme="light"] body.rotate-lock.cf-only .now-playing-screen.la-open .cf-close-btn{ background:rgba(23,25,28,.08); color:#17191c; }
   .cf-close-btn svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; }
   #wlFilterBtn .wl-ico-close{ display:none; }
