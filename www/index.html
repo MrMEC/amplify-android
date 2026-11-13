@@ -8090,6 +8090,66 @@
     #accentOverlay .accent-panel{ max-height:calc(100vh - 16px); max-height:calc(100dvh - 16px); overflow-y:auto; overscroll-behavior:contain; }
     #accentOverlay .accent-actions{ position:sticky; bottom:-1px; background:inherit; padding-bottom:4px; }
   }
+
+  /* ---------- Build 606 (Mark): artist and album pages sideways ----------
+     Two columns beside the rail: on the left, fixed, the picture (the artist's in a circle, the
+     album's cover), the name, one line of details and Shuffle / Play / More at the foot; on the
+     right what scrolls (songs, albums...), with the mini player under it only. Upright is
+     untouched (all of this is inside the sideways media query); Play keeps its own colours. */
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px){
+    body.phone-land:is(.artist-open, .album-open){ --aal-w:236px; }
+    body.phone-land:is(.artist-open, .album-open) .layout{ padding-left:calc(var(--rail-w) + var(--aal-w)); }
+    body.phone-land:is(.artist-open, .album-open):not(.np-open) .player-bar{ left:calc(var(--rail-w) + var(--aal-w) + 8px) !important; }
+    body.phone-land:is(.artist-open, .album-open) :is(.artist-hero, .album-hero){
+      position:fixed; left:var(--rail-w); top:0; bottom:0; width:var(--aal-w); margin:0 !important;
+      padding:52px 16px 14px; box-sizing:border-box; z-index:44;
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+      background:var(--page-tint, var(--main-bg)); overflow:hidden; }
+    /* the back arrow at the top left of the left column */
+    body.phone-land:is(.artist-open, .album-open) #detailBackBtn{ position:fixed; left:calc(var(--rail-w) + 8px); top:6px; z-index:46; }
+    body.phone-land:is(.artist-open, .album-open) #sectionHeadingRow{ min-height:44px; z-index:47; }
+    /* the mini player is narrower here: the volume slider goes (the phone's buttons still work) */
+    body.phone-land:is(.artist-open, .album-open):not(.np-open) .player-bar .vol-wrap{ display:none !important; }
+    /* artist: the photo in a circle, the words and buttons stacked under it */
+    body.phone-land.artist-open .artist-hero-art-wrap{
+      display:flex; flex-direction:column; align-items:center; width:100% !important; height:100% !important;
+      margin:0 !important; clip-path:none !important; overflow:visible; }
+    body.phone-land.artist-open .artist-hero-art{
+      position:relative !important; inset:auto !important; flex:0 0 auto; width:116px !important; height:116px !important; aspect-ratio:1/1;
+      border-radius:50% !important; overflow:hidden; -webkit-mask-image:none !important; mask-image:none !important;
+      box-shadow:0 10px 26px rgba(0,0,0,.4); transform:none !important; }
+    body.phone-land.artist-open .artist-hero-art img{ width:100%; height:100%; object-fit:cover; }
+    /* the column doesn't scroll, so the upright page's fade-on-scroll is off here */
+    body.phone-land.artist-open .artist-hero-art-wrap{ --hero-scroll:0 !important; --hero-parallax:0 !important; }
+    body.phone-land.artist-open .artist-hero-art{ filter:none !important; opacity:1 !important; }
+    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
+    body.phone-land.artist-open .artist-hero-overlay{
+      position:relative !important; top:auto !important; left:auto; right:auto; margin:0 !important; padding:0 !important;
+      flex:1 1 auto; width:100%; min-height:0; display:flex; flex-direction:column; align-items:center; }
+    body.phone-land.artist-open .artist-hero-overlay::before{ display:none !important; }
+    body.phone-land.artist-open .artist-hero-name{ margin:10px 0 0 !important; font-size:20px !important; line-height:1.15; max-width:100%;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    body.phone-land.artist-open .artist-hero-sub{ margin:3px 0 0 !important; font-size:12px !important; max-width:100%;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body.phone-land.artist-open .artist-hero-actions{ margin:auto 0 0 !important; }
+    /* album: the cover, the words, the buttons */
+    body.phone-land.album-open .album-hero-art-wrap{ width:112px !important; height:112px; margin:0 0 9px !important; }
+    body.phone-land.album-open .album-hero-name{ font-size:18px !important; line-height:1.15; margin:0 !important; max-width:100%;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    body.phone-land.album-open .album-hero-artist{ font-size:12.5px !important; margin:3px 0 0 !important; max-width:100%;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body.phone-land.album-open .album-hero-meta{ font-size:11px; margin:2px 0 0 !important; }
+    body.phone-land.album-open .album-hero-actions{ margin:auto 0 0 !important; }
+    /* the buttons, smaller to fit the column (Play keeps its colours) */
+    body.phone-land:is(.artist-open, .album-open) :is(.artist-hero-actions, .album-hero-actions){ gap:10px; width:100%; justify-content:center; }
+    body.phone-land:is(.artist-open, .album-open) :is(.artist-hero-actions, .album-hero-actions) .album-play-pill{
+      min-width:0; height:40px; padding:0 22px; font-size:14px; gap:7px; }
+    body.phone-land:is(.artist-open, .album-open) :is(.artist-hero-actions, .album-hero-actions) .album-circle-btn{
+      width:40px; height:40px; flex:0 0 40px; }
+    body.phone-land:is(.artist-open, .album-open) :is(.artist-hero-actions, .album-hero-actions) .album-circle-btn svg{ width:19px; height:19px; }
+    /* menus open upward from the foot, on screen */
+    body.phone-land:is(.artist-open, .album-open) :is(.artist-hero, .album-hero) .artist-menu{ top:auto; bottom:calc(100% + 6px); max-height:calc(100dvh - 70px); overflow-y:auto; }
+  }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
