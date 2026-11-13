@@ -232,6 +232,29 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
   }
 
   /** {ms} stops playback after ms (fading out at the end); {endOfItem:true} at the end of what is playing; {ms:0} turns it off. */
+  // Build 600: the visualizer -- on while it shows (the audio is only measured then), and the
+  // levels of what is being heard now.
+  @PluginMethod
+  public void setViz(PluginCall call) {
+    Viz.enabled = Boolean.TRUE.equals(call.getBoolean("on", false));
+    call.resolve();
+  }
+
+  @PluginMethod
+  public void vizLevels(PluginCall call) {
+    JSObject r = new JSObject();
+    float[] b = Viz.current();
+    if (b != null) {
+      com.getcapacitor.JSArray a = new com.getcapacitor.JSArray();
+      for (float v : b) {
+        try { a.put(Math.round(v * 1000) / 1000.0); } catch (Exception ignored) {}
+      }
+      r.put("bands", a);
+    }
+    r.put("on", Viz.enabled);
+    call.resolve(r);
+  }
+
   @PluginMethod
   public void setSleep(PluginCall call) {
     long ms = Math.max(0L, (long) (double) call.getDouble("ms", 0.0));

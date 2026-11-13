@@ -14710,14 +14710,38 @@
   }
   // ---------- Build 599 (Mark): the visualizer (Immersive View, upright) ----------
   // Bars in the cover's own colour (--np-vivid, the colour Play takes), centred in the space
-  // between Play and the bottom of the screen, clear of Play. The phone plays the sound itself,
-  // so there are no levels to read: the bars move to a lively, beat-like pattern while music
-  // plays and settle low when it pauses. Drawn only while it is on screen (~30 frames a second).
+  // between Play and the bottom of the screen, clear of Play. Build 600 (Mark: an actual working
+  // visualizer): in the app the bars are the real levels of what is playing, measured by the
+  // player itself (VizProcessor.java: 32 bands, kept in step with what comes out of the speaker),
+  // bass in the middle, treble at the edges. Where there are none (the browser, a video's player)
+  // they move to a beat-like pattern instead. Settle low when paused. Drawn only while on screen.
   (function(){
     var cv = document.getElementById('npImmViz');
     if(!cv || !cv.getContext) return;
     var ctx = cv.getContext('2d'), raf = 0, last = 0, t0 = performance.now();
     var N = 0, lv = [], ph = [], sp = [], kick = 0, nextKick = 0, box = null;
+    var vizPlug = (audio && audio.isNative && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AmplifyPlayer &&
+      typeof window.Capacitor.Plugins.AmplifyPlayer.vizLevels === 'function') ? window.Capacitor.Plugins.AmplifyPlayer : null;
+    var real = null, realAt = 0, asking = false, nativeOn = false, peak = .5;
+    function setNative(on){
+      if(!vizPlug || nativeOn === on) return;
+      nativeOn = on; real = null;
+      try{ vizPlug.setViz({ on: on })['catch'](function(){}); }catch(e){}
+    }
+    function ask(now){
+      if(!vizPlug || asking) return;
+      asking = true;
+      vizPlug.vizLevels().then(function(r){
+        asking = false;
+        if(r && r.bands && r.bands.length){ real = r.bands; realAt = performance.now(); }
+      })['catch'](function(){ asking = false; });
+    }
+    // Bar i (of N, mirrored about the middle) -> a level from the 32 bands: bass in the middle.
+    function realAt_(i){
+      var B = real.length, half = (N - 1) / 2, d = Math.abs(i - half) / (half || 1);
+      var x = d * (B - 1), a = Math.floor(x), f = x - a, b = Math.min(B - 1, a + 1);
+      return real[a] * (1 - f) + real[b] * f;
+    }
     function wanted(){
       var b = document.body.classList;
       if(!b.contains('np-immersive') || b.contains('npl') || b.contains('rotate-lock') || b.contains('np-video-full')) return false;
@@ -14769,6 +14793,13 @@
     function draw(now){
       var playing = document.body.classList.contains('ui-playing');
       var t = (now - t0) / 1000;
+      if(playing) ask(now);
+      var useReal = playing && real && now - realAt < 400;
+      if(useReal){
+        // A slow automatic gain, so quiet and loud songs both fill the space.
+        var mx = 0; for(var q = 0; q < real.length; q++) if(real[q] > mx) mx = real[q];
+        peak = Math.max(.35, mx > peak ? mx : peak * .995 + mx * .005);
+      }
       if(playing && now > nextKick){ kick = .55 + Math.random() * .45; nextKick = now + 380 + Math.random() * 260; }
       kick *= .9;
       var w = box.w, h = box.h, bw = w / N, barW = Math.max(3, bw * .48), col = colour();
@@ -14783,10 +14814,12 @@
       ctx.fillStyle = grad; ctx.shadowColor = col; ctx.shadowBlur = 14;
       for(var i = 0; i < N; i++){
         var c = (i + .5) / N, env = .35 + .65 * Math.sin(Math.PI * c);
-        var target = playing
+        var target = useReal
+          ? Math.min(1, Math.pow(Math.max(0, realAt_(i)) / peak, 1.6) * (.9 + .1 * env))
+          : playing
           ? Math.min(1, env * (.22 + .3 * (.5 + .5 * Math.sin(t * sp[i] + ph[i])) + .25 * (.5 + .5 * Math.sin(t * sp[i] * 2.3 + ph[i] * 1.7)) + kick * (.25 + .4 * Math.random())))
           : .06 * env + .02;
-        lv[i] += (target - lv[i]) * (playing ? .35 : .12);
+        lv[i] += (target - lv[i]) * (useReal ? (target > lv[i] ? .7 : .25) : playing ? .35 : .12);
         var bh = Math.max(barW, lv[i] * h), x = i * bw + (bw - barW) / 2, y = (h - bh) / 2;
         ctx.globalAlpha = .55 + .45 * lv[i];
         ctx.beginPath();
@@ -14804,6 +14837,7 @@
     }
     function stop(){
       if(raf) cancelAnimationFrame(raf); raf = 0;
+      setNative(false);
       document.body.classList.remove('np-imm-viz-shown');
       setTimeout(function(){ if(!wanted()) document.body.classList.remove('np-imm-viz-on'); }, 650);
     }
@@ -14813,6 +14847,7 @@
       requestAnimationFrame(function(){
         if(!wanted() || !setup()){ stop(); return; }
         document.body.classList.add('np-imm-viz-shown');
+        setNative(true);
         if(reducedMotion()){ draw(performance.now()); return; }
         if(!raf) raf = requestAnimationFrame(frame);
       });

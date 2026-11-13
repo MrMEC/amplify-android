@@ -199,7 +199,7 @@ public class PlaybackService extends MediaLibraryService {
         return new androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
             .setEnableFloatOutput(enableFloatOutput)
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-            .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[] {new EqProcessor(), new LevelingProcessor()})
+            .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[] {new EqProcessor(), new LevelingProcessor(), new VizProcessor()})
             .build();
       }
     };
@@ -1036,6 +1036,7 @@ public class PlaybackService extends MediaLibraryService {
     @Override // androidx.media3.common.Player.Listener
     public void onIsPlayingChanged(boolean z) {
       ListenClock.playing(z);
+      Viz.setPlaying(z);
       if (z) PlaybackService.this.sleep.playStarted();
       PlaybackService.this.saveCarProgress();
       if (!z) {
