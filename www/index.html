@@ -511,6 +511,7 @@
     .status-line:not(.has-message) + .home-hero{ margin-top:0; }
     /* While a page slides in (slideInPage), the page is its own layer for the trip. */
     body.page-sliding .browse-view{ will-change:transform; }
+    body.page-sliding.phone-land:is(.artist-open, .album-open) .browse-view{ will-change:auto; }   /* build 610: keeps the picture column on the screen */
   }
   .search-input-wrap{ position:relative; flex:1; min-width:0; }
   .search-input-wrap input{
@@ -7904,7 +7905,11 @@
     body.az-on:not(.np-open) .player-bar{ right:40px; }
     /* Favorite Artists: nine across. */
     .fav-artists-row{ gap:14px; }
-    .fav-artists-row > .tile, .lib-fav-row > .tile{ --fa-w:calc((100vw - var(--rail-w) - 2 * var(--main-pad, 21px) - 8 * 14px) / 9); flex:0 0 var(--fa-w); width:var(--fa-w); }
+    /* Build 610 (Mark: favourite artists too small sideways): the same size as upright (the Artist
+       circles setting), so the same row looks the same either way round. */
+    .fav-artists-row > .tile, .lib-fav-row > .tile{ --fa-w:var(--w-artist); flex:0 0 var(--fa-w); width:var(--fa-w); }
+    /* Build 610 (Mark): Zen sideways sits beside the rail, so its back arrow and words aren't under it. */
+    body.phone-land .zen-screen{ left:var(--rail-w) !important; }
     /* Albums (and an artist's albums): seven across. */
     body .tile-grid:has(> .tile[data-entity="album"]), body .artist-albums{ grid-template-columns:repeat(7, minmax(0, 1fr)); column-gap:12px; }
     /* Search: its box at the top beside the rail, without the heading row (more room for results). */
@@ -43641,6 +43646,22 @@
     // From exactly the right edge of the screen: the column can sit inset from the left, so
     // its own width (100%) would leave a sliver showing on the first frame.
     var dx = Math.ceil(window.innerWidth - browseView.getBoundingClientRect().left) + 2;
+    // Build 610 (Mark: lag as an artist page slides in sideways): there the picture column is
+    // fixed to the screen, and a moving page would carry it along from the wrong place and then
+    // jump. So each part of the page slides by itself, the column into its own place.
+    var B = document.body.classList;
+    if(B.contains('phone-land') && (B.contains('artist-open') || B.contains('album-open'))){
+      var parts = Array.prototype.filter.call(browseView.children, function(el){ return el.offsetParent !== null || getComputedStyle(el).position === 'fixed'; })
+        .filter(function(el){ return getComputedStyle(el).display !== 'none'; });
+      var list = parts.map(function(el){
+        return el.animate([{ transform: 'translate3d(' + (window.innerWidth + 2) + 'px, 0, 0)' }, { transform: 'translate3d(0, 0, 0)' }],
+          { duration: 360, easing: 'cubic-bezier(.22, .8, .24, 1)' });
+      });
+      var multi = pageSlideAnim = { cancel: function(){ list.forEach(function(x){ try{ x.cancel(); }catch(e){} }); } };
+      var fin = function(){ if(pageSlideAnim === multi){ pageSlideAnim = null; B.remove('page-sliding'); } };
+      if(list.length){ list[0].onfinish = fin; list[0].oncancel = fin; } else fin();
+      return;
+    }
     var a = pageSlideAnim = browseView.animate([
       { transform: 'translate3d(' + dx + 'px, 0, 0)' },
       { transform: 'translate3d(0, 0, 0)' }
