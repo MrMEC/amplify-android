@@ -7814,6 +7814,10 @@
     /* Build 594 (Mark): over Now Playing the rail is lifted (z 1150) above the screen; the profile
        picture and Cast at its foot go above it too, or the rail's glass covers them. */
     body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .sidebar-top{ z-index:1160; }
+    /* Build 613 (Mark): over Zen the rail is lifted to z 2300; the profile picture and Cast at its
+       foot go above it too, or the rail's glass hides them. */
+    body.zen-open:not(.rotate-lock):not(.np-video-full) .sidebar-top{ z-index:2310; transition:z-index 0s linear .4s; }
+    body.zen-open.zen-menu:not(.rotate-lock):not(.np-video-full) .sidebar-top{ z-index:2110; transition:none; }
     html[data-theme] body.cast-avail:not(.ltv-dock) .sidebar-top .cast-btn{ width:32px; height:32px; flex:0 0 32px; }
     html[data-theme] body.cast-avail:not(.ltv-dock) .sidebar-top .hamburger-btn,
     html[data-theme] body.cast-avail:not(.ltv-dock) .sidebar-top .hamburger-btn .hb-avatar{ width:34px; height:34px; }
