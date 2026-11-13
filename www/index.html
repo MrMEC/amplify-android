@@ -22188,24 +22188,23 @@
     function measure(){
       W = root.clientWidth; H = root.clientHeight;
       if(!W || !H) return false;
-      // The caption keeps the place it was given when the covers were laid out as one block
-      // with it (cover, the visible part of its reflection, caption), centred together.
-      var S0 = Math.round(Math.max(60, Math.min(H * 0.5, W * 0.34)));
-      var top0 = Math.round(Math.max(10, (H - (S0 * 1.4 + 46)) / 2));
-      caption.style.top = Math.round(top0 + S0 * 1.4 + 4) + 'px';
-      // The covers are a little larger and sit higher, keeping the same room for their
-      // reflection between them and the caption as before.
-      var capTop = top0 + S0 * 1.4 + 4;
-      S = Math.round(Math.min(S0 * COVER_SCALE, (capTop - 8) / (1 + REFL_GAP)));
-      // Build 603 (Mark): Settings > Home's cover size, tilt and reflection apply here too.
-      // Large is the most the screen has room for; Medium and Small in the carousel's proportions.
+      // Build 604 (Mark: the covers were far smaller than Home's and sat low): the covers are the
+      // size Home's Flow carousel uses (Settings > Home > Cover size), as large as the screen
+      // allows, and the cover, the room under it and the caption are centred top to bottom as
+      // one block -- the same spacing as Home's (room = size x 0.42 - 60 with the reflection).
       var cfg = flowCfg();
-      S = Math.round(S * (CAROUSEL_SIZES[cfg.size] || 230) / 230);
       root.classList.toggle('cf-norefl', !cfg.reflect);
+      var CAP_H = 44;
+      var roomFor = function(sz){ return cfg.reflect ? Math.max(8, Math.round(sz * 0.42) - 60) : 8; };
+      S = CAROUSEL_SIZES[cfg.size] || 200;
+      S = Math.round(Math.max(60, Math.min(S, W * 0.42)));
+      while(S > 60 && S + roomFor(S) + CAP_H > H - 16) S--;
+      var block = S + roomFor(S) + CAP_H;
+      coverTop = Math.max(8, Math.round((H - block) / 2));
+      caption.style.top = (coverTop + S + roomFor(S)) + 'px';
       C = S * 0.64;               // centre to first side cover
       G = S * 0.2;                // between consecutive side covers
       D = S * 0.62;               // how far back the sides sit
-      coverTop = Math.max(8, Math.round(capTop - S * REFL_GAP - S)) + COVER_DROP;
       stage.style.top = coverTop + 'px';
       stage.style.perspective = Math.round(S * 3.3) + 'px';
       stage.style.perspectiveOrigin = '50% ' + Math.round(S / 2) + 'px';
