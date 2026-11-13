@@ -7913,21 +7913,22 @@
     html body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel{ padding-left:0 !important; }
     /* Now Playing (when it isn't the sideways full-screen player) opens beside the rail, as it opens above the tab bar upright. */
     body:is(.np-open, .np-sheet):not(.rotate-lock):not(.np-video-full) .now-playing-screen{ left:var(--rail-w); width:auto; }
-    /* ---------- Build 595 (Mark): the sideways Now Playing, layout A ----------
+    /* ---------- Build 595/597 (Mark): the sideways Now Playing, layout A ----------
        body.npl (set by script: sideways phone, Now Playing showing, not a channel or a video).
-       The cover on the left at almost full height; title, seek bar, transport and a row of
-       actions on the right; behind it all the cover blurred further, so nothing sharp sits
-       behind the text. */
-    body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 48px), 46vw); overflow:hidden !important; padding:0 !important; }
-    body.npl .np-below, body.npl .np-next-up, body.npl .np-upnext, body.npl .np-hero-top,
-    body.npl .np-hero-fade, body.npl .np-art-bleed, body.npl #npEpThumb, body.npl .np-art-edit{ display:none !important; }
-    body.npl .np-backdrop{ position:absolute; inset:0; height:auto; }
-    body.npl .np-backdrop-clip{ height:100% !important; }
+       The cover on the left at almost full height; the title, seek bar and one row of controls
+       (Favourite, Previous, Play, Next, More) on the right; behind it the cover blurred further.
+       The screen scrolls, as upright, to the album's other tracks and the rest underneath.
+       Sized for Mark's phone (~678x297 CSS px sideways) first. */
+    body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 48px), 42vw); --npl-pad:24px; padding:0 !important; overflow-x:hidden !important; overflow-y:auto !important; }
+    body.npl .np-next-up, body.npl .np-upnext, body.npl .np-hero-top, body.npl .np-hero-fade, body.npl .np-art-bleed,
+    body.npl #npEpThumb, body.npl .np-art-edit, body.npl #nplShuffleBtn, body.npl #nplQueueBtn, body.npl .npl-row{ display:none !important; }
+    body.npl .np-backdrop-clip{ height:100dvh !important; }
     body.npl .np-backdrop-img{ inset:-40%; filter:blur(140px) saturate(1.5) brightness(.5); }
     body.npl .np-backdrop-scrim{ background:rgba(0,0,0,.22); }
-    body.npl .np-float{ position:absolute; top:0; left:0; width:0; height:0; }
-    body.npl .now-playing-screen{ --np-float-top:24px; --np-float-left:calc(28px + var(--npl-art) + 36px); }
-    body.npl .np-hero{ flex-direction:row; align-items:center; gap:36px; height:100%; width:100%; padding:24px 28px; box-sizing:border-box; }
+    /* Minimise: top right. */
+    body.npl .np-float .np-back{ top:var(--npl-pad) !important; left:auto !important; right:20px !important; }
+    body.npl .np-hero{ flex:none; flex-direction:row; align-items:center; gap:40px; height:100dvh; width:100%;
+      padding:var(--npl-pad) 24px var(--npl-pad) 28px; box-sizing:border-box; }
     body.npl .np-art-wrap{ width:var(--npl-art); height:var(--npl-art); flex:0 0 var(--npl-art); aspect-ratio:1/1; }
     body.npl .np-art{ -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
       border-radius:14px; overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,.45); }
@@ -7935,64 +7936,44 @@
     body.npl .np-hero-foot::before{ display:none; }
     body.npl .np-details{
       display:grid; grid-template-columns:repeat(20, minmax(0, 1fr));
-      grid-template-rows:44px auto auto auto auto minmax(0, 1fr) auto auto auto;
+      grid-template-rows:auto auto auto auto auto minmax(8px, 1fr) auto auto;
       align-items:center; width:100%; max-width:none; height:100%; margin:0; text-align:left;
     }
-    body.npl .np-details > *{ grid-column:1 / -1; margin:0; }
-    body.npl .np-controls, body.npl .npl-row{ display:contents; }
-    body.npl .npl-from{ display:flex; flex-direction:column; align-items:center; grid-row:1; grid-column:5 / 17; min-width:0; text-align:center; }
+    body.npl .np-details > *{ grid-column:1 / -1; margin:0; min-height:min-content; }
+    body.npl .np-controls{ display:contents; }
+    /* (The title and the line above it keep clear of the minimise button.) */
+    body.npl .npl-from{ display:flex; flex-direction:column; align-items:flex-start; grid-row:1; min-width:0; padding-right:52px; margin-bottom:6px; }
     body.npl .npl-from[hidden]{ display:none; }
     .npl-from-k{ font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--text-faint); }
     .npl-from-v{ font-size:13px; font-weight:500; color:var(--text); max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    body.npl .np-menu-wrap{ grid-row:1; grid-column:18 / 21; justify-self:end; }
-    body.npl .np-name{ grid-row:2; align-self:end; margin-top:14px; font-size:30px; line-height:1.12; text-align:left;
+    body.npl .np-name{ grid-row:2; align-self:start; font-size:30px; line-height:1.12; text-align:left; padding-right:52px;
       display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     body.npl .now-playing-screen .np-name{ text-shadow:0 1px 3px rgba(0,0,0,.3); }
-    body.npl .np-float .np-back{ top:24px !important; left:calc(28px + var(--npl-art) + 36px) !important; }
-    body.npl .np-menu{ top:calc(100% + 4px); bottom:auto; max-height:calc(100dvh - 96px); overflow-y:auto; overscroll-behavior:contain; }
     body.npl .np-onair{ grid-row:3; text-align:left; justify-self:start; }
-    body.npl .np-sub{ grid-row:4; margin-top:6px; text-align:left; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body.npl .np-sub{ grid-row:4; margin-top:8px; padding-right:52px; text-align:left; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     body.npl .np-cast-note, body.npl .np-video-toggle{ grid-row:5; justify-self:start; margin-top:8px; }
-    body.npl .np-seek{ grid-row:7; max-width:none; width:100%; margin:0 0 14px; }
+    body.npl .np-seek{ grid-row:7; max-width:none; width:100%; margin:0 0 16px; }
+    /* One row: Favourite, Previous, Play, Next, More -- Play in the middle. */
     body.npl .np-details > .np-controls > *{ grid-row:8; justify-self:center; margin:0; }
-    body.npl #nplShuffleBtn{ grid-column:1 / 5; justify-self:start; }
+    body.npl #npFavBtn{ grid-column:1 / 5; justify-self:start; }
     body.npl #npPrevBtn, body.npl #npSkipBackBtn{ grid-column:5 / 9; }
     body.npl #npPlayBtn{ grid-column:9 / 13; }
     body.npl #npNextBtn, body.npl #npSkipFwdBtn{ grid-column:13 / 17; }
-    body.npl #nplQueueBtn{ grid-column:17 / 21; justify-self:end; }
-    body.npl .np-details > .np-controls > .np-menu-wrap{ grid-row:1; grid-column:18 / 21; justify-self:end; }
-    body.npl #npFavBtn, body.npl .npl-row > *{ grid-row:9; margin-top:10px; }
-    body.npl #npFavBtn{ grid-column:1 / 6; justify-self:start; }
-    body.npl #nplLyricsBtn{ grid-column:6 / 11; justify-self:center; }
-    body.npl #nplAddBtn{ grid-column:11 / 16; justify-self:center; }
-    body.npl #nplSleepBtn{ grid-column:16 / 21; justify-self:end; }
-    body.npl .npl-btn{ display:flex; align-items:center; justify-content:center; width:44px; height:44px; padding:0; border:none;
-      border-radius:50%; background:transparent; color:var(--text); opacity:.88; cursor:pointer; }
-    body.npl .npl-btn[hidden]{ display:none; }
-    body.npl .npl-btn svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-    body.npl .npl-btn.spin svg{ animation:queueShuffleSpin .5s ease; }
-    /* Build 596 (Mark: far too tight on his phone, ~678x297 CSS px sideways): rows never squeeze
-       into each other, and a short screen gets a compact set of sizes. */
-    body.npl .np-details{ grid-template-rows:44px auto auto auto auto minmax(4px, 1fr) auto auto auto; align-content:stretch; }
-    body.npl .np-details > *{ min-height:min-content; }
+    body.npl .np-details > .np-controls > .np-menu-wrap{ grid-column:17 / 21; justify-self:end; }
+    body.npl .now-playing-screen:has(.np-menu.open) .np-float{ visibility:hidden; }
+    body.npl .np-menu{ max-height:calc(100dvh - 110px); overflow-y:auto; overscroll-behavior:contain; }
+    /* Underneath, as upright: the album's tracks and the rest. */
+    body.npl .np-below{ padding:12px 24px 32px 28px; }
     @media (max-height: 360px){
-      body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 32px), 40vw); --np-float-top:16px; }
-      body.npl .np-hero{ padding:16px 20px 16px 22px; gap:26px; }
-      body.npl .np-float .np-back{ top:16px !important; left:calc(22px + var(--npl-art) + 26px) !important; }
-      body.npl .np-details{ grid-template-rows:40px auto auto auto auto minmax(2px, 1fr) auto auto auto; }
+      body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 40px), 42vw); --npl-pad:20px; }
+      body.npl .np-hero{ gap:32px; padding-left:24px; }
       body.npl .npl-from{ display:none !important; }
-      body.npl .np-menu-wrap{ height:40px; display:flex; align-items:center; }
-      body.npl .np-name{ margin-top:4px; font-size:22px; line-height:1.15; }
-      body.npl .np-sub{ margin-top:3px; font-size:14px; }
-      body.npl .np-cast-note, body.npl .np-video-toggle{ margin-top:4px; }
-      body.npl .np-seek{ margin:0 0 4px; }
+      body.npl .np-name{ font-size:24px; line-height:1.15; }
+      body.npl .np-sub{ margin-top:6px; font-size:15px; }
+      body.npl .np-seek{ margin:0 0 10px; }
       body.npl .np-seek-wave{ height:22px; }
-      body.npl #npPlayBtn{ width:52px; height:52px; font-size:20px; }
-      body.npl .np-step-btn, body.npl .np-skip-btn{ width:40px; height:40px; }
-      body.npl .npl-btn{ width:40px; height:40px; }
-      body.npl .npl-btn svg{ width:20px; height:20px; }
-      body.npl #npFavBtn{ width:40px; height:40px; }
-      body.npl #npFavBtn, body.npl .npl-row > *{ margin-top:4px; }
+      body.npl #npPlayBtn{ width:56px; height:56px; font-size:20px; }
+      body.npl .np-step-btn, body.npl .np-skip-btn, body.npl #npFavBtn{ width:44px; height:44px; }
     }
     /* The queue and lyrics take half the screen sideways, beside the rail rather than under it. */
     body.phone-land .queue-panel:not(.lyrics-panel){ width:50%; }
