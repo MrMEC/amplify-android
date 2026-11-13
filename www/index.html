@@ -8170,6 +8170,23 @@
     /* menus open upward from the foot, on screen */
     body.phone-land:is(.artist-open, .album-open) :is(.artist-hero, .album-hero) .artist-menu{ top:auto; bottom:calc(100% + 6px); max-height:calc(100dvh - 70px); overflow-y:auto; }
   }
+
+  /* Build 611: the slide-over (slideOverTo). The old page is held still and dimmed a touch; the new
+     one slides in from the right with a soft shadow on its leading edge, like the profile menu. */
+  html.vt-slide::view-transition-old(root){ animation:vt-under .36s cubic-bezier(.22,.8,.24,1) both; }
+  html.vt-slide::view-transition-new(root){ animation:vt-over .36s cubic-bezier(.22,.8,.24,1) both; box-shadow:-10px 0 28px rgba(0,0,0,.35); }
+  @keyframes vt-over{ from{ transform:translateX(100%); } to{ transform:none; } }
+  @keyframes vt-under{ from{ filter:brightness(1); } to{ filter:brightness(.82); } }
+  html.vt-slide .mobile-nav{ view-transition-name:vt-nav; }
+  html.vt-slide .player-bar{ view-transition-name:vt-player; }
+  html.vt-slide .sidebar-top{ view-transition-name:vt-top; }
+  html.vt-slide .mobile-tabbar{ view-transition-name:vt-tabbar; }
+  html.vt-slide::view-transition-group(vt-nav), html.vt-slide::view-transition-group(vt-player),
+  html.vt-slide::view-transition-group(vt-top), html.vt-slide::view-transition-group(vt-tabbar){ animation:none; }
+  html.vt-slide::view-transition-old(vt-nav), html.vt-slide::view-transition-old(vt-player),
+  html.vt-slide::view-transition-old(vt-top), html.vt-slide::view-transition-old(vt-tabbar){ display:none; }
+  html.vt-slide::view-transition-new(vt-nav), html.vt-slide::view-transition-new(vt-player),
+  html.vt-slide::view-transition-new(vt-top), html.vt-slide::view-transition-new(vt-tabbar){ animation:none; }
 </style>
 <!-- Installed-app manifest. This is a single self-contained file with nowhere to put a
      separate manifest.json, so it is built here at load time and handed to Chrome as a data:
@@ -43637,7 +43654,27 @@
   // drawn in full before it starts. Not for a page restored by Back, nor one opened behind the
   // landscape screen (Cover Flow), nor with the system's "Remove animations" setting.
   var pageSlideAnim = null;
+  // Build 611 (Mark): an artist or album page slides in OVER the page you were on, the way the
+  // profile menu does -- the page underneath stays put (a picture of it, the browser's View
+  // Transitions), and the new page slides across it, its own background and all. The rail, the
+  // mini player, the tab bar and the profile corner don't move.
+  var vtSliding = false;
+  function slideOverTo(update){
+    var ok = !!document.startViewTransition && !navReplaying && !openingBehindNowPlaying && isMobileLayout() &&
+      !document.body.classList.contains('rotate-lock') && !document.body.classList.contains('np-open');
+    try{ if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) ok = false; }catch(e){}
+    if(!ok){ update(); return; }
+    var root = document.documentElement;
+    root.classList.add('vt-slide');
+    vtSliding = true;
+    var t;
+    try{ t = document.startViewTransition(function(){ try{ update(); } finally { vtSliding = false; } }); }
+    catch(e){ vtSliding = false; root.classList.remove('vt-slide'); update(); return; }
+    var end = function(){ root.classList.remove('vt-slide'); };
+    t.finished.then(end, end);
+  }
   function slideInPage(){
+    if(vtSliding) return;
     if(navReplaying || openingBehindNowPlaying || !isMobileLayout() || !browseView.animate) return;
     if(document.body.classList.contains('rotate-lock')) return;
     try{ if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; }catch(e){}
@@ -43671,6 +43708,10 @@
   }
 
   function openArtistPage(key){
+    var a = arguments;
+    slideOverTo(function(){ openArtistPageNow.apply(null, a); });
+  }
+  function openArtistPageNow(key){
     // Captured before enterLibraryChrome() resets the active view out from under it.
     pushView();
     enterLibraryChrome();
@@ -45367,6 +45408,10 @@
   }
 
   function openAlbumPage(key, fromArtistKey){
+    var a = arguments;
+    slideOverTo(function(){ openAlbumPageNow.apply(null, a); });
+  }
+  function openAlbumPageNow(key, fromArtistKey){
     pushView();
     enterLibraryChrome();
     activeLibrarySection = fromArtistKey ? 'artists' : 'albums';
