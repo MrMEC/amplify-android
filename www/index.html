@@ -3595,8 +3595,9 @@
   .np-coll-head{ display:flex; align-items:center; gap:6px; margin:0 0 16px; }
   .np-coll-head > .np-related-heading{ margin:0; flex:1; min-width:0; }
   .np-coll-head > .np-foot-toggle{ display:none; }
-  /* Build 347: an archive.org result's video always has its title under it (no hide arrow). */
-  .now-playing-screen.np-ia .np-coll-head > .np-foot-toggle{ display:none !important; }
+  /* Build 601 (Mark): an archive.org video has the same show / hide details arrow as your own
+     movies and episodes (build 347 had left it out). */
+  .now-playing-screen.np-ia .np-coll-head > .np-foot-toggle{ display:flex; }
   .now-playing-screen.np-channel:not(.np-tv) .np-coll-head > .np-foot-toggle{ display:flex; }
   .np-coll-head > .epg-corner.np-foot-toggle{ width:34px; height:34px; flex:0 0 34px; margin-left:-8px; border-radius:50%; background:transparent; }
   .np-coll-head > .epg-corner.np-foot-toggle svg{ width:22px; height:22px; }
@@ -3928,7 +3929,7 @@
   /* Build 309 (Mark): TV channels (the guide's corner) and your own videos (the arrow beside the
      list's heading) share one shown / hidden setting. */
   /* Build 347: only while there's a list under them (with the arrow to bring them back). */
-  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed:not(.np-coll-empty):not(.np-ia) .np-hero-foot{
+  body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed:not(.np-coll-empty) .np-hero-foot{
     height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
@@ -27749,6 +27750,11 @@
       // The program details only when the schedule agrees about what's on.
       if(on && on.it.vid !== st.id) on = null;
     }
+    if(st && isArchiveVideo(st)){
+      var iaId = String(st.guid || '').replace(/^ia:/, '').split('/')[0];
+      src = iaId ? archiveArtUrl(iaId) : (st.artworkUrl600 || st.artworkUrl100 || st.favicon || '');
+      on = null;
+    }
     var details = npDetailsEl();
     npEpThumb.hidden = !src;
     if(details) details.classList.toggle('np-has-ep', !!src);
@@ -45817,6 +45823,8 @@
     // A podcast episode's subtitle names the show it belongs to -- the same way in as an
     // artist link below, so the show is reachable without leaving Now Playing to hunt for it
     // on the Podcasts page.
+    // Build 601 (Mark: an archive.org video showed the last channel's picture): its own picture.
+    if(isArchiveVideo(st)) syncNpEpThumb(st);
     if(isPodcastTrack(st)){
       npSub.classList.add('np-sub-linked');
       if(st.collectionName && st.collectionId != null){
@@ -50816,17 +50824,18 @@
     if(!others.length){ npCollection.style.display = 'none'; return; }
     npCollection.style.display = '';
     npCollectionHeading.textContent = 'More Videos';
+    // Build 601 (Mark): the same rows as More Movies and Episodes (picture, title, year · maker).
     others.forEach(function(it){
       var row = document.createElement('div');
-      row.className = 'ch-row ch-mine np-ia-row';
-      var logo = document.createElement('div');
-      logo.className = 'ch-logo';
-      logo.appendChild(vImg(archiveArtUrl(it.id)));
-      row.appendChild(logo);
+      row.className = 'vep-row np-ia-row';
+      var th = document.createElement('div');
+      th.className = 'vep-thumb';
+      th.appendChild(vImg(archiveArtUrl(it.id)));
+      row.appendChild(th);
       var text = document.createElement('div');
-      text.className = 'ch-text';
-      var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = it.title; text.appendChild(n);
-      var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = [it.year, it.creator].filter(Boolean).join(' \u00b7 ') || 'Video'; text.appendChild(sb);
+      text.className = 'vep-text';
+      var n = document.createElement('div'); n.className = 'vep-title'; n.textContent = it.title; text.appendChild(n);
+      var sb = document.createElement('div'); sb.className = 'vep-sub'; sb.textContent = [it.year, it.creator].filter(Boolean).join(' \u00b7 ') || 'Video'; text.appendChild(sb);
       row.appendChild(text);
       row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: ctx.noHistory, list: ctx.items }); });
       npCollectionGrid.appendChild(row);
