@@ -15847,6 +15847,21 @@
     npHoldVideo(false);
     return false;
   }
+  // Build 602: and Now Playing closing ends full screen (unless the picture-in-picture window,
+  // which asks for it, is what's showing).
+  (function(){
+    var t = 0;
+    new MutationObserver(function(){
+      clearTimeout(t);
+      t = setTimeout(function(){
+        if(npVideoFull && !npShowingNow() && !(typeof pipActive !== 'undefined' && pipActive)){
+          var keep = npVideoNoAutoFull;
+          exitVideoFull();
+          npVideoNoAutoFull = keep;
+        }
+      }, 150);
+    }).observe(nowPlayingScreen, { attributes: true, attributeFilter: ['style'] });
+  })();
   function exitVideoFull(){
     if(!npVideoFull) return;
     try{ videoViewLog.push(new Date().toLocaleTimeString() + ' full screen exit win ' + window.innerWidth + 'x' + window.innerHeight); if(videoViewLog.length > 24) videoViewLog.shift(); }catch(e){}
@@ -15877,11 +15892,16 @@
   });
   // Turning the phone on its side while the video shows goes full screen; upright again
   // comes back out (unless full screen was asked for with the button, which holds landscape).
+  // Build 602 (Mark: the rail kept going missing sideways, and Cover Flow with it): only while
+  // Now Playing (the video) is actually showing. A video left loaded behind a closed Now Playing
+  // used to go full screen over whatever page was showing when the phone turned -- invisible,
+  // but hiding the rail and the player bar, dimming the page and keeping Cover Flow away.
+  function npShowingNow(){ return nowPlayingScreen.style.display === 'flex' && !npClosing(); }
   window.addEventListener('resize', function(){
     var landscape = window.innerWidth > window.innerHeight;
     if(!landscape) npVideoNoAutoFull = false;
     if(!npVideoOn) return;
-    if(landscape && !npVideoFull && !npAutoFullOff()) enterVideoFull(false);
+    if(landscape && !npVideoFull && !npAutoFullOff() && (npShowingNow() || pipActive)) enterVideoFull(false);
     else if(!landscape && npVideoFull && !npVideoFullLocked) exitVideoFull();
   });
   // Something new loaded (the shim has already dropped the video), or the lock screen /
