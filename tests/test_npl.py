@@ -27,7 +27,8 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         for theme, size, big in CASES:
-            ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=3.3, is_mobile=True, has_touch=True, color_scheme=theme)
+            pw = 327 if size[0] < 800 else 411  # the upright width of the phone in each case (Mark's: 327)
+            ctx = await b.new_context(viewport={'width': pw, 'height': size[0] + 30}, screen={'width': pw, 'height': size[0] + 30}, device_scale_factor=3.3, is_mobile=True, has_touch=True, color_scheme=theme)
             await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE)
             await ctx.add_init_script("localStorage.setItem('radioPlayerTheme', '%s')" % theme)
             pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -40,10 +41,19 @@ async def main():
             await pg.evaluate("(js)=>window.__h.ev(js)", "runLibrarySection('songs'); 1"); await pg.wait_for_timeout(800)
             await pg.tap('#stationsGrid .song-row:not(.shuffle-all-row)'); await pg.wait_for_timeout(1200)
             await pg.evaluate("document.body.classList.add('cast-avail'); var cb=document.querySelector('.sidebar-top .cast-btn'); if(cb) cb.hidden=false;")
+            FS = "[getComputedStyle(document.getElementById('npName')).fontSize, getComputedStyle(document.querySelector('#nowPlayingScreen .np-sub')).fontSize]"
+            await pg.evaluate("document.getElementById('playerNowTrigger').click()"); await pg.wait_for_timeout(1500)
+            portFs = await pg.evaluate(FS)
+            await pg.evaluate("document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(900)
             await pg.set_viewport_size({'width': size[0], 'height': size[1]}); await pg.wait_for_timeout(1200)
             await pg.evaluate("document.getElementById('playerNowTrigger').click()"); await pg.wait_for_timeout(1500)
             if big: await pg.evaluate(ZOOM); await pg.wait_for_timeout(300)
             T = '[%s %dx%d%s]' % (theme, size[0], size[1], ' big' if big else '')
+            await pg.evaluate("document.body.classList.add('cast-avail'); var cb=document.querySelector('.sidebar-top .cast-btn'); if(cb) cb.hidden=false;"); await pg.wait_for_timeout(300)
+            landFs = await pg.evaluate(FS)
+            check(landFs == portFs, T + ' title and artist line the same size as upright %s %s' % (portFs, landFs))
+            cast = await pg.evaluate("(()=>{ var c=document.querySelector('.sidebar-top .cast-btn').getBoundingClientRect(), a=document.getElementById('npArt').getBoundingClientRect(); var e=document.elementFromPoint(c.left+c.width/2, c.top+c.height/2); return [Math.round(c.left-a.left), Math.round(c.top-a.top), Math.round(c.width), !!(e&&e.closest('.cast-btn'))]; })()")
+            check(0 < cast[0] <= 16 and 0 < cast[1] <= 16 and cast[2] >= 32 and cast[3], T + ' Cast on the top left of the cover %s' % cast)
             r = await pg.evaluate(GEO); g = r['g']
             await pg.screenshot(path='/tmp/claude-0/t/shots/npl-%s-%d%s.png' % (theme, size[0], '-big' if big else ''))
             check(r['npl'] and not r['rot'], T + ' layout A on %s' % r)
@@ -60,6 +70,12 @@ async def main():
             for k in ('#npArt', '#npName', '#npPlayBtn', '#npSeek', '#npFavBtn', '.sidebar-top .hamburger-btn', '#npBackBtn', '.np-menu-wrap'):
                 check(bool(g[k]), T + ' shows ' + k)
             art = g['#npArt']; check(art and abs((art[2]-art[0]) - (art[3]-art[1])) <= 2 and art[0] >= 76, T + ' square cover beside the rail %s' % art)
+            # Immersive View: the rail slides away and everything moves left
+            await pg.evaluate("document.getElementById('npArtWrap').click()"); await pg.wait_for_timeout(1200)
+            im = await pg.evaluate("(()=>{ var s=document.getElementById('nowPlayingScreen').getBoundingClientRect(), a=document.getElementById('npArtWrap').getBoundingClientRect(), n=document.getElementById('mobileNav').getBoundingClientRect(); return [document.body.classList.contains('np-immersive'), Math.round(s.left), Math.round(a.left), Math.round(n.right), Math.round(a.right)]; })()")
+            await pg.screenshot(path='/tmp/claude-0/t/shots/npl-imm-%s-%d%s.png' % (theme, size[0], '-big' if big else ''))
+            check(im[0] and im[1] == 0 and im[3] <= 0 and im[2] <= 30, T + ' Immersive: rail gone, content moved left %s' % im)
+            await pg.evaluate("document.getElementById('npArtWrap').click()"); await pg.wait_for_timeout(900)
             # scrolls down to the album's tracks and the rest
             sc = await pg.evaluate("(()=>{ var s=document.getElementById('nowPlayingScreen'); var max=s.scrollHeight-s.clientHeight; s.scrollTop=s.clientHeight; var b=document.querySelector('#nowPlayingScreen .np-below'); var r=b.getBoundingClientRect(); return [max, Math.round(r.top), Math.round(r.height), (b.innerText||'').slice(0,80)]; })()")
             await pg.wait_for_timeout(400)

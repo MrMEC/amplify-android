@@ -7919,7 +7919,15 @@
        (Favourite, Previous, Play, Next, More) on the right; behind it the cover blurred further.
        The screen scrolls, as upright, to the album's other tracks and the rest underneath.
        Sized for Mark's phone (~678x297 CSS px sideways) first. */
-    body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 48px), 42vw); --npl-pad:24px; padding:0 !important; overflow-x:hidden !important; overflow-y:auto !important; }
+    body.npl{ --npl-pad:24px; --npl-left:28px; }
+    body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 48px), 42vw); padding:0 !important; overflow-x:hidden !important; overflow-y:auto !important;
+      transition:left .38s cubic-bezier(.4,0,.2,1), bottom .38s cubic-bezier(.4,0,.2,1); }
+    /* Build 598 (Mark): Immersive View sideways -- the rail slides away and everything moves left with it. */
+    body.npl.np-immersive:is(.np-open, .np-sheet) .now-playing-screen{ left:0 !important; }
+    /* Cast sits on the top left corner of the cover (glass, as over Now Playing upright). */
+    body.npl .sidebar-top .cast-btn{ position:fixed; z-index:1170; top:calc(var(--npl-pad) + 10px);
+      left:calc(var(--rail-w) + var(--npl-left) + 10px); width:36px !important; height:36px !important; flex:none !important; }
+    body.npl.np-immersive .sidebar-top .cast-btn{ left:calc(var(--npl-left) + 10px); }
     body.npl .np-next-up, body.npl .np-upnext, body.npl .np-hero-top, body.npl .np-hero-fade, body.npl .np-art-bleed,
     body.npl #npEpThumb, body.npl .np-art-edit, body.npl #nplShuffleBtn, body.npl #nplQueueBtn, body.npl .npl-row{ display:none !important; }
     body.npl .np-backdrop-clip{ height:100dvh !important; }
@@ -7928,8 +7936,9 @@
     /* Minimise: top right. */
     body.npl .np-float .np-back{ top:var(--npl-pad) !important; left:auto !important; right:20px !important; }
     body.npl .np-hero{ flex:none; flex-direction:row; align-items:center; gap:40px; height:100dvh; width:100%;
-      padding:var(--npl-pad) 24px var(--npl-pad) 28px; box-sizing:border-box; }
-    body.npl .np-art-wrap{ width:var(--npl-art); height:var(--npl-art); flex:0 0 var(--npl-art); aspect-ratio:1/1; }
+      padding:var(--npl-pad) 24px var(--npl-pad) var(--npl-left); box-sizing:border-box; }
+    body.npl .np-art-wrap{ width:var(--npl-art); height:var(--npl-art); flex:0 0 var(--npl-art); aspect-ratio:1/1;
+      overflow:hidden; border-radius:14px; box-shadow:0 18px 40px rgba(0,0,0,.45); }
     body.npl .np-art{ -webkit-mask-image:none; mask-image:none; filter:none; opacity:1; transform:none;
       border-radius:14px; overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,.45); }
     body.npl .np-hero-foot{ position:relative; top:auto; left:auto; right:auto; flex:1 1 0; min-width:0; height:100%; padding:0; margin:0; }
@@ -7946,11 +7955,11 @@
     body.npl .npl-from[hidden]{ display:none; }
     .npl-from-k{ font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--text-faint); }
     .npl-from-v{ font-size:13px; font-weight:500; color:var(--text); max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    body.npl .np-name{ grid-row:2; align-self:start; font-size:30px; line-height:1.12; text-align:left; padding-right:52px;
+    body.npl .np-name{ grid-row:2; align-self:start; font-size:clamp(18px, calc(var(--np-port-w, 100vmin) * .05), 26px); line-height:1.2; text-align:left; padding-right:52px;
       display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     body.npl .now-playing-screen .np-name{ text-shadow:0 1px 3px rgba(0,0,0,.3); }
     body.npl .np-onair{ grid-row:3; text-align:left; justify-self:start; }
-    body.npl .np-sub{ grid-row:4; margin-top:8px; padding-right:52px; text-align:left; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    body.npl .np-sub{ grid-row:4; margin-top:6px; padding-right:52px; text-align:left; font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     body.npl .np-cast-note, body.npl .np-video-toggle{ grid-row:5; justify-self:start; margin-top:8px; }
     body.npl .np-seek{ grid-row:7; max-width:none; width:100%; margin:0 0 16px; }
     /* One row: Favourite, Previous, Play, Next, More -- Play in the middle. */
@@ -7965,11 +7974,10 @@
     /* Underneath, as upright: the album's tracks and the rest. */
     body.npl .np-below{ padding:12px 24px 32px 28px; }
     @media (max-height: 360px){
-      body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 40px), 42vw); --npl-pad:20px; }
-      body.npl .np-hero{ gap:32px; padding-left:24px; }
+      body.npl{ --npl-pad:20px; --npl-left:24px; }
+      body.npl .now-playing-screen{ --npl-art:min(calc(100dvh - 40px), 42vw); }
+      body.npl .np-hero{ gap:32px; }
       body.npl .npl-from{ display:none !important; }
-      body.npl .np-name{ font-size:24px; line-height:1.15; }
-      body.npl .np-sub{ margin-top:6px; font-size:15px; }
       body.npl .np-seek{ margin:0 0 10px; }
       body.npl .np-seek-wave{ height:22px; }
       body.npl #npPlayBtn{ width:56px; height:56px; font-size:20px; }
@@ -14687,8 +14695,6 @@
   // a video of your own, which have their own full-screen layouts.
   function setNpImmersive(on){
     on = !!on;
-    // Build 595: the sideways layout A has no Immersive View.
-    if(on && document.body.classList.contains('npl')) on = false;
     var was = document.body.classList.contains('np-immersive');
     document.body.classList.toggle('np-immersive', on);
     if(on === was) return;
@@ -57404,6 +57410,7 @@
       var npl = land && npS.style.display === 'flex' && !B.contains('rotate-lock') && !B.contains('np-video-full') &&
         !npS.classList.contains('np-channel') && !npS.classList.contains('np-video-on');
       B.toggle('npl', npl);
+      try{ var pw = Math.min(window.screen.width, window.screen.height); if(pw) document.documentElement.style.setProperty('--np-port-w', pw + 'px'); }catch(e){}
       if(npl) nplSync();
       railFit(land);
       if(wasLand !== land){ var sr = stationsGrid.querySelector(':scope > .lib-tabs, :scope > .watch-tabs') || document.getElementById('podcastTabs'); if(sr) try{ syncStickyTabs(sr); }catch(e){} }
