@@ -3863,7 +3863,7 @@
   #ltvManageSheet .artist-menu-title + .np-menu-item, #ltvManageSheet .ltv-sheet-label + .np-menu-item{ border-top:0; }
   #ltvManageSheet .np-menu-item i{ flex:0 0 24px; width:24px; font-size:19px; text-align:center; }
   #ltvManageSheet .np-menu-item.on{ font-weight:600; }
-  #ltvManageSheet .np-menu-item.on i, #ltvManageSheet .np-menu-item .fa-plus, #ltvManageSheet .np-menu-item .fa-wand-magic-sparkles, #ltvManageSheet .np-menu-item .fa-grip-vertical{ color:var(--accent); }
+  #ltvManageSheet .np-menu-item.on i, #ltvManageSheet .np-menu-item .fa-plus, #ltvManageSheet .np-menu-item .fa-pen, #ltvManageSheet .np-menu-item .fa-grip-vertical{ color:var(--accent); }
   #ltvManageSheet .ltv-sheet-label{ font-size:13px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.55); padding:18px 2px 4px; border-top:1px solid rgba(255,255,255,.1); margin-top:2px; }
   .ltv-manage-scrim{ display:block !important; position:fixed; inset:0; z-index:6090; background:rgba(0,0,0,.55); opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s linear .38s; }
   .ltv-manage-scrim.open{ opacity:1; visibility:visible; transition:opacity .3s ease, visibility 0s; }
@@ -4633,6 +4633,8 @@
   .ch-select-bar button{ pointer-events:auto; min-height:52px; min-width:60%; padding:0 24px; border-radius:26px; border:0; background:#d93025; color:#fff; font:inherit; font-size:16px; font-weight:700; box-shadow:0 6px 20px rgba(0,0,0,.4); cursor:pointer; }
   .ch-select-bar button:disabled{ background:#4a4d55; color:rgba(255,255,255,.55); box-shadow:none; }
   body.watch-land #stationsGrid > .epg-manage{ display:none; }
+  #stationsGrid > .epg-manage{ grid-column:1/-1; width:100%; box-sizing:border-box; }
+  .epg-manage-btn span{ white-space:nowrap; }
   /* Fix artist info. Each candidate is one row: a small portrait (or a neutral tile), the
      article title, and Wikipedia's one-line description, which is what actually tells a band
      from a blood disorder at a glance. */
@@ -13461,7 +13463,7 @@
       b.type = 'button';
       b.className = 'settings-data-btn settings-wide-btn cl-find';
       b.id = 'cleanupFindBtn';
-      b.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>';
+      b.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
       b.appendChild(document.createTextNode(cfg.button));
       b.addEventListener('click', function(){ startCleanupLookup(); });
       var row = document.createElement('div');
@@ -29599,7 +29601,7 @@
     }
     opt('Add Channels', 'fa-solid fa-plus', null, function(){ leaveNp(); pushView(); openAddChannelsPage(); });
     // Build 617 (Mark): Build a Custom Channel lives here now, not in Add Channels.
-    opt('Build a Custom Channel', 'fa-solid fa-wand-magic-sparkles', null, function(){ leaveNp(); openLiveChEditor(null); });
+    opt('Build a Custom Channel', 'fa-solid fa-pen', null, function(){ leaveNp(); openLiveChEditor(null); });
     opt('Arrange Channels', 'fa-solid fa-grip-vertical', null, function(){ leaveNp(); setChannelsArranging(true); });
     label('Layout');
     [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
@@ -29642,7 +29644,7 @@
       m.appendChild(b);
     }
     opt('Add Channels', false, function(){ leaveNp(); pushView(); openAddChannelsPage(); }, 'fa-solid fa-plus');   // build 409
-    opt('Build a Custom Channel', false, function(){ leaveNp(); openLiveChEditor(null); }, 'fa-solid fa-wand-magic-sparkles');   // build 617
+    opt('Build a Custom Channel', false, function(){ leaveNp(); openLiveChEditor(null); }, 'fa-solid fa-pen');   // build 617
     opt('Arrange Channels', false, function(){ leaveNp(); setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
     var sep = document.createElement('div'); sep.className = 'ch-menu-sep'; m.appendChild(sep);
     label('Layout');
