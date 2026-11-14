@@ -55595,7 +55595,7 @@
     if(privacyOn()) return;   // build 346
     var ref = heroRefOf(st);
     if(!ref || !ref.k) return;
-    if(heroCleared){ heroCleared = false; try{ localStorage.removeItem(HERO_CLEARED_KEY); }catch(e){} }
+    if(heroHidden[ref.k]){ delete heroHidden[ref.k]; heroHiddenSave(); }
     var h = heroHistLoad().filter(function(x){ return x.k !== ref.k; });
     h.unshift(ref);
     if(h.length > HERO_MAX) h.length = HERO_MAX;
@@ -55606,13 +55606,16 @@
   // slides as well. pred(item, ref) picks what goes; the slide for what is playing now stays.
   // Build 619 (Mark): Settings > Appearance > Home > Carousel > Reset. Every entry goes (what
   // is playing right now stays as the first slide); the carousel then fills again from plays.
-  var HERO_CLEARED_KEY = 'radioPlayerHeroCleared', heroCleared = false;
-  try{ heroCleared = localStorage.getItem(HERO_CLEARED_KEY) === '1'; }catch(e){}
+  // Reset only hides what Home shows; play history, Continue Listening and stats are untouched.
+  // Hidden keys come back the moment that item is played again.
+  var HERO_HIDDEN_KEY = 'radioPlayerHeroHidden', heroHidden = {};
+  try{ heroHidden = JSON.parse(localStorage.getItem(HERO_HIDDEN_KEY) || '{}') || {}; }catch(e){ heroHidden = {}; }
+  function heroHiddenSave(){ try{ localStorage.setItem(HERO_HIDDEN_KEY, JSON.stringify(heroHidden)); }catch(e){} }
   function clearHeroEntries(){
-    heroHist = [];
-    heroCleared = true;
-    try{ localStorage.setItem(HERO_HIST_KEY, '[]'); localStorage.setItem(HERO_CLEARED_KEY, '1'); }catch(e){}
-    try{ if(typeof zenState !== 'undefined' && Array.isArray(zenState.recent)){ zenState.recent = []; zenSave(); } }catch(e){}
+    var keep = null;
+    try{ if(zenBarActive && typeof zenHeroItem === 'function') keep = favKey(zenHeroItem()); }catch(e){}
+    heroItems(true).forEach(function(t){ var k = favKey(t); if(k && k !== keep) heroHidden[k] = 1; });
+    heroHiddenSave();
     heroSlideByKey = {};
     renderNpHero();
   }
@@ -55634,12 +55637,14 @@
       return ref.it || null;
     }catch(e){ return null; }
   }
-  function heroItems(){
-    var out = [], seen = {};
+  function heroItems(all){
+    var out = [], seen = {}, nowKey = null;
+    try{ nowKey = currentStation ? favKey(currentStation) : null; }catch(e){}
     function add(t){
       if(!t || out.length >= HERO_MAX || isBlacklisted(t)) return;
       var k = favKey(t);
       if(!k || seen[k]) return;
+      if(!all && heroHidden[k] && k !== nowKey) return;
       // Build 599 (Mark): songs by one artist all lead to the same artist page, so that artist
       // shows once (the first, most recent of them).
       var ent = heroArtistEntry(t), ak = ent ? 'artist:' + ent.key : null;
@@ -55650,7 +55655,7 @@
     add(currentStation);
     heroHistLoad().forEach(function(ref){ add(heroResolve(ref)); });
     if(typeof zenRecentItems === 'function' && !privacyOn()) zenRecentItems().forEach(add);
-    if(!out.length && !heroCleared) add(lastPlayedStation());
+    if(!out.length) add(lastPlayedStation());
     return out;
   }
 
@@ -56308,7 +56313,7 @@
     function paintReset(){ if(resetBtn) resetBtn.textContent = resetLabel(); }
     if(resetBtn) resetBtn.addEventListener('click', function(){
       var what = carouselCfg.mode === 'flow' ? 'Cover Flow' : carouselCfg.mode === 'none' ? 'the carousel' : 'the slides';
-      confirmThen({ title: resetLabel() + '?', message: 'This clears every entry in ' + what + ' on Home. It starts fresh from what you play next. Your favorites, playlists and library are not touched.', ok: 'Reset' }, function(){
+      confirmThen({ title: resetLabel() + '?', message: 'This removes every entry from ' + what + ' on Home. It fills again as you play. Your play history, favorites, playlists and library are not touched.', ok: 'Reset' }, function(){
         if(typeof clearHeroEntries === 'function') clearHeroEntries();
       });
     });
