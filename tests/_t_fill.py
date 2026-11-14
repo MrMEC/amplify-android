@@ -85,15 +85,15 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/lms-{TAG}-1-livetv.png')
 
 
-        await pg.evaluate("localStorage.setItem('radioPlayerLogoFill','fill')"); await pg.reload(); await pg.wait_for_timeout(2500)
+
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1800)
-        await pg.evaluate("document.querySelectorAll('#stationsGrid .epg-logo').forEach(function(l,i){ if(i>2) return; l.innerHTML='<img alt=\\'\\' src=\\'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%2290%22><rect width=%22120%22 height=%2290%22 fill=%22%232a4a9a%22/><text x=%2260%22 y=%2255%22 fill=%22white%22 font-size=%2226%22 text-anchor=%22middle%22>CLASSIC</text></svg>\\'>'; })")
-        await pg.wait_for_timeout(300)
-        await pg.screenshot(path=f'{SHOTS}/fill-{TAG}-1.png', clip={'x':0,'y':120,'width':327,'height':260})
-        print(await pg.evaluate("(function(){var c=document.querySelector('#stationsGrid .epg-ch').getBoundingClientRect(),l=document.querySelector('#stationsGrid .epg-logo').getBoundingClientRect(); return [c.width,c.height,l.width,l.height]})()"))
-        await pg.evaluate("localStorage.setItem('radioPlayerLogoFill','fit')"); await pg.reload(); await pg.wait_for_timeout(2500)
-        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1800)
-        print(await pg.evaluate("(function(){var l=document.querySelector('#stationsGrid .epg-logo').getBoundingClientRect(); return [l.width,l.height]})()"), errs)
+        await pg.evaluate("document.querySelector('#stationsGrid .epg-logo').click()"); await pg.wait_for_timeout(600)
+        await pg.screenshot(path=f'{SHOTS}/fill2-{TAG}-1.png')
+        items = await pg.evaluate("Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).map(function(b){ return b.textContent.trim(); })"); print(items)
+        await pg.evaluate("Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).filter(function(b){return /Fill Logo/.test(b.textContent)})[0].click()"); await pg.wait_for_timeout(800)
+        print(await pg.evaluate("Array.from(document.querySelectorAll('#stationsGrid .epg-ch')).slice(0,3).map(function(c){return c.className+' '+Math.round(c.querySelector('.epg-logo').getBoundingClientRect().height)})"), await pg.evaluate("localStorage.getItem('radioPlayerLogoFillChannels')"))
+        await pg.evaluate("document.querySelector('#stationsGrid .epg-logo').click()"); await pg.wait_for_timeout(500)
+        print(await pg.evaluate("Array.from(document.querySelectorAll('#chSheetItems .ch-sheet-item')).map(function(b){ return b.textContent.trim(); })"), errs)
         await b.close()
 
 asyncio.run(main())

@@ -29623,7 +29623,8 @@
     paintArt();
     art.addEventListener('click', function(){
       openArtUrlDialogFor({ key: 'chart:' + c.url, title: 'Channel Picture', name: (c.name || '') + ' TV',
-        refresh: function(){ paintArt(); saveVideoChannels(); if(onVideoView) rerenderVideoKeepingScroll(); try{ refreshChannelGrids(); }catch(e){} } });
+        refresh: function(){ paintArt(); saveVideoChannels(); if(onVideoView) rerenderVideoKeepingScroll(); try{ refreshChannelGrids(); }catch(e){}
+          try{ heroSlideByKey = {}; renderNpHero(true); }catch(e){} } });
       artUrlOverlay.classList.add('over-confirm');
     });
     var artRow = document.createElement('div'); artRow.className = 'ace-art-row'; artRow.appendChild(art);
@@ -29653,6 +29654,7 @@
       if(shuffle){ c.archive.order = shuffle.checked ? 'shuffle' : 'sequence'; saveVideoChannels(); }
       close();
       if(onVideoView) rerenderVideoKeepingScroll();
+      try{ heroSlideByKey = {}; renderNpHero(true); }catch(e){}
     });
     document.body.appendChild(back);
   }
@@ -55818,6 +55820,20 @@
       return ref.it || null;
     }catch(e){ return null; }
   }
+  // Build 630 (Mark): a channel slide shows the channel's picture and name as they are now (Edit
+  // Channel), not as they were when it was played.
+  function heroFreshChannel(t){
+    try{
+      if(!t || !t.videoChannel || t.liveCh) return t;
+      var c = findVideoChannel(t.urlToResolve || t.url);
+      if(!c) return t;
+      var f = {}; Object.keys(t).forEach(function(x){ f[x] = t[x]; });
+      f.favicon = chLogo(c); f.name = c.name || t.name;
+      f.channel = {}; Object.keys(t.channel || {}).forEach(function(x){ f.channel[x] = t.channel[x]; });
+      f.channel.logo = f.favicon; f.channel.name = f.name;
+      return f;
+    }catch(e){ return t; }
+  }
   function heroItems(all){
     var out = [], seen = {}, nowKey = null;
     try{ nowKey = currentStation ? favKey(currentStation) : null; }catch(e){}
@@ -55830,7 +55846,7 @@
       // shows once (the first, most recent of them).
       var ent = heroArtistEntry(t), ak = ent ? 'artist:' + ent.key : null;
       if(ak && seen[ak]) return;
-      seen[k] = true; if(ak) seen[ak] = true; out.push(t);
+      seen[k] = true; if(ak) seen[ak] = true; out.push(heroFreshChannel(t));
     }
     // Build 625 (Mark): in Privacy mode nothing new is added, so what is playing now only shows if
     // it was already in the carousel.
@@ -56074,7 +56090,7 @@
     var pos = Math.max(0, Math.min(n - 1, npHeroTrack.scrollLeft / w));
     npHeroProgress.firstChild.style.width = ((pos + 1) / n * 100).toFixed(2) + '%';
   }
-  function renderNpHero(){
+  function renderNpHero(force){
     if(!npHero || !npHeroTrack) return;
     if(carouselCfg.mode === 'none'){ npHero.style.display = 'none'; return; }   // build 562
     var items = heroItems();
@@ -56088,7 +56104,7 @@
     var playKey = currentStation ? favKey(currentStation) : null;
     if(heroFlowOn() && playKey && playKey !== heroFlowPlayKey && keys[0] === playKey) stayFirst = true;
     heroFlowPlayKey = playKey;
-    if(keys.join('\n') !== prevKeys.join('\n')){
+    if(force === true || keys.join('\n') !== prevKeys.join('\n')){
       var keep = {};
       heroSlides = items.map(function(item, i){
         var k = keys[i];
