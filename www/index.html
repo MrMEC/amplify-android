@@ -4623,6 +4623,7 @@
   .ch-edit-bar .ch-bar-btn{ min-height:36px; padding:0 16px; border-radius:18px; border:1px solid var(--border, rgba(128,128,128,.35)); background:none; color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
   .ch-edit-bar .ch-bar-btn:active{ opacity:.7; }
   .ch-edit-bar .ch-bar-spacer{ flex:1; }
+  .ch-edit-bar.ch-bar-center{ justify-content:center; }
   .ch-edit-list > .tile.ch-selectable{ cursor:pointer; }
   .ch-edit-list > .tile .ch-check{ flex:0 0 auto; width:24px; height:24px; border-radius:50%; margin-right:12px; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
     border:2px solid var(--text-faint, rgba(128,128,128,.7)); color:transparent; font-size:12px; }
@@ -9859,7 +9860,7 @@
       <!-- Build 346 (Mark): Privacy. While on, searches aren't saved under Search and nothing played
            goes into Continue Listening or Continue Watching. -->
       <div class="settings-row">
-        <div class="set-text"><span class="settings-label" id="privacyLabel">Privacy</span><span class="set-desc">Searches aren&rsquo;t saved and nothing is added to Continue Listening or Watching</span></div>
+        <div class="set-text"><span class="settings-label" id="privacyLabel">Privacy</span><span class="set-desc">Secure mode to disable tracking</span></div>
         <select class="settings-select" id="privacySelect" aria-labelledby="privacyLabel">
           <option value="off">Off</option>
           <option value="on">On</option>
@@ -10652,6 +10653,9 @@
   </button>
   <button type="button" class="np-menu-item" id="rowMenuRename" role="menuitem" style="display:none;">
     <i class="fa-solid fa-pen"></i><span>Rename</span>
+  </button>
+  <button type="button" class="np-menu-item" id="rowMenuHide" role="menuitem" style="display:none;">
+    <i class="fa-solid fa-eye-slash"></i><span id="rowMenuHideLabel">Hide Channel</span>
   </button>
   <button type="button" class="np-menu-item" id="rowMenuRemove" role="menuitem" style="display:none;">
     <i class="fa-solid fa-xmark"></i><span id="rowMenuRemoveLabel">Remove</span>
@@ -12652,7 +12656,8 @@
     var sel = document.getElementById('privacySelect');
     if(!sel) return;
     sel.value = privacyOn() ? 'on' : 'off';
-    sel.addEventListener('change', function(){ try{ localStorage.setItem(PRIVACY_KEY, sel.value === 'on' ? 'on' : 'off'); }catch(e){} });
+    sel.addEventListener('change', function(){ try{ localStorage.setItem(PRIVACY_KEY, sel.value === 'on' ? 'on' : 'off'); }catch(e){}
+      try{ if(onVideoView) rerenderVideoKeepingScroll(); refreshChannelGrids(); }catch(e){} });
   })();
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
@@ -25812,8 +25817,19 @@
   function channelAzCompare(a, b){
     return alphaCompare(alphaSortKey(a.name || ''), alphaSortKey(b.name || '')) || (a.url < b.url ? -1 : a.url > b.url ? 1 : 0);
   }
-  function visibleVideoChannels(){
-    var list = videoChannels.filter(channelVisible);
+  // Build 623 (Mark): Hide Channel. A hidden channel is left out of the Live TV grid and guide unless
+  // Privacy mode is on; the Edit list always shows it (marked Hidden) so it can be shown again.
+  var HIDDEN_CH_KEY = 'radioPlayerHiddenChannels';
+  var chHiddenSet = {};
+  try{ (JSON.parse(localStorage.getItem(HIDDEN_CH_KEY) || '[]') || []).forEach(function(u){ chHiddenSet[u] = 1; }); }catch(e){}
+  function chIsHidden(url){ return !!chHiddenSet[url]; }
+  function chHiddenNow(url){ return !!chHiddenSet[url] && !privacyOn(); }
+  function chSetHidden(url, on){
+    if(on) chHiddenSet[url] = 1; else delete chHiddenSet[url];
+    try{ localStorage.setItem(HIDDEN_CH_KEY, JSON.stringify(Object.keys(chHiddenSet))); }catch(e){}
+  }
+  function visibleVideoChannels(all){
+    var list = videoChannels.filter(function(c){ return channelVisible(c) && (all === true || !chHiddenNow(c.url)); });
     return channelOrder === 'az' ? list.sort(channelAzCompare) : list;
   }
   // My Channels: grouped by category, or one list.
@@ -26029,7 +26045,7 @@
   }
   function renderChannelsTab(){
     videoRefreshHeaderBtnEl.style.display = 'none';
-    var mine = visibleVideoChannels();
+    var mine = visibleVideoChannels(videoChannelsEditing);
     // Build 263: Edit is always there: it's where your own channels are made and changed.
     videoReorderHeaderBtnEl.style.display = '';
     // Sorting lives in edit mode (Mark: options only while editing), so no Sort button here.
@@ -26623,7 +26639,7 @@
   // The channels, as My Channels entries; one with nothing to play isn't in the guide.
   function liveChannels(all){
     if(!liveChState()) return [];
-    return liveChDefs().map(liveChEntry).filter(function(c){ return all || !c.empty; });
+    return liveChDefs().map(liveChEntry).filter(function(c){ return all || (!c.empty && !chHiddenNow(c.url)); });
   }
   function liveChannelByUrl(url){
     var def = liveChDefById(String(url || '').slice('amplify-live:'.length));
@@ -26917,7 +26933,7 @@
   function buildLiveEditRow(c, o){
     var def = liveChDefOf(c), st = liveChStationOf(c);
     var row = buildEntityTile({ key: 'livech:' + c.url, reorderId: c.url, entity: o.entity, name: c.name, row: true,
-      sub: c.empty ? 'Nothing to play yet' : liveChKindText(def), artFrom: st,
+      sub: (c.empty ? 'Nothing to play yet' : liveChKindText(def)) + (chIsHidden(c.url) ? ' \u00b7 Hidden' : ''), artFrom: st,
       draggable: o.manual, container: o.container, onReorder: o.onReorder,
       onClick: o.onTap || function(){ openLiveChEditor(def.id); } });
     row.classList.add('ch-item', 'lc-row');
@@ -26937,18 +26953,30 @@
     }
     row.appendChild(buildRowMoreBtn(st, { fav: !c.empty, className: 'row-more-btn', renameLabel: 'Edit Channel',
       onRename: function(){ openLiveChEditor(def.id); },
+      onHide: chHideAction(c.url), hideLabel: chIsHidden(c.url) ? 'Show Channel' : 'Hide Channel',
       onRemove: function(){ deleteLiveChannel(def.id); } }));
     if(o.manual) addChGrip(row);
     return row;
   }
+  // Hide / Show for a channel's menu; nothing in Privacy mode (hidden channels show then anyway).
+  function chHideAction(url){
+    if(privacyOn()) return null;
+    return function(){
+      chSetHidden(url, !chIsHidden(url));
+      if(onVideoView) rerenderVideoKeepingScroll();
+      try{ refreshChannelGrids(); }catch(e){}
+    };
+  }
   function buildAddedEditRow(ch, o){
     var row = buildEntityTile({
       key: 'channel:' + ch.url, reorderId: ch.url, entity: o.entity, name: ch.name, row: true,
+      sub: chIsHidden(ch.url) ? 'Hidden' : undefined,
       artFrom: channelToStation(ch), draggable: o.manual, container: o.container, onReorder: o.onReorder, onClick: o.onTap
     });
     row.classList.add('ch-item');
     // Build 243: the grid has no menus (Mark), so Favorite, Rename and Remove live here.
     row.appendChild(buildRowMoreBtn(channelToStation(ch), { fav: true, className: 'row-more-btn',
+      onHide: chHideAction(ch.url), hideLabel: chIsHidden(ch.url) ? 'Show Channel' : 'Hide Channel',
       onRemove: function(){ removeVideoChannel(ch.url); },
       onRename: function(){ promptRenameVideoChannel(ch); } }));
     if(o.manual) addChGrip(row);
@@ -27063,7 +27091,8 @@
       return b;
     }
     if(!chSelecting){
-      btn('chSelectBtn', 'Select', function(){ setChannelsSelecting(true); });
+      bar.classList.add('ch-bar-center');
+      btn('chSelectBtn', 'Select Channels', function(){ setChannelsSelecting(true); });
     } else {
       btn('chSelCancelBtn', 'Cancel', function(){ setChannelsSelecting(false); });
       var sp = document.createElement('span'); sp.className = 'ch-bar-spacer'; bar.appendChild(sp);
@@ -29539,6 +29568,10 @@
       item(fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart', fav ? 'Remove from Favorites' : 'Add to Favorites', function(){ toggleFavorite(st); if(onVideoView) rerenderVideoKeepingScroll(); npRefresh(); });
     }
     item('fa-solid fa-grip-vertical', 'Move', function(){ leaveNp(); setChannelsArranging(true); });
+    if(!privacyOn()){
+      var hideFn = chHideAction(ch.url);
+      item(chIsHidden(ch.url) ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash', chIsHidden(ch.url) ? 'Show Channel' : 'Hide Channel', function(){ hideFn(); npRefresh(); });
+    }
     item('fa-solid fa-trash', 'Remove from Live TV', function(){
       var name = ch.name || 'this channel';
       confirmThen({ title: 'Remove ' + quoteName(name) + ' from Live TV?', message: mine ? 'The shows and movies stay in your library.' : '', ok: 'Remove' }, function(){
@@ -47564,7 +47597,7 @@
     b.addEventListener('click', function(e){
       e.stopPropagation();
       if(rowMenu.classList.contains('open') && rowMenu._anchor === b){ closeRowMenu(); return; }
-      var mo = { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename, renameLabel: opts.renameLabel };
+      var mo = { fav: withFav, onRemove: opts.onRemove, onRename: opts.onRename, renameLabel: opts.renameLabel, onHide: opts.onHide, hideLabel: opts.hideLabel };
       // Build 247: a channel in search results: Add to My Channels, or Remove from My Channels
       // once it's saved (asked when the menu opens, so it follows a change made a moment ago).
       if(opts.channel) mo = channelMenuOpts(opts.channel, withFav);
@@ -47614,6 +47647,9 @@
     rowMenuOnRename = (opts && opts.onRename) || null;
     rowMenuRename.style.display = rowMenuOnRename ? '' : 'none';
     rowMenuRename.lastElementChild.textContent = (opts && opts.renameLabel) || 'Rename';
+    rowMenuOnHide = (opts && opts.onHide) || null;
+    rowMenuHide.style.display = rowMenuOnHide ? '' : 'none';
+    rowMenuHideLabel.textContent = (opts && opts.hideLabel) || 'Hide Channel';
     rowMenuOnAddChannel = (opts && opts.onAddChannel) || null;
     rowMenuAddChannel.style.display = rowMenuOnAddChannel ? '' : 'none';
     rowMenuRemoveLabel.textContent = (opts && opts.removeLabel) || 'Remove';
@@ -47655,6 +47691,13 @@
   });
   var rowMenuAddChannel = document.getElementById('rowMenuAddChannel');
   var rowMenuRemoveLabel = document.getElementById('rowMenuRemoveLabel');
+  var rowMenuHide = document.getElementById('rowMenuHide'), rowMenuHideLabel = document.getElementById('rowMenuHideLabel');
+  var rowMenuOnHide = null;
+  rowMenuHide.addEventListener('click', function(e){
+    e.stopPropagation();
+    var fn = rowMenuOnHide; closeRowMenu();
+    if(fn) fn();
+  });
   var rowMenuOnAddChannel = null;
   rowMenuAddChannel.addEventListener('click', function(e){
     e.stopPropagation();
