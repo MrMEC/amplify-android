@@ -7893,6 +7893,11 @@
     body.rail-compact .mobile-nav-btn span{ display:none; }
     body.rail-compact .mobile-nav-btn{ padding:5px 0; }
     body.rail-compact .mobile-nav{ gap:0; }
+    /* Build 614 (Mark): bigger touch targets. With the labels gone, the five buttons share all the
+       height above the profile picture (up to 56px each), a little wider, with slightly bigger icons. */
+    body.rail-compact .mobile-nav-btn{ flex:1 1 0; min-height:0; max-height:56px; padding:0; width:68px; justify-content:center; }
+    body.rail-compact .mobile-nav-btn svg{ width:27px; height:27px; }
+    body.rail-compact .mobile-nav{ gap:2px; padding-top:6px; padding-bottom:calc(var(--rail-foot, 64px) - 6px); }
     /* Live TV: Cast is on the video's controls, not the rail as well. */
     html body.ltv-dock .sidebar-top .cast-btn{ display:none !important; }
     /* Movies, TV Shows, Music Videos: no count. */
