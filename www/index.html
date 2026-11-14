@@ -55615,6 +55615,9 @@
     var keep = null;
     try{ if(zenBarActive && typeof zenHeroItem === 'function') keep = favKey(zenHeroItem()); }catch(e){}
     heroItems(true).forEach(function(t){ var k = favKey(t); if(k && k !== keep) heroHidden[k] = 1; });
+    // Everything in the history too (songs by one artist show as one slide, so some never made the list).
+    heroHistLoad().forEach(function(ref){ if(ref && ref.k && ref.k !== keep) heroHidden[ref.k] = 1; });
+    (Array.isArray(zenState.recent) ? zenState.recent : []).forEach(function(id){ var k = 'zen:' + (id || 'custom'); if(k !== keep) heroHidden[k] = 1; });
     heroHiddenSave();
     heroSlideByKey = {};
     renderNpHero();
