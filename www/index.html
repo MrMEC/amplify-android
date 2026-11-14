@@ -3948,6 +3948,10 @@
   .epg-ch{ box-shadow:0 -4px 0 0 var(--epg-bg); }
   .epg-logo{ display:flex; align-items:center; justify-content:center; width:60px; height:28px; }
   .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
+  /* Build 628 (Mark): Settings > Shape & density > Channel logos > Fill: the logo covers the whole cell. */
+  body.logo-fill .epg-ch .epg-logo{ position:absolute; inset:0 4px; width:auto; height:auto; border-radius:5px; overflow:hidden; }
+  body.logo-fill .epg-ch .epg-logo img{ width:100%; height:100%; max-width:none; max-height:none; object-fit:cover; }
+  body.logo-fill .ch-logo img{ object-fit:cover; padding:0; }
   .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:normal; word-break:normal; hyphens:none; max-width:100%; }
   .epg-heart{ color:var(--accent); font-size:11px; }
   .epg-prog{ position:absolute; top:0; height:62px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
@@ -9604,6 +9608,10 @@
         <select class="settings-select" id="shapeArtistSelect" aria-labelledby="shapeArtistLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
       </div>
       <div class="settings-row">
+        <div class="set-text"><span class="settings-label" id="logoFillLabel">Channel logos</span><span class="set-desc">Fit shows the whole logo; Fill covers the logo space edge to edge so it reads larger</span></div>
+        <select class="settings-select" id="logoFillSelect" aria-labelledby="logoFillLabel"><option value="fit">Fit</option><option value="fill">Fill</option></select>
+      </div>
+      <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="shapePlayLabel">Play button</span><span class="set-desc">Home carousel, Now Playing, and artist and album pages</span></div>
         <select class="settings-select" id="shapePlaySelect" aria-labelledby="shapePlayLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
       </div>
@@ -12714,6 +12722,19 @@
     // The tap that ends a long press must not open the profile.
     btn.addEventListener('click', function(e){ if(fired){ fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   })();
+  // Build 628 (Mark): channel logos fit or fill their space.
+  (function(){
+    var KEY = 'radioPlayerLogoFill', sel = document.getElementById('logoFillSelect');
+    function on(){ try{ return localStorage.getItem(KEY) === 'fill'; }catch(e){ return false; } }
+    document.body.classList.toggle('logo-fill', on());
+    if(!sel) return;
+    sel.value = on() ? 'fill' : 'fit';
+    sel.addEventListener('change', function(){
+      try{ localStorage.setItem(KEY, sel.value); }catch(e){}
+      document.body.classList.toggle('logo-fill', sel.value === 'fill');
+    });
+  })();
+
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
     var row = document.getElementById('levelingRow'), sel = document.getElementById('levelingSelect');
