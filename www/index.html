@@ -55282,7 +55282,9 @@
     try{
       if(ref.r === 'zen') return ref.k === 'zen:mix' || typeof zenHeroItem !== 'function' ? null : (typeof zenHeroItem === 'function' ? zenHeroItem(ref.z || '') : null);
       if(ref.r === 'song') return libraryById[ref.id] || null;
-      if(ref.r === 'video'){ var v = vlib().byId[ref.id]; return v || null; }
+      // Build 616 (Mark): the library's record is not the playable item (no name, and its kind is
+      // .kind, not .videoKind) -- after a restart TV shows read "Movie" with no title. Make it one.
+      if(ref.r === 'video'){ var v = vlib().byId[ref.id]; return v ? videoToTrack(v) : null; }
       return ref.it || null;
     }catch(e){ return null; }
   }
