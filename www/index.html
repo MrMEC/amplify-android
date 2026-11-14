@@ -4572,6 +4572,12 @@
      modal), so it has to stack above the other .settings-overlay panels. */
   #artUrlOverlay{ z-index:502; }
   #artUrlOverlay.over-tags{ z-index:1003; }
+  #artUrlOverlay.over-confirm{ z-index:5100; }
+  .ace-art-row{ display:flex; align-items:center; gap:14px; margin:4px 0 16px; }
+  .ace-art{ position:relative; width:64px; height:64px; padding:0; border:none; cursor:pointer; flex:none; }
+  .ace-art .ace-art-pen{ position:absolute; right:3px; bottom:3px; width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--accent-text); display:flex; align-items:center; justify-content:center; font-size:10px; }
+  .ace-art-txt{ font-size:13px; color:var(--text-dim); }
+  .ace-switch{ margin:-6px 0 18px; }
   /* Build 263: the channel editor. Its list of shows and movies scrolls inside the dialog. */
   #liveChPanel{ width:min(400px, 100%); max-height:calc(100dvh - 40px); overflow-y:auto; box-sizing:border-box; }
   .lc-opts{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -4589,6 +4595,8 @@
   /* Build 305: the editor as a page. */
   .tile-grid > .lc-panel{ grid-column:1/-1; width:100%; max-width:560px; max-height:none; overflow:visible; margin:0;
     padding:0; background:none; border:none; box-shadow:none; border-radius:0; transform:none; animation:none; }
+  /* Build 627: the id rule above (max-height, overflow:auto) beat this, so the page was clipped at the screen's height and scrolled inside itself. */
+  .tile-grid > #liveChPanel{ max-height:none; overflow:visible; }
   .tile-grid > .lc-panel > .settings-header{ display:none; }
   .tile-grid > .lc-panel .lc-body{ padding:0; }
   .lc-body .cs-field{ margin-bottom:14px; }
@@ -17919,6 +17927,7 @@
     showArtMainScreen();
     artUrlOverlay.classList.remove('open');
     artUrlOverlay.classList.remove('over-tags');
+    artUrlOverlay.classList.remove('over-confirm');
     artUrlClearBtn.style.display = '';
     artPendingUpload = null;
     artPendingFile = null;
@@ -25920,11 +25929,13 @@
     for(var i = 0; i < videoChannels.length; i++) if(videoChannels[i].url === url) return videoChannels[i];
     return null;
   }
+  // Build 627 (Mark): a picture you chose for an added channel (Edit Channel) wins over its own.
+  function chLogo(ch){ var c = ch && ch.url ? getCustomArtUrl('chart:' + ch.url) : null; return c || (ch && ch.logo) || ''; }
   function channelToStation(ch){
     var st = {
-      name: ch.name, urlToResolve: ch.url, favicon: ch.logo || '', tags: (ch.cats || []).join(','),
+      name: ch.name, urlToResolve: ch.url, favicon: chLogo(ch), tags: (ch.cats || []).join(','),
       country: ch.country || '', codec: '', bitrate: '', stationuuid: null, videoChannel: true,
-      channel: { id: ch.id || '', name: ch.name || '', url: ch.url, logo: ch.logo || '',
+      channel: { id: ch.id || '', name: ch.name || '', url: ch.url, logo: chLogo(ch),
         country: ch.country || '', cats: ch.cats || [], src: ch.src || 'link' }
     };
     // Build 262: one of your own channels (its poster as its picture; playing it tunes in).
@@ -28074,10 +28085,10 @@
     logo.className = 'epg-logo';
     function plainLogo(){
       logo.innerHTML = '';
-      if(ch.logo){
+      if(chLogo(ch)){
         var img = document.createElement('img');
         img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
-        img.src = secureUrl(ch.logo);
+        img.src = secureUrl(chLogo(ch));
         img.onerror = function(){ logo.innerHTML = ''; logo.appendChild(epgLogoName(ch)); };
         logo.appendChild(img);
       } else logo.appendChild(epgLogoName(ch));
@@ -29575,6 +29586,63 @@
   function closeChSheet(){ chSheetOverlay.classList.remove('open'); }
   chSheetOverlay.addEventListener('click', function(e){ if(e.target === chSheetOverlay) closeChSheet(); });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && chSheetOverlay.classList.contains('open')){ e.stopImmediatePropagation(); closeChSheet(); } }, true);
+  // Build 627 (Mark): Edit Channel for a channel you added (IPTV or archive.org): its name and
+  // its picture; an archive.org channel of your own also has its Shuffle switch.
+  function openAddedChEditor(c, done){
+    var back = document.createElement('div');
+    back.className = 'confirm-overlay open added-ch-ed';
+    var panel = document.createElement('div');
+    panel.className = 'confirm-panel';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Edit Channel');
+    var h = document.createElement('h2'); h.className = 'confirm-title'; h.textContent = 'Edit Channel'; panel.appendChild(h);
+    var art = document.createElement('button');
+    art.type = 'button'; art.className = 'ace-art ch-logo'; art.setAttribute('aria-label', 'Change picture'); art.title = 'Change picture';
+    var pen = document.createElement('span'); pen.className = 'ace-art-pen'; pen.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
+    function paintArt(){
+      art.innerHTML = '';
+      var u = chLogo(c);
+      if(u){ var im = document.createElement('img'); im.alt = ''; im.referrerPolicy = 'no-referrer'; im.src = secureUrl(u);
+        im.onerror = function(){ art.innerHTML = ''; art.style.background = mineColor(c.name || ''); art.innerHTML = '<span class="ch-mono"></span>'; art.firstChild.textContent = mineMono(c.name || ''); art.appendChild(pen); };
+        art.style.background = ''; art.appendChild(im); }
+      else { art.style.background = mineColor(c.name || ''); art.innerHTML = '<span class="ch-mono"></span>'; art.firstChild.textContent = mineMono(c.name || ''); }
+      art.appendChild(pen);
+    }
+    paintArt();
+    art.addEventListener('click', function(){
+      openArtUrlDialogFor({ key: 'chart:' + c.url, title: 'Channel Picture', name: (c.name || '') + ' TV',
+        refresh: function(){ paintArt(); saveVideoChannels(); if(onVideoView) rerenderVideoKeepingScroll(); try{ refreshChannelGrids(); }catch(e){} } });
+      artUrlOverlay.classList.add('over-confirm');
+    });
+    var artRow = document.createElement('div'); artRow.className = 'ace-art-row'; artRow.appendChild(art);
+    var artTxt = document.createElement('div'); artTxt.className = 'ace-art-txt'; artTxt.textContent = 'Tap the picture to change it.';
+    artRow.appendChild(artTxt); panel.appendChild(artRow);
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'pf-input'; inp.value = c.name || ''; inp.maxLength = 80; inp.setAttribute('aria-label', 'Channel name');
+    inp.autocapitalize = 'words'; panel.appendChild(inp);
+    var shuffle = null;
+    if(isArchiveCustomUrl(c.url) && c.archive && c.archive.items){
+      var sw = document.createElement('label'); sw.className = 'ia-switch ace-switch';
+      sw.innerHTML = '<input type="checkbox" role="switch" aria-label="Shuffle"><span class="ia-switch-track" aria-hidden="true"></span><span class="ia-switch-text">Shuffle</span>';
+      shuffle = sw.querySelector('input'); shuffle.checked = c.archive.order === 'shuffle';
+      panel.appendChild(sw);
+    }
+    var acts = document.createElement('div'); acts.className = 'confirm-actions';
+    var cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'confirm-cancel'; cancel.textContent = 'Cancel';
+    var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'confirm-ok confirm-ok-safe'; ok.textContent = 'Save';
+    acts.appendChild(cancel); acts.appendChild(ok); panel.appendChild(acts);
+    back.appendChild(panel);
+    function close(){ back.remove(); if(done) try{ done(); }catch(e){} }
+    cancel.addEventListener('click', close);
+    back.addEventListener('click', function(e){ if(e.target === back) close(); });
+    ok.addEventListener('click', function(){
+      var nm = inp.value.trim();
+      if(nm && nm !== c.name) renameVideoChannel(c.url, nm);
+      if(shuffle){ c.archive.order = shuffle.checked ? 'shuffle' : 'sequence'; saveVideoChannels(); }
+      close();
+      if(onVideoView) rerenderVideoKeepingScroll();
+    });
+    document.body.appendChild(back);
+  }
   function openChSheet(ch, opts){
     opts = opts || {};
     // Build 584 (Mark): the guide under the video opens this too (a tap on a logo). There, the
@@ -29587,7 +29655,7 @@
     var st = mine ? liveChStationOf(ch) : channelToStation(ch);
     var logo = document.getElementById('chSheetLogo');
     logo.innerHTML = '';
-    var pic = ch.logo || ch.art || '';
+    var pic = chLogo(ch) || ch.art || '';
     logo.style.background = '';
     function mono(){ logo.style.background = mineColor(ch.name || ''); logo.innerHTML = '<span class="ch-mono"></span>'; logo.firstChild.textContent = mineMono(ch.name || ''); }
     if(pic){ var img = document.createElement('img'); img.alt = ''; img.referrerPolicy = 'no-referrer'; img.src = secureUrl(pic); img.onerror = mono; logo.appendChild(img); }
@@ -29609,7 +29677,7 @@
     }
     if(!ch.empty) item('fa-solid fa-play', 'Watch Now', function(){ playChannel(ch, fromNp ? { still: true } : undefined); });
     if(mine && def) item('fa-solid fa-pen', 'Edit Channel', function(){ leaveNp(); openLiveChEditor(def.id); });
-    else if(!mine) item('fa-solid fa-pen', 'Rename', function(){ var c = findVideoChannel(ch.url); if(c) promptRenameVideoChannel(c); npRefresh(); });
+    else if(!mine) item('fa-solid fa-pen', 'Edit Channel', function(){ var c = findVideoChannel(ch.url); if(c) openAddedChEditor(c, npRefresh); });
     if(!ch.empty){
       var fav = isFavorite(st);
       item(fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart', fav ? 'Remove from Favorites' : 'Add to Favorites', function(){ toggleFavorite(st); if(onVideoView) rerenderVideoKeepingScroll(); npRefresh(); });
@@ -51085,7 +51153,7 @@
   }
   function archiveCustomRefresh(ch){
     var a = ch.archive;
-    ch.logo = a.items.length ? archiveArtUrl(a.items[0].id) : '';
+    ch.logo = a.items.length ? archiveArtUrl(a.items[0].id) : '';   // a picture chosen in Edit Channel overrides it (chLogo)
     saveVideoChannels();
   }
   function addToArchiveCustom(ch, it){
