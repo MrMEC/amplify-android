@@ -3948,10 +3948,9 @@
   .epg-ch{ box-shadow:0 -4px 0 0 var(--epg-bg); }
   .epg-logo{ display:flex; align-items:center; justify-content:center; width:60px; height:28px; }
   .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
-  /* Build 628 (Mark): Settings > Shape & density > Channel logos > Fill: the logo covers the whole cell. */
-  body.logo-fill .epg-ch .epg-logo{ position:absolute; inset:0 4px; width:auto; height:auto; border-radius:5px; overflow:hidden; }
-  body.logo-fill .epg-ch .epg-logo img{ width:100%; height:100%; max-width:none; max-height:none; object-fit:cover; }
-  body.logo-fill .ch-logo img{ object-fit:cover; padding:0; }
+  /* Build 629 (Mark): a channel set to Fill Logo (its menu) has its logo cover the whole cell. */
+  .epg-ch.logo-fill .epg-logo{ position:absolute; inset:0 4px; width:auto; height:auto; border-radius:5px; overflow:hidden; }
+  .epg-ch.logo-fill .epg-logo img{ width:100%; height:100%; max-width:none; max-height:none; object-fit:cover; }
   .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:normal; word-break:normal; hyphens:none; max-width:100%; }
   .epg-heart{ color:var(--accent); font-size:11px; }
   .epg-prog{ position:absolute; top:0; height:62px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
@@ -5686,6 +5685,8 @@
   /* Build 623: the bundled icon font has no eye glyphs; drawn like the star. */
   .fa-eye:before{ content:""; display:inline-block; width:1em; height:1em; vertical-align:-0.12em; background-color:currentColor; -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z'/%3E%3C/svg%3E") center/contain no-repeat; }
   .fa-eye-slash:before{ content:""; display:inline-block; width:1em; height:1em; vertical-align:-0.12em; background-color:currentColor; -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z'/%3E%3C/svg%3E") center/contain no-repeat; }
+  .fa-expand:before{ content:""; display:inline-block; width:1em; height:1em; vertical-align:-0.12em; background-color:currentColor; -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z'/%3E%3C/svg%3E") center/contain no-repeat; }
+  .fa-compress:before{ content:""; display:inline-block; width:1em; height:1em; vertical-align:-0.12em; background-color:currentColor; -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 3.41L16.71 8.7 20 12h-8V4l3.29 3.29L20.59 2 22 3.41zM3.41 22l5.29-5.29L12 20v-8H4l3.29 3.29L2 20.59 3.41 22z'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 3.41L16.71 8.7 20 12h-8V4l3.29 3.29L20.59 2 22 3.41zM3.41 22l5.29-5.29L12 20v-8H4l3.29 3.29L2 20.59 3.41 22z'/%3E%3C/svg%3E") center/contain no-repeat; }
   .fa-pen:before{ content:"\f304"; }
   .fa-check:before{ content:"\f00c"; }
   .fa-play:before{ content:"\f04b"; }
@@ -9608,10 +9609,6 @@
         <select class="settings-select" id="shapeArtistSelect" aria-labelledby="shapeArtistLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
       </div>
       <div class="settings-row">
-        <div class="set-text"><span class="settings-label" id="logoFillLabel">Channel logos</span><span class="set-desc">Fit shows the whole logo; Fill covers the logo space edge to edge so it reads larger</span></div>
-        <select class="settings-select" id="logoFillSelect" aria-labelledby="logoFillLabel"><option value="fit">Fit</option><option value="fill">Fill</option></select>
-      </div>
-      <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="shapePlayLabel">Play button</span><span class="set-desc">Home carousel, Now Playing, and artist and album pages</span></div>
         <select class="settings-select" id="shapePlaySelect" aria-labelledby="shapePlayLabel"><option value="circle">Circular</option><option value="rounded">Rounded</option><option value="square">Square</option></select>
       </div>
@@ -12722,19 +12719,6 @@
     // The tap that ends a long press must not open the profile.
     btn.addEventListener('click', function(e){ if(fired){ fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   })();
-  // Build 628 (Mark): channel logos fit or fill their space.
-  (function(){
-    var KEY = 'radioPlayerLogoFill', sel = document.getElementById('logoFillSelect');
-    function on(){ try{ return localStorage.getItem(KEY) === 'fill'; }catch(e){ return false; } }
-    document.body.classList.toggle('logo-fill', on());
-    if(!sel) return;
-    sel.value = on() ? 'fill' : 'fit';
-    sel.addEventListener('change', function(){
-      try{ localStorage.setItem(KEY, sel.value); }catch(e){}
-      document.body.classList.toggle('logo-fill', sel.value === 'fill');
-    });
-  })();
-
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
     var row = document.getElementById('levelingRow'), sel = document.getElementById('levelingSelect');
@@ -27038,6 +27022,14 @@
     return row;
   }
   // Hide / Show for a channel's menu; nothing in Privacy mode (hidden channels show then anyway).
+  // Build 629 (Mark): Fill Logo, channel by channel (Fit shows the whole logo, Fill covers the cell).
+  var LOGO_FILL_KEY = 'radioPlayerLogoFillChannels', chFillSet = {};
+  try{ (JSON.parse(localStorage.getItem(LOGO_FILL_KEY) || '[]') || []).forEach(function(u){ chFillSet[u] = 1; }); }catch(e){}
+  function chLogoFilled(url){ return !!chFillSet[url]; }
+  function chSetLogoFill(url, on){
+    if(on) chFillSet[url] = 1; else delete chFillSet[url];
+    try{ localStorage.setItem(LOGO_FILL_KEY, JSON.stringify(Object.keys(chFillSet))); }catch(e){}
+  }
   function chHideAction(url){
     if(privacyOn()) return null;
     return function(){
@@ -28100,7 +28092,7 @@
     // the channel: its logo (or name), a heart if it's a favourite
     var cell = document.createElement('button');
     cell.type = 'button';
-    cell.className = 'epg-ch' + (playing ? ' playing' : '') + (ch.dead ? ' dead' : '');
+    cell.className = 'epg-ch' + (playing ? ' playing' : '') + (ch.dead ? ' dead' : '') + (chLogoFilled(ch.url) ? ' logo-fill' : '');
     cell.setAttribute('aria-label', (ch.name || 'Channel') + (playing ? ', playing' : ''));
     var logo = document.createElement('span');
     logo.className = 'epg-logo';
@@ -29704,6 +29696,11 @@
       item(fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart', fav ? 'Remove from Favorites' : 'Add to Favorites', function(){ toggleFavorite(st); if(onVideoView) rerenderVideoKeepingScroll(); npRefresh(); });
     }
     item('fa-solid fa-grip-vertical', 'Move', function(){ leaveNp(); setChannelsArranging(true); });
+    item(chLogoFilled(ch.url) ? 'fa-solid fa-compress' : 'fa-solid fa-expand', chLogoFilled(ch.url) ? 'Fit Logo' : 'Fill Logo', function(){
+      chSetLogoFill(ch.url, !chLogoFilled(ch.url));
+      if(onVideoView) rerenderVideoKeepingScroll();
+      try{ refreshChannelGrids(); }catch(e){}
+    });
     if(!privacyOn()){
       var hideFn = chHideAction(ch.url);
       item(chIsHidden(ch.url) ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash', chIsHidden(ch.url) ? 'Show Channel' : 'Hide Channel', function(){ hideFn(); npRefresh(); });
