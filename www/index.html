@@ -12662,7 +12662,8 @@
     if(!sel) return;
     sel.value = privacyOn() ? 'on' : 'off';
     sel.addEventListener('change', function(){ try{ localStorage.setItem(PRIVACY_KEY, sel.value === 'on' ? 'on' : 'off'); }catch(e){}
-      try{ if(onVideoView) rerenderVideoKeepingScroll(); refreshChannelGrids(); }catch(e){} });
+      try{ if(onVideoView) rerenderVideoKeepingScroll(); refreshChannelGrids(); }catch(e){}
+      try{ renderNpHero(); }catch(e){} });
   })();
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
@@ -35829,6 +35830,7 @@
   // The mixes played, newest first, kept with Zen's own settings so the carousel never loses them.
   function zenNote(){
     var it = zenHeroItem(); if(!it) return;
+    if(privacyOn()) return;   // build 625: nothing is added to the carousel in Privacy mode
     try{ noteHeroPlayed(it); }catch(e){}
     var id = it.zenId || '';
     var r = (Array.isArray(zenState.recent) ? zenState.recent : []).filter(function(x){ return x !== id; });
@@ -55703,11 +55705,19 @@
       if(ak && seen[ak]) return;
       seen[k] = true; if(ak) seen[ak] = true; out.push(t);
     }
-    if(zenBarActive && typeof zenHeroItem === 'function') add(zenHeroItem());
-    add(currentStation);
+    // Build 625 (Mark): in Privacy mode nothing new is added, so what is playing now only shows if
+    // it was already in the carousel.
+    var priv = privacyOn(), inHist = {};
+    if(priv){
+      heroHistLoad().forEach(function(r){ if(r && r.k) inHist[r.k] = 1; });
+      (Array.isArray(zenState.recent) ? zenState.recent : []).forEach(function(id){ inHist['zen:' + (id || 'custom')] = 1; });
+    }
+    function addNow(t){ if(t && priv && !inHist[favKey(t)]) return; add(t); }
+    if(zenBarActive && typeof zenHeroItem === 'function') addNow(zenHeroItem());
+    addNow(currentStation);
     heroHistLoad().forEach(function(ref){ add(heroResolve(ref)); });
     if(typeof zenRecentItems === 'function' && !privacyOn()) zenRecentItems().forEach(add);
-    if(!out.length) add(lastPlayedStation());
+    if(!out.length && !priv) add(lastPlayedStation());
     return out;
   }
 
