@@ -6969,6 +6969,14 @@
   .pf-stats{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin-top:24px; }
   /* ---------- Build 362: the header's menu button is your profile picture (phone) ---------- */
   .hb-avatar{ display:none; }
+  /* Build 626 (Mark): the eye beside the profile picture while Privacy mode is on. */
+  .privacy-eye-btn{ display:none; }
+  @media (max-width: 900px){
+    html body.privacy-on .sidebar-top .privacy-eye-btn{ display:flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0; margin:0 2px 0 0; border:none; background:none; color:var(--accent); cursor:pointer; flex-shrink:0; transition:opacity .2s ease; -webkit-tap-highlight-color:transparent; }
+    html body.privacy-on .sidebar-top .privacy-eye-btn svg{ width:24px; height:24px; display:block; }
+    html body.hdr-av-off .sidebar-top .privacy-eye-btn{ opacity:0; pointer-events:none; }
+    .sidebar-top .hamburger-btn{ -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; }
+  }
   @media (max-width: 900px){
     .sidebar-top .hamburger-btn .hb-lines, .sidebar-top .hamburger-btn .hb-label{ display:none !important; }
     html body .sidebar-top .hamburger-btn .hb-avatar{
@@ -8336,6 +8344,9 @@
         <button type="button" class="cast-btn" id="castBtn" aria-label="Cast" title="Cast" hidden>
           <svg class="cast-ico cast-ico-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
           <svg class="cast-ico cast-ico-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm18-7H5v1.63c3.96 1.28 7.09 4.41 8.37 8.37H19V7zM1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+        </button>
+        <button type="button" class="privacy-eye-btn" id="privacyEyeBtn" aria-label="Privacy mode is on. Tap to turn off" title="Privacy mode is on" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
         </button>
         <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false" title="Menu">
           <i class="hb-lines" aria-hidden="true"><span></span><span></span><span></span></i><b class="hb-label">Menu</b>
@@ -12657,13 +12668,43 @@
   // (videos, channels, music videos); a video's place in it isn't kept either.
   var PRIVACY_KEY = 'radioPlayerPrivacy';
   function privacyOn(){ try{ return localStorage.getItem(PRIVACY_KEY) === 'on'; }catch(e){ return false; } }
+  // Build 626 (Mark): Privacy can also be switched from the header: a long press on the profile button
+  // turns it on and shows an eye (primary colour) beside it; tapping the eye, or a second long
+  // press, turns it off. Settings > Privacy stays in step.
+  function privacySet(on){
+    try{ localStorage.setItem(PRIVACY_KEY, on ? 'on' : 'off'); }catch(e){}
+    var sel = document.getElementById('privacySelect');
+    if(sel) sel.value = on ? 'on' : 'off';
+    document.body.classList.toggle('privacy-on', !!on);
+    try{ if(onVideoView) rerenderVideoKeepingScroll(); refreshChannelGrids(); }catch(e){}
+    try{ renderNpHero(); }catch(e){}
+  }
   (function(){
     var sel = document.getElementById('privacySelect');
-    if(!sel) return;
-    sel.value = privacyOn() ? 'on' : 'off';
-    sel.addEventListener('change', function(){ try{ localStorage.setItem(PRIVACY_KEY, sel.value === 'on' ? 'on' : 'off'); }catch(e){}
-      try{ if(onVideoView) rerenderVideoKeepingScroll(); refreshChannelGrids(); }catch(e){}
-      try{ renderNpHero(); }catch(e){} });
+    document.body.classList.toggle('privacy-on', privacyOn());
+    if(sel){
+      sel.value = privacyOn() ? 'on' : 'off';
+      sel.addEventListener('change', function(){ privacySet(sel.value === 'on'); });
+    }
+    var eye = document.getElementById('privacyEyeBtn');
+    if(eye) eye.addEventListener('click', function(e){ e.stopPropagation(); privacySet(false); });
+    var btn = document.getElementById('hamburgerBtn'), timer = null, sx = 0, sy = 0, fired = false;
+    if(!btn) return;
+    function cancel(){ if(timer){ clearTimeout(timer); timer = null; } }
+    btn.addEventListener('pointerdown', function(e){
+      if(!isMobileLayout()) return;
+      fired = false; sx = e.clientX; sy = e.clientY; cancel();
+      timer = setTimeout(function(){
+        timer = null; fired = true;
+        try{ if(navigator.vibrate) navigator.vibrate(18); }catch(e2){}
+        privacySet(!privacyOn());
+      }, 550);
+    });
+    btn.addEventListener('pointermove', function(e){ if(timer && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) cancel(); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(t){ btn.addEventListener(t, cancel); });
+    btn.addEventListener('contextmenu', function(e){ if(isMobileLayout()) e.preventDefault(); });
+    // The tap that ends a long press must not open the profile.
+    btn.addEventListener('click', function(e){ if(fired){ fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   })();
   // Volume leveling (build 231): the phone's player keeps the setting (LevelingProcessor).
   (function(){
