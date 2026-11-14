@@ -3863,7 +3863,7 @@
   #ltvManageSheet .artist-menu-title + .np-menu-item, #ltvManageSheet .ltv-sheet-label + .np-menu-item{ border-top:0; }
   #ltvManageSheet .np-menu-item i{ flex:0 0 24px; width:24px; font-size:19px; text-align:center; }
   #ltvManageSheet .np-menu-item.on{ font-weight:600; }
-  #ltvManageSheet .np-menu-item.on i, #ltvManageSheet .np-menu-item .fa-plus, #ltvManageSheet .np-menu-item .fa-grip-vertical{ color:var(--accent); }
+  #ltvManageSheet .np-menu-item.on i, #ltvManageSheet .np-menu-item .fa-plus, #ltvManageSheet .np-menu-item .fa-wand-magic-sparkles, #ltvManageSheet .np-menu-item .fa-grip-vertical{ color:var(--accent); }
   #ltvManageSheet .ltv-sheet-label{ font-size:13px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.55); padding:18px 2px 4px; border-top:1px solid rgba(255,255,255,.1); margin-top:2px; }
   .ltv-manage-scrim{ display:block !important; position:fixed; inset:0; z-index:6090; background:rgba(0,0,0,.55); opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s linear .38s; }
   .ltv-manage-scrim.open{ opacity:1; visibility:visible; transition:opacity .3s ease, visibility 0s; }
@@ -4605,10 +4605,34 @@
   #liveChMvPick[hidden]{ display:none; }
   .tile-grid > .lc-panel .lc-actions{ padding:4px 0 8px; justify-content:space-between; }
   .lc-list .artist-info-thumb.lc-mv-thumb{ width:44px; height:44px; border-radius:50%; }
+  /* Build 617: the Shows & Movies pane picks from My Library or from archive.org. */
+  .lc-where{ margin-bottom:8px; }
+  .lc-where[hidden]{ display:none; }
+  .lc-ia-head{ padding:8px 8px 2px; font-size:.78rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); }
+  .lc-list .lc-ia-thumb{ width:56px; height:42px; object-fit:cover; background:var(--surface-2, rgba(128,128,128,.18)); }
   /* Build 264: each list of channels in Edit is its own box, so a row drags only within it. */
   .tile-grid > .ch-edit-list{ grid-column:1/-1; display:flex; flex-direction:column; min-width:0; }
   .tile-grid > .ch-edit-list + .ch-group-head{ margin-top:6px; }
   .tile-grid > .ch-edit-list:empty{ display:none; }
+  /* Build 617 (Mark): the Edit list scrolls with a finger anywhere on it. A row used to take the
+     whole touch for itself (touch-action:none), so only the gaps scrolled; reordering is press,
+     hold and drag, which doesn't need it. */
+  .ch-edit-list > .tile.tile-draggable{ touch-action:pan-y; }
+  /* ...and Select: tick any number of channels, then remove them together. */
+  .tile-grid > .ch-edit-bar{ grid-column:1/-1; display:flex; align-items:center; gap:8px; margin:0 0 6px; }
+  .ch-edit-bar .ch-bar-btn{ min-height:36px; padding:0 16px; border-radius:18px; border:1px solid var(--border, rgba(128,128,128,.35)); background:none; color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .ch-edit-bar .ch-bar-btn:active{ opacity:.7; }
+  .ch-edit-bar .ch-bar-spacer{ flex:1; }
+  .ch-edit-list > .tile.ch-selectable{ cursor:pointer; }
+  .ch-edit-list > .tile .ch-check{ flex:0 0 auto; width:24px; height:24px; border-radius:50%; margin-right:12px; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+    border:2px solid var(--text-faint, rgba(128,128,128,.7)); color:transparent; font-size:12px; }
+  .ch-edit-list > .tile.ch-selected .ch-check{ background:var(--accent); border-color:var(--accent); color:var(--accent-text, #fff); }
+  .ch-edit-list > .tile.ch-selected{ background:color-mix(in srgb, var(--accent) 14%, transparent); }
+  .ch-edit-list > .tile.ch-selectable .row-more-btn, .ch-edit-list > .tile.ch-selectable .ch-grip{ display:none !important; }
+  .ch-select-bar{ position:sticky; bottom:calc(var(--mnav-total, 0px) + 10px); z-index:30; grid-column:1/-1; display:flex; justify-content:center; padding:10px 0 4px; pointer-events:none; }
+  .ch-select-bar button{ pointer-events:auto; min-height:52px; min-width:60%; padding:0 24px; border-radius:26px; border:0; background:#d93025; color:#fff; font:inherit; font-size:16px; font-weight:700; box-shadow:0 6px 20px rgba(0,0,0,.4); cursor:pointer; }
+  .ch-select-bar button:disabled{ background:#4a4d55; color:rgba(255,255,255,.55); box-shadow:none; }
+  body.watch-land #stationsGrid > .epg-manage{ display:none; }
   /* Fix artist info. Each candidate is one row: a small portrait (or a neutral tile), the
      article title, and Wikipedia's one-line description, which is what actually tells a band
      from a blood disorder at a glance. */
@@ -10030,8 +10054,15 @@
         <div class="lc-opts lc-one-row" id="liveChKind" role="radiogroup" aria-labelledby="liveChKindLabel"></div>
       </div>
       <div class="cs-field lc-pane" id="liveChPanePick">
-        <input type="search" class="cs-field-input" id="liveChSearch" placeholder="Find shows and movies" autocomplete="off" aria-label="Find shows and movies">
-        <div class="artist-info-list lc-list" id="liveChList" role="listbox" aria-multiselectable="true" aria-label="Shows and movies"></div>
+        <div class="lc-opts lc-one-row lc-where" id="liveChPickWhere" role="radiogroup" aria-label="Pick from"></div>
+        <div id="liveChPickLib">
+          <input type="search" class="cs-field-input" id="liveChSearch" placeholder="Find shows and movies" autocomplete="off" aria-label="Find shows and movies">
+          <div class="artist-info-list lc-list" id="liveChList" role="listbox" aria-multiselectable="true" aria-label="Shows and movies"></div>
+        </div>
+        <div id="liveChPickIa" hidden>
+          <input type="search" class="cs-field-input" id="liveChIaSearch" placeholder="Search archive.org videos" autocomplete="off" aria-label="Search archive.org videos">
+          <div class="artist-info-list lc-list" id="liveChIaList" role="listbox" aria-multiselectable="true" aria-label="Archive.org videos"></div>
+        </div>
       </div>
       <div class="cs-field lc-pane" id="liveChPaneMovies">
         <div class="lc-opts lc-one-row" id="liveChFrom" role="radiogroup" aria-label="Movies from"></div>
@@ -25995,11 +26026,13 @@
     // Build 262: your own channels head the guide even with no channels added.
     if(!mine.length && !videoChannelsEditing && liveChannels().length){
       stationsGrid.appendChild(buildEpgGrid(epgAllChannels(mine)));
+      stationsGrid.appendChild(buildManageRow(false));   // build 617
       return;
     }
     if(!mine.length && !videoChannelsEditing){
       // Build 280: the two ways in, as cards.
       stationsGrid.appendChild(buildChannelsStart());
+      stationsGrid.appendChild(buildManageRow(false));   // build 617
       return;
     }
     // Edit mode: your own channels (build 263), then the sort options and one list of the added
@@ -26012,6 +26045,7 @@
     // headings), half-hour columns across; schedules are fetched in the background and the rows
     // fill in as they arrive.
     stationsGrid.appendChild(buildEpgGrid(epgAllChannels(mine)));
+    stationsGrid.appendChild(buildManageRow(false));   // build 617
     guideRefresh(mine.filter(function(ch){ return !!guideSource(ch); }));
     ltvAutoplaySoon();
     return;
@@ -26195,15 +26229,7 @@
       npCollectionGrid.appendChild(buildEpgGrid(gridList, { np: true }));
       // Build 583 (Mark): with the Watch heading gone from Live TV, adding and arranging channels
       // (and the guide's layout and order) are a button under the guide.
-      var mg = document.createElement('button');
-      mg.type = 'button'; mg.className = 'epg-manage-btn'; mg.id = 'npManageChannels';
-      mg.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add or Manage Channels</span>';
-      mg.addEventListener('click', function(e){
-        e.stopPropagation();
-        if(ltvSheet && ltvSheet.classList.contains('open')) closeLtvManageSheet(); else openGuideMenu(mg);
-      });
-      var mgRow = document.createElement('div'); mgRow.className = 'epg-manage'; mgRow.appendChild(mg);
-      npCollectionGrid.appendChild(mgRow);
+      npCollectionGrid.appendChild(buildManageRow(true));
       restoreEpgPlace(kept);
       epgRevealPlaying(npCollectionGrid);
       guideRefresh(mineList.filter(function(ch){ return !!guideSource(ch); }));
@@ -26232,6 +26258,21 @@
       return;
     }
     show('My Channels', visibleVideoChannels(), true);
+  }
+  // Build 617 (Mark): Add or Manage Channels is under the guide on the Live TV page too, not only
+  // under a playing channel. np: the one on the video screen (its sheet closes that screen first).
+  function buildManageRow(np){
+    var mg = document.createElement('button');
+    mg.type = 'button'; mg.className = 'epg-manage-btn'; mg.id = np ? 'npManageChannels' : 'ltvManageChannels';
+    mg.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add or Manage Channels</span>';
+    mg.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(ltvSheet && ltvSheet.classList.contains('open')) closeLtvManageSheet();
+      else if(np) openGuideMenu(mg);
+      else openLtvManageSheet(function(){});
+    });
+    var row = document.createElement('div'); row.className = 'epg-manage'; row.appendChild(mg);
+    return row;
   }
   function buildChannelRow(ch, opts){
     var saved = !(opts && opts.saved === false);
@@ -26411,14 +26452,54 @@
       if(todo.length) ensureMusicVideoStills(todo, function(){ liveChCache = null; });
     }catch(e){}
   }
+  // Build 617 (Mark): archive.org videos in a channel of your own, beside shows and movies from
+  // the phone or Plex. The channel keeps a stub for each (id, title, creator, year); the file and
+  // its length come from archive.org once (the same cache Archive.org channels use, a month) and
+  // the schedule is worked out from those like any other video. A video whose length isn't known
+  // yet is asked for in the background and joins the schedule as soon as it arrives.
+  var liveChArchiveAsked = {};
+  function liveChArchiveEnsure(stubs){
+    var now = Date.now();
+    var todo = (stubs || []).filter(function(it){
+      if(!it || !it.id || archiveUnits(it.id)) return false;
+      if(liveChArchiveAsked[it.id] && now - liveChArchiveAsked[it.id] < 5 * 60 * 1000) return false;
+      liveChArchiveAsked[it.id] = now;
+      return true;
+    });
+    if(!todo.length) return;
+    archiveProbe(todo).then(function(){
+      liveChCache = null;
+      try{ if(liveChEd) syncLiveChEditorBits(); }catch(e){}
+      try{ archiveRedraw(); }catch(e){}
+      try{ refreshChannelGrids(); }catch(e){}
+    });
+  }
+  // A channel's archive.org videos as schedule items (only those whose files are known).
+  function liveChArchiveList(stubs){
+    var out = [], seen = {}, ask = [];
+    (stubs || []).forEach(function(it){
+      if(!it || !it.id || seen[it.id]) return;
+      seen[it.id] = 1;
+      var us = archiveUnits(it.id);
+      if(!us){ ask.push(it); return; }
+      us.forEach(function(u){
+        if(!u.video || !(u.dur > 0)) return;
+        out.push({ id: u.id, archItem: true, duration: u.dur, uri: u.url, title: it.title || u.title || '', unitTitle: u.title || '',
+          stubId: it.id, year: it.year || '', creator: it.creator || '', stub: it });
+      });
+    });
+    if(ask.length) liveChArchiveEnsure(ask);
+    return out;
+  }
   // What a channel plays: its shows and its movies (before ordering).
   function liveChSources(def, lib){
-    var src = def.src || {}, shows = [], movies = [];
-    if(src.kind === 'mv') return { shows: [], movies: [], mvs: liveChMvList(src) };
+    var src = def.src || {}, shows = [], movies = [], archive = [];
+    if(src.kind === 'mv') return { shows: [], movies: [], mvs: liveChMvList(src), archive: [] };
     if(src.kind === 'pick'){
       var seen = {};
       (src.shows || []).forEach(function(n){ var s = liveChShow(lib, n); if(s && !seen[s.key]){ seen[s.key] = 1; shows.push(s); } });
       (src.movies || []).forEach(function(id){ var m = lib.byId[id]; if(m && m.kind === 'movie') movies.push(m); });
+      archive = liveChArchiveList(src.archive);
     } else if(src.kind === 'movies'){
       var from = src.from || 'phone';
       movies = lib.movies.filter(function(m){
@@ -26433,7 +26514,7 @@
       shows = lib.shows.filter(inDec);
       movies = lib.movies.filter(inDec);
     }
-    return { shows: shows, movies: movies.filter(liveChTimed), mvs: [] };
+    return { shows: shows, movies: movies.filter(liveChTimed), mvs: [], archive: archive };
   }
   function liveChShuffled(items, seed){
     return items.slice().sort(function(a, b){
@@ -26461,7 +26542,7 @@
     var lib = st.lib, set = liveChSources(def, lib), items = [];
     if(def.order === 'shuffle' || def.order === 'daily'){
       set.shows.forEach(function(s){ items = items.concat(liveChEpisodes(s)); });
-      items = liveChShuffled(items.concat(set.movies, set.mvs || []), def.id + (def.order === 'daily' ? '|' + day : ''));
+      items = liveChShuffled(items.concat(set.movies, set.mvs || [], set.archive || []), def.id + (def.order === 'daily' ? '|' + day : ''));
     } else if((set.mvs || []).length){
       // In order: artist by artist (A to Z), each artist's videos A to Z.
       items = set.mvs.slice();
@@ -26471,6 +26552,7 @@
       var lists = set.shows.map(liveChEpisodes).filter(function(l){ return l.length; });
       var mv = set.movies.slice().sort(function(a, b){ return (liveChYear(a) - liveChYear(b)) || alphaCompare(alphaSortKey(a.title || ''), alphaSortKey(b.title || '')); });
       if(mv.length) lists.push(mv);
+      if((set.archive || []).length) lists.push(set.archive);   // build 617: archive.org videos, in the order they were added
       for(var i = 0, more = true; more; i++){
         more = false;
         lists.forEach(function(l){ if(i < l.length){ items.push(l[i]); more = true; } });
@@ -26478,7 +26560,7 @@
     }
     var starts = [], slots = [], total = 0;
     items.forEach(function(v){ var sl = liveChSlotMs(def, v); starts.push(total); slots.push(sl); total += sl; });
-    var lu = { items: items, starts: starts, slots: slots, total: total, show: set.shows.length === 1 && !set.movies.length && !(set.mvs || []).length ? set.shows[0] : null, set: set };
+    var lu = { items: items, starts: starts, slots: slots, total: total, show: set.shows.length === 1 && !set.movies.length && !(set.mvs || []).length && !(set.archive || []).length ? set.shows[0] : null, set: set };
     st.lineups[key] = lu;
     return lu;
   }
@@ -26497,7 +26579,8 @@
       return an[0] + (an.length === 2 ? ' & ' + an[1] : ' & More');
     }
     var names = (set ? set.shows.map(function(s){ return s.title; }).concat(set.movies.map(function(m){ return m.title; })) : [])
-      .concat(set ? [] : (src.shows || []));
+      .concat(set ? [] : (src.shows || []))
+      .concat((src.archive || []).map(function(a){ return a && a.title; }).filter(Boolean));   // build 617
     if(!names.length) names = (src.shows || []).slice();
     if(!names.length) return 'New Channel';
     if(names.length === 1) return names[0];
@@ -26517,7 +26600,7 @@
     if(!art){
       try{
         var i0 = lu.items[0];
-        art = lu.show ? showPosterUrl(lu.show) : (i0 ? (i0.mvItem ? (i0.still ? capUrl(i0.still) : '') : videoPosterUrl(i0)) : '');
+        art = lu.show ? showPosterUrl(lu.show) : (i0 ? (i0.archItem ? archiveArtUrl(i0.stubId) : i0.mvItem ? (i0.still ? capUrl(i0.still) : '') : videoPosterUrl(i0)) : '');
       }catch(e){}
     }
     if(def.src && def.src.kind === 'mv') liveChProbeMusicVideos();
@@ -26585,6 +26668,13 @@
     if(v.mvItem){
       var still = v.still ? capUrl(v.still) : '';
       return { s: slot.s, e: slot.e, t: v.name || '', sub: v.artist || '', code: '', d: '', r: '', im: still, sq: still, raw: true, vid: v.id };
+    }
+    // Build 617: an archive.org video: its title, the year and creator under it, its picture.
+    if(v.archItem){
+      var apic = archiveArtUrl(v.stubId);
+      var pg = { s: slot.s, e: slot.e, t: v.title || '', sub: [v.year, v.creator].filter(Boolean).join(' \u00b7 '), code: '', d: '', r: '', im: apic, sq: apic, raw: true, vid: v.id };
+      Object.defineProperty(pg, 'ai', { value: v.stub, enumerable: false });   // Watch Now plays it
+      return pg;
     }
     var show = ep ? lib.showsByKey[v.showKey] : null;
     var im = '', sq = '';
@@ -26720,7 +26810,12 @@
       return true;
     }
     var t;
-    if(slot.v.mvItem){
+    if(slot.v.archItem){
+      // Build 617: an archive.org video on a channel of your own.
+      var av = slot.v;
+      t = { type: 'video', id: av.id, uri: av.uri, videoKind: 'archive', archive: true, favicon: archiveArtUrl(av.stubId), duration: av.duration,
+        liveTitle: av.title || '', year: av.year || '' };
+    } else if(slot.v.mvItem){
       // Build 305: a music video on a channel of your own.
       var mv = slot.v;
       t = { type: 'video', videoKind: 'music', id: mv.id, uri: mv.uri, artist: mv.artist, artistKey: mv.artistKey,
@@ -26731,7 +26826,7 @@
     t.liveCh = ch.url;
     t.urlToResolve = ch.url;
     t.name = ch.name;
-    if(slot.v.mvItem){ /* title and artist set above */ }
+    if(slot.v.mvItem || slot.v.archItem){ /* title (and artist) set above */ }
     else if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
     else{ var llu = ldef ? liveChLineupAt(ldef, now) : null; if(llu && !llu.show) t.liveShow = slot.v.show || ''; }
     t._liveItemStart = slot.s;
@@ -26752,7 +26847,8 @@
     var src = def.src || {};
     var k = src.kind === 'movies' ? 'All movies' + ({ phone: ' on the phone', plex: ' on Plex', all: '' })[src.from || 'phone']
       : src.kind === 'genre' ? 'Genre: ' + (src.genre || '') : src.kind === 'decade' ? 'The ' + (parseInt(src.decade, 10) || 0) + 's'
-      : src.kind === 'mv' ? (src.all ? 'All music videos' : 'Music videos · ' + (src.artists || []).length + ((src.artists || []).length === 1 ? ' artist' : ' artists')) : 'Shows & movies';
+      : src.kind === 'mv' ? (src.all ? 'All music videos' : 'Music videos · ' + (src.artists || []).length + ((src.artists || []).length === 1 ? ' artist' : ' artists'))
+      : (src.archive || []).length ? ((src.shows || []).length || (src.movies || []).length ? 'Shows, movies & archive.org' : 'Archive.org videos') : 'Shows & movies';
     return k + ' · ' + ({ sequence: 'In order', shuffle: 'Shuffled', daily: 'Daily shuffle' })[def.order || 'sequence'];
   }
   function liveChStationOf(c){
@@ -26810,7 +26906,7 @@
     var row = buildEntityTile({ key: 'livech:' + c.url, reorderId: c.url, entity: o.entity, name: c.name, row: true,
       sub: c.empty ? 'Nothing to play yet' : liveChKindText(def), artFrom: st,
       draggable: o.manual, container: o.container, onReorder: o.onReorder,
-      onClick: function(){ openLiveChEditor(def.id); } });
+      onClick: o.onTap || function(){ openLiveChEditor(def.id); } });
     row.classList.add('ch-item', 'lc-row');
     row.dataset.liveId = def.id;
     // In Manual the row drags, which takes the tap away from it: a tap that didn't move it still
@@ -26835,7 +26931,7 @@
   function buildAddedEditRow(ch, o){
     var row = buildEntityTile({
       key: 'channel:' + ch.url, reorderId: ch.url, entity: o.entity, name: ch.name, row: true,
-      artFrom: channelToStation(ch), draggable: o.manual, container: o.container, onReorder: o.onReorder
+      artFrom: channelToStation(ch), draggable: o.manual, container: o.container, onReorder: o.onReorder, onClick: o.onTap
     });
     row.classList.add('ch-item');
     // Build 243: the grid has no menus (Mark), so Favorite, Rename and Remove live here.
@@ -26879,14 +26975,118 @@
   // Build 280 (Mark): Arrange Channels, from the guide's ⋯ menu (it was Edit, with the layout
   // and order options, now in the menu, and New Channel, now Add Channels' first tab). The
   // lists show the order the guide uses; dragging a row makes that list's order Manual.
+  // Build 617 (Mark): Select. Tick any number of channels (your own or added) and remove them at
+  // once, after a confirmation. Reordering is switched off while selecting; Cancel goes back.
+  var chSelecting = false, chSelected = {};
+  function chSelCount(){ return Object.keys(chSelected).length; }
+  function chSelUrls(){
+    return Array.prototype.map.call(stationsGrid.querySelectorAll('.ch-edit-list > .tile'), function(el){ return el.dataset.reorderId; }).filter(Boolean);
+  }
+  function chSelPaint(){
+    var n = chSelCount();
+    Array.prototype.forEach.call(stationsGrid.querySelectorAll('.ch-edit-list > .tile'), function(el){
+      var on = !!chSelected[el.dataset.reorderId];
+      el.classList.toggle('ch-selected', on);
+      el.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    var del = document.getElementById('chSelDeleteBtn');
+    if(del){ del.disabled = !n; del.textContent = n ? 'Remove ' + n + (n === 1 ? ' Channel' : ' Channels') : 'Remove'; }
+    var all = document.getElementById('chSelAllBtn');
+    if(all) all.textContent = n && n === chSelUrls().length ? 'Select None' : 'Select All';
+  }
+  function chSelDecorate(row){
+    var url = row.dataset.reorderId;
+    row.classList.add('ch-selectable');
+    row.setAttribute('role', 'checkbox');
+    var ck = document.createElement('span');
+    ck.className = 'ch-check'; ck.setAttribute('aria-hidden', 'true');
+    ck.innerHTML = '<i class="fa-solid fa-check"></i>';
+    row.insertBefore(ck, row.firstChild);
+    row._chToggle = function(){ if(chSelected[url]) delete chSelected[url]; else chSelected[url] = 1; chSelPaint(); };
+    chSelPaint();
+  }
+  function setChannelsSelecting(on){
+    chSelecting = !!on;
+    chSelected = {};
+    if(onVideoView) renderVideoHome();
+  }
+  // Gone from Live TV: your own channels (with their picture, favorites and history) and added ones.
+  function removeChannelsBatch(urls){
+    var live = urls.filter(isLiveChUrl), set = {};
+    urls.forEach(function(u){ set[u] = 1; });
+    live.forEach(function(u){ deleteLiveChannel(u.slice('amplify-live:'.length), true); });
+    var before = videoChannels.length;
+    videoChannels = videoChannels.filter(function(c){ return !set[c.url]; });
+    if(videoChannels.length !== before) saveVideoChannels();
+  }
+  function chSelRemove(){
+    var urls = Object.keys(chSelected);
+    if(!urls.length) return;
+    var name = '';
+    if(urls.length === 1){
+      var c = null;
+      try{ c = isLiveChUrl(urls[0]) ? liveChannels(true).filter(function(x){ return x.url === urls[0]; })[0] : findVideoChannel(urls[0]); }catch(e){}
+      name = c && c.name || '';
+    }
+    var anyOwn = urls.some(isLiveChUrl);
+    confirmThen({ title: urls.length === 1 ? 'Remove ' + quoteName(name) + ' from Live TV?' : 'Remove ' + urls.length + ' channels from Live TV?',
+      message: anyOwn ? 'The shows and movies of your own channels stay in your library.' : '', ok: 'Remove' }, function(){
+      removeChannelsBatch(urls);
+      chSelecting = false; chSelected = {};
+      var left = 0;
+      try{ left = liveChannels(true).length + visibleVideoChannels().length; }catch(e){}
+      if(!left){ setChannelsArranging(false); return; }
+      if(onVideoView) renderVideoHome();
+    });
+  }
+  function appendChEditBar(){
+    var bar = document.createElement('div');
+    bar.className = 'ch-edit-bar';
+    function btn(id, text, fn){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'ch-bar-btn'; b.id = id; b.textContent = text;
+      b.addEventListener('click', fn);
+      bar.appendChild(b);
+      return b;
+    }
+    if(!chSelecting){
+      btn('chSelectBtn', 'Select', function(){ setChannelsSelecting(true); });
+    } else {
+      btn('chSelCancelBtn', 'Cancel', function(){ setChannelsSelecting(false); });
+      var sp = document.createElement('span'); sp.className = 'ch-bar-spacer'; bar.appendChild(sp);
+      btn('chSelAllBtn', 'Select All', function(){
+        var urls = chSelUrls();
+        if(urls.length && chSelCount() === urls.length) chSelected = {};
+        else { chSelected = {}; urls.forEach(function(u){ chSelected[u] = 1; }); }
+        chSelPaint();
+      });
+    }
+    stationsGrid.appendChild(bar);
+  }
+  function appendChSelectBar(){
+    var wrap = document.createElement('div');
+    wrap.className = 'ch-select-bar';
+    var b = document.createElement('button');
+    b.type = 'button'; b.id = 'chSelDeleteBtn'; b.disabled = true; b.textContent = 'Remove';
+    b.addEventListener('click', chSelRemove);
+    wrap.appendChild(b);
+    stationsGrid.appendChild(wrap);
+    chSelPaint();
+  }
   function renderChannelsEdit(mine){
+    appendChEditBar();
+    var sel = chSelecting;
+    var manual = !sel;
+    function tap(url){ return sel ? function(){ var el = stationsGrid.querySelector('.ch-edit-list > .tile[data-reorder-id="' + String(url).replace(/"/g, '\\"') + '"]'); if(el && el._chToggle) el._chToggle(); } : null; }
+    function mark(row, c){ if(sel) chSelDecorate(row); return row; }
     if(channelLayout === 'mixed'){
       var box = chEditList('ch-mix-list');
       mixedChannelList(mine, true).forEach(function(c){
-        var o = { entity: 'mix-channel', manual: true, container: box, onReorder: function(){
+        var o = { entity: 'mix-channel', manual: manual, container: box, onTap: tap(c.url), onReorder: function(){
           reorderMixFromGrid(); channelMixOrder = 'manual'; chPrefSet(CHANNEL_MIX_ORDER_KEY, 'manual'); refreshChannelGrids(); } };
-        box.appendChild(isLiveChUrl(c.url) ? buildLiveEditRow(c, o) : buildAddedEditRow(c, o));
+        box.appendChild(mark(isLiveChUrl(c.url) ? buildLiveEditRow(c, o) : buildAddedEditRow(c, o)));
       });
+      if(sel) appendChSelectBar();
       return;
     }
     var live = orderedLiveChannels(true);
@@ -26894,19 +27094,20 @@
       stationsGrid.appendChild(buildChGroupHead('Your Channels'));
       var lbox = chEditList('ch-live-list');
       live.forEach(function(c){
-        lbox.appendChild(buildLiveEditRow(c, { entity: 'live-channel', manual: true, container: lbox,
-          onReorder: function(){ reorderLiveChFromGrid(); liveChOrder = 'manual'; chPrefSet(LIVE_CH_ORDER_KEY, 'manual'); refreshChannelGrids(); } }));
+        lbox.appendChild(mark(buildLiveEditRow(c, { entity: 'live-channel', manual: manual, container: lbox, onTap: tap(c.url),
+          onReorder: function(){ reorderLiveChFromGrid(); liveChOrder = 'manual'; chPrefSet(LIVE_CH_ORDER_KEY, 'manual'); refreshChannelGrids(); } })));
       });
     }
-    if(!mine.length) return;
+    if(!mine.length){ if(sel) appendChSelectBar(); return; }
     stationsGrid.appendChild(buildChGroupHead('Added Channels'));
     var abox = chEditList('ch-added-list');
     mine.forEach(function(ch){
-      abox.appendChild(buildAddedEditRow(ch, { entity: 'video-channel', manual: true, container: abox, onReorder: function(){
+      abox.appendChild(mark(buildAddedEditRow(ch, { entity: 'video-channel', manual: manual, container: abox, onTap: tap(ch.url), onReorder: function(){
         reorderVideoChannelsFromGrid(); channelOrder = 'manual';
         try{ localStorage.setItem(CHANNEL_ORDER_KEY, 'manual'); }catch(e){}
-        saveVideoChannels(); refreshChannelGrids(); } }));
+        saveVideoChannels(); refreshChannelGrids(); } })));
     });
+    if(sel) appendChSelectBar();
   }
   // Any guide on screen (under a playing channel) takes the new order.
   function refreshChannelGrids(){
@@ -26916,7 +27117,7 @@
       wrap.parentNode.replaceChild(fresh, wrap);
     });
   }
-  function deleteLiveChannel(id){
+  function deleteLiveChannel(id, quiet){
     var url = 'amplify-live:' + id;
     liveChStore = liveChDefs().filter(function(d){ return d.id !== id; });
     saveLiveChDefs();
@@ -26930,7 +27131,7 @@
       vsave(CHANNEL_HISTORY_KEY, channelHistory);
       refreshContinueWatching();
     }
-    if(onVideoView) rerenderVideoKeepingScroll();
+    if(onVideoView && !quiet) rerenderVideoKeepingScroll();
   }
 
   var liveChEd = null;
@@ -26985,6 +27186,11 @@
     lcEl('liveChName').value = liveChEd.name;
     lcEl('liveChSearch').value = '';
     lcEl('liveChMvSearch').value = '';
+    lcEl('liveChIaSearch').value = '';
+    clearTimeout(liveChIaTimer); liveChIaToken++;
+    // Build 617: a channel made only of archive.org videos opens on that list.
+    liveChEd.pickWhere = def && def.src.kind === 'pick' && (def.src.archive || []).length && !(def.src.shows || []).length && !(def.src.movies || []).length ? 'ia' : 'lib';
+    liveChEd.ia = null;
     lcEl('liveChDeleteBtn').style.visibility = def ? '' : 'hidden';
     stationsGrid.appendChild(liveChPanelEl);
     document.body.classList.add('lc-page-open');
@@ -27013,7 +27219,7 @@
   // The editor's channel as it stands (what Save would keep).
   function liveChEdDef(){
     var src = liveChEd.src, out = { kind: src.kind };
-    if(src.kind === 'pick'){ out.shows = (src.shows || []).slice(); out.movies = (src.movies || []).slice(); }
+    if(src.kind === 'pick'){ out.shows = (src.shows || []).slice(); out.movies = (src.movies || []).slice(); out.archive = (src.archive || []).map(archiveItemStub); }
     else if(src.kind === 'movies') out.from = src.from || 'phone';
     else if(src.kind === 'genre') out.genre = src.genre || '';
     else if(src.kind === 'decade') out.decade = parseInt(src.decade, 10) || 0;
@@ -27047,7 +27253,7 @@
     lcEl('liveChPaneMovies').hidden = src.kind !== 'movies';
     lcEl('liveChPaneGenre').hidden = src.kind !== 'genre';
     lcEl('liveChPaneDecade').hidden = src.kind !== 'decade';
-    if(src.kind === 'pick') renderLiveChPickList();
+    if(src.kind === 'pick') renderLiveChPick();
     if(src.kind === 'movies') lcPills(lcEl('liveChFrom'), [['phone', 'Phone'], ['plex', 'Plex'], ['all', 'Both']], src.from || 'phone', function(v){ src.from = v; renderLiveChEditor(); });
     if(src.kind === 'genre'){
       var gs = lcGenres(lib), gsel = lcEl('liveChGenre');
@@ -27080,24 +27286,137 @@
     set.shows.forEach(function(s){ liveChEpisodes(s).forEach(function(e){ secs += e.duration || 0; }); });
     set.movies.forEach(function(m){ secs += m.duration || 0; });
     mvs.forEach(function(v){ secs += v.duration || 0; });
+    var arch = set.archive || [], nArch = {};
+    arch.forEach(function(a){ secs += a.duration || 0; nArch[a.stubId] = 1; });
+    nArch = Object.keys(nArch).length;
     var bits = [];
     if(nShows) bits.push(nShows + (nShows === 1 ? ' show' : ' shows'));
     if(nMovies) bits.push(nMovies + (nMovies === 1 ? ' movie' : ' movies'));
+    if(nArch) bits.push(nArch + (nArch === 1 ? ' archive.org video' : ' archive.org videos'));
     if(mvs.length) bits.push(mvs.length + (mvs.length === 1 ? ' music video' : ' music videos'));
     var hrs = Math.round(secs / 3600);
     // Build 305 (Mark): nothing said while nothing is picked.
     var picking = d.src.kind === 'pick' || (d.src.kind === 'mv' && !d.src.all);
+    var waiting = (d.src.archive || []).some(function(a){ return !archiveUnits(a.id); });   // build 617: lengths still being asked for
     lcEl('liveChSummary').textContent = !secs
-      ? (picking ? '' : 'Nothing in your library fits this yet.')
+      ? (waiting ? 'Getting the archive.org videos\u2026' : picking ? '' : 'Nothing in your library fits this yet.')
       : bits.join(' and ') + ', ' + (hrs >= 1 ? 'about ' + hrs + (hrs === 1 ? ' hour' : ' hours') : 'under an hour') + ' before it repeats.';
     lcEl('liveChSaveBtn').disabled = !secs;
     // The picture: the one chosen, else the first show's or movie's poster.
     var thumb = lcEl('liveChArtBtn'), url = getCustomArtUrl('livech:amplify-live:' + ed.id) || '';
-    if(!url){ try{ url = set.shows[0] ? showPosterUrl(set.shows[0]) : (set.movies[0] ? videoPosterUrl(set.movies[0]) : (mvs[0] && mvs[0].still ? capUrl(mvs[0].still) : '')); }catch(e){ url = ''; } }
+    if(!url){ try{ url = set.shows[0] ? showPosterUrl(set.shows[0]) : (set.movies[0] ? videoPosterUrl(set.movies[0]) : (mvs[0] && mvs[0].still ? capUrl(mvs[0].still) : '')); }catch(e){ url = ''; }
+      if(!url && arch[0]) url = archiveArtUrl(arch[0].stubId); }
     if(thumb.dataset.src !== url){
       thumb.dataset.src = url;
       thumb.innerHTML = '';
       if(url){ var im = document.createElement('img'); im.alt = ''; im.src = url; im.onerror = function(){ im.remove(); }; thumb.appendChild(im); }
+    }
+  }
+  // Build 617 (Mark): Shows & Movies picks from My Library or from archive.org (video only), in
+  // one channel: tick as many of either as you like.
+  function renderLiveChPick(){
+    var ed = liveChEd, iaOk = sourceOn('archive');
+    if(!iaOk) ed.pickWhere = 'lib';
+    var where = ed.pickWhere === 'ia' ? 'ia' : 'lib';
+    var n = (ed.src.archive || []).length;
+    lcEl('liveChPickWhere').hidden = !iaOk;
+    if(iaOk) lcPills(lcEl('liveChPickWhere'), [['lib', 'My Library'], ['ia', n ? 'Archive.org (' + n + ')' : 'Archive.org']], where, function(v){
+      ed.pickWhere = v; renderLiveChPick();
+    });
+    lcEl('liveChPickLib').hidden = where !== 'lib';
+    lcEl('liveChPickIa').hidden = where !== 'ia';
+    if(where === 'lib') renderLiveChPickList(); else renderLiveChIaList();
+  }
+  var liveChIaToken = 0, liveChIaTimer = 0;
+  // Video on archive.org that Amplify can play, 30 a page.
+  function liveChIaFetch(term, page){
+    var words = String(term || '').replace(/[^A-Za-z0-9\u00C0-\uFFFF\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
+    if(!words.length) return Promise.resolve({ items: [], total: 0, page: 1 });
+    var w = words.join(' AND '), pg = page || 1;
+    var q = '(title:(' + w + ') OR creator:(' + w + ')) AND mediatype:(movies)';
+    return extJson(archiveQueryUrl(q, ARCHIVE_PAGE_SIZE, pg), { 'Accept': 'application/json' }).then(function(d){
+      var found = archiveDocs(d), total = Number(d && d.response && d.response.numFound) || found.length;
+      return archiveOnlyPlayable(found).then(function(items){ return { items: items, total: total, page: pg }; });
+    });
+  }
+  function liveChIaSearchNow(){
+    var ed = liveChEd;
+    if(!ed) return;
+    clearTimeout(liveChIaTimer);
+    var term = String(lcEl('liveChIaSearch').value || '').trim(), tok = ++liveChIaToken;
+    if(!term){ ed.ia = null; renderLiveChIaList(); return; }
+    ed.ia = { q: term, items: [], total: 0, page: 0, loading: true, failed: false };
+    renderLiveChIaList();
+    liveChIaFetch(term, 1).then(function(r){
+      if(tok !== liveChIaToken || !liveChEd || liveChEd !== ed) return;
+      ed.ia = { q: term, items: r.items, total: r.total, page: r.page, loading: false, failed: false };
+      renderLiveChIaList();
+    }, function(){
+      if(tok !== liveChIaToken || !liveChEd || liveChEd !== ed) return;
+      ed.ia = { q: term, items: [], total: 0, page: 0, loading: false, failed: true };
+      renderLiveChIaList();
+    });
+  }
+  function renderLiveChIaList(){
+    var ed = liveChEd, box = lcEl('liveChIaList');
+    if(!ed) return;
+    var added = ed.src.archive || (ed.src.archive = []);
+    box.innerHTML = '';
+    function head(t){ var h = document.createElement('div'); h.className = 'lc-ia-head'; h.textContent = t; box.appendChild(h); }
+    function note(t){ var e = document.createElement('div'); e.className = 'artist-info-empty'; e.textContent = t; box.appendChild(e); }
+    function has(id){ return added.some(function(x){ return x.id === id; }); }
+    function row(it){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'artist-info-row';
+      b.setAttribute('role', 'option');
+      b.dataset.iaId = it.id;
+      b.setAttribute('aria-selected', has(it.id) ? 'true' : 'false');
+      var th = document.createElement('img');
+      th.className = 'artist-info-thumb lc-ia-thumb'; th.loading = 'lazy'; th.alt = ''; th.src = archiveArtUrl(it.id);
+      th.onerror = function(){ th.removeAttribute('src'); };
+      b.appendChild(th);
+      var tx = document.createElement('span');
+      tx.className = 'artist-info-text';
+      var nm = document.createElement('span'); nm.className = 'artist-info-name'; nm.textContent = it.title;
+      var ds = document.createElement('span'); ds.className = 'artist-info-desc'; ds.textContent = ['Archive.org', it.year, it.creator].filter(Boolean).join(' \u00b7 ');
+      tx.appendChild(nm); tx.appendChild(ds);
+      b.appendChild(tx);
+      var ck = document.createElement('i'); ck.className = 'fa-solid fa-check'; ck.setAttribute('aria-hidden', 'true');
+      b.appendChild(ck);
+      b.addEventListener('click', function(){
+        if(has(it.id)){ ed.src.archive = added = added.filter(function(x){ return x.id !== it.id; }); }
+        else { var stub = archiveItemStub(it); added.push(stub); liveChArchiveEnsure([stub]); }
+        b.setAttribute('aria-selected', has(it.id) ? 'true' : 'false');
+        var tab = lcEl('liveChPickWhere').querySelector('.home-tab[data-opt="ia"]');
+        if(tab) tab.textContent = added.length ? 'Archive.org (' + added.length + ')' : 'Archive.org';
+        syncLiveChEditorBits();
+      });
+      box.appendChild(b);
+    }
+    var ia = ed.ia;
+    if(added.length){ head('In this channel'); added.forEach(row); }
+    if(ia){
+      head('Results');
+      if(ia.loading) note('Searching archive.org\u2026');
+      else if(ia.failed) note('Couldn\u2019t reach archive.org. Try again.');
+      else if(!ia.items.length) note('No playable videos found for that.');
+      else{
+        ia.items.forEach(row);
+        if(archiveHasMore(ia.total, ia.page)){
+          box.appendChild(archiveMoreButton(function(){
+            var tok = liveChIaToken;
+            return liveChIaFetch(ia.q, ia.page + 1).then(function(r){
+              if(tok !== liveChIaToken || ed.ia !== ia) return;
+              ia.items = ia.items.concat(r.items.filter(function(x){ return !ia.items.some(function(y){ return y.id === x.id; }); }));
+              ia.total = r.total; ia.page = r.page;
+              renderLiveChIaList();
+            });
+          }));
+        }
+      }
+    } else if(!added.length){
+      note('Search archive.org for videos to put in this channel, next to your own shows and movies.');
     }
   }
   function renderLiveChPickList(){
@@ -27223,6 +27542,8 @@
   lcEl('liveChMvSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChMvList(); });
   lcEl('liveChSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChPickList(); });
   lcEl('liveChName').addEventListener('input', function(){ if(liveChEd) liveChEd.name = lcEl('liveChName').value; });
+  lcEl('liveChIaSearch').addEventListener('input', function(){ clearTimeout(liveChIaTimer); liveChIaTimer = setTimeout(liveChIaSearchNow, 500); });
+  lcEl('liveChIaSearch').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); liveChIaSearchNow(); try{ lcEl('liveChIaSearch').blur(); }catch(x){} } });
   lcEl('liveChGenre').addEventListener('change', function(){ if(liveChEd){ liveChEd.src.genre = lcEl('liveChGenre').value; syncLiveChEditorBits(); } });
   lcEl('liveChDecade').addEventListener('change', function(){ if(liveChEd){ liveChEd.src.decade = parseInt(lcEl('liveChDecade').value, 10) || 0; syncLiveChEditorBits(); } });
   function liveChChangePicture(){
@@ -27969,6 +28290,7 @@
   var epgInfoItem = null;
   function epgOwnContent(ch, it){
     if(!ch || !it) return null;
+    if(isLiveChUrl(ch.url) && it.ai && it.ai.id) return { archive: it.ai };   // build 617
     if(isLiveChUrl(ch.url) && it.vid){
       var v = null; try{ v = vlib().byId[it.vid]; }catch(e){}
       return v ? { video: v } : null;
@@ -29007,7 +29329,7 @@
       var d = defs[i], ds = d.src || {};
       if(ds.kind !== src.kind) continue;
       if(src.kind === 'pick'){
-        if((ds.movies || []).length || (ds.shows || []).length !== 1) continue;
+        if((ds.movies || []).length || (ds.archive || []).length || (ds.shows || []).length !== 1) continue;
         var a = liveChShow(lib, ds.shows[0]);
         if(a && a.key === src.showKey) return d;
       } else if(src.kind === 'movies'){ if((ds.from || 'phone') === src.from) return d; }
@@ -29088,13 +29410,7 @@
     var lib = vlib();
     var q = alphaSortKey(String(addChannelsState.mineQ || '').trim());
     function match(t){ return !q || alphaSortKey(t || '').indexOf(q) !== -1; }
-    var card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'ch-custom-card';
-    card.id = 'chCustomBtn';
-    card.innerHTML = '<div class="ch-logo"><i class="fa-solid fa-plus" aria-hidden="true"></i></div><div class="ch-text"><div class="ch-name">Build a Custom Channel</div><div class="ch-sub">Mix shows and movies, a genre, a decade or music videos</div></div>';
-    card.addEventListener('click', function(){ openLiveChEditor(null); });
-    host.appendChild(card);
+    // Build 617 (Mark): Build a Custom Channel moved to Add or Manage Channels (the menu under the guide).
     var anyMv = false;
     try{ anyMv = musicVideoCatalog().all.length > 0; }catch(e){}
     if(!lib.shows.length && !lib.movies.length && !anyMv){
@@ -29226,6 +29542,7 @@
   // list without the options: a drag makes that list's order Manual and keeps it.
   function setChannelsArranging(on){
     videoChannelsEditing = !!on;
+    chSelecting = false; chSelected = {};   // build 617
     if(!on && channelOrder === 'manual') reorderVideoChannelsFromGrid();
     if(onVideoView) renderVideoHome();
     window.scrollTo(0, 0);
@@ -29281,6 +29598,8 @@
       m.appendChild(b);
     }
     opt('Add Channels', 'fa-solid fa-plus', null, function(){ leaveNp(); pushView(); openAddChannelsPage(); });
+    // Build 617 (Mark): Build a Custom Channel lives here now, not in Add Channels.
+    opt('Build a Custom Channel', 'fa-solid fa-wand-magic-sparkles', null, function(){ leaveNp(); openLiveChEditor(null); });
     opt('Arrange Channels', 'fa-solid fa-grip-vertical', null, function(){ leaveNp(); setChannelsArranging(true); });
     label('Layout');
     [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
@@ -29323,6 +29642,7 @@
       m.appendChild(b);
     }
     opt('Add Channels', false, function(){ leaveNp(); pushView(); openAddChannelsPage(); }, 'fa-solid fa-plus');   // build 409
+    opt('Build a Custom Channel', false, function(){ leaveNp(); openLiveChEditor(null); }, 'fa-solid fa-wand-magic-sparkles');   // build 617
     opt('Arrange Channels', false, function(){ leaveNp(); setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
     var sep = document.createElement('div'); sep.className = 'ch-menu-sep'; m.appendChild(sep);
     label('Layout');
