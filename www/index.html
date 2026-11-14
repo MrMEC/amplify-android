@@ -7419,7 +7419,7 @@
   #settingsPanel .set-subcats{ display:flex; flex-direction:column; }
   #settingsPanel .set-subcats .set-cat:last-child{ border-bottom:none; }
   /* Build 565: on Home the Carousel settings come first; a line sets them apart from Favorites. */
-  #settingsPanel [data-set-page="home"] > .set-subcats{ border-top:1px solid var(--border); }
+  #settingsPanel [data-set-page="home-carousel"] #carouselResetBtn{ margin-top:6px; }
   .shape-preview{ display:flex; align-items:flex-end; gap:16px; padding:16px; margin:6px 0 0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-card); }
   .shape-preview .sp-tile{ display:flex; flex-direction:column; gap:6px; width:72px; }
   .shape-preview .sp-art{ display:block; width:72px; height:72px; background:linear-gradient(135deg,var(--accent),var(--panel-2)); border-radius:var(--r-tile); }
@@ -9406,6 +9406,12 @@
     <!-- Build 395 (Mark): Appearance is a short list; each group has its own page. -->
     <section class="set-page" data-set-page="appearance" data-set-title="Appearance" hidden>
       <div class="set-subcats">
+      <!-- Build 619 (Mark): Home is the first option under Appearance. -->
+      <button type="button" class="set-cat" data-set-cat="home">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Carousel, Favorites and the Featured card</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
       <button type="button" class="set-cat" data-set-cat="appearance-theme">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11" r="1"/><circle cx="10.6" cy="7.6" r="1"/><circle cx="15" cy="7.8" r="1"/></svg></span>
         <span class="set-cat-text"><span class="set-cat-name">Theme &amp; color</span><span class="set-cat-sub">Light or dark, AMOLED black, presets, accent</span></span>
@@ -9424,12 +9430,6 @@
       <button type="button" class="set-cat" data-set-cat="appearance-shape">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="6"/><path d="M4 12h16M12 4v16"/></svg></span>
         <span class="set-cat-text"><span class="set-cat-name">Shape &amp; density</span><span class="set-cat-sub">Corners, spacing, artist portrait shape</span></span>
-        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
-      </button>
-      <!-- Build 567 (Mark): Home lives here now, below Shape & density. -->
-      <button type="button" class="set-cat" data-set-cat="home">
-        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.6 12 4l8 6.6V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Home</span><span class="set-cat-sub">Carousel, Favorites and the Featured card</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       </div>
@@ -9736,6 +9736,25 @@
     <!-- Build 545 (Mark): which kinds of favourite show in Home's Favorites tab. -->
     <!-- Build 546 (Mark): Home is a category with two pages under it, Favorites (what was Home) and Featured. -->
     <section class="set-page" data-set-page="home" data-set-title="Home" data-set-parent="appearance" hidden>
+      <div class="set-subcats">
+      <button type="button" class="set-cat" data-set-cat="home-carousel">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7.5" y="5" width="9" height="12" rx="1.5"/><path d="M4.5 7.5v7M19.5 7.5v7M9 20h6"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Carousel</span><span class="set-cat-sub">Slides or Cover Flow, size, tilt, reset</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="home-favorites">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Favorites</span><span class="set-cat-sub">What shows under Favorites on Home</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="set-cat" data-set-cat="home-featured">
+        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
+        <span class="set-cat-text"><span class="set-cat-name">Featured</span><span class="set-cat-sub">Seasonal card on Home, dates and poster art</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+      </div>
+    </section>
+    <section class="set-page" data-set-page="home-carousel" data-set-title="Carousel" data-set-parent="home" hidden>
       <!-- Build 565 (Mark): moved here from Theme & color, above Favorites. Build 551: Home's carousel as Slides (as it was) or Flow (cover flow); Flow's own settings show only while it is chosen. -->
       <div class="settings-row settings-row--stack">
         <span class="settings-label" id="carouselLabel">Carousel</span>
@@ -9766,17 +9785,9 @@
           </select>
         </div>
       </div>
-      <div class="set-subcats">
-      <button type="button" class="set-cat" data-set-cat="home-favorites">
-        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Favorites</span><span class="set-cat-sub">What shows under Favorites on Home</span></span>
-        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="set-cat" data-set-cat="home-featured">
-        <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Featured</span><span class="set-cat-sub">Seasonal card on Home, dates and poster art</span></span>
-        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
-      </button>
+      <div class="settings-row settings-row--stack">
+        <span class="set-desc" id="carouselResetDesc">Clears every slide so the carousel starts fresh from what you play next.</span>
+        <button type="button" class="settings-data-btn" id="carouselResetBtn">Reset Slides</button>
       </div>
     </section>
     <section class="set-page" data-set-page="home-favorites" data-set-title="Favorites" data-set-parent="home" hidden>
@@ -55584,6 +55595,7 @@
     if(privacyOn()) return;   // build 346
     var ref = heroRefOf(st);
     if(!ref || !ref.k) return;
+    if(heroCleared){ heroCleared = false; try{ localStorage.removeItem(HERO_CLEARED_KEY); }catch(e){} }
     var h = heroHistLoad().filter(function(x){ return x.k !== ref.k; });
     h.unshift(ref);
     if(h.length > HERO_MAX) h.length = HERO_MAX;
@@ -55592,6 +55604,18 @@
   }
   // Build 225: removing something from Continue Listening or Continue Watching takes it off the
   // slides as well. pred(item, ref) picks what goes; the slide for what is playing now stays.
+  // Build 619 (Mark): Settings > Appearance > Home > Carousel > Reset. Every entry goes (what
+  // is playing right now stays as the first slide); the carousel then fills again from plays.
+  var HERO_CLEARED_KEY = 'radioPlayerHeroCleared', heroCleared = false;
+  try{ heroCleared = localStorage.getItem(HERO_CLEARED_KEY) === '1'; }catch(e){}
+  function clearHeroEntries(){
+    heroHist = [];
+    heroCleared = true;
+    try{ localStorage.setItem(HERO_HIST_KEY, '[]'); localStorage.setItem(HERO_CLEARED_KEY, '1'); }catch(e){}
+    try{ if(typeof zenState !== 'undefined' && Array.isArray(zenState.recent)){ zenState.recent = []; zenSave(); } }catch(e){}
+    heroSlideByKey = {};
+    renderNpHero();
+  }
   function forgetHeroPlayed(pred){
     var h = heroHistLoad();
     var keep = h.filter(function(ref){ var it = heroResolve(ref); return !pred(it, ref); });
@@ -55626,7 +55650,7 @@
     add(currentStation);
     heroHistLoad().forEach(function(ref){ add(heroResolve(ref)); });
     if(typeof zenRecentItems === 'function' && !privacyOn()) zenRecentItems().forEach(add);
-    if(!out.length) add(lastPlayedStation());
+    if(!out.length && !heroCleared) add(lastPlayedStation());
     return out;
   }
 
@@ -56262,6 +56286,7 @@
       if(tilt) tilt.value = String(carouselCfg.tilt);
       if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
       if(refl) refl.value = carouselCfg.reflect ? 'on' : 'off';
+      paintReset();
     }
     Array.prototype.forEach.call(sw.querySelectorAll('.theme-opt'), function(b){
       b.addEventListener('click', function(){
@@ -56276,6 +56301,16 @@
       carouselCfg.tilt = Math.max(30, Math.min(80, parseInt(tilt.value, 10) || 66));
       if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
       save(); layoutHeroFlow(false);
+    });
+    // Build 619 (Mark): Reset Slides / Reset Cover Flow clears every entry (after a dialog).
+    var resetBtn = document.getElementById('carouselResetBtn');
+    function resetLabel(){ return carouselCfg.mode === 'flow' ? 'Reset Cover Flow' : carouselCfg.mode === 'none' ? 'Reset Carousel' : 'Reset Slides'; }
+    function paintReset(){ if(resetBtn) resetBtn.textContent = resetLabel(); }
+    if(resetBtn) resetBtn.addEventListener('click', function(){
+      var what = carouselCfg.mode === 'flow' ? 'Cover Flow' : carouselCfg.mode === 'none' ? 'the carousel' : 'the slides';
+      confirmThen({ title: resetLabel() + '?', message: 'This clears every entry in ' + what + ' on Home. It starts fresh from what you play next. Your favorites, playlists and library are not touched.', ok: 'Reset' }, function(){
+        if(typeof clearHeroEntries === 'function') clearHeroEntries();
+      });
     });
     if(refl) refl.addEventListener('change', function(){ carouselCfg.reflect = refl.value === 'on'; save(); applyCarousel(); });
     // (Build 603: auto-advance removed.)
