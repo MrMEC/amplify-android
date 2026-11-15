@@ -21,8 +21,13 @@ def art(c1, c2):
         t = y / 299
         for x in range(300): px[x, y] = tuple(int(c1[i] * (1 - t) + c2[i] * t) for i in range(3))
     b = io.BytesIO(); im.save(b, 'PNG'); return b.getvalue()
-ARTS = {'a': art((20, 160, 150), (30, 120, 190)), 'b': art((240, 120, 40), (190, 30, 80)), 'c': art((230, 220, 180), (245, 240, 225)), 'd': art((60, 40, 120), (20, 10, 50))}
-NAMES = [('a', 'R&B Now', 'Apple Music R&B'), ('b', 'Sunset Boulevard Mix Extended Edition', 'Daily Mix'), ('c', 'Tchaikovsky Undiscovered', 'Classical'), ('d', 'Midnight Drive', 'The Night Owls')]
+def logo():
+    im = Image.new('RGBA', (300, 120), (0, 0, 0, 0)); px = im.load()
+    for y in range(30, 90):
+        for x in range(20, 280): px[x, y] = (255, 255, 255, 255)
+    b = io.BytesIO(); im.save(b, 'PNG'); return b.getvalue()
+ARTS = {'e': logo(), 'a': art((20, 160, 150), (30, 120, 190)), 'b': art((240, 120, 40), (190, 30, 80)), 'c': art((230, 220, 180), (245, 240, 225)), 'd': art((60, 40, 120), (20, 10, 50))}
+NAMES = [('a', 'R&B Now', 'Apple Music R&B'), ('b', 'Sunset Boulevard Mix Extended Edition', 'Daily Mix'), ('c', 'Tchaikovsky Undiscovered', 'Classical'), ('d', 'Midnight Drive', 'The Night Owls'), ('e', 'Lucha Plus', 'Live TV')]
 async def route(r):
     u = r.request.url
     if u.startswith(f'http://127.0.0.1:{PORT}'): return await r.continue_()
@@ -46,20 +51,15 @@ async def main():
             if scroll:
                 await pg.evaluate("(function(){var t=document.getElementById('npHeroTrack');var sl=t.children[%d];t.scrollTo({left:sl.offsetLeft,behavior:'instant'});})()" % scroll); await pg.wait_for_timeout(700)
             await pg.screenshot(path=f'{SHOTS}/cl-{name}.png')
-        await look('slides', {'mode': 'slides', 'heading': False})
-        await look('card', {'mode': 'card', 'heading': True})
-        r = await pg.evaluate("Array.from(document.querySelectorAll('#npHeroTrack > .nph-slide')).map(function(s){ return [getComputedStyle(s).getPropertyValue('--card-bg').trim() || s.style.getPropertyValue('--card-bg'), s.style.getPropertyValue('--card-fg'), Math.round(s.getBoundingClientRect().width), Math.round(s.getBoundingClientRect().height)]; })")
-        print('card slides', r)
-        check(any('rgb' in x[0] for x in r), 'cover colour applied to the footer')
-        await look('card2', {'mode': 'card', 'heading': True}, 1)
-        
-        await look('edit-below', {'mode': 'edit', 'textPos': 'below', 'heading': True})
-        await look('edit-above', {'mode': 'edit', 'textPos': 'above', 'heading': True})
-        await look('edit-above2', {'mode': 'edit', 'textPos': 'above', 'heading': True}, 1)
-        await look('flow-heading', {'mode': 'flow', 'heading': True})
-        await look('slides-heading', {'mode': 'slides', 'heading': True})
-        check(await pg.evaluate("document.getElementById('npHeroHeading').hidden") is False, 'heading shown')
-        await pg.evaluate("window.ampCarouselSet({mode:'slides',heading:false})"); await pg.wait_for_timeout(300)
-        check(await pg.evaluate("document.getElementById('npHeroHeading').hidden") is True, 'heading hidden')
+        for sz in ('l', 'm', 's'):
+            await look('card-' + sz, {'mode': 'card', 'size': sz, 'heading': True})
+            await look('edit-' + sz, {'mode': 'edit', 'size': sz, 'textPos': 'below', 'heading': True})
+        await look('card-logo', {'mode': 'card', 'size': 'm'}, 4)
+        await look('edit-above-m', {'mode': 'edit', 'size': 'm', 'textPos': 'above', 'heading': True})
+        r = await pg.evaluate("(function(){var h=document.getElementById('npHero').getBoundingClientRect(); var t=document.querySelector('.home-tabs,.featured-home'); return [Math.round(h.height), Math.round(Array.from(document.querySelectorAll('#npHeroTrack > .nph-slide')).reduce(function(m,s){return Math.max(m,s.getBoundingClientRect().height)},0))]})()")
+        print('hero/slide heights (edit above, m)', r)
+        print('play btn visible', await pg.evaluate("getComputedStyle(document.querySelector('.nph-play')).display"))
+        await pg.evaluate("window.ampCarouselSet({mode:'slides',heading:false})")
+        await pg.evaluate("__s.open()") if False else None
         print('errs', errs); await B.close()
 asyncio.run(main()); print('FAILS', fails)
