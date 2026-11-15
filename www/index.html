@@ -3960,6 +3960,11 @@
   .epg-t{ font-size:13px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .epg-s{ font-size:11.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .epg-prog.whole .epg-t{ font-weight:500; }
+  /* Build 637 (Mark): a Grid description stands in for the schedule: one block, the words wrapping
+     (up to three lines) beside the logo instead of running off on one line. */
+  .epg-prog.desc > .epg-t{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; font-size:12.5px; line-height:1.28;
+    max-width:min(calc(100vw - 80px - 11px - 24px), 520px); overflow:hidden; text-overflow:clip; }
+  .lc-desc{ display:block; width:100%; min-height:62px; resize:none; font:inherit; line-height:1.35; box-sizing:border-box; }
   /* Build 245 (Mark): a block's words stay in view as the grid scrolls sideways (they ride along
      just right of the channel column until the block's own end pushes them off), so a channel
      without a schedule never turns into an empty bar, and a long program keeps its title showing. */
@@ -10141,6 +10146,11 @@
         <label id="liveChAdsLabel">Commercials</label>
         <div class="lc-opts lc-one-row" id="liveChAds" role="radiogroup" aria-labelledby="liveChAdsLabel"></div>
         <p class="lc-note" id="liveChAdsNote">After each show, classic TV commercials from archive.org fill the rest of its half hour or hour. A break can run up to 30 seconds over.</p>
+      </div>
+      <div class="cs-field" id="liveChDescField">
+        <label for="liveChDesc">Grid description</label>
+        <textarea class="cs-field-input lc-desc" id="liveChDesc" rows="2" maxlength="140" autocomplete="off" placeholder="Optional"></textarea>
+        <p class="lc-note">Shown in the guide in place of the channel's schedule. Leave it empty to show the schedule.</p>
       </div>
       <p class="lc-note" id="liveChSummary"></p>
     </div>
@@ -26709,7 +26719,7 @@
     }
     if(def.src && def.src.kind === 'mv') liveChProbeMusicVideos();
     return { id: 'live:' + def.id, name: def.name || liveChAutoName(def, lu.set), url: url,
-      logo: custom, art: art || '', cats: [], src: 'live', live: true, empty: !lu.items.length };
+      logo: custom, art: art || '', cats: [], src: 'live', live: true, empty: !lu.items.length, gridDesc: def.gridDesc || '' };
   }
   // The channels, as My Channels entries; one with nothing to play isn't in the guide.
   function liveChannels(all){
@@ -27305,10 +27315,11 @@
     libraryShuffleBtn.style.display = 'none';
     setResultCount(null);
     resetStationsGrid();
-    liveChEd = def ? { id: def.id, isNew: false, name: def.name || '', src: JSON.parse(JSON.stringify(def.src)), order: def.order || 'sequence', ads: def.ads || 0 }
-      : { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), isNew: true, name: '', src: { kind: 'pick', shows: [], movies: [] }, order: 'sequence', ads: 0 };
+    liveChEd = def ? { id: def.id, isNew: false, name: def.name || '', src: JSON.parse(JSON.stringify(def.src)), order: def.order || 'sequence', ads: def.ads || 0, gridDesc: def.gridDesc || '' }
+      : { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), isNew: true, name: '', src: { kind: 'pick', shows: [], movies: [] }, order: 'sequence', ads: 0, gridDesc: '' };
     lcEl('liveChTitle').textContent = title;
     lcEl('liveChName').value = liveChEd.name;
+    lcEl('liveChDesc').value = liveChEd.gridDesc || '';
     lcEl('liveChSearch').value = '';
     lcEl('liveChMvSearch').value = '';
     lcEl('liveChIaSearch').value = '';
@@ -27349,7 +27360,7 @@
     else if(src.kind === 'genre') out.genre = src.genre || '';
     else if(src.kind === 'decade') out.decade = parseInt(src.decade, 10) || 0;
     else if(src.kind === 'mv'){ if(src.all) out.all = true; else out.artists = (src.artists || []).slice(); }
-    return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order, ads: src.kind === 'mv' ? 0 : (liveChEd.ads || 0) };
+    return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order, ads: src.kind === 'mv' ? 0 : (liveChEd.ads || 0), gridDesc: String(lcEl('liveChDesc').value || '').replace(/\s+/g, ' ').trim().slice(0, 140) };
   }
   function renderLiveChEditor(){
     var ed = liveChEd, lib = vlib(), src = ed.src;
@@ -27667,6 +27678,7 @@
   lcEl('liveChMvSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChMvList(); });
   lcEl('liveChSearch').addEventListener('input', function(){ if(liveChEd) renderLiveChPickList(); });
   lcEl('liveChName').addEventListener('input', function(){ if(liveChEd) liveChEd.name = lcEl('liveChName').value; });
+  lcEl('liveChDesc').addEventListener('input', function(){ if(liveChEd) liveChEd.gridDesc = lcEl('liveChDesc').value; });
   lcEl('liveChIaSearch').addEventListener('input', function(){ clearTimeout(liveChIaTimer); liveChIaTimer = setTimeout(liveChIaSearchNow, 500); });
   lcEl('liveChIaSearch').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); liveChIaSearchNow(); try{ lcEl('liveChIaSearch').blur(); }catch(x){} } });
   lcEl('liveChGenre').addEventListener('change', function(){ if(liveChEd){ liveChEd.src.genre = lcEl('liveChGenre').value; syncLiveChEditorBits(); } });
@@ -27689,7 +27701,7 @@
   lcEl('liveChSaveBtn').addEventListener('click', function(){
     if(!liveChEd || lcEl('liveChSaveBtn').disabled) return;
     var d = liveChEdDef(), cur = liveChDefById(d.id);
-    if(cur){ cur.name = d.name; cur.src = d.src; cur.order = d.order; cur.ads = d.ads || 0; }
+    if(cur){ cur.name = d.name; cur.src = d.src; cur.order = d.order; cur.ads = d.ads || 0; cur.gridDesc = d.gridDesc || ''; }
     else liveChDefs().push(d);
     saveLiveChDefs();
     if(d.ads) adPoolBuild();
@@ -28147,6 +28159,14 @@
     // (its 4-minute videos as separate blocks were too many to read).
     var mvCh = false;
     if(isLiveChUrl(ch.url)){ var mdef = liveChDefOf(ch); mvCh = !!(mdef && mdef.src && mdef.src.kind === 'mv'); }
+    // Build 637 (Mark): a channel with a Grid description shows it as its one block, in place of its schedule.
+    var gdesc = String(ch.gridDesc || '').trim();
+    if(gdesc){
+      var gb = epgBlock(ch, t0, t1, gdesc, '', true, true);
+      gb.classList.add('desc');
+      row.appendChild(gb);
+      return row;
+    }
     var blocks = src && !mvCh ? epgBlocks(ch, t0, t1) : [];
     var now = Date.now();
     if(!blocks.length){
@@ -29645,6 +29665,14 @@
     var inp = document.createElement('input');
     inp.type = 'text'; inp.className = 'pf-input'; inp.value = c.name || ''; inp.maxLength = 80; inp.setAttribute('aria-label', 'Channel name');
     inp.autocapitalize = 'words'; panel.appendChild(inp);
+    // Build 637 (Mark): a Grid description shows in the guide in place of the channel's schedule.
+    var dsc = document.createElement('textarea');
+    dsc.className = 'pf-input lc-desc'; dsc.rows = 2; dsc.maxLength = 140; dsc.value = c.gridDesc || '';
+    dsc.placeholder = 'Grid description (optional)'; dsc.setAttribute('aria-label', 'Grid description');
+    panel.appendChild(dsc);
+    var dscNote = document.createElement('div'); dscNote.className = 'ace-art-txt'; dscNote.style.marginTop = '4px';
+    dscNote.textContent = 'Shown in the guide in place of the schedule. Leave it empty to show the schedule.';
+    panel.appendChild(dscNote);
     var shuffle = null;
     if(isArchiveCustomUrl(c.url) && c.archive && c.archive.items){
       var sw = document.createElement('label'); sw.className = 'ia-switch ace-switch';
@@ -29664,6 +29692,8 @@
       var nm = inp.value.trim();
       if(nm && nm !== c.name) renameVideoChannel(c.url, nm);
       if(shuffle){ c.archive.order = shuffle.checked ? 'shuffle' : 'sequence'; saveVideoChannels(); }
+      var gd = dsc.value.replace(/\s+/g, ' ').trim().slice(0, 140);
+      if(gd !== (c.gridDesc || '')){ if(gd) c.gridDesc = gd; else delete c.gridDesc; saveVideoChannels(); try{ refreshChannelGrids(); }catch(e){} }
       close();
       if(onVideoView) rerenderVideoKeepingScroll();
       try{ heroSlideByKey = {}; renderNpHero(true); }catch(e){}
@@ -30020,7 +30050,7 @@
     var n = 0;
     (Array.isArray(list) ? list : []).forEach(function(d){
       if(!liveChValidDef(d) || liveChDefById(d.id)) return;
-      liveChDefs().push({ id: String(d.id), name: String(d.name || ''), src: d.src, order: ['sequence', 'shuffle', 'daily'].indexOf(d.order) !== -1 ? d.order : 'sequence', ads: d.ads === 30 || d.ads === 60 ? d.ads : 0 });
+      liveChDefs().push({ id: String(d.id), name: String(d.name || ''), src: d.src, order: ['sequence', 'shuffle', 'daily'].indexOf(d.order) !== -1 ? d.order : 'sequence', ads: d.ads === 30 || d.ads === 60 ? d.ads : 0, gridDesc: String(d.gridDesc || '').slice(0, 140) });
       n++;
     });
     if(n){ saveLiveChDefs(); if(typeof refreshVideoPages === 'function') refreshVideoPages(); }

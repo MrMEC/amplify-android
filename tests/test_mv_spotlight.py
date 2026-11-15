@@ -115,7 +115,18 @@ async def main():
         await pg.screenshot(path=f'{SHOTS}/spot-home.png')
         hf = lambda: pg.evaluate("Array.from(document.querySelectorAll('[data-daily=spotlight] .yt-title')).map(function(e){return e.textContent}).join('|')")
         hb = await hf(); await pull(240); await pg.wait_for_timeout(100); await pg.screenshot(path=f'{SHOTS}/ptr-home-pull.png'); await lift(); await pg.wait_for_timeout(2600)
-        print('home reshuffled', hb != await hf(), 'tiles', await pg.evaluate("document.querySelectorAll('[data-daily=spotlight] .mv-tile').length"))
+        print('home same after pull', hb == await hf(), 'tiles', await pg.evaluate("document.querySelectorAll('[data-daily=spotlight] .mv-tile').length"))
+        # Daily: a pull, a reload and a return to the tab keep the picks; a new day draws again
+        hb = await hf(); await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
+        print('titles', await pg.evaluate("Array.from(document.querySelectorAll('.mv-spotlight-label, [data-daily=spotlight] .daily-heading-text')).map(function(e){return e.textContent})"))
+        wb = await first(); print('watch matches home', wb == hb)
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
+        print('same after reload', wb == await first())
+        await pg.evaluate("var s=JSON.parse(localStorage.getItem('radioPlayerDailySpotlight')); s.day='2000-1-1'; localStorage.setItem('radioPlayerDailySpotlight', JSON.stringify(s))")
+        await pg.reload(); await pg.wait_for_timeout(2500)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
+        print('new day differs', wb != await first())
         # a short pull: no refresh, just a bounce back
         before = after
         await pull(60); await lift(); await pg.wait_for_timeout(1200)
