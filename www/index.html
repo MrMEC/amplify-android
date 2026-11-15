@@ -10051,6 +10051,17 @@
     <div class="st-body" id="statsBody"></div>
   </div>
 </div>
+<!-- Build 641: naming a saved theme (Settings > Theme Settings). -->
+<div class="confirm-overlay" id="thNameOverlay" role="dialog" aria-modal="true" aria-labelledby="thNameTitle">
+  <div class="confirm-panel">
+    <h2 class="confirm-title" id="thNameTitle">Name this theme</h2>
+    <input type="text" class="pf-input" id="thNameInput" maxlength="30" autocomplete="off" spellcheck="false" placeholder="Theme name">
+    <div class="confirm-actions">
+      <button type="button" class="confirm-cancel" id="thNameCancel">Cancel</button>
+      <button type="button" class="confirm-ok confirm-ok-safe" id="thNameSave">Save</button>
+    </div>
+  </div>
+</div>
 <!-- Edit Profile: name and photo (kept on this phone). -->
 <div class="confirm-overlay" id="pfEditOverlay" role="dialog" aria-modal="true" aria-labelledby="pfEditTitle">
   <div class="confirm-panel pf-edit-panel">
@@ -12753,15 +12764,23 @@
     });
     thListEl.hidden = !list.length;
   }
-  document.getElementById('themeSaveBtn').addEventListener('click', function(){
-    zenNamePrompt('Name this theme', '', 'Save', function(name){
+  (function(){
+    var ov = document.getElementById('thNameOverlay'), inp = document.getElementById('thNameInput');
+    function close(){ ov.classList.remove('open'); }
+    function save(){
+      var name = inp.value.trim(); if(!name) return;
       var a = thLoadCustom(), lc = name.toLowerCase(), hit = -1;
       a.forEach(function(t, i){ if(t.name.toLowerCase() === lc) hit = i; });
       var t = { id: hit >= 0 ? a[hit].id : 't' + Date.now().toString(36), name: name, s: thSnapshot() };
       if(hit >= 0) a[hit] = t; else a.push(t);
-      thSaveCustom(a); zenSheetClose(); thSync();
-    });
-  });
+      thSaveCustom(a); close(); thSync();
+    }
+    document.getElementById('themeSaveBtn').addEventListener('click', function(){ inp.value = ''; ov.classList.add('open'); setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 50); });
+    document.getElementById('thNameCancel').addEventListener('click', close);
+    document.getElementById('thNameSave').addEventListener('click', save);
+    ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
+    inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); save(); } });
+  })();
   (function(){ var pg = document.querySelector('[data-set-page="appearance-theme"]'); if(pg) ['click', 'change', 'input'].forEach(function(ev){ pg.addEventListener(ev, function(){ setTimeout(thSync, 60); }); }); })();
   thSync();
 
