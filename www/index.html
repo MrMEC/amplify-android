@@ -1754,7 +1754,8 @@
   /* Build 645 (Mark): each carousel is a row with a small picture of it on the right. */
   #settingsPanel #carouselSwitch{ display:flex; flex-direction:column; gap:8px; padding:0; background:none; border:0; border-radius:0; }
   #settingsPanel #carouselSwitch .theme-opt{ justify-content:space-between; gap:12px; padding:7px 14px; min-height:56px; border:1.5px solid var(--border); border-radius:12px; background:var(--panel-2); font-size:14px; }
-  #settingsPanel #carouselSwitch .theme-opt.active{ border-color:var(--accent); }
+  #settingsPanel #carouselSwitch .theme-opt.active{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 16%, var(--panel-2)); color:var(--text); }
+  #settingsPanel #carouselSwitch .theme-opt.active svg.co-prev{ color:var(--accent); }
   #settingsPanel #carouselSwitch .theme-opt svg.co-prev{ display:block; width:72px; height:44px; flex:none; }
   #settingsPanel .theme-opt svg{ flex-shrink:0; width:15px; height:15px; }
   @media (max-width: 360px){ #settingsPanel .theme-opt svg{ display:none; } }
