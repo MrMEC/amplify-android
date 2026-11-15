@@ -9872,7 +9872,7 @@
     <section class="set-page" data-set-page="home-carousel" data-set-title="Carousel" data-set-parent="home" hidden>
       <!-- Build 565 (Mark): moved here from Theme & color, above Favorites. Build 551: Home's carousel as Slides (as it was) or Flow (cover flow); Flow's own settings show only while it is chosen. -->
       <div class="settings-row settings-row--stack">
-        <span class="settings-label" id="carouselLabel">Carousel</span>
+        <span class="settings-label" id="carouselLabel">Select a carousel</span>
         <div class="theme-switch" id="carouselSwitch" role="group" aria-labelledby="carouselLabel">
           <button type="button" class="theme-opt" data-carousel-opt="slides"><span>Slides</span><svg class="co-prev" viewBox="0 0 72 44" aria-hidden="true" focusable="false"><rect x="2" y="2" width="68" height="40" rx="5" fill="currentColor" fill-opacity=".28"/><rect x="26" y="6" width="20" height="2" rx="1" fill="currentColor" fill-opacity=".6"/><rect x="8" y="26" width="30" height="4.5" rx="2" fill="currentColor" fill-opacity=".9"/><rect x="8" y="33" width="19" height="3" rx="1.5" fill="currentColor" fill-opacity=".6"/></svg></button>
           <button type="button" class="theme-opt" data-carousel-opt="flow"><span>Flow</span><svg class="co-prev" viewBox="0 0 72 44" aria-hidden="true" focusable="false"><polygon points="3,11 18,8 18,28 3,25" fill="currentColor" fill-opacity=".4"/><polygon points="69,11 54,8 54,28 69,25" fill="currentColor" fill-opacity=".4"/><rect x="23" y="5" width="26" height="26" rx="3" fill="currentColor" fill-opacity=".8"/><rect x="23" y="33" width="26" height="5" rx="2" fill="currentColor" fill-opacity=".2"/><rect x="29" y="40" width="14" height="2.5" rx="1.2" fill="currentColor" fill-opacity=".6"/></svg></button>
@@ -9881,27 +9881,15 @@
           <button type="button" class="theme-opt" data-carousel-opt="none"><span>None</span><svg class="co-prev" viewBox="0 0 72 44" aria-hidden="true" focusable="false"><rect x="6" y="6" width="60" height="32" rx="5" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="2" stroke-dasharray="4 3"/><path d="M24 34L48 10" stroke="currentColor" stroke-opacity=".7" stroke-width="2.4" stroke-linecap="round"/></svg></button>
         </div>
       </div>
-      <div id="carouselFlowOpts" hidden>
+      <div id="carouselCardOpts" hidden>
         <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover size</span><span class="set-desc">Home&rsquo;s Flow, Card and Editorial carousels, and Cover Flow</span></div>
-          <select class="settings-select" id="flowSizeSelect" aria-labelledby="flowSizeLabel">
+          <div class="set-text"><span class="settings-label" id="carouselCardSizeLabel">Card size</span><span class="set-desc">How wide each card is</span></div>
+          <select class="settings-select" id="carouselCardSizeSelect" aria-labelledby="carouselCardSizeLabel">
             <option value="s">Small</option>
             <option value="m">Medium</option>
             <option value="l">Large</option>
           </select>
         </div>
-        <div class="settings-row settings-row--stack">
-          <span class="settings-label" id="flowTiltLabel">Tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
-          <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
-        </div>
-        <div class="settings-row">
-          <div class="set-text"><span class="settings-label" id="flowReflectLabel">Reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
-          <select class="settings-select" id="flowReflectSelect" aria-labelledby="flowReflectLabel">
-            <option value="off">Off</option>
-            <option value="on">On</option>
-          </select>
-        </div>
-      </div>
       <div id="carouselEditOpts" hidden>
         <div class="settings-row">
           <div class="set-text"><span class="settings-label" id="carouselTextPosLabel">Text position</span><span class="set-desc">Where Editorial puts the details</span></div>
@@ -9910,6 +9898,7 @@
             <option value="above">Above the cover</option>
           </select>
         </div>
+      </div>
       </div>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="carouselHeadingLabel">Show heading</span><span class="set-desc">Adds a &ldquo;Recently played&rdquo; heading above the carousel</span></div>
@@ -9922,7 +9911,30 @@
         <span class="set-desc" id="carouselResetDesc">Clears every slide so the carousel starts fresh from what you play next.</span>
         <button type="button" class="settings-data-btn" id="carouselResetBtn">Reset Slides</button>
       </div>
-    </section>
+      <div id="carouselFlowOpts" hidden>
+        <h3 class="set-sub">Cover Flow</h3>
+        <div class="set-desc set-desc-block">Used by the Flow carousel on Home, and by Albums when you turn your phone sideways.</div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowSizeLabel">Cover Flow cover size</span></div>
+          <select class="settings-select" id="flowSizeSelect" aria-labelledby="flowSizeLabel">
+            <option value="s">Small</option>
+            <option value="m">Medium</option>
+            <option value="l">Large</option>
+          </select>
+        </div>
+        <div class="settings-row settings-row--stack">
+          <span class="settings-label" id="flowTiltLabel">Cover Flow tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
+          <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowReflectLabel">Cover Flow reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
+          <select class="settings-select" id="flowReflectSelect" aria-labelledby="flowReflectLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </div>
+      </div>
+</section>
     <section class="set-page" data-set-page="home-favorites" data-set-title="Favorites" data-set-parent="home" hidden>
       <h3 class="set-sub">Favorites on Home</h3>
       <div class="set-desc set-desc-block">Choose which favourites show in the Favorites tab on Home. Everything you favourite is always on the Favorites page.</div>
@@ -12747,7 +12759,7 @@
     var s = { theme: o.theme, amoled: !!o.amoled, accent: { dark: o.accent, light: o.accent }, bg: {},
       font: { body: o.body || 'poppins', head: o.head || 'same', size: o.size || 100, weight: o.weight || 0 },
       shape: { radius: o.radius || 'soft', density: o.density || 'comfortable', artist: o.artist || 'circle', play: o.play || 'circle' },
-      carousel: { mode: o.car[0], size: o.car[1] || 'm', tilt: o.car[2] || 66, reflect: o.car[3] !== false, textPos: o.car[4] || 'below', heading: !!o.car[5] } };
+      carousel: { mode: o.car[0], size: o.car[1] || 'm', tilt: o.car[2] || 66, reflect: o.car[3] !== false, textPos: o.car[4] || 'below', heading: !!o.car[5], cardSize: o.car[6] || 'm' } };
     s.bg[o.theme] = o.bg || { mode: 'default' };
     return s;
   }
@@ -12755,13 +12767,13 @@
     { id: 'neon', name: 'Midnight Neon', dot: ['#00e5ff', '#7c3aed'], s: thMake({ theme: 'dark', amoled: true, accent: '#00e5ff', bg: thG('radial', 't', 35, 70, '#7c3aed', 'base'), body: 'inter', radius: 'round', play: 'circle', car: ['flow','l',60,true] }) },
     { id: 'noir', name: 'Gilded Noir', dot: ['#d4af37', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#d4af37', bg: thS('#000000'), head: 'serif', radius: 'square', artist: 'square', play: 'square', car: ['edit','m',66,true,'above',true] }) },
     { id: 'paper', name: 'Paper & Ink', dot: ['#1f2937', '#f6f4ef'], s: thMake({ theme: 'light', accent: '#1f2937', bg: thS('#f6f4ef'), body: 'serif', head: 'serif', radius: 'square', artist: 'square', play: 'square', car: ['none'] }) },
-    { id: 'synth', name: 'Synthwave', dot: ['#ff4fd8', '#3b82f6'], s: thMake({ theme: 'dark', accent: '#ff4fd8', bg: thG('diagonal', 'tl', 45, 80, '#ff4fd8', '#3b82f6'), body: 'nunito', radius: 'round', artist: 'rounded', play: 'rounded', car: ['flow','m',75,true] }) },
+    { id: 'synth', name: 'Synthwave', dot: ['#ff4fd8', '#3b82f6'], s: thMake({ theme: 'dark', accent: '#ff4fd8', bg: thG('diagonal', 'tl', 45, 80, '#ff4fd8', '#3b82f6'), body: 'nunito', radius: 'round', artist: 'rounded', play: 'rounded', car: ['card','m',75,true,'below',false,'m'] }) },
     { id: 'deep', name: 'Deep Ocean', dot: ['#38bdf8', '#0d1b2a'], s: thMake({ theme: 'dark', accent: '#38bdf8', bg: thS('#0d1b2a'), body: 'opensans', radius: 'soft', car: ['slides','l'] }) },
-    { id: 'evergreen', name: 'Evergreen', dot: ['#4ade80', '#0d1a14'], s: thMake({ theme: 'dark', accent: '#4ade80', bg: thS('#0d1a14'), body: 'lato', density: 'roomy', artist: 'rounded', radius: 'round', car: ['flow','s',40,false] }) },
-    { id: 'boulevard', name: 'Sunset Boulevard', dot: ['#ff8a3d', '#ff5e62'], s: thMake({ theme: 'dark', accent: '#ff8a3d', bg: thG('vertical', 't', 40, 85, '#ff5e62', '#ff9966'), radius: 'soft', play: 'rounded', car: ['flow','l',45,false] }) },
-    { id: 'candy', name: 'Cotton Candy', dot: ['#d6336c', '#fbeff1'], s: thMake({ theme: 'light', accent: '#d6336c', bg: thS('#fbeff1'), body: 'nunito', radius: 'round', density: 'roomy', car: ['card','s',66,true,'below',true] }) },
+    { id: 'evergreen', name: 'Evergreen', dot: ['#4ade80', '#0d1a14'], s: thMake({ theme: 'dark', accent: '#4ade80', bg: thS('#0d1a14'), body: 'lato', density: 'roomy', artist: 'rounded', radius: 'round', car: ['edit','m',40,false,'below',true,'m'] }) },
+    { id: 'boulevard', name: 'Sunset Boulevard', dot: ['#ff8a3d', '#ff5e62'], s: thMake({ theme: 'dark', accent: '#ff8a3d', bg: thG('vertical', 't', 40, 85, '#ff5e62', '#ff9966'), radius: 'soft', play: 'rounded', car: ['card','m',45,false,'below',true,'l'] }) },
+    { id: 'candy', name: 'Cotton Candy', dot: ['#d6336c', '#fbeff1'], s: thMake({ theme: 'light', accent: '#d6336c', bg: thS('#fbeff1'), body: 'nunito', radius: 'round', density: 'roomy', car: ['card','s',66,true,'below',true,'s'] }) },
     { id: 'terminal', name: 'Terminal', dot: ['#39ff14', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#39ff14', bg: thS('#000000'), body: 'mono', head: 'mono', radius: 'square', density: 'compact', artist: 'square', play: 'square', car: ['none'] }) },
-    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded', car: ['flow','m',55,false] }) }
+    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded', car: ['edit','m',55,false,'above',false,'s'] }) }
   ];
   function thLoadCustom(){ try{ var a = JSON.parse(localStorage.getItem(THEMES_KEY) || '[]'); return Array.isArray(a) ? a.filter(function(t){ return t && t.name && t.s; }) : []; }catch(e){ return []; } }
   function thSaveCustom(a){ try{ localStorage.setItem(THEMES_KEY, JSON.stringify(a)); }catch(e){} }
@@ -12775,13 +12787,13 @@
       shape: { radius: shapePrefs.radius, density: shapePrefs.density, artist: shapePrefs.artist, play: shapePrefs.play }, carousel: thCarouselNow() };
   }
   function thCarouselNow(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm' };
     try{ var v = JSON.parse(localStorage.getItem('radioPlayerCarousel') || 'null');
-      if(v && typeof v === 'object'){ if(v.textPos === 'above') d.textPos = 'above'; if(v.heading === true) d.heading = true; if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode; if(v.size === 's' || v.size === 'm' || v.size === 'l') d.size = v.size;
+      if(v && typeof v === 'object'){ if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize; if(v.textPos === 'above') d.textPos = 'above'; if(v.heading === true) d.heading = true; if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode; if(v.size === 's' || v.size === 'm' || v.size === 'l') d.size = v.size;
         if(typeof v.tilt === 'number') d.tilt = v.tilt; if(typeof v.reflect === 'boolean') d.reflect = v.reflect; } }catch(e){}
     return d;
   }
-  function thCarSig(c){ return c.mode === 'none' ? 'none' : (c.mode === 'flow' ? ['flow', c.size, c.tilt, !!c.reflect].join(',') : c.mode === 'card' ? 'card' : c.mode === 'edit' ? 'edit,' + (c.textPos === 'above' ? 'above' : 'below') : 'slides,' + c.size) + ',' + (c.heading ? 'h' : ''); }
+  function thCarSig(c){ return c.mode === 'none' ? 'none' : (c.mode === 'flow' ? ['flow', c.size, c.tilt, !!c.reflect].join(',') : c.mode === 'card' ? 'card,' + c.cardSize : c.mode === 'edit' ? 'edit,' + c.cardSize + ',' + (c.textPos === 'above' ? 'above' : 'below') : 'slides,' + c.size) + ',' + (c.heading ? 'h' : ''); }
   function thBgSig(p){
     p = p || {};
     if(p.mode === 'solid' && p.color) return 's:' + p.color;
@@ -12853,7 +12865,7 @@
     ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
     inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); save(); } });
   })();
-  (function(){ var pg = document.querySelector('[data-set-page="appearance-theme"]'); if(pg) ['click', 'change', 'input'].forEach(function(ev){ pg.addEventListener(ev, function(){ setTimeout(thSync, 60); }); }); })();
+  ['appearance-theme', 'home-carousel'].forEach(function(n){ var pg = document.querySelector('[data-set-page="' + n + '"]'); if(pg) ['click', 'change', 'input'].forEach(function(ev){ pg.addEventListener(ev, function(){ setTimeout(thSync, 60); }); }); });
   thSync();
 
   // ---------- how many results a search asks for ----------
@@ -56205,12 +56217,13 @@
   var CAROUSEL_KEY = 'radioPlayerCarousel';
   var CAROUSEL_SIZES = { s: 170, m: 200, l: 230 };
   function carouselLoad(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm' };
     try{
       var v = JSON.parse(localStorage.getItem(CAROUSEL_KEY) || 'null');
       if(v && typeof v === 'object'){
         if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode;   // build 562: None, no carousel at all; build 643: Card, Editorial
         if(v.textPos === 'above') d.textPos = 'above';
+        if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize;
         if(v.heading === true) d.heading = true;
         if(CAROUSEL_SIZES[v.size]) d.size = v.size;
         if(typeof v.tilt === 'number' && v.tilt >= 30 && v.tilt <= 80) d.tilt = v.tilt;
@@ -56407,7 +56420,7 @@
   function fitHeroTitle(slide){
     // Build 555 (Mark): Flow's title is one line, shrunk as far as it must be (never an ellipsis).
     var cardish = !!(slide && slide._item && heroCardsOn());
-    var lines = slide && slide._titleLines || (cardish && carouselCfg.mode === 'edit' && carouselCfg.size === 'l' ? 1 : 2), minSize = slide && slide._titleMin || (cardish ? 11 : HERO_TITLE_MIN);
+    var lines = slide && slide._titleLines || (cardish && carouselCfg.mode === 'edit' && carouselCfg.cardSize === 'l' ? 1 : 2), minSize = slide && slide._titleMin || (cardish ? 11 : HERO_TITLE_MIN);
     var el = slide && slide.querySelector('.nph-title');
     if(!el || !el.textContent) return;
     var w = el.clientWidth;
@@ -56861,14 +56874,14 @@
     var flow = heroFlowOn();
     npHero.classList.toggle('nph-card', carouselCfg.mode === 'card');
     npHero.classList.toggle('nph-edit', carouselCfg.mode === 'edit');
-    npHero.classList.toggle('nph-sm', carouselCfg.size !== 'l');
+    npHero.classList.toggle('nph-sm', carouselCfg.cardSize !== 'l');
     npHero.classList.toggle('nph-above', carouselCfg.mode === 'edit' && carouselCfg.textPos === 'above');
     var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
     var reflWas = npHero.classList.contains('nph-reflect');
     npHero.classList.toggle('nph-flow', flow);
     npHero.classList.toggle('nph-reflect', flow && carouselCfg.reflect);
     npHero.style.setProperty('--flow-size', size + 'px');
-    npHero.style.setProperty('--card-w', carouselCfg.size === 'l' ? 'calc(100% - 44px)' : carouselCfg.size === 's' ? '140px' : '180px');   // build 645: Large is the biggest; Medium and Small much smaller
+    npHero.style.setProperty('--card-w', carouselCfg.cardSize === 'l' ? 'calc(100% - 44px)' : carouselCfg.cardSize === 's' ? 'min(132px, calc((100vw - 46px - 32px) / 2.35))' : '180px');   // build 645: Large is the biggest; Medium and Small much smaller
     npHero.style.setProperty('--flow-room', (carouselCfg.reflect ? Math.max(8, Math.round(size * 0.42) - 60) : 8) + 'px');   // build 552: 40px less; 554: 20px more
     if(was !== carouselCfg.mode || reflWas !== npHero.classList.contains('nph-reflect')){
       heroSlides.forEach(function(sl){ sl._artDone = false; sl._fitKey = ''; });
@@ -56892,7 +56905,7 @@
     var sizeSel = document.getElementById('flowSizeSelect');
     var tilt = document.getElementById('flowTiltRange'), tiltVal = document.getElementById('flowTiltVal');
     var refl = document.getElementById('flowReflectSelect');
-    var editOpts = document.getElementById('carouselEditOpts'), posSel = document.getElementById('carouselTextPosSelect'), headSel = document.getElementById('carouselHeadingSelect');
+    var cardOpts = document.getElementById('carouselCardOpts'), cardSizeSel = document.getElementById('carouselCardSizeSelect'), editOpts = document.getElementById('carouselEditOpts'), posSel = document.getElementById('carouselTextPosSelect'), headSel = document.getElementById('carouselHeadingSelect');
     if(!sw) return;
     function save(){ try{ localStorage.setItem(CAROUSEL_KEY, JSON.stringify(carouselCfg)); }catch(e){} }
     function show(){
@@ -56907,6 +56920,8 @@
       if(tilt) tilt.value = String(carouselCfg.tilt);
       if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
       if(refl) refl.value = carouselCfg.reflect ? 'on' : 'off';
+      if(cardOpts) cardOpts.hidden = !heroCardsOn();
+      if(cardSizeSel) cardSizeSel.value = carouselCfg.cardSize;
       if(editOpts) editOpts.hidden = carouselCfg.mode !== 'edit';
       if(posSel) posSel.value = carouselCfg.textPos;
       if(headSel) headSel.value = carouselCfg.heading ? 'on' : 'off';
@@ -56938,6 +56953,7 @@
       });
     });
     if(refl) refl.addEventListener('change', function(){ carouselCfg.reflect = refl.value === 'on'; save(); applyCarousel(); });
+    if(cardSizeSel) cardSizeSel.addEventListener('change', function(){ if(/^[sml]$/.test(cardSizeSel.value)){ carouselCfg.cardSize = cardSizeSel.value; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); } });
     if(posSel) posSel.addEventListener('change', function(){ carouselCfg.textPos = posSel.value === 'above' ? 'above' : 'below'; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); });
     if(headSel) headSel.addEventListener('change', function(){ carouselCfg.heading = headSel.value === 'on'; save(); applyCarousel(); });
     // (Build 603: auto-advance removed.)
@@ -56945,6 +56961,7 @@
     window.ampCarouselSet = function(c){
       var prev = carouselCfg.mode;
       carouselCfg.mode = c.mode === 'flow' || c.mode === 'none' || c.mode === 'card' || c.mode === 'edit' ? c.mode : 'slides';
+      if(c.cardSize === 's' || c.cardSize === 'm' || c.cardSize === 'l') carouselCfg.cardSize = c.cardSize;
       if(c.textPos) carouselCfg.textPos = c.textPos === 'above' ? 'above' : 'below';
       if(typeof c.heading === 'boolean') carouselCfg.heading = c.heading;
       if(CAROUSEL_SIZES[c.size]) carouselCfg.size = c.size;
