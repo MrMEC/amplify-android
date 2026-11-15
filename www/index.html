@@ -55792,7 +55792,7 @@
   function heroHiddenSave(){ try{ localStorage.setItem(HERO_HIDDEN_KEY, JSON.stringify(heroHidden)); }catch(e){} }
   function clearHeroEntries(){
     var keep = null, nowK = null;
-    try{ nowK = currentStation ? favKey(currentStation) : null; }catch(e){}
+    try{ nowK = currentStation ? favKey(heroFreshChannel(currentStation)) : null; }catch(e){}
     try{ if(zenBarActive && typeof zenHeroItem === 'function') keep = favKey(zenHeroItem()); }catch(e){}
     heroItems(true).forEach(function(t){ var k = favKey(t); if(k && k !== keep && k !== nowK) heroHidden[k] = 1; });
     // Everything in the history too (songs by one artist show as one slide, so some never made the list).
@@ -55820,25 +55820,27 @@
       return ref.it || null;
     }catch(e){ return null; }
   }
-  // Build 630 (Mark): a channel slide shows the channel's picture and name as they are now (Edit
-  // Channel), not as they were when it was played.
+  // Build 630/631 (Mark): a channel slide shows the channel's picture and name as they are now
+  // (Edit Channel). Whatever is playing from an added archive.org channel (the tuned show, or an
+  // item queued from it) is that one channel, so it is a single slide with the channel's art.
   function heroFreshChannel(t){
     try{
-      if(!t || !t.videoChannel || t.liveCh) return t;
-      var c = findVideoChannel(t.urlToResolve || t.url);
-      if(!c) return t;
-      var f = {}; Object.keys(t).forEach(function(x){ f[x] = t[x]; });
-      f.favicon = chLogo(c); f.name = c.name || t.name;
-      f.channel = {}; Object.keys(t.channel || {}).forEach(function(x){ f.channel[x] = t.channel[x]; });
-      f.channel.logo = f.favicon; f.channel.name = f.name;
-      return f;
+      if(!t) return t;
+      var cu = '';
+      if(t.liveCh && isArchiveChUrl(t.liveCh)) cu = t.liveCh;
+      else if(t.archiveCh) cu = t.archiveCh;
+      else if(t.videoChannel && !t.liveCh) cu = t.urlToResolve || t.url || '';
+      if(!cu) return t;
+      var c = findVideoChannel(cu);
+      return c ? channelToStation(c) : t;
     }catch(e){ return t; }
   }
   function heroItems(all){
     var out = [], seen = {}, nowKey = null;
-    try{ nowKey = currentStation ? favKey(currentStation) : null; }catch(e){}
+    try{ nowKey = currentStation ? favKey(heroFreshChannel(currentStation)) : null; }catch(e){}
     function add(t){
       if(!t || out.length >= HERO_MAX || isBlacklisted(t)) return;
+      t = heroFreshChannel(t);
       var k = favKey(t);
       if(!k || seen[k]) return;
       if(!all && heroHidden[k] && k !== nowKey) return;
@@ -55846,7 +55848,7 @@
       // shows once (the first, most recent of them).
       var ent = heroArtistEntry(t), ak = ent ? 'artist:' + ent.key : null;
       if(ak && seen[ak]) return;
-      seen[k] = true; if(ak) seen[ak] = true; out.push(heroFreshChannel(t));
+      seen[k] = true; if(ak) seen[ak] = true; out.push(t);
     }
     // Build 625 (Mark): in Privacy mode nothing new is added, so what is playing now only shows if
     // it was already in the carousel.
@@ -55855,7 +55857,7 @@
       heroHistLoad().forEach(function(r){ if(r && r.k) inHist[r.k] = 1; });
       (Array.isArray(zenState.recent) ? zenState.recent : []).forEach(function(id){ inHist['zen:' + (id || 'custom')] = 1; });
     }
-    function addNow(t){ if(t && priv && !inHist[favKey(t)]) return; add(t); }
+    function addNow(t){ if(t && priv && !inHist[favKey(heroFreshChannel(t))]) return; add(t); }
     if(zenBarActive && typeof zenHeroItem === 'function') addNow(zenHeroItem());
     addNow(currentStation);
     heroHistLoad().forEach(function(ref){ add(heroResolve(ref)); });
