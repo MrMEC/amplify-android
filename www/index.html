@@ -11522,7 +11522,7 @@
     var allArtists = document.getElementById('allArtistsLink');
     if(allArtists) allArtists.style.display = 'none';
     sectionHeadingRow.classList.remove('has-side-link');
-    if(typeof liveChPageLeft === 'function' && liveChPanelEl && liveChPanelEl.parentNode === stationsGrid) liveChPageLeft();
+    if(typeof liveChPageLeft === 'function' && liveChPanelEl && (liveChPanelEl.parentNode === stationsGrid || !liveChPanelEl.isConnected)) liveChPageLeft();
     stationsGrid.innerHTML = '';
     stationsGrid.classList.remove('grid-songs');
     stationsGrid.classList.remove('grid-album');
@@ -27550,6 +27550,9 @@
   function openLiveChEditor(id){
     var def = id ? liveChDefById(id) : null;
     closeChSheet && closeChSheet();
+    // Build 650 (Mark: a blank screen opening Edit Channel): leaving the editor by a tab can leave its panel out of the page
+    // altogether, and every later open then failed on a missing field. It goes back to its holder first.
+    if(!liveChPanelEl.isConnected){ liveChOverlayEl.appendChild(liveChPanelEl); document.body.classList.remove('lc-page-open'); liveChEd = null; }
     var title = def ? 'Edit Channel' : 'New Channel';
     pushView();
     enterLibraryChrome();
@@ -27581,7 +27584,7 @@
   }
   // The panel back in its holder (any way off the page: Back, a tab, Save).
   function liveChPageLeft(){
-    if(!liveChPageOpen()) return;
+    if(!liveChPageOpen() && liveChPanelEl.isConnected) return;
     liveChOverlayEl.appendChild(liveChPanelEl);
     document.body.classList.remove('lc-page-open');
     if(liveChEd){
