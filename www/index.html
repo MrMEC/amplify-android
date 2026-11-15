@@ -4222,12 +4222,13 @@
   .mv-sum{ font-size:13px; color:var(--text-dim); }
   .mv-acts{ display:flex; gap:8px; }
   .mv-acts .mv-btn{ padding:9px 16px; font-size:13px; }
-  .tile-grid > .mv-recent, .tile-grid > .mv-daily{ grid-column:1/-1; }
+  .tile-grid > .mv-recent, .tile-grid > .mv-daily, .tile-grid > .mv-spotlight{ grid-column:1/-1; }
   /* Build 306 (Mark): a thin grey edge on video stills (Home's daily videos, the Music Videos
      tab and an artist's Music Videos page), like the artist circles. */
-  #dailyHomeSections .yt-thumb, .mv-recent .yt-thumb, .mv-daily .yt-thumb, .mv-row .vep-thumb{
+  #dailyHomeSections .yt-thumb, .mv-recent .yt-thumb, .mv-daily .yt-thumb, .mv-spotlight .yt-thumb, .mv-row .vep-thumb{
     border:1.5px solid var(--top-artist-ring, #3a3a3e); background-clip:padding-box; box-sizing:border-box; }
   .mv-daily .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mv-spotlight .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mv-recent .yt-date{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tile-grid > .mv-artists-head{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; }
   .mv-seg{ display:flex; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--r-pill, 999px); padding:3px; flex-shrink:0; }
@@ -30395,7 +30396,7 @@
     openNowPlaying(v, true);
   }
   // The section on an artist page: a sideways row of 16:9 stills, like Music Videos.
-  function buildMusicVideoTile(v, list, showArtist){
+  function buildMusicVideoTile(v, list, showArtist, artistOnly){
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'yt-tile mv-tile';
@@ -30424,7 +30425,7 @@
     var d = document.createElement('span');
     d.className = 'yt-date';
     // Build 302: Recently Added names the artist before the length ("Artist · 3:45").
-    function durText(){ return [showArtist ? v.artist : '', v.duration ? formatTime(v.duration) : ''].filter(Boolean).join(' · '); }
+    function durText(){ return [showArtist ? v.artist : '', v.duration && !artistOnly ? formatTime(v.duration) : ''].filter(Boolean).join(' · '); }
     d.textContent = durText();
     b._paintDur = function(){ d.textContent = durText(); };
     b.appendChild(th); b.appendChild(t); b.appendChild(d);
@@ -32923,6 +32924,8 @@
       mvPlayHdr.onclick = function(){ mvPlayList(cat.all, false); };
       mvShuffleHdr.onclick = function(){ mvPlayList(cat.all, true); };
     }
+    // Build 633 (Mark): Spotlight, at the very top.
+    appendMvSpotlight(cat);
     // Build 306 (Mark): the day's artist (the same one as Home's daily videos), above Recently Added.
     appendMvDailySection(cat);
     // Recently added: the newest dozen, a sideways row of stills.
@@ -33004,6 +33007,36 @@
       stationsGrid.appendChild(ot);
     }
     if(sort === 'az') buildAzRail(azItemsFromGrid('.tile.mv-artist:not(.mv-other)', '.tile-name'));
+  }
+  // Build 633 (Mark): Spotlight, up to 30 random videos from different artists in the library,
+  // artist and title under each still. One video per artist first (so it is a mix of artists);
+  // only if fewer than 30 artists have videos are the rest filled with more of their videos.
+  // The pick stays the same while the library does, and is drawn again when the app restarts.
+  var MV_SPOTLIGHT_MAX = 30, mvSpotlightPick = null;
+  function mvSpotlightList(cat){
+    var sig = cat.idx;
+    if(mvSpotlightPick && mvSpotlightPick.sig === sig && mvSpotlightPick.list.every(function(v){ return cat.all.indexOf(v) !== -1; })) return mvSpotlightPick.list;
+    var pool = cat.artists.filter(function(a){ return a.videos.length; });
+    var picks = shuffled(pool).slice(0, MV_SPOTLIGHT_MAX).map(function(a){ return a.videos[Math.floor(Math.random() * a.videos.length)]; });
+    if(picks.length < MV_SPOTLIGHT_MAX){
+      var used = {}; picks.forEach(function(v){ used[v.uri] = 1; });
+      var rest = shuffled(cat.all.filter(function(v){ return !used[v.uri] && v.artist; }));
+      picks = picks.concat(rest.slice(0, MV_SPOTLIGHT_MAX - picks.length));
+    }
+    picks = shuffled(picks);
+    mvSpotlightPick = { sig: sig, list: picks };
+    return picks;
+  }
+  function appendMvSpotlight(cat){
+    var list = mvSpotlightList(cat);
+    if(list.length < 2) return;
+    appendGridSection('Spotlight').classList.add('mv-spotlight-label');
+    var row = document.createElement('div');
+    row.className = 'artist-videos artist-mvs mv-spotlight';
+    var tiles = {};
+    list.forEach(function(v){ var t = buildMusicVideoTile(v, list, true, true); tiles[v.uri] = t; row.appendChild(t); });
+    stationsGrid.appendChild(row);
+    ensureMusicVideoStills(list, function(v){ var t = tiles[v.uri]; if(t && t.isConnected){ t._paintStill(); t._paintDur(); } });
   }
   function appendMvDailySection(cat){
     try{ ensureDailyLists(); }catch(e){}

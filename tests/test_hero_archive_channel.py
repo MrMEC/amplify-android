@@ -89,6 +89,8 @@ async def main():
           c.push({id:'archive:m:x1',name:'Disney anthology television series',url:'amplify-archive:m:x1',logo:'https://archive.org/services/img/cartoon_one',cats:['archive.org'],catNames:['Archive.org'],src:'archive',archive:{items:[{id:'cartoon_one',title:'Cartoon One',creator:'',year:'',video:true},{id:'cartoon_two',title:'Cartoon Two',creator:'',year:'',video:true}],order:'sequence'},addedAt:1});
           localStorage.setItem('radioPlayerVideoChannels',JSON.stringify(c));
           var a=JSON.parse(localStorage.getItem('radioPlayerCustomArt')||'{}'); a['chart:amplify-archive:m:x1']='https://archive.org/services/img/chosen'; localStorage.setItem('radioPlayerCustomArt',JSON.stringify(a)); })()""")
+        await pg.evaluate("""(function(){ var it={type:'video',id:'cartoon_one.mp4',uri:'https://archive.org/download/cartoon_one/cartoon_one.mp4',videoKind:'archive',archive:true,name:'Cartoon One',favicon:'https://archive.org/services/img/cartoon_one',archiveCh:'amplify-archive:m:x1',urlToResolve:'amplify-archive:m:x1',duration:3120};
+          localStorage.setItem('radioPlayerPlayedHistory',JSON.stringify([{k:'video:cartoon_one.mp4',r:'item',it:it}])); })()""")
         await pg.reload(); await pg.wait_for_timeout(2500)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1800)
         await pg.evaluate("(function(){ var l=Array.from(document.querySelectorAll('#stationsGrid .epg-logo')); var x=l.filter(function(e){var c=e.closest('[aria-label]'); return c && /Disney/.test(c.getAttribute('aria-label'))})[0]; x.click(); })()"); await pg.wait_for_timeout(600)
