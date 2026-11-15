@@ -45352,7 +45352,7 @@
       head.appendChild(h);
       sec.appendChild(head);
       var grid = document.createElement('div');
-      grid.className = 'tile-grid' + (id === 'videos' ? ' daily-videos-grid' : '');
+      grid.className = 'tile-grid' + (id === 'videos' || id === 'spotlight' ? ' daily-videos-grid' : '');
       sec.appendChild(grid);
       dailyHomeSections.appendChild(sec);
       makeHomeRow(grid);
@@ -45366,6 +45366,9 @@
   function renderDailyHome(){
     if(!dailyReady || !dailyHomeSections) return;
     var order = [];
+    // Build 635 (Mark): Spotlight leads, above the Daily Mixes.
+    var spot = renderDailySpotlight();
+    if(spot) order.push(spot);
     if(ensureDailyLists()){
       dailyState.mixes.forEach(function(mix){
         var songs = dailyMixSongs(mix);
@@ -45405,6 +45408,28 @@
       order.forEach(function(sec, i){ if(sec._grid && lefts[i]) sec._grid.scrollLeft = lefts[i]; });
     }
     if(document.body.classList.contains('home-stacked')) syncHomeRows();
+  }
+  // Build 635 (Mark): the same Spotlight as at the top of Music Videos (30 random videos from
+  // different artists); its heading opens Music Videos.
+  function renderDailySpotlight(){
+    var cat;
+    try{ cat = musicVideoCatalog(); }catch(e){ return null; }
+    if(!cat || !cat.all.length) return null;
+    var list = mvSpotlightList(cat);
+    if(list.length < 2) return null;
+    var sec = dailySection('spotlight', 'Spotlight', function(){
+      pushView(); videoTab = 'music'; vsave(VIDEO_TAB_KEY, 'music'); openVideoHome();
+    });
+    var grid = sec._grid, sig = list.map(function(v){ return v.uri; }).join('|');
+    if(grid._sig !== sig){
+      grid._sig = sig;
+      grid.innerHTML = '';
+      grid.scrollLeft = 0;
+      var tiles = {};
+      list.forEach(function(v){ var t = buildMusicVideoTile(v, list, true, true); tiles[v.uri] = t; grid.appendChild(t); });
+      ensureMusicVideoStills(list, function(v){ var t = tiles[v.uri]; if(t && t.isConnected){ t._paintStill(); t._paintDur(); } });
+    }
+    return sec;
   }
   function renderDailyVideos(){
     var key = dailyState && dailyState.videoKey;
@@ -57716,14 +57741,16 @@
     ind.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3.5v4.6h-4.6"/></svg>';
     document.body.appendChild(ind);
     var mainEl = document.querySelector('main.main');
-    var MARK = 84, HOLD = 66, MAX = 230, LONGPRESS_MS = 320;
+    // The fixed header goes down with the page, so the two never slide over each other.
+    var hdrEl = document.querySelector('.sidebar-top');
+    var MARK = 72, HOLD = 54, MAX = 150, LONGPRESS_MS = 320;
     var st = null, busy = false;
     function editing(){
       return favoritesEditing || customSearchesEditing || stationPlaylistsEditing || stationPlaylistStationsEditing || genresEditing || favArtistsEditing || videoChannelsEditing;
     }
     function blocked(target){
       var b = document.body.classList;
-      if(b.contains('np-open') || b.contains('epg-land') || b.contains('drawer-open')) return true;
+      if(b.contains('np-open') || b.contains('epg-land') || b.contains('drawer-open') || b.contains('search-open') || b.contains('rotate-lock')) return true;
       if(editing()) return true;
       if(window.scrollY > 0 || (document.scrollingElement && document.scrollingElement.scrollTop > 0)) return true;
       for(var el = target; el && el !== document.body && el.nodeType === 1; el = el.parentElement){
@@ -57736,32 +57763,45 @@
       }
       return false;
     }
-    function pullOf(dy){ return MAX * (1 - Math.exp(-dy * 0.62 / MAX)) * 1.0; }
-    function paint(p){
-      if(mainEl) mainEl.style.transform = p ? 'translate3d(0,' + p + 'px,0)' : '';
-      var prog = Math.min(1, p / MARK);
-      ind.style.opacity = String(Math.min(1, p / 28));
-      ind.style.transform = 'translate3d(0,' + (Math.max(0, p - 44) + 6) + 'px,0) rotate(' + Math.round(prog * 300) + 'deg) scale(' + (0.7 + 0.3 * prog).toFixed(3) + ')';
+    function pullOf(dy){ return MAX * (1 - Math.exp(-dy * 0.55 / MAX)); }
+    function shift(v){ return v ? 'translate3d(0,' + v + 'px,0)' : ''; }
+    function place(p){
+      if(mainEl) mainEl.style.transform = shift(p);
+      if(hdrEl) hdrEl.style.transform = shift(p);
     }
-    // The spring: down past the rest point, up above it, a smaller bounce, then still.
-    function bounceBack(from, done){
-      var fr = [
-        { transform: 'translate3d(0,' + from + 'px,0)', offset: 0 },
-        { transform: 'translate3d(0,-26px,0)', offset: 0.32 },
-        { transform: 'translate3d(0,13px,0)', offset: 0.58 },
-        { transform: 'translate3d(0,-6px,0)', offset: 0.78 },
+    function indAt(p){
+      // Inside the space the pull opens above the header.
+      var y = Math.max(-46, Math.min(12, (p - 44) / 2));
+      var prog = Math.min(1, p / MARK);
+      ind.style.transform = 'translate3d(0,' + y + 'px,0) rotate(' + Math.round(prog * 300) + 'deg) scale(' + (0.7 + 0.3 * prog).toFixed(3) + ')';
+    }
+    function paint(p){
+      place(p);
+      ind.style.opacity = String(Math.min(1, p / 24));
+      indAt(p);
+    }
+    function frames(from, mid){
+      return [
+        { transform: shift(from) || 'translate3d(0,0,0)', offset: 0 },
+        { transform: 'translate3d(0,' + mid[0] + 'px,0)', offset: 0.5 },
+        { transform: 'translate3d(0,' + mid[1] + 'px,0)', offset: 0.78 },
         { transform: 'translate3d(0,0,0)', offset: 1 }
       ];
-      var a = null;
-      if(mainEl && mainEl.animate) a = mainEl.animate(fr, { duration: 760, easing: 'cubic-bezier(.3,.1,.4,1)' });
-      ind.animate([{ opacity: ind.style.opacity || 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
-      var fin = function(){ if(mainEl) mainEl.style.transform = ''; ind.style.opacity = '0'; ind.classList.remove('spin'); ind.getAnimations().forEach(function(x){ x.cancel(); }); busy = false; if(done) done(); };
+    }
+    function animate(el, fr, opts){ return el && el.animate ? el.animate(fr, opts) : null; }
+    // A small spring back: one slight rebound above the rest point, then still.
+    function bounceBack(from, done){
+      var fr = frames(from, [-5, 2]), opts = { duration: 520, easing: 'cubic-bezier(.3,.1,.4,1)' };
+      var a = animate(mainEl, fr, opts); animate(hdrEl, fr, opts);
+      ind.animate([{ opacity: ind.style.opacity || 1 }, { opacity: 0 }], { duration: 240, fill: 'forwards' });
+      var fin = function(){ place(0); ind.style.opacity = '0'; ind.classList.remove('spin'); ind.getAnimations().forEach(function(x){ x.cancel(); }); busy = false; if(done) done(); };
       if(a) a.onfinish = fin; else setTimeout(fin, 20);
     }
     function refreshNow(){
       mvSpotlightPick = null;
       try{
         if(onVideoView && !onVideoDetailView){ renderVideoHome(); return; }
+        if(onHomeView && !onVideoView) renderDailyHome();
         var snap = snapshotView();
         navReplaying = true;
         try{ snap.open(); } finally { navReplaying = false; }
@@ -57772,16 +57812,15 @@
       if(p >= MARK){
         busy = true;
         ind.classList.add('spin');
-        ind.style.transform = 'translate3d(0,' + (HOLD - 44 + 6) + 'px,0) scale(1)';
         ind.style.opacity = '1';
-        if(mainEl && mainEl.animate){
-          var a = mainEl.animate([{ transform: 'translate3d(0,' + p + 'px,0)' }, { transform: 'translate3d(0,' + (HOLD - 10) + 'px,0)', offset: .5 }, { transform: 'translate3d(0,' + HOLD + 'px,0)' }], { duration: 380, easing: 'cubic-bezier(.2,1.4,.4,1)', fill: 'forwards' });
-          a.onfinish = function(){ if(mainEl) mainEl.style.transform = 'translate3d(0,' + HOLD + 'px,0)'; a.cancel(); };
-        }
+        var fr = [{ transform: shift(p) }, { transform: shift(HOLD) }], opts = { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' };
+        var a1 = animate(mainEl, fr, opts), a2 = animate(hdrEl, fr, opts);
+        indAt(HOLD);
+        setTimeout(function(){ place(HOLD); if(a1) a1.cancel(); if(a2) a2.cancel(); }, 230);
         var t0 = Date.now();
         setTimeout(function(){
           refreshNow();
-          setTimeout(function(){ bounceBack(HOLD); }, Math.max(0, 750 - (Date.now() - t0)));
+          setTimeout(function(){ bounceBack(HOLD); }, Math.max(0, 700 - (Date.now() - t0)));
         }, 60);
       } else if(p > 0){
         busy = true;

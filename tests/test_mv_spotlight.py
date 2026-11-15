@@ -79,7 +79,7 @@ async def main():
         b = await p.chromium.launch(executable_path='/opt/pw-browsers/chromium')
         ctx = await b.new_context(viewport={'width': W, 'height': H_}, device_scale_factor=3.3, is_mobile=True, has_touch=True, color_scheme='dark', locale='en-US', timezone_id='America/New_York')
         await ctx.add_init_script(MOCK); await ctx.add_init_script(AUTO_NOTICE); await ctx.add_init_script(SEEDMV)
-        pg = await ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e) + ' ' + (e.stack or '')[:300]))
+        pg = await ctx.new_page(); cdp = await ctx.new_cdp_session(pg); errs = []; pg.on('pageerror', lambda e: errs.append(str(e) + ' ' + (e.stack or '')[:300]))
         await pg.route('**/*', route2)
         await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(3000)
         await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(1500)
@@ -89,6 +89,30 @@ async def main():
           var arts=tiles.map(function(t){return t.querySelector('.yt-date').textContent}); var uniq={}; arts.forEach(function(a){uniq[a]=1});
           return {kids:kids.slice(0,6), n:tiles.length, uniq:Object.keys(uniq).length, first:tiles.slice(0,3).map(function(t){return t.querySelector('.yt-title').textContent+' | '+t.querySelector('.yt-date').textContent})} })()""")
         print(r)
+        async def pull(dist, steps=24, hold=0, x=160, y0=300):
+            await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x, 'y': y0}]})
+            for k in range(1, steps + 1):
+                await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': x, 'y': y0 + dist * k / steps}]})
+                await asyncio.sleep(0.012)
+        async def lift(): await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
+        first = lambda: pg.evaluate("Array.from(document.querySelectorAll('.mv-spotlight .yt-title')).map(function(e){return e.textContent}).join('|')")
+        before = await first()
+        await pull(260); await pg.wait_for_timeout(100)
+        print('transform mid-pull', await pg.evaluate("document.querySelector('main.main').style.transform"), await pg.evaluate("getComputedStyle(document.querySelector('.ptr-ind')).opacity"))
+        await pg.screenshot(path=f'{SHOTS}/ptr-pull.png')
+        await lift(); await pg.wait_for_timeout(450)
+        await pg.screenshot(path=f'{SHOTS}/ptr-hold.png')
+        await pg.wait_for_timeout(1800)
+        after = await first()
+        print('reshuffled', before != after, 'n', after.count('|') + 1, 'transform after', repr(await pg.evaluate("document.querySelector('main.main').style.transform")))
+        # a short pull: no refresh, just a bounce back
+        before = after
+        await pull(60); await lift(); await pg.wait_for_timeout(1200)
+        print('short pull same', before == await first())
+        # a pull that starts scrolled down does nothing
+        await pg.evaluate("window.scrollTo(0, 300)"); await pg.wait_for_timeout(300)
+        await pull(260); await lift(); await pg.wait_for_timeout(300)
+        print('scrolled pull transform', repr(await pg.evaluate("document.querySelector('main.main').style.transform")))
         await pg.screenshot(path=f'{SHOTS}/spot-{TAG}-1.png')
         print('errs', errs); await b.close()
 
