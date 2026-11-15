@@ -105,6 +105,17 @@ async def main():
         await pg.wait_for_timeout(1800)
         after = await first()
         print('reshuffled', before != after, 'n', after.count('|') + 1, 'transform after', repr(await pg.evaluate("document.querySelector('main.main').style.transform")))
+        # header timeline during a refresh: header and page must move together
+        await pg.evaluate("window.__tl=[]; (function f(){ var h=document.querySelector('.sidebar-top').getBoundingClientRect(), m=document.querySelector('main.main').getBoundingClientRect(); window.__tl.push([Math.round(h.top), Math.round(m.top), getComputedStyle(document.querySelector('.sidebar-top')).transitionDuration]); if(window.__tl.length<60) setTimeout(f,40); })()")
+        await pull(240); await lift(); await pg.wait_for_timeout(2600)
+        tl = await pg.evaluate("window.__tl"); print('hdr/main tops', [(a, b) for a, b, c in tl][::2], tl[0][2])
+        # Home
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=home]').click()"); await pg.wait_for_timeout(2500)
+        print('home spot', await pg.evaluate("(function(){var d=document.getElementById('dailyHomeSections'); var s=d&&d.querySelector('[data-daily=spotlight]'); return [d&&d.style.display, s?s.style.display:'none', s?s.querySelectorAll('.mv-tile').length:0, Array.from(d?d.children:[]).map(function(c){return c.dataset.daily}).join(',')]})()"))
+        await pg.screenshot(path=f'{SHOTS}/spot-home.png')
+        hf = lambda: pg.evaluate("Array.from(document.querySelectorAll('[data-daily=spotlight] .yt-title')).map(function(e){return e.textContent}).join('|')")
+        hb = await hf(); await pull(240); await pg.wait_for_timeout(100); await pg.screenshot(path=f'{SHOTS}/ptr-home-pull.png'); await lift(); await pg.wait_for_timeout(2600)
+        print('home reshuffled', hb != await hf(), 'tiles', await pg.evaluate("document.querySelectorAll('[data-daily=spotlight] .mv-tile').length"))
         # a short pull: no refresh, just a bounce back
         before = after
         await pull(60); await lift(); await pg.wait_for_timeout(1200)

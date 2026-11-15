@@ -33016,14 +33016,23 @@
     }
     if(sort === 'az') buildAzRail(azItemsFromGrid('.tile.mv-artist:not(.mv-other)', '.tile-name'));
   }
-  // Build 633 (Mark): Spotlight, up to 30 random videos from different artists in the library,
-  // artist and title under each still. One video per artist first (so it is a mix of artists);
-  // only if fewer than 30 artists have videos are the rest filled with more of their videos.
-  // The pick stays the same while the library does, and is drawn again when the app restarts.
-  var MV_SPOTLIGHT_MAX = 30, mvSpotlightPick = null;
+  // Build 633/636 (Mark): Daily Spotlight, up to 30 random videos from different artists in the
+  // library, artist and title under each still. One video per artist first (so it is a mix of
+  // artists); only if fewer than 30 artists have videos are the rest filled with more of theirs.
+  // The picks are drawn once a day and kept (pulling down to refresh does not change them); a new
+  // day, or a library whose videos have changed, draws again.
+  var MV_SPOTLIGHT_MAX = 30, MV_SPOTLIGHT_KEY = 'radioPlayerDailySpotlight', mvSpotlightPick = null;
+  function mvSpotlightDay(){ var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
   function mvSpotlightList(cat){
-    var sig = cat.idx;
-    if(mvSpotlightPick && mvSpotlightPick.sig === sig && mvSpotlightPick.list.every(function(v){ return cat.all.indexOf(v) !== -1; })) return mvSpotlightPick.list;
+    var day = mvSpotlightDay();
+    if(mvSpotlightPick && mvSpotlightPick.day === day && mvSpotlightPick.sig === cat.idx && mvSpotlightPick.list.every(function(v){ return cat.all.indexOf(v) !== -1; })) return mvSpotlightPick.list;
+    var byUri = {}; cat.all.forEach(function(v){ byUri[v.uri] = v; });
+    var saved = null;
+    try{ saved = JSON.parse(localStorage.getItem(MV_SPOTLIGHT_KEY) || 'null'); }catch(e){}
+    if(saved && saved.day === day && Array.isArray(saved.uris)){
+      var kept = saved.uris.map(function(u){ return byUri[u]; }).filter(Boolean);
+      if(kept.length >= 2 && kept.length === saved.uris.length){ mvSpotlightPick = { day: day, sig: cat.idx, list: kept }; return kept; }
+    }
     var pool = cat.artists.filter(function(a){ return a.videos.length; });
     var picks = shuffled(pool).slice(0, MV_SPOTLIGHT_MAX).map(function(a){ return a.videos[Math.floor(Math.random() * a.videos.length)]; });
     if(picks.length < MV_SPOTLIGHT_MAX){
@@ -33032,13 +33041,14 @@
       picks = picks.concat(rest.slice(0, MV_SPOTLIGHT_MAX - picks.length));
     }
     picks = shuffled(picks);
-    mvSpotlightPick = { sig: sig, list: picks };
+    mvSpotlightPick = { day: day, sig: cat.idx, list: picks };
+    try{ localStorage.setItem(MV_SPOTLIGHT_KEY, JSON.stringify({ day: day, uris: picks.map(function(v){ return v.uri; }) })); }catch(e){}
     return picks;
   }
   function appendMvSpotlight(cat){
     var list = mvSpotlightList(cat);
     if(list.length < 2) return;
-    appendGridSection('Spotlight').classList.add('mv-spotlight-label');
+    appendGridSection('Daily Spotlight').classList.add('mv-spotlight-label');
     var row = document.createElement('div');
     row.className = 'artist-videos artist-mvs mv-spotlight';
     var tiles = {};
@@ -45366,7 +45376,7 @@
   function renderDailyHome(){
     if(!dailyReady || !dailyHomeSections) return;
     var order = [];
-    // Build 635 (Mark): Spotlight leads, above the Daily Mixes.
+    // Build 635 (Mark): Daily Spotlight leads, above the Daily Mixes.
     var spot = renderDailySpotlight();
     if(spot) order.push(spot);
     if(ensureDailyLists()){
@@ -45417,7 +45427,7 @@
     if(!cat || !cat.all.length) return null;
     var list = mvSpotlightList(cat);
     if(list.length < 2) return null;
-    var sec = dailySection('spotlight', 'Spotlight', function(){
+    var sec = dailySection('spotlight', 'Daily Spotlight', function(){
       pushView(); videoTab = 'music'; vsave(VIDEO_TAB_KEY, 'music'); openVideoHome();
     });
     var grid = sec._grid, sig = list.map(function(v){ return v.uri; }).join('|');
@@ -57733,8 +57743,7 @@
 
   // ---------- Build 634 (Mark): pull down to refresh ----------
   // Pull the page down from the very top: it stretches with a springy bounce, a circle follows
-  // the pull, and past the mark letting go redraws the page you are on (Spotlight draws again,
-  // Home reloads). The page then springs back with an overshoot.
+  // the pull, and past the mark letting go redraws the page you are on (Home reloads). The page then springs back with an overshoot.
   (function(){
     var ind = document.createElement('div');
     ind.className = 'ptr-ind'; ind.setAttribute('aria-hidden', 'true');
@@ -57798,7 +57807,6 @@
       if(a) a.onfinish = fin; else setTimeout(fin, 20);
     }
     function refreshNow(){
-      mvSpotlightPick = null;
       try{
         if(onVideoView && !onVideoDetailView){ renderVideoHome(); return; }
         if(onHomeView && !onVideoView) renderDailyHome();
