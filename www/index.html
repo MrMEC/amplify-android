@@ -26890,6 +26890,27 @@
     var k = Math.max(1, Math.ceil((d - 120000) / g));
     return Math.max(d, k * g);
   }
+  // Build 650 (Mark: not one movie in a whole day of the Muppets channel): the shows take turns, an episode of each in
+  // order; the movies (and archive.org videos) used to be one more list taking its turns, so they ran out after a few
+  // rounds while a show still had hundreds of episodes, and whole days had none. Now one of them follows every
+  // LIVE_CH_EXTRA_GAP episodes, round and round the list, so they come up all day, every day.
+  var LIVE_CH_EXTRA_GAP = 8;
+  function liveChSequence(showLists, extras){
+    var rounds = [];
+    for(var i = 0, more = true; more; i++){
+      more = false;
+      showLists.forEach(function(l){ if(i < l.length){ rounds.push(l[i]); more = true; } });
+    }
+    if(!extras.length) return rounds;
+    if(!rounds.length) return extras.slice();
+    var out = [], x = 0;
+    rounds.forEach(function(v, k){
+      out.push(v);
+      if((k + 1) % LIVE_CH_EXTRA_GAP === 0) out.push(extras[x++ % extras.length]);
+    });
+    if(!x) out = out.concat(extras);
+    return out;
+  }
   // A channel's videos in order, each with its length (only videos whose length is known).
   // day: the date for a daily shuffle ('' otherwise).
   function liveChLineup(def, day){
@@ -26900,7 +26921,10 @@
     var lib = st.lib, set = liveChSources(def, lib), items = [];
     if(def.order === 'shuffle' || def.order === 'daily'){
       set.shows.forEach(function(s){ items = items.concat(liveChEpisodes(s)); });
-      items = liveChShuffled(items.concat(set.movies, set.mvs || [], set.archive || []), def.id + (def.order === 'daily' ? '|' + day : ''));
+      var seed = def.id + (def.order === 'daily' ? '|' + day : '');
+      // Build 650: movies and archive.org videos are spread through the day, not left to chance among hundreds of episodes.
+      if(items.length && (set.movies.length || (set.archive || []).length) && !(set.mvs || []).length) items = liveChSequence([liveChShuffled(items, seed)], liveChShuffled(set.movies.concat(set.archive || []), seed + '|x'));
+      else items = liveChShuffled(items.concat(set.movies, set.mvs || [], set.archive || []), seed);
     } else if((set.mvs || []).length){
       // In order: artist by artist (A to Z), each artist's videos A to Z.
       items = set.mvs.slice();
@@ -26909,12 +26933,7 @@
       // then title) taking a turn of their own.
       var lists = set.shows.map(liveChEpisodes).filter(function(l){ return l.length; });
       var mv = set.movies.slice().sort(function(a, b){ return (liveChYear(a) - liveChYear(b)) || alphaCompare(alphaSortKey(a.title || ''), alphaSortKey(b.title || '')); });
-      if(mv.length) lists.push(mv);
-      if((set.archive || []).length) lists.push(set.archive);   // build 617: archive.org videos, in the order they were added
-      for(var i = 0, more = true; more; i++){
-        more = false;
-        lists.forEach(function(l){ if(i < l.length){ items.push(l[i]); more = true; } });
-      }
+      items = liveChSequence(lists, mv.concat(set.archive || []));   // build 650
     }
     var starts = [], slots = [], total = 0;
     items.forEach(function(v){ var sl = liveChSlotMs(def, v); starts.push(total); slots.push(sl); total += sl; });
