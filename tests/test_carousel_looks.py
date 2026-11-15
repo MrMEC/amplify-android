@@ -49,7 +49,8 @@ async def main():
         await pg.set_viewport_size({'width': 360, 'height': 780}); await pg.wait_for_timeout(500)
         async def look(name, cfg):
             await pg.evaluate("window.ampCarouselSet(%s)" % json.dumps(cfg)); await pg.wait_for_timeout(1000)
-            await pg.evaluate("window.scrollTo(0,0)")
+            await pg.evaluate("window.scrollTo(0,0)"); await pg.evaluate(INJ); await pg.evaluate("(function(){var t=document.getElementById('npHeroTrack');t.scrollLeft+=2;})()"); await pg.wait_for_timeout(250); await pg.evaluate("document.getElementById('npHeroTrack').scrollLeft=0"); await pg.wait_for_timeout(150)
+            print('T', await pg.evaluate("document.querySelector('#npHeroTrack > .nph-slide .nph-title').textContent"))
             await pg.screenshot(path=f'{SHOTS}/cl-{name}.png')
             return await pg.evaluate("""(function(){
               var tr=document.getElementById('npHeroTrack'), sl=[].slice.call(tr.children).filter(function(x){return x.classList.contains('nph-slide')});
@@ -63,11 +64,18 @@ async def main():
                 artTops:arts.map(function(a){return a.t}), artBottoms:arts.map(function(a){return a.b}), heroBottom:r(hero).b, trackBottom:r(tr).b, nextTop:nxt?r(nxt).t:null, slideBottom:lastB, nextTag:nxt?(nxt.className||nxt.tagName):null,
                 titleSz:sl.map(function(s){return getComputedStyle(s.querySelector('.nph-title')).fontSize})};})()""")
         R = {}
+        INJ = "(function(){var s=document.querySelectorAll('#npHeroTrack > .nph-slide');var d=[['Song','Iguazu Falls (Cataratas del Iguaz\\u00fa)','Sheena Easton','The Ultimate Collection: 100 Hits'],['Live TV','Lucha Plus','Lucha Libre AAA Worldwide','S4 E12 \\u00b7 Clash of Champions'],['Song','Strut','Sheena Easton','']];d.forEach(function(x,i){var e=s[i];e.querySelector('.nph-kicker').textContent=x[0];e.querySelector('.nph-title').textContent=x[1];e.querySelector('.nph-line').textContent=x[2];e.querySelector('.nph-line2').textContent=x[3];e._fitKey='';});})()"
         for sz in ('l', 'm', 's'):
             R['card-' + sz] = await look('card-' + sz, {'mode': 'card', 'cardSize': sz, 'heading': False})
             R['edit-' + sz] = await look('edit-' + sz, {'mode': 'edit', 'cardSize': sz, 'textPos': 'below', 'heading': True})
         R['edit-above-s'] = await look('edit-above-s', {'mode': 'edit', 'cardSize': 's', 'textPos': 'above', 'heading': True})
         R['edit-above-m'] = await look('edit-above-m', {'mode': 'edit', 'cardSize': 'm', 'textPos': 'above', 'heading': True})
+        rad = await pg.evaluate("(function(){var c=document.querySelector('#favoritesGrid > .tile');return [getComputedStyle(c).borderTopLeftRadius]})()")
+        await pg.evaluate("window.ampCarouselSet({mode:'card',cardSize:'s'})"); await pg.wait_for_timeout(600)
+        rc = await pg.evaluate("getComputedStyle(document.querySelector('#npHeroTrack > .nph-slide')).borderTopLeftRadius")
+        await pg.evaluate("window.ampCarouselSet({mode:'edit',cardSize:'s'})"); await pg.wait_for_timeout(600)
+        re_ = await pg.evaluate("getComputedStyle(document.querySelector('#npHeroTrack > .nph-slide .nph-media')).borderTopLeftRadius")
+        check(rad[0] == rc == re_, 'corner radius fav %s card %s editorial %s' % (rad[0], rc, re_))
         for k, v in R.items(): print(k, json.dumps(v))
         c = R['card-s']; check(c['favW'] is not None and abs(c['slideW'][0] - c['favW']) < 0.6 and abs(c['gap'] - c['favGap']) < 0.6, 'Card small = Favorites width %s vs %s, gap %s vs %s' % (c['slideW'][0], c['favW'], c['gap'], c['favGap']))
         for k, v in R.items():

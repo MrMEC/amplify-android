@@ -1623,31 +1623,38 @@
   .nph-card .nph-scrim, .nph-edit .nph-scrim, .nph-card .nph-desc, .nph-edit .nph-desc{ display:none; }
   .home-hero.nph-card .nph-art, .home-hero.nph-edit .nph-art{ -webkit-mask-image:none; mask-image:none; }
   .home-hero.nph-card .nph-media, .home-hero.nph-edit .nph-media{ position:relative; inset:auto; flex:none; overflow:hidden; background:#15161a; }
-  .home-hero.nph-card .nph-slide{ border-radius:var(--r-hero, 22px); background:var(--card-bg, #26282d); color:var(--card-fg, #fff);
-    box-shadow:0 8px 20px rgba(0,0,0,.3); transition:background-color .35s ease; }
-  html[data-theme="light"] .home-hero.nph-card .nph-slide{ box-shadow:0 8px 20px rgba(0,0,0,.16); }
-  .home-hero.nph-card .nph-media{ aspect-ratio:1 / 1; background:none; }
-  .nph-card .nph-body{ position:static; flex:1; padding:10px 12px 11px; justify-content:center; align-items:center; text-align:center; min-height:0; }
-  .nph-card .nph-text{ text-shadow:none; }
-  .nph-card .nph-kicker{ color:inherit; opacity:.72; font-size:10px; margin-bottom:2px; }
-  .nph-card .nph-line{ margin-top:2px; }
+  /* Build 649 (Mark): Card is built the way a Favorites card is: the cover flush on top, a band under it that is a blurred
+     copy of the cover (paintFavWash), white words with a soft shadow, and the Favorites corner radius. */
+  .home-hero.nph-card .nph-slide{ border-radius:var(--r-tile, 8.5px) !important; overflow:hidden; background:var(--panel); color:#fff; box-shadow:none; }
+  .home-hero.nph-card .nph-media{ aspect-ratio:1 / 1; background:var(--art-bg); border-radius:0; }
+  .home-hero.nph-card .nph-art img{ object-fit:cover; }
+  .nph-wash, .nph-wscrim{ display:none; }
+  .nph-card .nph-wash{ display:block; position:absolute; inset:-40%; background-size:100% auto; background-position:center; background-repeat:repeat; filter:blur(30px) saturate(1.5) brightness(.62); }
+  .nph-card .nph-wscrim{ display:block; position:absolute; inset:0; background:rgba(0,0,0,.30); }
+  .nph-card .nph-body{ position:relative; overflow:hidden; flex:1 1 auto; min-height:76px; padding:12px 12px; justify-content:center; align-items:center; text-align:center; }
+  .nph-card .nph-text{ position:relative; z-index:1; width:100%; text-align:center; text-shadow:0 1px 8px rgba(0,0,0,.5); }
+  .nph-card .nph-kicker{ color:rgba(255,255,255,.82); font-size:10px; margin-bottom:2px; }
+  .nph-card .nph-title{ color:#fff; font-size:13.5px; font-weight:700; line-height:1.2; -webkit-line-clamp:3; line-clamp:3; }
+  .nph-card .nph-line, .nph-card .nph-line2{ color:rgba(255,255,255,.82); font-size:11.5px; font-weight:500; margin-top:3px; opacity:1; }
+  .nph-card[data-card-size="m"] .nph-title{ font-size:15px; }
+  .nph-card[data-card-size="l"] .nph-title{ font-size:19px; }
+  .nph-card[data-card-size="m"] .nph-line, .nph-card[data-card-size="m"] .nph-line2{ font-size:12.5px; }
+  .nph-card[data-card-size="l"] .nph-line, .nph-card[data-card-size="l"] .nph-line2{ font-size:14px; }
+  .nph-line2{ display:none; }
+  .nph-card .nph-line2, .nph-edit .nph-line2{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nph-card .nph-line, .nph-edit .nph-line{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nph-line:empty, .nph-line2:empty{ display:none !important; }
+  .nph-card .nph-play, .nph-edit .nph-play{ display:none !important; }
   .home-hero.nph-card .nph-art img, .home-hero.nph-edit .nph-art img{ object-position:center center; }
-  .nph-card .nph-title{ color:inherit; font-size:17px; line-height:1.15; }
-  .nph-card .nph-line{ color:inherit; opacity:.88; font-size:14px; font-weight:600; margin-top:3px; }
-  .nph-card .nph-play{ position:absolute; right:10px; top:10px; width:40px; height:40px; margin:0; font-size:16px; }
   .home-hero.nph-edit .nph-slide{ background:none; overflow:visible; }
-  .home-hero.nph-edit .nph-media{ aspect-ratio:4 / 3; border-radius:var(--r-hero, 22px); order:1; box-shadow:0 8px 20px rgba(0,0,0,.25); }
+  .home-hero.nph-edit .nph-media{ aspect-ratio:4 / 3; border-radius:var(--r-tile, 8.5px) !important; order:1; box-shadow:var(--shadow); }
   .nph-edit .nph-body{ order:2; flex:1 1 auto; padding:10px 2px 0; align-items:flex-start; }
   .nph-edit .nph-text{ text-shadow:none; text-align:left; }
-  .nph-edit .nph-kicker{ color:var(--text-dim); font-size:11px; margin-bottom:3px; }
+  .nph-edit .nph-kicker{ color:var(--text-dim); font-size:10.5px; margin-bottom:3px; }
   .nph-edit .nph-title{ color:var(--text); font-size:18px; line-height:1.2; -webkit-line-clamp:1; white-space:nowrap; }
   .nph-edit.nph-sm .nph-title{ -webkit-line-clamp:2; white-space:normal; font-size:15px; }
-  .nph-card.nph-sm .nph-title{ font-size:14px; }
-  .nph-card.nph-sm .nph-kicker, .nph-edit.nph-sm .nph-kicker{ font-size:9.5px; }
-  .nph-card.nph-sm .nph-line, .nph-edit.nph-sm .nph-line{ font-size:11.5px; margin-top:2px; }
-  .nph-card.nph-sm .nph-body{ padding:8px 8px 9px; }
-  .nph-edit .nph-line{ color:var(--text-dim); font-size:14px; font-weight:600; margin-top:3px; }
-  .nph-edit .nph-play{ width:44px; height:44px; margin:0; }
+  .nph-edit .nph-line, .nph-edit .nph-line2{ color:var(--text-dim); font-size:13px; font-weight:500; margin-top:2px; }
+  .nph-edit.nph-sm .nph-line, .nph-edit.nph-sm .nph-line2{ font-size:11.5px; }
   .nph-edit.nph-above .nph-body{ order:1; flex:1 1 auto; padding:0 2px 10px; min-height:0; align-items:flex-end; }
   .nph-edit.nph-above .nph-media{ order:2; }
   /* Build 223: a thin progress bar in place of the dots, in the same 78 x 6px they took
@@ -56348,11 +56355,29 @@
     try{ rec = showableMeta(entry.key); }catch(e){}
     return rec ? heroText(rec.bio || rec.description || '') : '';
   }
+  // Build 649 (Mark): what is on a Live TV channel now, from its guide: [programme, episode].
+  function heroLiveProgram(st){
+    try{
+      var url = st && (st.urlToResolve || st.url_resolved || st.url || '');
+      var ch = url ? findVideoChannel(url) : null;
+      if(!ch || !guideSource(ch)) return null;
+      var it = guideNowNext(ch).now;
+      if(!it) return null;
+      var a = '', b = '';
+      if(it.code){ a = it.code; b = it.t || ''; }
+      else { if(it.t && alphaSortKey(it.t) !== alphaSortKey(ch.name || '')) a = it.t; b = it.sub || ''; if(!a){ a = b; b = ''; } }
+      return a ? (b ? [a, b] : [a]) : null;
+    }catch(e){ return null; }
+  }
   function heroTextFor(item, entry){
-    var o = { kicker: '', title: '', line: '', desc: '' };
+    var o = { kicker: '', title: '', line: '', line2: '', desc: '' };
     if(item && item.type === 'zen'){ o.kicker = 'Zen Mix'; o.title = item.name || 'Zen'; return o; }
     if(entry){
-      o.kicker = 'Artist'; o.title = entry.name; o.desc = heroArtistBio(entry);
+      // Build 649 (Mark): a recent library song shows its title, artist and album. Card / Editorial lead with the song;
+      // Slides and Flow keep the artist as the title and add the song under it.
+      o.desc = heroArtistBio(entry);
+      if(heroCardsOn()){ o.kicker = 'Song'; o.title = item.name || entry.name; o.line = entry.name; o.line2 = item.album || ''; }
+      else { o.kicker = 'Artist'; o.title = entry.name; o.line = [item.name, item.album].filter(Boolean).join(' \u00b7 '); }
     } else if(isPodcastTrack(item) && isAudiobookGuid(item.guid)){
       // Build 455 (Mark): a book is an Audiobook, not a Podcast; its section under the title, its
       // author under that (the "Internet Archive · year" note is no description of a book).
@@ -56367,13 +56392,15 @@
     } else if(isLocalVideo(item)){
       o = heroVideoInfo(item);
     } else if(isLocalTrack(item)){
-      o.title = item.name || ''; o.line = item.artist || '';
+      o.title = item.name || ''; o.line = item.artist || ''; o.line2 = item.album || '';
     } else if(isChartSong(item)){
       o.kicker = 'Top 100'; o.title = item.name || ''; o.line = item.artist || '';
     } else {
       o.kicker = isChannelEntry(item) ? 'Live TV' : isPlaylistRadio(item) ? 'Playlist' : isArtistRadio(item) ? 'Artist Radio' : isCustomStation(item) ? 'Custom Station' : 'Station';
       o.title = stripExclusively((item.channel && item.channel.name) || item.name || '');
-      o.line = stationLastSongText(item);
+      var prog = isChannelEntry(item) ? heroLiveProgram(item) : null;
+      if(prog){ o.line = prog[0]; o.line2 = prog[1] || ''; if(!heroCardsOn()) { o.line = prog.join(' \u00b7 '); o.line2 = ''; } }
+      else o.line = stationLastSongText(item);
     }
     return o;
   }
@@ -56381,7 +56408,7 @@
     var slide = document.createElement('div');
     slide.className = 'nph-slide';
     slide.innerHTML = '<div class="nph-media" aria-hidden="true"><div class="nph-bg"></div><div class="nph-refl"><div class="nph-mid"></div></div><div class="nph-art"></div><div class="nph-scrim"></div></div>'
-      + '<div class="nph-body"><div class="nph-text"><div class="nph-kicker"></div><h2 class="nph-title"></h2><div class="nph-line"></div><div class="nph-desc"></div></div>'
+      + '<div class="nph-body"><div class="nph-wash"></div><div class="nph-wscrim"></div><div class="nph-text"><div class="nph-kicker"></div><h2 class="nph-title"></h2><div class="nph-line"></div><div class="nph-line2"></div><div class="nph-desc"></div></div>'
       + '<button type="button" class="nph-play" aria-label="Play"><i class="fa-solid fa-play" aria-hidden="true"></i></button></div>';
     slide._play = slide.querySelector('.nph-play');
     slide._play.addEventListener('click', function(e){
@@ -56416,8 +56443,19 @@
     if(titleEl.textContent !== o.title){ titleEl.textContent = o.title; slide._fitKey = ''; }
     fitHeroTitle(slide);
     slide.querySelector('.nph-line').textContent = o.line;
+    slide.querySelector('.nph-line2').textContent = o.line2 || '';
     slide.querySelector('.nph-desc').textContent = o.desc;
     slide._artDone = false;
+  }
+  // The words only (the look changed, or the guide moved on).
+  function heroRefreshText(slide){
+    var item = slide && slide._item; if(!item || item.type === 'zen') return;
+    var o = heroTextFor(item, slide._entry);
+    slide.querySelector('.nph-kicker').textContent = o.kicker;
+    var t = slide.querySelector('.nph-title'); if(t.textContent !== o.title){ t.textContent = o.title; }
+    slide.querySelector('.nph-line').textContent = o.line;
+    slide.querySelector('.nph-line2').textContent = o.line2 || '';
+    slide._fitKey = '';
   }
   // Build 273 (Mark): a hero title never breaks inside a word. It starts at its full size and
   // steps down until its longest word fits the line and the whole title fits two lines; at the
@@ -56426,7 +56464,7 @@
   function fitHeroTitle(slide){
     // Build 555 (Mark): Flow's title is one line, shrunk as far as it must be (never an ellipsis).
     var cardish = !!(slide && slide._item && heroCardsOn());
-    var lines = slide && slide._titleLines || (cardish && carouselCfg.mode === 'edit' && carouselCfg.cardSize === 'l' ? 1 : 2), minSize = slide && slide._titleMin || (cardish ? 11 : HERO_TITLE_MIN);
+    var lines = slide && slide._titleLines || (cardish && carouselCfg.mode === 'edit' && carouselCfg.cardSize === 'l' ? 1 : cardish && carouselCfg.mode === 'card' ? 3 : 2), minSize = slide && slide._titleMin || (cardish ? 11 : HERO_TITLE_MIN);
     var el = slide && slide.querySelector('.nph-title');
     if(!el || !el.textContent) return;
     var w = el.clientWidth;
@@ -56468,10 +56506,11 @@
     if(carouselCfg.mode === 'slides') renderStationArt(slide.querySelector('.nph-bg'), item);
     if(carouselCfg.mode === 'slides' || (heroFlowOn() && carouselCfg.reflect)) renderStationArt(slide.querySelector('.nph-mid'), item);
     if(carouselCfg.mode === 'card'){
-      heroTint(slide);
+      var wa = slide.querySelector('.nph-art'), ww = slide.querySelector('.nph-wash');
+      paintFavWash(wa, ww);
       if(!slide._tintObs && window.MutationObserver){
-        slide._tintObs = new MutationObserver(function(){ heroTint(slide); });
-        slide._tintObs.observe(slide.querySelector('.nph-art'), { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+        slide._tintObs = new MutationObserver(function(){ paintFavWash(wa, ww); });
+        slide._tintObs.observe(wa, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
       }
     }
     if(entry && !heroFlowOn()){
@@ -56627,9 +56666,9 @@
     heroSlides.forEach(function(slide){
       if(!heroIsStation(slide._item)) return;
       var el = slide.querySelector('.nph-line');
-      var t = stationLastSongText(slide._item);
-      if(el.textContent !== t){
-        el.textContent = t;
+      var o = heroTextFor(slide._item, slide._entry), t = o.line;
+      if(el.textContent !== t || slide.querySelector('.nph-line2').textContent !== (o.line2 || '')){
+        el.textContent = t; slide.querySelector('.nph-line2').textContent = o.line2 || '';
         // a new last song: its cover, once the slide has been painted at all
         if(slide._artDone) repaintHeroSlideArt(slide);
       }
@@ -56896,6 +56935,7 @@
     npHero.classList.toggle('nph-card', carouselCfg.mode === 'card');
     npHero.classList.toggle('nph-edit', carouselCfg.mode === 'edit');
     npHero.classList.toggle('nph-sm', carouselCfg.cardSize !== 'l');
+    npHero.setAttribute('data-card-size', carouselCfg.cardSize);
     npHero.classList.toggle('nph-above', carouselCfg.mode === 'edit' && carouselCfg.textPos === 'above');
     var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
     var reflWas = npHero.classList.contains('nph-reflect');
@@ -56905,7 +56945,7 @@
     heroSyncCardW();   // build 645: Large is the biggest; Medium and Small much smaller
     npHero.style.setProperty('--flow-room', (carouselCfg.reflect ? Math.max(8, Math.round(size * 0.42) - 60) : 8) + 'px');   // build 552: 40px less; 554: 20px more
     if(was !== carouselCfg.mode || reflWas !== npHero.classList.contains('nph-reflect')){
-      heroSlides.forEach(function(sl){ sl._artDone = false; sl._fitKey = ''; });
+      heroSlides.forEach(function(sl){ sl._artDone = false; sl._fitKey = ''; heroRefreshText(sl); });
     }
     if(was !== carouselCfg.mode){
       if(flow){ heroFlowIdx = Math.max(0, Math.min(heroSlides.length - 1, at)); }
