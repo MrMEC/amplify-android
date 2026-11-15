@@ -19599,6 +19599,9 @@
       if(bookArt) return bookArt;
     }
     var own = getCustomArtUrl(favKey(track));
+    // Build 631 (Mark): the art chosen in Edit Channel is kept under the channel's own key, and it
+    // is the channel's picture wherever the channel shows (carousel, player, Now Playing).
+    if(!own && track && track.videoChannel && track.channel && track.channel.url) own = getCustomArtUrl('chart:' + track.channel.url);
     if(own || !isLocalTrack(track) || !String(track.album || '').trim()) return own;
     var key = albumKeyFor(track), legacy = legacyAlbumKeyFor(track);
     return getCustomArtUrl('album:' + key) || (legacy !== key ? getCustomArtUrl('album:' + legacy) : null);
