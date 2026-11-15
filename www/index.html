@@ -4649,6 +4649,18 @@
   .tile-grid > .ch-edit-bar + .ch-group-head{ margin-top:0; }
   .ch-edit-bar .ch-bar-btn{ min-height:36px; padding:0 16px; border-radius:18px; border:1px solid var(--border, rgba(128,128,128,.35)); background:none; color:var(--text); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
   .ch-edit-bar .ch-bar-btn:active{ opacity:.7; }
+  .ch-edit-bar .ch-bar-btn.ch-bar-primary{ background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  /* Build 639 (Mark): the row stays at the top while the channels scroll under it (under the header on a
+     phone, like the tab rows; at the very top once the header slides away or sideways). */
+  .tile-grid > .ch-edit-bar{ position:sticky; top:0; z-index:20; background:var(--main-fill, var(--main-bg));
+    box-shadow:0 -30px 0 var(--main-bg), 0 -45px 0 var(--main-bg), 0 -60px 0 var(--main-bg), 0 8px 0 var(--main-bg); }
+  @media (max-width: 900px){
+    .tile-grid > .ch-edit-bar{ top:60px; transition:top .28s cubic-bezier(.4,0,.2,1); }
+    body.hdr-autohide.hdr-stuck .tile-grid > .ch-edit-bar{ top:8px; }
+  }
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px){
+    .tile-grid > .ch-edit-bar, body.hdr-autohide.hdr-stuck .tile-grid > .ch-edit-bar{ top:0; }
+  }
   .ch-edit-bar .ch-bar-spacer{ flex:1; }
   .ch-edit-bar.ch-bar-center{ justify-content:center; }
   .ch-edit-list > .tile.ch-selectable{ cursor:pointer; }
@@ -26132,7 +26144,7 @@
     videoRefreshHeaderBtnEl.style.display = 'none';
     var mine = visibleVideoChannels(videoChannelsEditing);
     // Build 263: Edit is always there: it's where your own channels are made and changed.
-    videoReorderHeaderBtnEl.style.display = '';
+    videoReorderHeaderBtnEl.style.display = videoChannelsEditing ? 'none' : '';   // build 639: Done is in the sticky row
     // Sorting lives in edit mode (Mark: options only while editing), so no Sort button here.
     videoSortHeaderBtnEl.style.display = 'none';
     syncVideoMenuBtn();
@@ -27186,6 +27198,7 @@
     if(!chSelecting){
       bar.classList.add('ch-bar-center');
       btn('chSelectBtn', 'Select Channels', function(){ setChannelsSelecting(true); });
+      btn('chDoneBtn', 'Done', function(){ setChannelsArranging(false); }).classList.add('ch-bar-primary');   // build 639: primary colour, right of Select Channels
     } else {
       btn('chSelCancelBtn', 'Cancel', function(){ setChannelsSelecting(false); });
       var sp = document.createElement('span'); sp.className = 'ch-bar-spacer'; bar.appendChild(sp);
@@ -29823,7 +29836,7 @@
     opt('Add Channels', 'fa-solid fa-plus', null, function(){ leaveNp(); pushView(); openAddChannelsPage(); });
     // Build 617 (Mark): Build a Custom Channel lives here now, not in Add Channels.
     opt('Build a Custom Channel', 'fa-solid fa-pen', null, function(){ leaveNp(); openLiveChEditor(null); });
-    opt('Arrange Channels', 'fa-solid fa-grip-vertical', null, function(){ leaveNp(); setChannelsArranging(true); });
+    opt('Edit Channels', 'fa-solid fa-grip-vertical', null, function(){ leaveNp(); setChannelsArranging(true); });
     label('Layout');
     [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
       var on = channelLayout === o[0];
@@ -29866,7 +29879,7 @@
     }
     opt('Add Channels', false, function(){ leaveNp(); pushView(); openAddChannelsPage(); }, 'fa-solid fa-plus');   // build 409
     opt('Build a Custom Channel', false, function(){ leaveNp(); openLiveChEditor(null); }, 'fa-solid fa-pen');   // build 617
-    opt('Arrange Channels', false, function(){ leaveNp(); setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
+    opt('Edit Channels', false, function(){ leaveNp(); setChannelsArranging(true); }, 'fa-solid fa-grip-vertical');
     var sep = document.createElement('div'); sep.className = 'ch-menu-sep'; m.appendChild(sep);
     label('Layout');
     [['split', 'Your Channels First'], ['mixed', 'Mix All Channels']].forEach(function(o){
@@ -32194,6 +32207,8 @@
 
   // ---- the Video page: Continue Watching and the tabs
   function appendVideoTabs(){
+    // Build 639 (Mark): Edit Channels has no tabs; its Select Channels / Done row sticks at the top instead.
+    if(videoChannelsEditing && videoTab === 'channels') return;
     var tabs = document.createElement('div');
     tabs.className = 'home-tabs video-tabs watch-tabs';
     tabs.classList.add('scroll-tabs');
