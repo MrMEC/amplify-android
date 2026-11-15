@@ -1625,14 +1625,12 @@
     box-shadow:0 8px 20px rgba(0,0,0,.3); transition:background-color .35s ease; }
   html[data-theme="light"] .home-hero.nph-card .nph-slide{ box-shadow:0 8px 20px rgba(0,0,0,.16); }
   .home-hero.nph-card .nph-media{ aspect-ratio:1 / 1; background:none; }
-  .nph-card .nph-body{ flex:1; padding:14px 62px 18px; justify-content:center; align-items:center; text-align:center; min-height:96px; }
+  .nph-card .nph-body{ position:static; flex:1; padding:14px 16px 18px; justify-content:center; align-items:center; text-align:center; min-height:96px; }
   .nph-card .nph-text{ text-shadow:none; }
   .nph-card .nph-kicker{ color:inherit; opacity:.72; font-size:10.5px; margin-bottom:3px; }
   .nph-card .nph-title{ color:inherit; font-size:19px; line-height:1.15; }
   .nph-card .nph-line{ color:inherit; opacity:.88; font-size:14px; font-weight:600; margin-top:3px; }
-  .nph-card .nph-play{ position:absolute; right:12px; top:50%; transform:translateY(-50%); width:40px; height:40px; margin:0;
-    background:var(--card-fg, #fff); color:var(--card-bg, #26282d); box-shadow:none; }
-  .nph-card .nph-play:active{ transform:translateY(-50%) scale(.95); }
+  .nph-card .nph-play{ position:absolute; right:10px; top:10px; width:40px; height:40px; margin:0; font-size:16px; }
   .home-hero.nph-edit .nph-slide{ background:none; overflow:visible; }
   .home-hero.nph-edit .nph-media{ aspect-ratio:4 / 3; border-radius:var(--r-hero, 22px); order:1; box-shadow:0 8px 20px rgba(0,0,0,.25); }
   .nph-edit .nph-body{ order:2; padding:12px 2px 0; align-items:center; }
@@ -56252,10 +56250,18 @@
     function go(){
       var rgb = null; try{ rgb = heroTintRead(img); }catch(e){}
       if(rgb || !/^https?:/i.test(src)){ if(src) heroTintCache[src] = rgb; heroTintSet(slide, rgb); return; }
-      readableImageCopy(src).then(function(copy){
+      // A picture from a site that allows it can be read straight (a browser, the desktop); on the phone a native copy is fetched.
+      var cors = new Image(); cors.crossOrigin = 'anonymous';
+      cors.onload = function(){
+        var c1 = null; try{ c1 = heroTintRead(cors); }catch(e){}
+        if(c1){ heroTintCache[src] = c1; if(slide.querySelector('.nph-art img') === img) heroTintSet(slide, c1); } else viaNative();
+      };
+      cors.onerror = viaNative;
+      cors.src = src;
+      function viaNative(){ readableImageCopy(src).then(function(copy){
         var c2 = null; if(copy){ try{ c2 = heroTintRead(copy.img); }catch(e){} copy.done(); }
         heroTintCache[src] = c2; if(slide._item && slide.querySelector('.nph-art img') === img) heroTintSet(slide, c2);
-      });
+      }); }
     }
     if(img.complete && img.naturalWidth) go(); else img.addEventListener('load', go, { once: true });
   }
@@ -56369,7 +56375,6 @@
     slide._item = item; slide._entry = entry;
     slide.classList.toggle('nph-tap', !!entry || heroIsStation(item) || heroIsPodcast(item) || item.type === 'zen');
     var o = heroTextFor(item, entry);
-    slide._titleMin = heroCardsOn() ? 14 : 0;
     slide.querySelector('.nph-kicker').textContent = o.kicker;
     var titleEl = slide.querySelector('.nph-title');
     if(titleEl.textContent !== o.title){ titleEl.textContent = o.title; slide._fitKey = ''; }
@@ -56384,7 +56389,7 @@
   var HERO_TITLE_MIN = 20;
   function fitHeroTitle(slide){
     // Build 555 (Mark): Flow's title is one line, shrunk as far as it must be (never an ellipsis).
-    var lines = slide && slide._titleLines || 2, minSize = slide && slide._titleMin || HERO_TITLE_MIN;
+    var lines = slide && slide._titleLines || 2, minSize = slide && slide._titleMin || (slide && slide._item && heroCardsOn() ? 14 : HERO_TITLE_MIN);
     var el = slide && slide.querySelector('.nph-title');
     if(!el || !el.textContent) return;
     var w = el.clientWidth;
