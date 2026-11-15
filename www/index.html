@@ -7287,6 +7287,13 @@
     background:var(--panel-2); color:var(--text); font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit; -webkit-tap-highlight-color:transparent; }
   .preset-chip .preset-dot{ width:26px; height:26px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(128,128,128,.35); }
   .preset-chip[aria-pressed="true"]{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, var(--panel-2)); }
+  .th-grid{ grid-template-columns:repeat(3, 1fr); }
+  .th-chip{ text-align:center; line-height:1.2; }
+  .th-list{ display:flex; flex-direction:column; gap:8px; width:100%; margin-bottom:10px; }
+  .th-row{ display:flex; gap:8px; align-items:stretch; }
+  .th-use{ flex:1; text-align:left; padding:11px 14px; border:1.5px solid var(--border); border-radius:12px; background:var(--panel-2); color:var(--text); font:inherit; font-weight:600; cursor:pointer; }
+  .th-use[aria-pressed="true"]{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, var(--panel-2)); }
+  .th-del{ width:44px; border:1.5px solid var(--border); border-radius:12px; background:var(--panel-2); color:var(--text-dim); cursor:pointer; }
   .preset-chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
   /* Build 392: AMOLED black, the dark theme on pure black. */
   html[data-theme="dark"][data-amoled]{
@@ -9470,7 +9477,7 @@
       </button>
       <button type="button" class="set-cat" data-set-cat="appearance-theme">
         <span class="set-cat-icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.1-1.5-1.1-2.6 0-.9.7-1.5 1.6-1.5h2.1a4.2 4.2 0 0 0 4.2-4.2c0-4-3.8-7.1-8.5-7.1z"/><circle cx="7.6" cy="11" r="1"/><circle cx="10.6" cy="7.6" r="1"/><circle cx="15" cy="7.8" r="1"/></svg></span>
-        <span class="set-cat-text"><span class="set-cat-name">Theme &amp; color</span><span class="set-cat-sub">Light or dark, AMOLED black, presets, accent</span></span>
+        <span class="set-cat-text"><span class="set-cat-name">Theme Settings</span><span class="set-cat-sub">Theme presets, light or dark, AMOLED black, accent</span></span>
         <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
       </button>
       <button type="button" class="set-cat" data-set-cat="appearance-sizes">
@@ -9492,7 +9499,16 @@
       <!-- Build 567 (Mark): the phone's sideways screens can be turned off. -->
     </section>
 
-    <section class="set-page" data-set-page="appearance-theme" data-set-title="Theme &amp; color" data-set-parent="appearance" hidden>
+    <section class="set-page" data-set-page="appearance-theme" data-set-title="Theme Settings" data-set-parent="appearance" hidden>
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="themePresetLabel">Theme presets</span>
+        <div class="preset-grid th-grid" id="themePresetGrid" role="group" aria-labelledby="themePresetLabel"></div>
+      </div>
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label">Your themes</span>
+        <div class="th-list" id="themeCustomList" hidden></div>
+        <button type="button" class="settings-data-btn" id="themeSaveBtn">Save current settings as a theme</button>
+      </div>
       <div class="settings-row settings-row--stack">
         <span class="settings-label" id="themeLabel">Theme</span>
         <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
@@ -11256,7 +11272,7 @@
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
-    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont', 'radioPlayerAmoled', 'radioPlayerLayout', 'radioPlayerShape',
+    'radioPlayerVideoEdits', 'radioPlayerMusicFolders', 'radioPlayerVideoFolders', 'radioPlayerTheme', 'radioPlayerCustomAccent', 'radioPlayerFont', 'radioPlayerAmoled', 'radioPlayerBackground', 'radioPlayerCustomThemes', 'radioPlayerLayout', 'radioPlayerShape',
     'radioPlayerLibArtistRadio', 'radioPlayerTourDone'];
   var MIRROR = {};
   if(native) KEYS.forEach(function(k){ MIRROR[k] = true; });
@@ -12648,6 +12664,106 @@
     clearCustomAccent(currentTheme);
     restoreAccentForTheme(currentTheme);
   });
+
+  // ---------- Build 639 (Mark): Theme Settings -- ten preset themes and your own saved ones ----------
+  // A theme is a snapshot of existing settings: light/dark, AMOLED, accent, background, fonts, shape
+  // and density. Presets are built into the same snapshot shape a saved theme uses.
+  var THEMES_KEY = 'radioPlayerCustomThemes';
+  function thG(style, pos, intensity, size, c1, c2){ return { mode: 'gradient', grad: { style: style, pos: pos, intensity: intensity, size: size, c1: c1, c2: c2 } }; }
+  function thS(color){ return { mode: 'solid', color: color }; }
+  function thMake(o){
+    var s = { theme: o.theme, amoled: !!o.amoled, accent: { dark: o.accent, light: o.accent }, bg: {},
+      font: { body: o.body || 'poppins', head: o.head || 'same', size: o.size || 100, weight: o.weight || 0 },
+      shape: { radius: o.radius || 'soft', density: o.density || 'comfortable', artist: o.artist || 'circle', play: o.play || 'circle' } };
+    s.bg[o.theme] = o.bg || { mode: 'default' };
+    return s;
+  }
+  var THEME_PRESETS = [
+    { id: 'neon', name: 'Midnight Neon', dot: ['#00e5ff', '#7c3aed'], s: thMake({ theme: 'dark', amoled: true, accent: '#00e5ff', bg: thG('radial', 't', 35, 70, '#7c3aed', 'base'), body: 'inter', radius: 'round', play: 'circle' }) },
+    { id: 'noir', name: 'Gilded Noir', dot: ['#d4af37', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#d4af37', bg: thS('#000000'), head: 'serif', radius: 'square', artist: 'square', play: 'square' }) },
+    { id: 'paper', name: 'Paper & Ink', dot: ['#1f2937', '#f6f4ef'], s: thMake({ theme: 'light', accent: '#1f2937', bg: thS('#f6f4ef'), body: 'serif', head: 'serif', radius: 'square', artist: 'square', play: 'square' }) },
+    { id: 'synth', name: 'Synthwave', dot: ['#ff4fd8', '#3b82f6'], s: thMake({ theme: 'dark', accent: '#ff4fd8', bg: thG('diagonal', 'tl', 45, 80, '#ff4fd8', '#3b82f6'), body: 'nunito', radius: 'round', artist: 'rounded', play: 'rounded' }) },
+    { id: 'deep', name: 'Deep Ocean', dot: ['#38bdf8', '#0d1b2a'], s: thMake({ theme: 'dark', accent: '#38bdf8', bg: thS('#0d1b2a'), body: 'opensans', radius: 'soft' }) },
+    { id: 'evergreen', name: 'Evergreen', dot: ['#4ade80', '#0d1a14'], s: thMake({ theme: 'dark', accent: '#4ade80', bg: thS('#0d1a14'), body: 'lato', density: 'roomy', artist: 'rounded', radius: 'round' }) },
+    { id: 'boulevard', name: 'Sunset Boulevard', dot: ['#ff8a3d', '#ff5e62'], s: thMake({ theme: 'dark', accent: '#ff8a3d', bg: thG('vertical', 't', 40, 85, '#ff5e62', '#ff9966'), radius: 'soft', play: 'rounded' }) },
+    { id: 'candy', name: 'Cotton Candy', dot: ['#d6336c', '#fbeff1'], s: thMake({ theme: 'light', accent: '#d6336c', bg: thS('#fbeff1'), body: 'nunito', radius: 'round', density: 'roomy' }) },
+    { id: 'terminal', name: 'Terminal', dot: ['#39ff14', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#39ff14', bg: thS('#000000'), body: 'mono', head: 'mono', radius: 'square', density: 'compact', artist: 'square', play: 'square' }) },
+    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded' }) }
+  ];
+  function thLoadCustom(){ try{ var a = JSON.parse(localStorage.getItem(THEMES_KEY) || '[]'); return Array.isArray(a) ? a.filter(function(t){ return t && t.name && t.s; }) : []; }catch(e){ return []; } }
+  function thSaveCustom(a){ try{ localStorage.setItem(THEMES_KEY, JSON.stringify(a)); }catch(e){} }
+  function thSnapshot(){
+    var all = bgLoadAll(), bg = {};
+    ['dark', 'light'].forEach(function(t){ if(all[t]) bg[t] = JSON.parse(JSON.stringify(all[t])); });
+    var am = false; try{ am = localStorage.getItem(AMOLED_KEY) === 'on'; }catch(e){}
+    var ca = loadCustomAccent() || {};
+    return { theme: themePref, amoled: am, accent: { dark: ca.dark || null, light: ca.light || null }, bg: bg,
+      font: { body: fontPrefs.body, head: fontPrefs.head, size: fontPrefs.size, weight: fontPrefs.weight },
+      shape: { radius: shapePrefs.radius, density: shapePrefs.density, artist: shapePrefs.artist, play: shapePrefs.play } };
+  }
+  function thBgSig(p){
+    p = p || {};
+    if(p.mode === 'solid' && p.color) return 's:' + p.color;
+    if(p.mode === 'gradient'){ var g = {}, k; for(k in BG_DEFAULT_GRAD) g[k] = BG_DEFAULT_GRAD[k]; if(p.grad) for(k in p.grad) g[k] = p.grad[k]; return 'g:' + [g.style, g.pos, g.intensity, g.size, g.c1, g.c2].join(','); }
+    return 'd';
+  }
+  function thSig(s){
+    return JSON.stringify([s.theme, !!s.amoled, s.accent.dark || null, s.accent.light || null, thBgSig(s.bg.dark), thBgSig(s.bg.light),
+      s.font.body, s.font.head, s.font.size, s.font.weight, s.shape.radius, s.shape.density, s.shape.artist, s.shape.play]);
+  }
+  function thApply(s){
+    try{ localStorage.setItem(AMOLED_KEY, s.amoled ? 'on' : 'off'); }catch(e){}
+    ['dark', 'light'].forEach(function(t){ if(s.accent[t]) saveCustomAccent(t, s.accent[t]); else clearCustomAccent(t); });
+    var all = {}; ['dark', 'light'].forEach(function(t){ if(s.bg[t]) all[t] = JSON.parse(JSON.stringify(s.bg[t])); });
+    try{ localStorage.setItem(BG_KEY, JSON.stringify(all)); }catch(e){}
+    fontPrefs.body = fontPrefs.custom.some(function(c){ return c.id === s.font.body; }) || FONT_STACKS[s.font.body] ? s.font.body : 'poppins';
+    fontPrefs.head = s.font.head === 'same' || FONT_STACKS[s.font.head] || fontCustomItem(s.font.head) ? s.font.head : 'same';
+    fontPrefs.size = s.font.size; fontPrefs.weight = s.font.weight;
+    shapePrefs = { radius: s.shape.radius, density: s.shape.density, artist: s.shape.artist, play: s.shape.play };
+    try{ localStorage.setItem(SHAPE_KEY, JSON.stringify(shapePrefs)); }catch(e){}
+    ['radius', 'density', 'artist', 'play'].forEach(function(k){ var el = document.getElementById('shape' + k.charAt(0).toUpperCase() + k.slice(1) + 'Select'); if(el) el.value = shapePrefs[k]; });
+    amoledApply(); setTheme(s.theme || 'system');   // setTheme restores the accent and the background
+    shapeApply(); fontChanged(); thSync();
+  }
+  var thGridEl = document.getElementById('themePresetGrid'), thListEl = document.getElementById('themeCustomList');
+  function thChip(name, dot, on, click){
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'preset-chip th-chip'; b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    var d = document.createElement('span'); d.className = 'preset-dot'; d.style.background = 'linear-gradient(135deg,' + dot[0] + ' 50%,' + dot[1] + ' 50%)'; b.appendChild(d);
+    var n = document.createElement('span'); n.textContent = name; b.appendChild(n);
+    b.addEventListener('click', click); return b;
+  }
+  function thSync(){
+    if(!thGridEl) return;
+    var cur = thSig(thSnapshot());
+    thGridEl.innerHTML = '';
+    THEME_PRESETS.forEach(function(p){ thGridEl.appendChild(thChip(p.name, p.dot, thSig(p.s) === cur, function(){ thApply(JSON.parse(JSON.stringify(p.s))); })); });
+    thListEl.innerHTML = '';
+    var list = thLoadCustom();
+    list.forEach(function(t, i){
+      var row = document.createElement('div'); row.className = 'th-row';
+      var use = document.createElement('button'); use.type = 'button'; use.className = 'th-use'; use.textContent = t.name; use.setAttribute('aria-pressed', thSig(t.s) === cur ? 'true' : 'false');
+      use.addEventListener('click', function(){ thApply(JSON.parse(JSON.stringify(t.s))); });
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'th-del'; del.setAttribute('aria-label', 'Delete ' + t.name); del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+      del.addEventListener('click', function(){
+        confirmThen({ title: 'Delete theme?', message: '"' + t.name + '" will be removed. Your current settings stay as they are.', ok: 'Delete' }, function(){
+          var a = thLoadCustom().filter(function(x){ return x.id !== t.id; }); thSaveCustom(a); thSync();
+        });
+      });
+      row.appendChild(use); row.appendChild(del); thListEl.appendChild(row);
+    });
+    thListEl.hidden = !list.length;
+  }
+  document.getElementById('themeSaveBtn').addEventListener('click', function(){
+    zenNamePrompt('Name this theme', '', 'Save', function(name){
+      var a = thLoadCustom(), lc = name.toLowerCase(), hit = -1;
+      a.forEach(function(t, i){ if(t.name.toLowerCase() === lc) hit = i; });
+      var t = { id: hit >= 0 ? a[hit].id : 't' + Date.now().toString(36), name: name, s: thSnapshot() };
+      if(hit >= 0) a[hit] = t; else a.push(t);
+      thSaveCustom(a); zenSheetClose(); thSync();
+    });
+  });
+  (function(){ var pg = document.querySelector('[data-set-page="appearance-theme"]'); if(pg) ['click', 'change', 'input'].forEach(function(ev){ pg.addEventListener(ev, function(){ setTimeout(thSync, 60); }); }); })();
+  thSync();
 
   // ---------- how many results a search asks for ----------
   // The directory caps what it returns per request, and a bigger number means a slower first
