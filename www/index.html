@@ -4688,6 +4688,19 @@
   .tile-grid > .lc-panel .lc-actions{ padding:4px 0 8px; justify-content:space-between; }
   .lc-list .artist-info-thumb.lc-mv-thumb{ width:44px; height:44px; border-radius:50%; }
   /* Build 617: the Shows & Movies pane picks from My Library or from archive.org. */
+
+  /* Build 653 (Mark): the channel editor, redesigned. One page that scrolls (no box inside it), settings first and
+     what plays last, a sticky Content search, and Save on a bar that stays above the bottom tabs. */
+  .tile-grid > .lc-panel .lc-list, .tile-grid > .lc-panel .artist-info-list{ max-height:none; overflow:visible; margin-top:6px; }
+  .lc-content{ margin-top:6px; padding-top:14px; border-top:1px solid var(--border, rgba(128,128,128,.25)); }
+  .lc-content-head{ font-size:1.05rem; font-weight:700; margin:0 0 10px; }
+  .lc-body .cs-field-input[type="search"]{ position:sticky; top:0; z-index:6; background:var(--main-fill, var(--main-bg, var(--bg))); box-shadow:0 -10px 0 var(--main-fill, var(--main-bg, var(--bg))), 0 6px 0 var(--main-fill, var(--main-bg, var(--bg))); }
+  .tile-grid > .lc-panel .lc-bar{ position:sticky; bottom:calc(var(--mnav-total, 0px) + 6px); z-index:30; margin:16px -4px 0; padding:8px 12px; border-radius:16px;
+    background:var(--panel-2, var(--panel, #1c1c1e)); box-shadow:0 6px 24px rgba(0,0,0,.45); display:flex; align-items:center; gap:10px; }
+  .lc-bar .lc-note{ flex:1; min-width:0; margin:0; font-size:12.5px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; }
+  .tile-grid > .lc-panel .lc-bar .lc-actions{ padding:0; margin:0; flex:none; gap:8px; }
+  .lc-bar .art-url-save-btn{ min-width:96px; }
+  .lc-more-sentinel{ height:56px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); font-size:13px; }
   .lc-where{ margin-bottom:8px; }
   .lc-where[hidden]{ display:none; }
   .lc-ia-head{ padding:8px 8px 2px; font-size:.78rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); }
@@ -10237,34 +10250,6 @@
         <label id="liveChKindLabel">Plays</label>
         <div class="lc-opts lc-one-row" id="liveChKind" role="radiogroup" aria-labelledby="liveChKindLabel"></div>
       </div>
-      <div class="cs-field lc-pane" id="liveChPanePick">
-        <div class="lc-opts lc-one-row lc-where" id="liveChPickWhere" role="radiogroup" aria-label="Pick from"></div>
-        <div id="liveChPickLib">
-          <input type="search" class="cs-field-input" id="liveChSearch" placeholder="Find shows and movies" autocomplete="off" aria-label="Find shows and movies">
-          <div class="artist-info-list lc-list" id="liveChList" role="listbox" aria-multiselectable="true" aria-label="Shows and movies"></div>
-        </div>
-        <div id="liveChPickIa" hidden>
-          <input type="search" class="cs-field-input" id="liveChIaSearch" placeholder="Search archive.org videos" autocomplete="off" aria-label="Search archive.org videos">
-          <div class="artist-info-list lc-list" id="liveChIaList" role="listbox" aria-multiselectable="true" aria-label="Archive.org videos"></div>
-        </div>
-      </div>
-      <div class="cs-field lc-pane" id="liveChPaneMovies">
-        <div class="lc-opts lc-one-row" id="liveChFrom" role="radiogroup" aria-label="Movies from"></div>
-      </div>
-      <div class="cs-field lc-pane" id="liveChPaneGenre">
-        <select class="settings-select lc-select" id="liveChGenre" aria-label="Genre"></select>
-        <p class="lc-note" id="liveChGenreNote" hidden>Genres come from Plex. If none are listed, use Sync Now in Settings, under Plex.</p>
-      </div>
-      <div class="cs-field lc-pane" id="liveChPaneDecade">
-        <select class="settings-select lc-select" id="liveChDecade" aria-label="Decade"></select>
-      </div>
-      <div class="cs-field lc-pane" id="liveChPaneMv">
-        <div class="lc-opts lc-one-row" id="liveChMvWho" role="radiogroup" aria-label="Which music videos"></div>
-        <div id="liveChMvPick">
-          <input type="search" class="cs-field-input" id="liveChMvSearch" placeholder="Find artists" autocomplete="off" aria-label="Find artists">
-          <div class="artist-info-list lc-list" id="liveChMvList" role="listbox" aria-multiselectable="true" aria-label="Artists"></div>
-        </div>
-      </div>
       <div class="cs-field">
         <label id="liveChOrderLabel">Order</label>
         <div class="lc-opts lc-one-row" id="liveChOrder" role="radiogroup" aria-labelledby="liveChOrderLabel"></div>
@@ -10272,20 +10257,53 @@
       <div class="cs-field" id="liveChAdsField">
         <label id="liveChAdsLabel">Commercials</label>
         <div class="lc-opts lc-one-row" id="liveChAds" role="radiogroup" aria-labelledby="liveChAdsLabel"></div>
-        <p class="lc-note" id="liveChAdsNote">After each show, classic TV commercials from archive.org fill the rest of its half hour or hour. A break can run up to 30 seconds over.</p>
+        <p class="lc-note" id="liveChAdsNote">Fills each slot with classic ads.</p>
       </div>
       <div class="cs-field" id="liveChDescField">
-        <label for="liveChDesc">Grid description</label>
-        <textarea class="cs-field-input lc-desc" id="liveChDesc" rows="2" maxlength="140" autocomplete="off" placeholder="Optional"></textarea>
-        <p class="lc-note">Shown in the guide in place of the channel's schedule. Leave it empty to show the schedule.</p>
+        <label for="liveChDesc">Guide text (optional)</label>
+        <input type="text" class="cs-field-input" id="liveChDesc" maxlength="140" autocomplete="off" placeholder="Replaces the schedule">
       </div>
-      <p class="lc-note" id="liveChSummary"></p>
+      <!-- Build 653 (Mark): what plays comes last, as the rest of the page, so the page scrolls (no box inside it) and the settings above are always one scroll away. -->
+      <div class="lc-content">
+        <div class="lc-content-head">Content</div>
+        <div class="cs-field lc-pane" id="liveChPanePick">
+          <div class="lc-opts lc-one-row lc-where" id="liveChPickWhere" role="radiogroup" aria-label="Pick from"></div>
+          <div id="liveChPickLib">
+            <input type="search" class="cs-field-input" id="liveChSearch" placeholder="Find shows and movies" autocomplete="off" aria-label="Find shows and movies">
+            <div class="artist-info-list lc-list" id="liveChList" role="listbox" aria-multiselectable="true" aria-label="Shows and movies"></div>
+          </div>
+          <div id="liveChPickIa" hidden>
+            <input type="search" class="cs-field-input" id="liveChIaSearch" placeholder="Search archive.org videos" autocomplete="off" aria-label="Search archive.org videos">
+            <div class="artist-info-list lc-list" id="liveChIaList" role="listbox" aria-multiselectable="true" aria-label="Archive.org videos"></div>
+          </div>
+        </div>
+        <div class="cs-field lc-pane" id="liveChPaneMovies">
+          <div class="lc-opts lc-one-row" id="liveChFrom" role="radiogroup" aria-label="Movies from"></div>
+        </div>
+        <div class="cs-field lc-pane" id="liveChPaneGenre">
+          <select class="settings-select lc-select" id="liveChGenre" aria-label="Genre"></select>
+          <p class="lc-note" id="liveChGenreNote" hidden>Genres come from Plex. If none are listed, use Sync Now in Settings, under Plex.</p>
+        </div>
+        <div class="cs-field lc-pane" id="liveChPaneDecade">
+          <select class="settings-select lc-select" id="liveChDecade" aria-label="Decade"></select>
+        </div>
+        <div class="cs-field lc-pane" id="liveChPaneMv">
+          <div class="lc-opts lc-one-row" id="liveChMvWho" role="radiogroup" aria-label="Which music videos"></div>
+          <div id="liveChMvPick">
+            <input type="search" class="cs-field-input" id="liveChMvSearch" placeholder="Find artists" autocomplete="off" aria-label="Find artists">
+            <div class="artist-info-list lc-list" id="liveChMvList" role="listbox" aria-multiselectable="true" aria-label="Artists"></div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="art-url-actions lc-actions">
-      <button class="art-url-trash-btn" id="liveChDeleteBtn" title="Delete this channel" aria-label="Delete this channel">
-        <i class="fa-solid fa-trash"></i>
-      </button>
-      <button class="art-url-save-btn" id="liveChSaveBtn">Save</button>
+    <div class="lc-bar">
+      <p class="lc-note" id="liveChSummary"></p>
+      <div class="art-url-actions lc-actions">
+        <button class="art-url-trash-btn" id="liveChDeleteBtn" title="Delete this channel" aria-label="Delete this channel">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+        <button class="art-url-save-btn" id="liveChSaveBtn">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -27732,7 +27750,7 @@
     lcEl('liveChPickIa').hidden = where !== 'ia';
     if(where === 'lib') renderLiveChPickList(); else renderLiveChIaList();
   }
-  var liveChIaToken = 0, liveChIaTimer = 0;
+  var liveChIaToken = 0, liveChIaTimer = 0, liveChIaObs = null;
   // Video on archive.org that Amplify can play, 30 a page.
   function liveChIaFetch(term, page){
     var words = String(term || '').replace(/[^A-Za-z0-9\u00C0-\uFFFF\s]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 6);
@@ -27770,7 +27788,7 @@
     function head(t){ var h = document.createElement('div'); h.className = 'lc-ia-head'; h.textContent = t; box.appendChild(h); }
     function note(t){ var e = document.createElement('div'); e.className = 'artist-info-empty'; e.textContent = t; box.appendChild(e); }
     function has(id){ return added.some(function(x){ return x.id === id; }); }
-    function row(it){
+    function row(it, before){
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'artist-info-row';
@@ -27797,27 +27815,44 @@
         if(tab) tab.textContent = added.length ? 'Archive.org (' + added.length + ')' : 'Archive.org';
         syncLiveChEditorBits();
       });
-      box.appendChild(b);
+      if(before) box.insertBefore(b, before); else box.appendChild(b);
     }
+    if(liveChIaObs){ try{ liveChIaObs.disconnect(); }catch(e){} liveChIaObs = null; }
     var ia = ed.ia;
-    if(added.length){ head('In this channel'); added.forEach(row); }
+    if(added.length){ head('In this channel'); added.forEach(function(it){ row(it); }); }
     if(ia){
       head('Results');
       if(ia.loading) note('Searching archive.org\u2026');
       else if(ia.failed) note('Couldn\u2019t reach archive.org. Try again.');
       else if(!ia.items.length) note('No playable videos found for that.');
       else{
-        ia.items.forEach(row);
+        ia.items.forEach(function(it){ row(it); });
         if(archiveHasMore(ia.total, ia.page)){
-          box.appendChild(archiveMoreButton(function(){
+          // Build 653 (Mark): more results load as the end of the list comes into view, added under the rows already there
+          // (nothing is redrawn, so the page stays where it is).
+          var sent = document.createElement('div');
+          sent.className = 'lc-more-sentinel'; sent.textContent = 'Loading more\u2026';
+          box.appendChild(sent);
+          var busy = false;
+          var more = function(){
+            if(busy || !liveChEd || liveChEd !== ed || ed.ia !== ia) return;
+            busy = true;
             var tok = liveChIaToken;
-            return liveChIaFetch(ia.q, ia.page + 1).then(function(r){
-              if(tok !== liveChIaToken || ed.ia !== ia) return;
-              ia.items = ia.items.concat(r.items.filter(function(x){ return !ia.items.some(function(y){ return y.id === x.id; }); }));
+            liveChIaFetch(ia.q, ia.page + 1).then(function(r){
+              if(tok !== liveChIaToken || ed.ia !== ia || !sent.parentNode) return;
+              var fresh = r.items.filter(function(x){ return !ia.items.some(function(y){ return y.id === x.id; }); });
+              ia.items = ia.items.concat(fresh);
               ia.total = r.total; ia.page = r.page;
-              renderLiveChIaList();
-            });
-          }));
+              fresh.forEach(function(it){ row(it, sent); });
+              busy = false;
+              if(!archiveHasMore(ia.total, ia.page) || !r.items.length){ sent.remove(); if(liveChIaObs){ liveChIaObs.disconnect(); liveChIaObs = null; } }
+              else if(liveChIaObs){ liveChIaObs.unobserve(sent); liveChIaObs.observe(sent); }   // still in view: asks again
+            }, function(){ busy = false; sent.textContent = 'Couldn\u2019t load more. Scroll up and down to try again.'; if(liveChIaObs){ liveChIaObs.unobserve(sent); liveChIaObs.observe(sent); } });
+          };
+          if('IntersectionObserver' in window){
+            liveChIaObs = new IntersectionObserver(function(es){ if(es.some(function(e){ return e.isIntersecting; })) more(); }, { rootMargin: '900px 0px' });
+            liveChIaObs.observe(sent);
+          } else { sent.textContent = 'More Results'; sent.style.cursor = 'pointer'; sent.addEventListener('click', more); }
         }
       }
     } else if(!added.length){
