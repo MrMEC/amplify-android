@@ -62,7 +62,7 @@ async def main():
               return {slideW:sl.map(function(s){return r(s).w}), slideH:sl.map(function(s){return r(s).h}), favW:fav?r(fav).w:null, favGap:fgap,
                 gap:sl.length>1?Math.round((sl[1].getBoundingClientRect().left-sl[0].getBoundingClientRect().right)*10)/10:null,
                 artTops:arts.map(function(a){return a.t}), artBottoms:arts.map(function(a){return a.b}), heroBottom:r(hero).b, trackBottom:r(tr).b, nextTop:nxt?r(nxt).t:null, slideBottom:lastB, nextTag:nxt?(nxt.className||nxt.tagName):null,
-                titleSz:sl.map(function(s){return getComputedStyle(s.querySelector('.nph-title')).fontSize})};})()""")
+                titleSz:sl.map(function(s){return getComputedStyle(s.querySelector('.nph-title')).fontSize}), trL:r(tr).l, trR:r(tr).l+r(tr).w, vw:innerWidth, s0L:r(sl[0]).l, favL:fav?r(fav).l:null};})()""")
         R = {}
         INJ = "(function(){var s=document.querySelectorAll('#npHeroTrack > .nph-slide');var d=[['Song','Iguazu Falls (Cataratas del Iguaz\\u00fa)','Sheena Easton','The Ultimate Collection: 100 Hits'],['Live TV','Lucha Plus','Lucha Libre AAA Worldwide','S4 E12 \\u00b7 Clash of Champions'],['Song','Strut','Sheena Easton','']];d.forEach(function(x,i){var e=s[i];e.querySelector('.nph-kicker').textContent=x[0];e.querySelector('.nph-title').textContent=x[1];e.querySelector('.nph-line').textContent=x[2];e.querySelector('.nph-line2').textContent=x[3];e._fitKey='';});})()"
         for sz in ('l', 'm', 's'):
@@ -77,6 +77,8 @@ async def main():
         re_ = await pg.evaluate("getComputedStyle(document.querySelector('#npHeroTrack > .nph-slide .nph-media')).borderTopLeftRadius")
         check(rad[0] == rc == re_, 'corner radius fav %s card %s editorial %s' % (rad[0], rc, re_))
         for k, v in R.items(): print(k, json.dumps(v))
+        for k, v in R.items():
+            check(v['trL'] == 0 and abs(v['trR'] - v['vw']) < 0.6 and abs(v['s0L'] - v['favL']) < 0.6, '%s runs edge to edge (%s..%s of %s), first card at the page margin %s vs Favorites %s' % (k, v['trL'], v['trR'], v['vw'], v['s0L'], v['favL']))
         c = R['card-s']; check(c['favW'] is not None and abs(c['slideW'][0] - c['favW']) < 0.6 and abs(c['gap'] - c['favGap']) < 0.6, 'Card small = Favorites width %s vs %s, gap %s vs %s' % (c['slideW'][0], c['favW'], c['gap'], c['favGap']))
         for k, v in R.items():
             if k.startswith('edit'):

@@ -37,7 +37,7 @@ async def main():
             on = await pg.evaluate("Array.from(document.querySelectorAll('#themePresetGrid [aria-pressed=true] span:last-child')).map(s=>s.textContent)")
             check(len(on)==1, f'{n} marked {on}')
             await pg.screenshot(path=f'{SHOTS}/th-{n}.png')
-        want = {1:'flow,l,60,true',2:'edit,m,above',3:'none',4:'card,m',5:'slides,l',6:'edit,m,below',7:'card,l',8:'card,s',9:'none',10:'edit,s,above'}
+        want = {1:'flow,l,60,true',2:'edit,m,above',3:'none',4:'card,m',5:'slides,l',6:'edit,m,below',7:'card,l',8:'card,s',9:'none',10:'edit,m,below'}
         for i,w in want.items():
             await pg.click(f'#themePresetGrid .th-chip:nth-child({i})'); await pg.wait_for_timeout(400)
             got = await pg.evaluate("(function(){var c=JSON.parse(localStorage.getItem('radioPlayerCarousel'));return c.mode=='none'?'none':c.mode=='flow'?['flow',c.size,c.tilt,c.reflect].join(','):c.mode=='card'?'card,'+c.cardSize:c.mode=='edit'?'edit,'+c.cardSize+','+c.textPos:'slides,'+c.size})()")

@@ -1615,7 +1615,9 @@
   .nph-heading[hidden]{ display:none; }
   .home-hero > .nph-heading{ margin:0 0 12px; }
   .home-hero.nph-flow > .nph-heading{ padding:0 var(--main-pad); }
-  .home-hero.nph-card .nph-track, .home-hero.nph-edit .nph-track{ position:relative; gap:var(--card-gap, 16px); align-items:stretch; border-radius:0 !important; background:none; box-shadow:none !important; padding-bottom:6px; margin-bottom:0; }
+  .home-hero.nph-card .nph-track, .home-hero.nph-edit .nph-track{ position:relative; gap:var(--card-gap, 16px); align-items:stretch; border-radius:0 !important; background:none; box-shadow:none !important; padding-bottom:6px; margin-bottom:0;
+    /* Build 654 (Mark): the row runs to both edges of the screen; the first card still starts at the page's margin. */
+    margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad)); padding-left:var(--main-pad); padding-right:var(--main-pad); scroll-padding-left:var(--main-pad); }
   /* Build 648 (Mark): the space under these carousels was the tabs' 40px top margin on top of the carousel's own; now 18px. */
   .home-hero.nph-card ~ #homeGroupTabs, .home-hero.nph-edit ~ #homeGroupTabs{ margin-top:18px; }
   .home-hero.nph-card .nph-slide, .home-hero.nph-edit .nph-slide{ flex:0 0 var(--card-w, calc(100% - 44px)); min-height:0; justify-content:flex-start; }
@@ -7095,6 +7097,8 @@
       /* Build 479 (Mark): a thin ring in the theme's primary colour, inside the 36px so the
          picture keeps its size and its place on the right margin. */
       box-sizing:border-box; border:2px solid var(--accent);
+      /* Build 654 (Mark): a small gap between the ring and the picture, as on the profile page's large photo. */
+      padding:2px; background-clip:content-box;
       transition:opacity .2s ease;
     }
     html body.np-open .sidebar-top .hamburger-btn .hb-avatar{ border-color:var(--np-vivid, var(--accent)); transition:opacity .2s ease, border-color .5s ease; }
@@ -7103,7 +7107,7 @@
        scrolled up, on every page. It never slides. Not tappable while it is faded out. */
     html body.hdr-av-off .sidebar-top .hamburger-btn .hb-avatar{ opacity:0; }
     html body.hdr-av-off .sidebar-top .hamburger-btn{ pointer-events:none; }
-    .hb-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+    .hb-avatar img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
     .hb-avatar svg{ width:58%; height:58%; }
     /* Just the picture: no disc behind it, on any page. */
     html body .sidebar-top .hamburger-btn,
@@ -12806,7 +12810,7 @@
     { id: 'boulevard', name: 'Sunset Boulevard', dot: ['#ff8a3d', '#ff5e62'], s: thMake({ theme: 'dark', accent: '#ff8a3d', bg: thG('vertical', 't', 40, 85, '#ff5e62', '#ff9966'), radius: 'soft', play: 'rounded', car: ['card','m',45,false,'below',true,'l'] }) },
     { id: 'candy', name: 'Cotton Candy', dot: ['#d6336c', '#fbeff1'], s: thMake({ theme: 'light', accent: '#d6336c', bg: thS('#fbeff1'), body: 'nunito', radius: 'round', density: 'roomy', car: ['card','s',66,true,'below',true,'s'] }) },
     { id: 'terminal', name: 'Terminal', dot: ['#39ff14', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#39ff14', bg: thS('#000000'), body: 'mono', head: 'mono', radius: 'square', density: 'compact', artist: 'square', play: 'square', car: ['none'] }) },
-    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded', car: ['edit','m',55,false,'above',false,'s'] }) }
+    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded', car: ['edit','m',55,false,'below',true,'m'] }) }
   ];
   function thLoadCustom(){ try{ var a = JSON.parse(localStorage.getItem(THEMES_KEY) || '[]'); return Array.isArray(a) ? a.filter(function(t){ return t && t.name && t.s; }) : []; }catch(e){ return []; } }
   function thSaveCustom(a){ try{ localStorage.setItem(THEMES_KEY, JSON.stringify(a)); }catch(e){} }
