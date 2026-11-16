@@ -7419,6 +7419,10 @@
   }
   .cl-item:active{ background:var(--panel-2); }
   .cl-item:last-of-type{ border-bottom:none; }
+  /* Build 656: the chapter check's rows are information only. */
+  .cl-item.cl-static{ cursor:default; }
+  .cl-item.cl-static:active{ background:none; }
+  #chapterGroups .set-sub:first-child{ margin-top:10px; }
   .cl-art.tile-art{ flex:0 0 48px; width:48px; height:48px; aspect-ratio:auto; margin:0; border-radius:6px; overflow:hidden; font-size:16px; }
   .cl-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .cl-name{ font-size:15px; font-weight:600; line-height:1.3; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -9781,6 +9785,19 @@
           <option value="off">Off</option>
         </select>
       </div>
+      <!-- Build 656 (Mark): which followed shows publish chapters and mark their ad breaks. -->
+      <h3 class="set-sub" id="chapterSub" hidden>Podcasts</h3>
+      <button type="button" class="settings-row set-link-row" id="chapterCheckBtn" style="display:none;">
+        <span class="set-text"><span class="settings-label">Podcast chapters</span><span class="set-desc">See which of your shows mark their ad breaks</span></span>
+        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
+      </button>
+    </section>
+
+    <!-- Build 656: the chapter check's results, grouped. -->
+    <section class="set-page" data-set-page="chapters" data-set-title="Podcast chapters" data-set-parent="playback" hidden>
+      <p class="set-lead" id="chapterLead"></p>
+      <div id="chapterGroups"></div>
+      <button type="button" class="settings-data-btn settings-wide-btn cl-more" id="chapterAgainBtn">Check again</button>
     </section>
 
     <!-- Library -->
@@ -14259,6 +14276,98 @@
     renderCleanupCats();
     showSettingsCat('cleanup');
   });
+
+  // ---------- Podcast chapters (build 656, Mark) ----------
+  // Reads each followed show's feed on the phone (ChapterCheck) and sorts the shows into those
+  // that mark their ad breaks as chapters (a "Skip ad" button would work for them), those with
+  // chapters but no ad marks, those without chapters, and feeds that couldn't be read.
+  var CHAPTER_GROUPS = [
+    { id: 'ads', name: 'Marks ad breaks', sub: 'Ad breaks are marked as chapters' },
+    { id: 'chapters', name: 'Chapters, no ad marks', sub: 'Has chapters, but ad breaks aren\u2019t marked' },
+    { id: 'none', name: 'No chapters', sub: '' },
+    { id: 'error', name: 'Couldn\u2019t check', sub: 'The show\u2019s feed couldn\u2019t be read' }
+  ];
+  var chapterRunning = false;
+  function chapterPlugin(){
+    var Cap = window.Capacitor;
+    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    if(!P || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform() || typeof P.podcastChapterCheck !== 'function') return null;
+    return P;
+  }
+  function renderChapterResults(results){
+    var byId = {};
+    (results || []).forEach(function(r){ if(r && r.id) byId[String(r.id)] = r; });
+    var groups = {};
+    CHAPTER_GROUPS.forEach(function(g){ groups[g.id] = []; });
+    podcastSubs.forEach(function(sub){
+      var r = byId[String(sub.collectionId)];
+      var st = r && groups[r.status] ? r.status : 'error';
+      groups[st].push(sub);
+    });
+    var box = document.getElementById('chapterGroups');
+    box.innerHTML = '';
+    var ads = groups.ads.length;
+    document.getElementById('chapterLead').textContent = ads
+      ? (ads === 1 ? '1 of your shows marks' : ads + ' of your shows mark') + ' its ad breaks as chapters, so Skip ad would work for '
+        + (ads === 1 ? 'it' : 'them') + '. Checked from each show\u2019s newest episodes.'
+      : 'None of your shows mark their ad breaks as chapters yet, so Skip ad wouldn\u2019t work for them. Checked from each show\u2019s newest episodes.';
+    CHAPTER_GROUPS.forEach(function(g){
+      var list = groups[g.id];
+      if(!list.length) return;
+      list.sort(function(a, b){ return String(a.collectionName || '').localeCompare(String(b.collectionName || '')); });
+      var h = document.createElement('h3');
+      h.className = 'set-sub';
+      h.textContent = g.name;
+      box.appendChild(h);
+      var wrap = document.createElement('div');
+      wrap.className = 'cl-list';
+      wrap.dataset.chGroup = g.id;
+      list.forEach(function(sub){
+        var row = document.createElement('div');
+        row.className = 'cl-item cl-static';
+        var art = document.createElement('span');
+        art.className = 'cl-art tile-art';
+        try{ renderStationArt(art, { favicon: sub.artworkUrl || '', name: sub.collectionName || '' }); }catch(e){}
+        var text = document.createElement('span');
+        text.className = 'cl-text';
+        var nm = document.createElement('span'); nm.className = 'cl-name'; nm.textContent = sub.collectionName || '';
+        var sb = document.createElement('span'); sb.className = 'cl-sub'; sb.textContent = g.sub || sub.artistName || '';
+        text.appendChild(nm); if(sb.textContent) text.appendChild(sb);
+        row.appendChild(art); row.appendChild(text);
+        wrap.appendChild(row);
+      });
+      box.appendChild(wrap);
+    });
+  }
+  function runChapterCheck(){
+    var P = chapterPlugin();
+    if(!P || chapterRunning) return;
+    if(!podcastSubs.length){
+      showNotice({ kind: 'info', title: 'No podcasts yet', message: 'Follow a show in Podcasts and it\u2019ll be checked here.' });
+      return;
+    }
+    chapterRunning = true;
+    var seq = showNotice({ kind: 'working', title: 'Checking your podcasts', message: 'Reading each show\u2019s newest episodes\u2026', sticky: true });
+    var shows = podcastSubs.map(function(sub){ return { id: String(sub.collectionId), feedUrl: sub.feedUrl || '' }; });
+    P.podcastChapterCheck({ shows: shows }).then(function(res){
+      chapterRunning = false;
+      closeNotice(seq);
+      renderChapterResults(res && res.results);
+      if(settingsCat !== 'chapters') showSettingsCat('chapters');
+      settingsPanelEl.scrollTop = 0;
+    })['catch'](function(){
+      chapterRunning = false;
+      showNotice({ kind: 'error', title: 'Couldn\u2019t check your podcasts', message: 'Try again in a moment.' });
+    });
+  }
+  (function(){
+    var btn = document.getElementById('chapterCheckBtn');
+    if(!btn || !chapterPlugin()) return;
+    btn.style.display = '';
+    document.getElementById('chapterSub').hidden = false;
+    btn.addEventListener('click', runChapterCheck);
+    document.getElementById('chapterAgainBtn').addEventListener('click', runChapterCheck);
+  })();
   ['tagOverlay', 'artUrlOverlay'].forEach(function(id){
     var o = document.getElementById(id);
     if(!o || !window.MutationObserver) return;
