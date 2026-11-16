@@ -3655,6 +3655,8 @@
   /* Build 601 (Mark): an archive.org video has the same show / hide details arrow as your own
      movies and episodes (build 347 had left it out). */
   .now-playing-screen.np-ia .np-coll-head > .np-foot-toggle{ display:flex; }
+  /* Build 652 (Mark): an archive.org video's description is a few lines, not the whole page. */
+  .now-playing-screen.np-ia .np-sub{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden; }
   .now-playing-screen.np-channel:not(.np-tv) .np-coll-head > .np-foot-toggle{ display:flex; }
   .np-coll-head > .epg-corner.np-foot-toggle{ width:34px; height:34px; flex:0 0 34px; margin-left:-8px; border-radius:50%; background:transparent; }
   .np-coll-head > .epg-corner.np-foot-toggle svg{ width:22px; height:22px; }
@@ -28700,6 +28702,22 @@
     epgInfoOverlay.querySelector('.epg-info-panel').scrollTop = 0;
   }
   var epgInfoItem = null;
+  // The archive.org videos of a custom channel, those after the one given first (what is coming up), then the ones before it.
+  function archiveListForChannel(ch, cur){
+    var raw = [];
+    try{
+      if(isLiveChUrl(ch.url)){ var def = liveChDefById(ch.url.slice('amplify-live:'.length)); raw = (def && def.src && def.src.archive) || []; }
+      else if(isArchiveChUrl(ch.url)){ raw = (ch.archive && ch.archive.items) || []; }
+    }catch(e){ raw = []; }
+    var seen = {}, all = [];
+    raw.forEach(function(it){
+      if(!it || !it.id || seen[it.id]) return;
+      seen[it.id] = 1;
+      all.push({ id: it.id, title: it.title || it.id, creator: it.creator || '', year: it.year || '', video: true });
+    });
+    var at = -1; all.forEach(function(it, i){ if(cur && it.id === cur.id) at = i; });
+    return at < 0 ? all : all.slice(at + 1).concat(all.slice(0, at + 1));
+  }
   function epgOwnContent(ch, it){
     if(!ch || !it) return null;
     if(isLiveChUrl(ch.url) && it.ai && it.ai.id) return { archive: it.ai };   // build 617
@@ -28716,7 +28734,13 @@
   document.getElementById('epgInfoWatch').addEventListener('click', function(){
     var ch = epgInfoCh, own = epgInfoItem; closeEpgInfo();
     if(own && own.video){ playVideo(own.video); return; }
-    if(own && own.archive){ playArchiveItem(own.archive); return; }
+    if(own && own.archive){
+      // Build 652 (Mark): a video picked from a custom channel's guide brings the rest of that channel with it:
+      // "More from <channel>" below, the arrow to hide the details, the description kept to a few lines.
+      var chList = ch ? archiveListForChannel(ch, own.archive) : [];
+      playArchiveItem(own.archive, null, chList.length ? { list: chList, label: ch.name || '' } : undefined);
+      return;
+    }
     if(ch) playChannel(ch);
   });
   document.addEventListener('keydown', function(e){
@@ -51905,7 +51929,7 @@
     var others = ctx ? ctx.items.filter(function(it){ return it && it.video && it.id !== id; }) : [];
     if(!others.length){ npCollection.style.display = 'none'; return; }
     npCollection.style.display = '';
-    npCollectionHeading.textContent = 'More Videos';
+    npCollectionHeading.textContent = ctx.label ? 'More from ' + ctx.label : 'More Videos';
     // Build 601 (Mark): the same rows as More Movies and Episodes (picture, title, year · maker).
     others.forEach(function(it){
       var row = document.createElement('div');
@@ -51919,7 +51943,7 @@
       var n = document.createElement('div'); n.className = 'vep-title'; n.textContent = it.title; text.appendChild(n);
       var sb = document.createElement('div'); sb.className = 'vep-sub'; sb.textContent = [it.year, it.creator].filter(Boolean).join(' \u00b7 ') || 'Video'; text.appendChild(sb);
       row.appendChild(text);
-      row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: ctx.noHistory, list: ctx.items }); });
+      row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: ctx.noHistory, list: ctx.items, label: ctx.label }); });
       npCollectionGrid.appendChild(row);
     });
   }
@@ -51943,7 +51967,7 @@
       actions: [{ label: 'OK' }, { label: 'Open on archive.org', primary: true, run: function(){ try{ window.open('https://archive.org/details/' + encodeURIComponent(item.id), '_blank'); }catch(e){} } }] });
   }
   function playArchiveItem(item, row, opts){
-    if(opts && opts.list) archiveNpResults = { items: opts.list.slice(), noHistory: !!opts.noHistory };
+    if(opts && opts.list) archiveNpResults = { items: opts.list.slice(), noHistory: !!opts.noHistory, label: opts.label || '' };
     else archiveNpResults = null;
     if(row) row.classList.add('loading');
     extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){

@@ -92,7 +92,7 @@ async def main():
             await pg.screenshot(path=f'{SHOTS}/lms-{TAG}-2-manage-btn.png')
             await pg.evaluate("document.getElementById('ltvManageChannels').click()"); await pg.wait_for_timeout(700)
             items = await pg.evaluate("Array.from(document.querySelectorAll('#ltvManageSheet .np-menu-item')).map(function(b){ return b.textContent.trim(); })")
-            check(items[:3] == ['Add Channels', 'Build a Custom Channel', 'Arrange Channels'], f'[{TAG}] the menu: Add Channels, Build a Custom Channel, Arrange Channels {items}')
+            check(items[:3] == ['Add Channels', 'Build a Custom Channel', 'Edit Channels'], f'[{TAG}] the menu: Add Channels, Build a Custom Channel, Arrange Channels {items}')
             await pg.screenshot(path=f'{SHOTS}/lms-{TAG}-3-sheet.png')
             await pg.evaluate("document.querySelector('.ltv-manage-scrim').click()"); await pg.wait_for_timeout(500)
 
@@ -109,7 +109,7 @@ async def main():
 
         # 3. Arrange Channels: scroll by swiping over the rows
         await pg.evaluate("(function(){ var b = document.getElementById('videoReorderHeaderBtn'); b.click(); })()"); await pg.wait_for_timeout(400)
-        await pg.evaluate("Array.from(document.querySelectorAll('#guideMenu .np-menu-item')).filter(function(b){ return /Arrange/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(900)
+        await pg.evaluate("Array.from(document.querySelectorAll('#guideMenu .np-menu-item')).filter(function(b){ return /Arrange|Edit Channels/.test(b.textContent); })[0].click()"); await pg.wait_for_timeout(900)
         rows = await pg.evaluate("document.querySelectorAll('.ch-edit-list > .tile').length")
         check(rows == 9 + 14, f'[{TAG}] Arrange lists all 23 channels {rows}')
         await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
@@ -220,6 +220,19 @@ async def main():
         await pg.wait_for_timeout(1500)
         loads = await pg.evaluate("window.__loads.map(function(a){ return a.url || a.uri || ''; })")
         check(len(loads) >= 1, f'[{TAG}] tuning in the channel plays something {loads[-1:]}')
+        # 6. Build 652: a coming-up archive video, played from the guide, brings the channel's other videos below it
+        await pg.evaluate("document.getElementById('npBackBtn') && document.getElementById('npBackBtn').click()"); await pg.wait_for_timeout(500)
+        await pg.evaluate("document.querySelector('.mobile-nav-btn[data-nav=video]').click()"); await pg.wait_for_timeout(700)
+        await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(400)
+        opened = await pg.evaluate("""(function(){ var r = Array.from(document.querySelectorAll('#stationsGrid .epg-row')).filter(function(x){ return /Cartoons/.test(x.querySelector('.epg-ch').textContent); })[0];
+          var ps = Array.from(r.querySelectorAll('.epg-prog:not(.now)')).filter(function(x){ return /Superman|Betty/.test(x.textContent); }); if(!ps.length) return 'none'; ps[0].click(); return ps[0].textContent.slice(0,30); })()""")
+        await pg.wait_for_timeout(500)
+        await pg.evaluate("document.getElementById('epgInfoWatch').click()"); await pg.wait_for_timeout(2500)
+        S = await pg.evaluate("""(function(){ var tg = document.getElementById('npFootToggle'), sub = document.getElementById('npSub'), cs = getComputedStyle(sub);
+          return { opened: %s, ia: document.getElementById('nowPlayingScreen').classList.contains('np-ia'), toggle: getComputedStyle(tg).display, heading: document.getElementById('npCollectionHeading').textContent,
+            rows: Array.from(document.querySelectorAll('#npCollectionGrid > *')).map(function(r){ return r.textContent; }), clamp: cs.webkitLineClamp || cs.lineClamp }; })()""" % json.dumps(opened).replace('%','%%') if False else "(function(){ var tg = document.getElementById('npFootToggle'), sub = document.getElementById('npSub'), cs = getComputedStyle(sub); return { ia: document.getElementById('nowPlayingScreen').classList.contains('np-ia'), toggle: getComputedStyle(tg).display, heading: document.getElementById('npCollectionHeading').textContent, rows: Array.from(document.querySelectorAll('#npCollectionGrid > *')).map(function(r){ return r.textContent; }), clamp: cs.webkitLineClamp }; })()")
+        await pg.screenshot(path=f'{SHOTS}/lms-{TAG}-15-ia-np.png')
+        check(S['ia'] and S['toggle'] == 'flex' and S['heading'] == 'More from Cartoons & Seinfeld' and len(S['rows']) == 1 and S['clamp'] == '3', f'[{TAG}] guide Watch Now on an archive video: arrow, More from the channel, 3-line description {opened} {S}')
         check(not errs, f'[{TAG}] no page errors {errs[:2]}')
         await b.close()
 
