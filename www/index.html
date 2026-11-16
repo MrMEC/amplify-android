@@ -11420,7 +11420,7 @@
   var P = cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer;
   var native = !!(P && typeof P.kvSet === 'function' && typeof P.kvGetAll === 'function');
   var KEYS = ['radioPlayerFavorites', 'radioPlayerFavOrder', 'radioPlayerFavOrderManual', 'radioPlayerFavArtistOrder',
-    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort', 'radioPlayerLiveChannels',
+    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort', 'radioPlayerLiveChannels', 'radioPlayerStarterPack',
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
@@ -26116,6 +26116,47 @@
   var videoChannels = [];
   try{ videoChannels = JSON.parse(localStorage.getItem(VIDEO_CHANNELS_KEY) || '[]') || []; }catch(e){ videoChannels = []; }
   if(!Array.isArray(videoChannels)) videoChannels = [];
+  // Build 660 (Mark): a first-time user's Live TV isn't empty. A starter pack of ordinary, removable
+  // channels (live cams, space, weather, news and classic TV) is added once, on a fresh install only
+  // (no saved channels of any kind), and never again, so removing one sticks. Nothing is seeded
+  // any more: your own show and movie channels come from Add Channels > My Shows & Movies.
+  // All are direct HLS streams (the normal channel player); each is marked "Not working" on its
+  // own if its stream is ever down, like any added channel.
+  var STARTER_DONE_KEY = 'radioPlayerStarterPack';
+  function starterTile(c1, c2, title, place){
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient></defs>'
+      + '<rect width="200" height="200" rx="28" fill="url(#g)"/>'
+      + '<circle cx="100" cy="52" r="19" fill="none" stroke="#fff" stroke-width="6" opacity=".92"/><circle cx="100" cy="52" r="7" fill="#fff" opacity=".92"/>'
+      + '<text x="100" y="116" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="' + (title.length > 8 ? 34 : 38) + '" fill="#fff">' + title + '</text>'
+      + '<text x="100" y="158" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="600" font-size="27" fill="#fff" opacity=".95">' + place + '</text></svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+  var BEACH_TV = 'https://5ed325193d4e1.streamlock.net:444/LiveTV/';
+  var STARTER_PACK = [
+    { id: 'starter:beachtv-fl-al', name: 'Beach TV Florida & Alabama', url: BEACH_TV + 'DTVHD/playlist.m3u8', logo: starterTile('#ff8a3d', '#d6336c', 'Beach TV', 'Gulf Coast'), cat: 'Live Cams' },
+    { id: 'starter:beachtv-keywest', name: 'Beach TV Key West', url: BEACH_TV + 'KTVHD/playlist.m3u8', logo: starterTile('#1fb6d4', '#2b59c3', 'Beach TV', 'Key West'), cat: 'Live Cams' },
+    { id: 'starter:beachtv-myrtle', name: 'Beach TV Myrtle Beach', url: BEACH_TV + 'MTVHD/playlist.m3u8', logo: starterTile('#34b36b', '#0f7c8c', 'Beach TV', 'Myrtle Beach'), cat: 'Live Cams' },
+    { id: 'starter:windowtv', name: 'Window TV', url: 'https://cdn.whiplash.cc/whiplash-windowtv/index.m3u8', logo: starterTile('#6a5acd', '#2d3a8c', 'Window TV', 'Scenic'), cat: 'Live Cams' },
+    { id: 'starter:nasa', name: 'NASA TV', url: 'https://ntv2.akamaized.net/hls/live/2013923/NASA-NTV2-HLS/master.m3u8', logo: 'https://i.imgur.com/rmyfoOI.png', cat: 'Space' },
+    { id: 'starter:weathernation', name: 'WeatherNation', url: 'https://d2ferbiwcx1539.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-8zd06wicndthf-ssai-prd/WNNationalSamsung/WNNationalSamsung.m3u8', logo: 'https://graph.facebook.com/WeatherNation/picture?width=200&height=200', cat: 'Weather' },
+    { id: 'starter:cbsnews', name: 'CBS News', url: 'https://cbsnews.akamaized.net/hls/live/2020607/cbsnlineup_8/master.m3u8', logo: 'https://i.imgur.com/nki2HDQ.png', cat: 'News' },
+    { id: 'starter:reuters', name: 'Reuters TV', url: 'https://reuters-reutersnow-1-eu.rakuten.wurl.tv/playlist.m3u8', logo: 'https://i.imgur.com/AbvCnoH.png', cat: 'News' },
+    { id: 'starter:docurama', name: 'Docurama', url: 'https://cinedigm.vo.llnwd.net/conssui/amagi_hls_data_xumo1234A-docuramaA/CDN/master.m3u8', logo: 'https://i.imgur.com/bNg8mze.png', cat: 'Documentary' },
+    { id: 'starter:retrotv', name: 'Retro TV', url: 'https://lukentvlive.vgcdn.net/v1/master/cef183924f24adfa3d5d7601c3a17769082c0c2b/retro/index.m3u8', logo: 'https://i.imgur.com/PNTYOgg.png', cat: 'Classic TV' }
+  ];
+  (function(){
+    try{
+      if(localStorage.getItem(STARTER_DONE_KEY)) return;
+      var fresh = localStorage.getItem(VIDEO_CHANNELS_KEY) === null && localStorage.getItem('radioPlayerLiveChannels') === null;
+      if(fresh && !videoChannels.length){
+        STARTER_PACK.forEach(function(c){
+          videoChannels.push({ id: c.id, name: c.name, url: c.url, logo: c.logo, country: 'US', cats: [c.cat.toLowerCase()], catNames: [c.cat], src: 'starter', addedAt: Date.now() });
+        });
+        localStorage.setItem(VIDEO_CHANNELS_KEY, JSON.stringify(videoChannels));
+      }
+      localStorage.setItem(STARTER_DONE_KEY, '1');
+    }catch(e){}
+  })();
   // Adult channels (iptv-org's "XXX" category, or a playlist group named that way) are never
   // shown in Video: not in Add Channels, its category list, or My Channels.
   try{ localStorage.removeItem('radioPlayerAdultChannels'); }catch(e){}
@@ -26769,12 +26810,7 @@
   }
   var liveChStore = null;
   function liveChDefaultDefs(){
-    return [
-      { id: 'office', name: '', src: { kind: 'pick', shows: ['The Office'], movies: [] }, order: 'sequence' },
-      { id: 'madtv', name: '', src: { kind: 'pick', shows: ['MadTV'], movies: [] }, order: 'sequence' },
-      { id: 'seinfeld', name: '', src: { kind: 'pick', shows: ['Seinfeld'], movies: [] }, order: 'sequence' },
-      { id: 'movies', name: 'Movies', src: { kind: 'movies', from: 'phone' }, order: 'shuffle' }
-    ];
+    return [];   // build 660 (Mark): no seeded channels
   }
   function liveChValidDef(d){
     if(!d || typeof d !== 'object' || !d.id || !d.src || typeof d.src !== 'object') return false;
