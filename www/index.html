@@ -1630,6 +1630,8 @@
   .home-hero.nph-card .nph-slide{ border-radius:var(--r-tile, 8.5px) !important; overflow:hidden; background:var(--panel); color:#fff; box-shadow:none; }
   .home-hero.nph-card .nph-media{ aspect-ratio:1 / 1; background:var(--art-bg); border-radius:0; }
   .home-hero.nph-card .nph-art img{ object-fit:cover; }
+  /* Build 655 (Mark): a channel's logo is shown whole on its gray, not cropped to fill the Card's square. */
+  .home-hero.nph-card .nph-art.channel-art img{ object-fit:contain; }
   .nph-wash, .nph-wscrim{ display:none; }
   .nph-card .nph-wash{ display:block; position:absolute; inset:-40%; background-size:100% auto; background-position:center; background-repeat:repeat; filter:blur(30px) saturate(1.5) brightness(.62); }
   .nph-card .nph-wscrim{ display:block; position:absolute; inset:0; background:rgba(0,0,0,.30); }

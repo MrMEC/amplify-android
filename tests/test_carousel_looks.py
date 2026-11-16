@@ -35,7 +35,8 @@ async def route(r):
         k = u.rsplit('/', 1)[1][:1]
         return await r.fulfill(status=200, content_type='image/png', headers={'access-control-allow-origin': '*'}, body=ARTS.get(k, ARTS['a']))
     return await r.fulfill(status=200, body='{}', content_type='application/json')
-HIST = [{'k': 'video:%s.mp4' % k, 'r': 'item', 'it': {'type': 'video', 'id': '%s.mp4' % k, 'uri': 'https://archive.org/download/%s/%s.mp4' % (k, k), 'videoKind': 'archive', 'archive': True, 'name': n, 'favicon': 'https://archive.org/services/img/' + k, 'duration': 3000, 'artist': s}} for k, n, s in NAMES]
+CHAN = {'k': 'station:chan1', 'r': 'item', 'it': {'name': 'Lucha Plus', 'url': 'https://example.com/lucha.m3u8', 'stationuuid': 'chan1', 'videoChannel': True, 'favicon': 'https://archive.org/services/img/e'}}
+HIST = [CHAN] + [{'k': 'video:%s.mp4' % k, 'r': 'item', 'it': {'type': 'video', 'id': '%s.mp4' % k, 'uri': 'https://archive.org/download/%s/%s.mp4' % (k, k), 'videoKind': 'archive', 'archive': True, 'name': n, 'favicon': 'https://archive.org/services/img/' + k, 'duration': 3000, 'artist': s}} for k, n, s in NAMES]
 SEED = "(function(){ if(!localStorage.getItem('__s')){ localStorage.setItem('__s','1'); localStorage.setItem('radioPlayerPlayedHistory', %s); var f=[]; ['Motown Radio','Jazz FM','Chill','Organic'].forEach(function(n,i){ f.push({name:n, urlToResolve:'http://x/'+i, favicon:'', tags:'soul', stationuuid:'u'+i}); }); localStorage.setItem('radioPlayerFavorites', JSON.stringify(f)); } })();" % json.dumps(json.dumps(HIST))
 async def main():
     async with async_playwright() as p:
@@ -76,6 +77,10 @@ async def main():
         await pg.evaluate("window.ampCarouselSet({mode:'edit',cardSize:'s'})"); await pg.wait_for_timeout(600)
         re_ = await pg.evaluate("getComputedStyle(document.querySelector('#npHeroTrack > .nph-slide .nph-media')).borderTopLeftRadius")
         check(rad[0] == rc == re_, 'corner radius fav %s card %s editorial %s' % (rad[0], rc, re_))
+        await pg.evaluate("window.ampCarouselSet({mode:'card',cardSize:'m'})"); await pg.wait_for_timeout(700)
+        fit = await pg.evaluate("Array.from(document.querySelectorAll('#npHeroTrack > .nph-slide .nph-art')).map(function(a){ var i = a.querySelector('img'); return [a.classList.contains('channel-art'), i ? getComputedStyle(i).objectFit : null]; })")
+        check(any(f[0] for f in fit) and all(f[1] == 'contain' for f in fit if f[0]), 'Card: channel logos are shown whole (contain) %s' % fit)
+        await pg.screenshot(path=SHOTS + '/cl-card-logo.png')
         for k, v in R.items(): print(k, json.dumps(v))
         for k, v in R.items():
             check(v['trL'] == 0 and abs(v['trR'] - v['vw']) < 0.6 and abs(v['s0L'] - v['favL']) < 0.6, '%s runs edge to edge (%s..%s of %s), first card at the page margin %s vs Favorites %s' % (k, v['trL'], v['trR'], v['vw'], v['s0L'], v['favL']))
