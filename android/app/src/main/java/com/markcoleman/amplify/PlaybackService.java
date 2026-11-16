@@ -61,7 +61,6 @@ import org.json.JSONObject;
 @OptIn(markerClass = UnstableApi.class)
 public class PlaybackService extends MediaLibraryService {
   private static final SessionCommand NEXT;
-  private static final ImmutableList<CommandButton> PODCAST_BUTTONS;
   private static final SessionCommand PREV;
   private static final SessionCommand SKIP_BACK;
   private static final SessionCommand SKIP_FORWARD;
@@ -141,18 +140,6 @@ public class PlaybackService extends MediaLibraryService {
     SKIP_BACK = sessionCommand;
     SessionCommand sessionCommand2 = new SessionCommand("amplify.SKIP_FORWARD", Bundle.EMPTY);
     SKIP_FORWARD = sessionCommand2;
-    PODCAST_BUTTONS =
-        ImmutableList.of(
-            new CommandButton.Builder(57410)
-                .setDisplayName("Back 15 seconds")
-                .setSessionCommand(sessionCommand)
-                .setSlots(2)
-                .build(),
-            new CommandButton.Builder(63220)
-                .setDisplayName("Forward 30 seconds")
-                .setSessionCommand(sessionCommand2)
-                .setSlots(3)
-                .build());
     PREV = new SessionCommand("amplify.PREV", Bundle.EMPTY);
     NEXT = new SessionCommand("amplify.NEXT", Bundle.EMPTY);
   }
@@ -177,6 +164,70 @@ public class PlaybackService extends MediaLibraryService {
     Leveler.enabled = on;
     c.getSharedPreferences(AUDIO_PREFS, android.content.Context.MODE_PRIVATE)
         .edit().putBoolean(KEY_LEVELING, on).apply();
+  }
+
+  // Build 658 (Mark): how far a podcast skips back and forward (Settings > Playback), kept like
+  // volume leveling so the car's buttons use it even when the car starts the app. Videos keep
+  // the player's own increments.
+  static final String KEY_SKIP_BACK = "podcastSkipBack";
+  static final String KEY_SKIP_FWD = "podcastSkipFwd";
+  static final int[] SKIP_BACK_CHOICES = {5, 10, 15, 30};
+  static final int[] SKIP_FWD_CHOICES = {15, 30, 45, 60, 90};
+  static volatile int podcastBackSec = 15;
+  static volatile int podcastFwdSec = 30;
+
+  static int pick(int v, int[] choices, int dflt) {
+    for (int c : choices) if (c == v) return v;
+    return dflt;
+  }
+
+  static void loadPodcastSkip(android.content.Context c) {
+    android.content.SharedPreferences sp = c.getSharedPreferences(AUDIO_PREFS, android.content.Context.MODE_PRIVATE);
+    podcastBackSec = pick(sp.getInt(KEY_SKIP_BACK, 15), SKIP_BACK_CHOICES, 15);
+    podcastFwdSec = pick(sp.getInt(KEY_SKIP_FWD, 30), SKIP_FWD_CHOICES, 30);
+  }
+
+  static void setPodcastSkip(android.content.Context c, int back, int fwd) {
+    podcastBackSec = pick(back, SKIP_BACK_CHOICES, podcastBackSec);
+    podcastFwdSec = pick(fwd, SKIP_FWD_CHOICES, podcastFwdSec);
+    c.getSharedPreferences(AUDIO_PREFS, android.content.Context.MODE_PRIVATE)
+        .edit().putInt(KEY_SKIP_BACK, podcastBackSec).putInt(KEY_SKIP_FWD, podcastFwdSec).apply();
+    final PlaybackService svc = instance;
+    if (svc != null) svc.main.post(svc::updateButtons);
+  }
+
+  private static int backIcon(int sec) {
+    switch (sec) {
+      case 5: return CommandButton.ICON_SKIP_BACK_5;
+      case 10: return CommandButton.ICON_SKIP_BACK_10;
+      case 15: return CommandButton.ICON_SKIP_BACK_15;
+      case 30: return CommandButton.ICON_SKIP_BACK_30;
+      default: return CommandButton.ICON_SKIP_BACK;
+    }
+  }
+
+  private static int fwdIcon(int sec) {
+    switch (sec) {
+      case 15: return CommandButton.ICON_SKIP_FORWARD_15;
+      case 30: return CommandButton.ICON_SKIP_FORWARD_30;
+      default: return CommandButton.ICON_SKIP_FORWARD;
+    }
+  }
+
+  /** The car's and lock screen's podcast buttons, labelled with the chosen lengths. */
+  static ImmutableList<CommandButton> podcastButtons() {
+    int b = podcastBackSec, f = podcastFwdSec;
+    return ImmutableList.of(
+        new CommandButton.Builder(backIcon(b))
+            .setDisplayName("Back " + b + " seconds")
+            .setSessionCommand(SKIP_BACK)
+            .setSlots(2)
+            .build(),
+        new CommandButton.Builder(fwdIcon(f))
+            .setDisplayName("Forward " + f + " seconds")
+            .setSessionCommand(SKIP_FORWARD)
+            .setSlots(3)
+            .build());
   }
 
   // Build 240: the equalizer preset (Settings), kept like volume leveling.
@@ -209,6 +260,7 @@ public class PlaybackService extends MediaLibraryService {
   public void onCreate() {
     CrashLog.install(this);
     super.onCreate();
+    loadPodcastSkip(this);
     this.exo =
         new ExoPlayer.Builder(this, levelingRenderers())
             .setMediaSourceFactory(
@@ -464,7 +516,7 @@ public class PlaybackService extends MediaLibraryService {
     return skipAwarePlayer == null
         ? ImmutableList.of()
         : skipAwarePlayer.isPodcastNow()
-            ? PODCAST_BUTTONS
+            ? podcastButtons()
             : (this.player.prevAvailable() || this.player.nextAvailable())
                 ? ImmutableList.of(trackButton(false, true), trackButton(true, true))
                 : ImmutableList.of();
@@ -491,10 +543,10 @@ public class PlaybackService extends MediaLibraryService {
     long jMax = Math.max(0L, this.exo.getCurrentPosition());
     long duration = this.exo.getDuration();
     ExoPlayer exoPlayer2 = this.exo;
-    long jMax2 =
-        z
-            ? Math.max(0L, jMax - exoPlayer2.getSeekBackIncrement())
-            : jMax + exoPlayer2.getSeekForwardIncrement();
+    boolean pod = this.player != null && this.player.isPodcastNow();
+    long back = pod ? podcastBackSec * 1000L : exoPlayer2.getSeekBackIncrement();
+    long fwd = pod ? podcastFwdSec * 1000L : exoPlayer2.getSeekForwardIncrement();
+    long jMax2 = z ? Math.max(0L, jMax - back) : jMax + fwd;
     if (!z && duration != -9223372036854775807L && duration > 0) {
       jMax2 = Math.min(jMax2, Math.max(0L, duration - 1000));
     }

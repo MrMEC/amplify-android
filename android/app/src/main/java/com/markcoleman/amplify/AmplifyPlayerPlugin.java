@@ -341,6 +341,19 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     call.resolve(o);
   }
 
+  // Build 658: podcast skip lengths in seconds ({back, fwd}); answers what's in force.
+  @PluginMethod
+  public void setPodcastSkip(PluginCall call) {
+    Integer back = call.getInt("back", null);
+    Integer fwd = call.getInt("fwd", null);
+    if (back == null || fwd == null) PlaybackService.loadPodcastSkip(getContext());
+    else PlaybackService.setPodcastSkip(getContext(), back, fwd);
+    JSObject o = new JSObject();
+    o.put("back", PlaybackService.podcastBackSec);
+    o.put("fwd", PlaybackService.podcastFwdSec);
+    call.resolve(o);
+  }
+
   @PluginMethod
   public void sleepInfo(PluginCall call) {
     main.post(() -> call.resolve(sleepObj(false)));
@@ -2811,61 +2824,6 @@ public class AmplifyPlayerPlugin extends Plugin implements SkipAwarePlayer.Remot
     new Thread(() -> {
       try {
         call.resolve(JSObject.fromJSONObject(PodcastFeeds.refreshAll(getContext())));
-      } catch (Exception e) {
-        call.reject(String.valueOf(e.getMessage()));
-      }
-    }).start();
-  }
-
-  // Build 656: which followed shows publish chapters, and which of those mark ad breaks
-  // (ChapterCheck). Takes {shows: [{id, feedUrl}]}; answers {results: [{id, status, scanned,
-  // withChapters, adChapters, error}]}. Six feeds at a time, like the podcast refresh.
-  @PluginMethod
-  public void podcastChapterCheck(PluginCall call) {
-    final org.json.JSONArray shows;
-    try {
-      JSArray a = call.getArray("shows");
-      shows = a == null ? new org.json.JSONArray() : a;
-    } catch (Exception e) {
-      call.reject("bad shows");
-      return;
-    }
-    new Thread(() -> {
-      final org.json.JSONArray results = new org.json.JSONArray();
-      java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(6);
-      for (int i = 0; i < shows.length(); i++) {
-        final org.json.JSONObject sh = shows.optJSONObject(i);
-        if (sh == null) continue;
-        pool.execute(() -> {
-          ChapterCheck.Result r = ChapterCheck.check(sh.optString("feedUrl", ""));
-          try {
-            org.json.JSONObject o = new org.json.JSONObject();
-            o.put("id", sh.optString("id", ""));
-            o.put("status", r.status);
-            o.put("scanned", r.scanned);
-            o.put("withChapters", r.withChapters);
-            o.put("adChapters", r.adChapters);
-            o.put("error", r.error);
-            synchronized (results) { results.put(o); }
-          } catch (Exception ignored) {
-            // skip
-          }
-        });
-      }
-      pool.shutdown();
-      try {
-        pool.awaitTermination(120, java.util.concurrent.TimeUnit.SECONDS);
-      } catch (InterruptedException ignored) {
-        Thread.currentThread().interrupt();
-      }
-      try {
-        JSArray arr = new JSArray();
-        synchronized (results) {
-          for (int i = 0; i < results.length(); i++) arr.put(JSObject.fromJSONObject(results.getJSONObject(i)));
-        }
-        JSObject out = new JSObject();
-        out.put("results", arr);
-        call.resolve(out);
       } catch (Exception e) {
         call.reject(String.valueOf(e.getMessage()));
       }

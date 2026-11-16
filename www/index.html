@@ -6203,6 +6203,13 @@
     width:var(--np-skip-size, 28.55px); height:var(--np-skip-size, 28.55px); display:block;
     fill:none; stroke:currentColor; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round;
   }
+  /* Build 658: the skip length (Settings > Playback) written inside the arrow. */
+  .np-skip-btn{ position:relative; }
+  .np-skip-num{
+    position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
+    font-size:calc(var(--np-skip-size, 28.55px) * .34); font-weight:700; line-height:1; letter-spacing:-.02em;
+    color:currentColor; pointer-events:none; font-variant-numeric:tabular-nums;
+  }
   /* The step and ellipsis glyphs are drawn in fixed pixels (see "CSS-drawn glyphs"), so they
      are scaled as a whole rather than resized part by part. */
   .np-step-btn .icon-step-back,
@@ -7419,10 +7426,6 @@
   }
   .cl-item:active{ background:var(--panel-2); }
   .cl-item:last-of-type{ border-bottom:none; }
-  /* Build 656: the chapter check's rows are information only. */
-  .cl-item.cl-static{ cursor:default; }
-  .cl-item.cl-static:active{ background:none; }
-  #chapterGroups .set-sub:first-child{ margin-top:10px; }
   .cl-art.tile-art{ flex:0 0 48px; width:48px; height:48px; aspect-ratio:auto; margin:0; border-radius:6px; overflow:hidden; font-size:16px; }
   .cl-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .cl-name{ font-size:15px; font-weight:600; line-height:1.3; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -9153,9 +9156,9 @@
                    "Font Awesome (self-hosted subset)" block in <style>) and render as empty
                    circles, so these use the same plain Unicode rotate arrow
                    podcastRefreshHeaderBtn's Refresh button already uses instead. -->
-              <button type="button" class="np-skip-btn" id="npSkipBackBtn" title="Back 15 seconds" aria-label="Back 15 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>
+              <button type="button" class="np-skip-btn" id="npSkipBackBtn" title="Back 15 seconds" aria-label="Back 15 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span class="np-skip-num" id="npSkipBackNum" aria-hidden="true">15</span></button>
               <button class="np-play-btn" id="npPlayBtn" disabled><i class="fa-solid fa-play"></i></button>
-              <button type="button" class="np-skip-btn" id="npSkipFwdBtn" title="Forward 30 seconds" aria-label="Forward 30 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
+              <button type="button" class="np-skip-btn" id="npSkipFwdBtn" title="Forward 30 seconds" aria-label="Forward 30 seconds" style="display:none;"><svg class="np-skip-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg><span class="np-skip-num" id="npSkipFwdNum" aria-hidden="true">30</span></button>
               <button class="np-step-btn" id="npNextBtn" title="Next track" aria-label="Next track">
                 <span class="icon-step-fwd" aria-hidden="true"></span>
               </button>
@@ -9785,19 +9788,28 @@
           <option value="off">Off</option>
         </select>
       </div>
-      <!-- Build 656 (Mark): which followed shows publish chapters and mark their ad breaks. -->
-      <h3 class="set-sub" id="chapterSub" hidden>Podcasts</h3>
-      <button type="button" class="settings-row set-link-row" id="chapterCheckBtn" style="display:none;">
-        <span class="set-text"><span class="settings-label">Podcast chapters</span><span class="set-desc">See which of your shows mark their ad breaks</span></span>
-        <i class="fa-solid fa-chevron-right set-cat-chev" aria-hidden="true"></i>
-      </button>
-    </section>
-
-    <!-- Build 656: the chapter check's results, grouped. -->
-    <section class="set-page" data-set-page="chapters" data-set-title="Podcast chapters" data-set-parent="playback" hidden>
-      <p class="set-lead" id="chapterLead"></p>
-      <div id="chapterGroups"></div>
-      <button type="button" class="settings-data-btn settings-wide-btn cl-more" id="chapterAgainBtn">Check again</button>
+      <!-- Build 658 (Mark): how far a podcast skips back and forward, on Now Playing, the lock
+           screen and in Android Auto. -->
+      <h3 class="set-sub">Podcasts</h3>
+      <div class="settings-row">
+        <span class="settings-label">Skip back</span>
+        <select class="settings-select" id="podSkipBackSelect" aria-label="Skip back">
+          <option value="5">5 seconds</option>
+          <option value="10">10 seconds</option>
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Skip forward</span>
+        <select class="settings-select" id="podSkipFwdSelect" aria-label="Skip forward">
+          <option value="15">15 seconds</option>
+          <option value="30">30 seconds</option>
+          <option value="45">45 seconds</option>
+          <option value="60">60 seconds</option>
+          <option value="90">90 seconds</option>
+        </select>
+      </div>
     </section>
 
     <!-- Library -->
@@ -14277,97 +14289,6 @@
     showSettingsCat('cleanup');
   });
 
-  // ---------- Podcast chapters (build 656, Mark) ----------
-  // Reads each followed show's feed on the phone (ChapterCheck) and sorts the shows into those
-  // that mark their ad breaks as chapters (a "Skip ad" button would work for them), those with
-  // chapters but no ad marks, those without chapters, and feeds that couldn't be read.
-  var CHAPTER_GROUPS = [
-    { id: 'ads', name: 'Marks ad breaks', sub: 'Ad breaks are marked as chapters' },
-    { id: 'chapters', name: 'Chapters, no ad marks', sub: 'Has chapters, but ad breaks aren\u2019t marked' },
-    { id: 'none', name: 'No chapters', sub: '' },
-    { id: 'error', name: 'Couldn\u2019t check', sub: 'The show\u2019s feed couldn\u2019t be read' }
-  ];
-  var chapterRunning = false;
-  function chapterPlugin(){
-    var Cap = window.Capacitor;
-    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
-    if(!P || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform() || typeof P.podcastChapterCheck !== 'function') return null;
-    return P;
-  }
-  function renderChapterResults(results){
-    var byId = {};
-    (results || []).forEach(function(r){ if(r && r.id) byId[String(r.id)] = r; });
-    var groups = {};
-    CHAPTER_GROUPS.forEach(function(g){ groups[g.id] = []; });
-    podcastSubs.forEach(function(sub){
-      var r = byId[String(sub.collectionId)];
-      var st = r && groups[r.status] ? r.status : 'error';
-      groups[st].push(sub);
-    });
-    var box = document.getElementById('chapterGroups');
-    box.innerHTML = '';
-    var ads = groups.ads.length;
-    document.getElementById('chapterLead').textContent = ads
-      ? (ads === 1 ? '1 of your shows marks its' : ads + ' of your shows mark their') + ' ad breaks as chapters, so Skip ad would work for '
-        + (ads === 1 ? 'it' : 'them') + '. Checked from each show\u2019s newest episodes.'
-      : 'None of your shows mark their ad breaks as chapters yet, so Skip ad wouldn\u2019t work for them. Checked from each show\u2019s newest episodes.';
-    CHAPTER_GROUPS.forEach(function(g){
-      var list = groups[g.id];
-      if(!list.length) return;
-      list.sort(function(a, b){ return String(a.collectionName || '').localeCompare(String(b.collectionName || '')); });
-      var h = document.createElement('h3');
-      h.className = 'set-sub';
-      h.textContent = g.name;
-      box.appendChild(h);
-      var wrap = document.createElement('div');
-      wrap.className = 'cl-list';
-      wrap.dataset.chGroup = g.id;
-      list.forEach(function(sub){
-        var row = document.createElement('div');
-        row.className = 'cl-item cl-static';
-        var art = document.createElement('span');
-        art.className = 'cl-art tile-art';
-        try{ renderStationArt(art, { favicon: sub.artworkUrl || '', name: sub.collectionName || '' }); }catch(e){}
-        var text = document.createElement('span');
-        text.className = 'cl-text';
-        var nm = document.createElement('span'); nm.className = 'cl-name'; nm.textContent = sub.collectionName || '';
-        var sb = document.createElement('span'); sb.className = 'cl-sub'; sb.textContent = g.sub || sub.artistName || '';
-        text.appendChild(nm); if(sb.textContent) text.appendChild(sb);
-        row.appendChild(art); row.appendChild(text);
-        wrap.appendChild(row);
-      });
-      box.appendChild(wrap);
-    });
-  }
-  function runChapterCheck(){
-    var P = chapterPlugin();
-    if(!P || chapterRunning) return;
-    if(!podcastSubs.length){
-      showNotice({ kind: 'info', title: 'No podcasts yet', message: 'Follow a show in Podcasts and it\u2019ll be checked here.' });
-      return;
-    }
-    chapterRunning = true;
-    var seq = showNotice({ kind: 'working', title: 'Checking your podcasts', message: 'Reading each show\u2019s newest episodes\u2026', sticky: true });
-    var shows = podcastSubs.map(function(sub){ return { id: String(sub.collectionId), feedUrl: sub.feedUrl || '' }; });
-    P.podcastChapterCheck({ shows: shows }).then(function(res){
-      chapterRunning = false;
-      closeNotice(seq);
-      renderChapterResults(res && res.results);
-      if(settingsCat !== 'chapters') showSettingsCat('chapters');
-      settingsPanelEl.scrollTop = 0;
-    })['catch'](function(){
-      chapterRunning = false;
-      showNotice({ kind: 'error', title: 'Couldn\u2019t check your podcasts', message: 'Try again in a moment.' });
-    });
-  }
-  (function(){
-    var btn = document.getElementById('chapterCheckBtn');
-    if(!btn || !chapterPlugin()) return;
-    btn.style.display = '';
-    document.getElementById('chapterSub').hidden = false;
-    btn.addEventListener('click', runChapterCheck);
-    document.getElementById('chapterAgainBtn').addEventListener('click', runChapterCheck);
-  })();
   ['tagOverlay', 'artUrlOverlay'].forEach(function(id){
     var o = document.getElementById(id);
     if(!o || !window.MutationObserver) return;
@@ -40449,6 +40370,42 @@
     });
   }
 
+  // ---------- skip lengths (build 658, Mark): Settings > Playback > Podcasts ----------
+  // Used by Now Playing's skip buttons, the lock screen and Android Auto (PlaybackService keeps
+  // its own copy, sent by setPodcastSkip, so the car has it even when it starts the app).
+  var PODCAST_SKIP_BACK_KEY = 'radioPlayerPodcastSkipBack', PODCAST_SKIP_FWD_KEY = 'radioPlayerPodcastSkipFwd';
+  var PODCAST_SKIP_BACKS = [5, 10, 15, 30], PODCAST_SKIP_FWDS = [15, 30, 45, 60, 90];
+  function podcastSkipRead(key, list, dflt){
+    var v = 0;
+    try{ v = parseInt(localStorage.getItem(key), 10); }catch(e){}
+    return list.indexOf(v) !== -1 ? v : dflt;
+  }
+  function podcastSkipBack(){ return podcastSkipRead(PODCAST_SKIP_BACK_KEY, PODCAST_SKIP_BACKS, 15); }
+  function podcastSkipFwd(){ return podcastSkipRead(PODCAST_SKIP_FWD_KEY, PODCAST_SKIP_FWDS, 30); }
+  function podcastSkipToNative(){
+    var Cap = window.Capacitor;
+    var P = Cap && Cap.Plugins && Cap.Plugins.AmplifyPlayer;
+    if(!P || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform() || typeof P.setPodcastSkip !== 'function') return;
+    P.setPodcastSkip({ back: podcastSkipBack(), fwd: podcastSkipFwd() })['catch'](function(){});
+  }
+  (function(){
+    var bs = document.getElementById('podSkipBackSelect'), fs = document.getElementById('podSkipFwdSelect');
+    if(!bs || !fs) return;
+    bs.value = String(podcastSkipBack());
+    fs.value = String(podcastSkipFwd());
+    function changed(){
+      try{
+        localStorage.setItem(PODCAST_SKIP_BACK_KEY, bs.value);
+        localStorage.setItem(PODCAST_SKIP_FWD_KEY, fs.value);
+      }catch(e){}
+      podcastSkipToNative();
+      try{ syncNpPodcastControls(); }catch(e){}
+    }
+    bs.addEventListener('change', changed);
+    fs.addEventListener('change', changed);
+    podcastSkipToNative();
+  })();
+
   // ---------- playback speed (global, not per-episode -- matches how every podcast app does it) ----------
   var PODCAST_SPEED_KEY = 'radioPlayerPodcastSpeed';
   var PODCAST_SPEEDS = [1, 1.25, 1.5, 1.75, 2];
@@ -42097,22 +42054,25 @@
     var show = !!(st && !st.liveCh && (isPodcastTrack(st) || isLocalVideo(st)));
     npSkipBackBtn.style.display = show ? '' : 'none';
     npSkipFwdBtn.style.display = show ? '' : 'none';
-    // A video skips 10 seconds either way; a podcast back 15, forward 30.
+    // A video skips 10 seconds either way; a podcast as far as Settings > Playback says.
     var vid = isLocalVideo(st);
-    npSkipBackBtn.title = vid ? 'Back 10 seconds' : 'Back 15 seconds';
-    npSkipFwdBtn.title = vid ? 'Forward 10 seconds' : 'Forward 30 seconds';
+    var bk = vid ? 10 : podcastSkipBack(), fw = vid ? 10 : podcastSkipFwd();
+    npSkipBackBtn.title = 'Back ' + bk + ' seconds';
+    npSkipFwdBtn.title = 'Forward ' + fw + ' seconds';
+    document.getElementById('npSkipBackNum').textContent = String(bk);
+    document.getElementById('npSkipFwdNum').textContent = String(fw);
     npSkipBackBtn.setAttribute('aria-label', npSkipBackBtn.title);
     npSkipFwdBtn.setAttribute('aria-label', npSkipFwdBtn.title);
   }
   npSkipBackBtn.addEventListener('click', function(){
     if(!npIsCurrent()) return;
-    try{ audio.currentTime = Math.max(0, (audio.currentTime || 0) - (isLocalVideo(npTarget()) ? 10 : 15)); }catch(e){}
+    try{ audio.currentTime = Math.max(0, (audio.currentTime || 0) - (isLocalVideo(npTarget()) ? 10 : podcastSkipBack())); }catch(e){}
     syncSeekBar();
   });
   npSkipFwdBtn.addEventListener('click', function(){
     if(!npIsCurrent()) return;
     var dur = isFinite(audio.duration) ? audio.duration : Infinity;
-    try{ audio.currentTime = Math.min(dur, (audio.currentTime || 0) + (isLocalVideo(npTarget()) ? 10 : 30)); }catch(e){}
+    try{ audio.currentTime = Math.min(dur, (audio.currentTime || 0) + (isLocalVideo(npTarget()) ? 10 : podcastSkipFwd())); }catch(e){}
     syncSeekBar();
   });
   // Paints the played part of the bar white (see "Now Playing: filled progress").
@@ -42362,11 +42322,11 @@
     // A podcast's hardware/lock-screen skip defaults to the -15s/+30s convention every
     // podcast app uses; a local file keeps the shorter 10s scrub it already had.
     safeSetHandler('seekbackward', seekable ? function(details){
-      var by = (details && details.seekOffset) || (isPodcast ? 15 : 10);
+      var by = (details && details.seekOffset) || (isPodcast ? podcastSkipBack() : 10);
       try{ audio.currentTime = Math.max(0, (audio.currentTime || 0) - by); }catch(e){}
     } : null);
     safeSetHandler('seekforward', seekable ? function(details){
-      var by = (details && details.seekOffset) || (isPodcast ? 30 : 10);
+      var by = (details && details.seekOffset) || (isPodcast ? podcastSkipFwd() : 10);
       var dur = isFinite(audio.duration) ? audio.duration : Infinity;
       try{ audio.currentTime = Math.min(dur, (audio.currentTime || 0) + by); }catch(e){}
     } : null);
