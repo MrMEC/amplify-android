@@ -1619,7 +1619,7 @@
     /* Build 654 (Mark): the row runs to both edges of the screen; the first card still starts at the page's margin. */
     margin-left:calc(-1 * var(--main-pad)); margin-right:calc(-1 * var(--main-pad)); padding-left:var(--main-pad); padding-right:var(--main-pad); scroll-padding-left:var(--main-pad); }
   /* Build 648 (Mark): the space under these carousels was the tabs' 40px top margin on top of the carousel's own; now 18px. */
-  .home-hero.nph-card ~ #homeGroupTabs, .home-hero.nph-edit ~ #homeGroupTabs{ margin-top:18px; }
+  .home-hero.nph-card ~ #homeGroupTabs, .home-hero.nph-edit ~ #homeGroupTabs{ margin-top:33px; }   /* build 667: +15px */
   .home-hero.nph-card .nph-slide, .home-hero.nph-edit .nph-slide{ flex:0 0 var(--card-w, calc(100% - 44px)); min-height:0; justify-content:flex-start; }
   .nph-card .nph-progress, .nph-edit .nph-progress, .nph-card .nph-bg, .nph-edit .nph-bg, .nph-card .nph-refl, .nph-edit .nph-refl,
   .nph-card .nph-scrim, .nph-edit .nph-scrim, .nph-card .nph-desc, .nph-edit .nph-desc{ display:none; }
@@ -1919,7 +1919,7 @@
   .artist-hero-sub{ font-size:13.5px; color:var(--text-dim); max-width:min(560px, 92%); }
   .artist-hero-sub:not(:empty){ margin-bottom:14px; }
   /* Build 503 (Mark): Home's Favorites / Playlists / Top 100 tabs, and the Featured card under the carousel. */
-  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:40px 0 10px; }   /* 40px from the carousel, the same as from any row to the next heading (build 400) */
+  .home-group-tabs{ display:flex; align-items:center; gap:8px; margin:55px 0 10px; }   /* 40px from the carousel, the same as from any row to the next heading (build 400) */
   .home-group-tabs .home-tab{ flex:0 0 auto; }
   .home-group-all{ margin-left:auto; flex:0 0 auto; background:none; border:0; color:var(--accent); font:inherit; font-size:13px; font-weight:600; padding:8px 2px; cursor:pointer; }
   body.home-grouped .home-section.in-group > .home-section-head{ display:none; }
@@ -2151,6 +2151,11 @@
   }
   /* More room between the bio's More and the Music Videos heading under it. */
   .tile-grid > .artist-videos-label:first-child, .tile-grid > .artist-yt-label:first-child, .tile-grid > .artist-archive-label:first-child{ padding-top:22px; margin-bottom:-10px; }
+  /* Build 667 (Mark): less space between an artist page's headings and what is under them
+     (10px closer). Each rule keeps its own negative bottom margin and takes 10px more. */
+  body.artist-open #stationsGrid > .grid-section-label{ margin-bottom:-36px; }
+  body.artist-open #stationsGrid > :is(.artist-videos-label, .artist-yt-label, .artist-archive-label):first-child{ margin-bottom:-20px; }
+  body.artist-open #stationsGrid > .grid-section-label.artist-genres-head{ margin-bottom:-32px; }
   @media (max-width: 900px){
     .artist-albums{ grid-template-columns: repeat(2, minmax(0,1fr)); gap:28px 14px; }
   }
