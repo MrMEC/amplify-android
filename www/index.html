@@ -28443,8 +28443,21 @@
         canSwap: null,
         onDrop: function(keys){
           saveEpgCatOrder(keys.filter(function(k){ return k !== 'all'; }));
-          rebuildEpgGridsInPlace();
+          setTimeout(rebuildEpgGridsInPlace, 0);
         } });
+      // a finger (or button) down on the row: a guide redraw now (a schedule or a channel getting
+      // ready) must leave the chips alone, or the chip being held would be swapped out mid-drag
+      var down = function(){ row._pressing = true; }, up = function(){ row._pressing = false; };
+      row.addEventListener('touchstart', down, { passive: true });
+      row.addEventListener('pointerdown', down);
+      ['touchend', 'touchcancel', 'pointerup', 'pointercancel'].forEach(function(k){ document.addEventListener(k, up, true); });
+    }
+    row._sl = row.isConnected ? row.scrollLeft : null;
+    if(row._pressing || row.classList.contains('hr-active')){
+      // keep the chips as they are; only which one is chosen can change
+      Array.prototype.forEach.call(row.children, function(b){ var on = b.dataset.cat === active; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      if(row.parentNode) row.parentNode.removeChild(row);
+      return row;
     }
     if(row.parentNode) row.parentNode.removeChild(row);
     row.innerHTML = '';
@@ -28480,7 +28493,7 @@
       var sc2 = fresh.querySelector('.epg-scroll'), tr2 = fresh.querySelector('.epg-head-track'), cr2 = fresh.querySelector('.epg-cats');
       if(sc2) sc2.scrollLeft = x;
       if(tr2) tr2.scrollLeft = x;
-      if(cr2){ cr2.scrollLeft = cx; epgRevealCat(cr2); }
+      if(cr2){ cr2.scrollLeft = cx; requestAnimationFrame(function(){ cr2.scrollLeft = cx; epgRevealCat(cr2); }); }
     });
   }
   function epgRevealCat(row){
@@ -28601,7 +28614,12 @@
     wrap._channels = allChannels;
     wrap._opts = opts;
     placeEpgNow(wrap, now);
-    if(head.classList.contains('has-cats')) requestAnimationFrame(function(){ epgRevealCat(head.querySelector('.epg-cats')); });
+    // The chips keep their sideways place through a redraw; a new row shows the chosen chip.
+    if(head.classList.contains('has-cats')){
+      var cr = head.querySelector('.epg-cats'), sl = cr._sl;
+      if(sl != null) cr.scrollLeft = sl;
+      requestAnimationFrame(function(){ if(sl != null) cr.scrollLeft = sl; else epgRevealCat(cr); });
+    }
     return wrap;
   }
   // ---- the playing channel's details under its video: shown or hidden (build 252)
