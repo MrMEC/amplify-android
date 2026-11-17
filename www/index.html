@@ -30808,7 +30808,7 @@
   }
   // artistKey -> [video item], built from the noted files and the library.
   function musicVideoIndex(){
-    var sig = musicVideos.files.length + '|' + musicVideos.at + '|' + libraryTracks.length + '|' + blacklist.length;
+    var sig = musicVideos.files.length + '|' + musicVideos.at + '|' + libraryTracks.length + '|' + blacklist.length + '|' + (artistStations || []).length;
     if(mvIndexCache && mvIndexCache.sig === sig) return mvIndexCache.map;
     var dirArtists = {};
     libraryTracks.forEach(function(t){
@@ -30826,8 +30826,10 @@
       Object.keys(m).forEach(function(k){ if(k !== 'n' && m[k] > n){ best = k; n = m[k]; } });
       return n / m.n > 0.6 ? best : '';
     }
-    function known(k){ return !!(k && findArtistEntry(k)); }
-    var map = {};
+    var baseMap = {};
+    buildArtistIndexBase().forEach(function(e){ baseMap[e.key] = e; });
+    function known(k){ return !!(k && baseMap[k]); }
+    var map = {}, only = {};
     musicVideos.files.forEach(function(f){
       var g = guessFromFilename(f.name);
       var key = '', title = '';
@@ -30855,20 +30857,44 @@
             : (g.artist ? g.artist + ' - ' + g.title : g.title);
         }
       }
-      if(!key) return;
+      var onlyName = '';
+      if(!key){
+        // Not an artist with songs: the artist the file names (or its own folder), which
+        // becomes an artist of the library with no songs (build 666).
+        var who = mvLeadArtist(g.artist);
+        if(who && /^\d+$/.test(who)) who = '';
+        var vt = g.artist ? g.title : '';
+        if(!who){
+          var vdir = dirOfRelPath(f.relPath || '');
+          var vlast = vdir ? vdir.split('/').pop() : '';
+          if(vlast && !MV_GENERIC_DIR_RE.test(vlast.trim())) who = vlast.trim();
+          vt = g.artist ? g.artist + ' - ' + g.title : g.title;
+        }
+        var wk = who ? artistMatchKey(who) : '';
+        if(!wk) return;
+        key = wk; title = vt; onlyName = who;
+        if(!only[key]) only[key] = who;
+      }
       var info = videoInfo[f.uri] || {};
-      var entry = findArtistEntry(key);
+      var entry = baseMap[key];
       var name = mvTidyTitle(title) || mvTidyTitle(f.name.replace(/\.[^.]+$/, ''));
       var it = { type: 'video', videoKind: 'music', id: 'mv:' + f.relPath, uri: f.uri, fileName: f.name, relPath: f.relPath,
-        name: name, title: name, artist: entry ? entry.name : '', artistKey: key, size: f.size || 0,
+        name: name, title: name, artist: entry ? entry.name : (only[key] || onlyName), artistKey: key, size: f.size || 0,
         duration: info.d || 0, still: info.t || '', favicon: info.t ? capUrl(info.t) : '' };
       (map[key] = map[key] || []).push(it);
     });
     Object.keys(map).forEach(function(k){
       map[k].sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
     });
-    mvIndexCache = { sig: sig, map: map };
+    mvIndexCache = { sig: sig, map: map, only: only };
     return map;
+  }
+  // artistKey -> name, for artists whose music videos are in the library but who have no songs
+  // or station (the Artists list and artist pages include them).
+  function musicVideoOnlyArtists(){
+    if(!musicVideos || !musicVideos.files.length) return {};
+    musicVideoIndex();
+    return (mvIndexCache && mvIndexCache.only) || {};
   }
   function musicVideosFor(key){ return (musicVideoIndex()[key] || []).slice(); }
   window.__amplifyMusicVideosFor = musicVideosFor;
@@ -33355,7 +33381,7 @@
       var e = findArtistEntry(k);
       var vids = idx[k].slice();
       vids.forEach(function(v){ placed[v.uri] = true; v.addedAt = (fileByUri[v.uri] || {}).lastModified || 0; });
-      artists[k] = { key: k, name: e ? e.name : (vids[0].artist || k), entry: e, videos: vids };
+      artists[k] = { key: k, name: e ? e.name : (vids[0].artist || k), entry: e, videos: vids, videoOnly: !!(e && e.videoOnly) };
     });
     var other = [];
     musicVideos.files.forEach(function(f){
@@ -33650,7 +33676,7 @@
     nm.className = 'mv-hero-name';
     nm.textContent = a.name;
     // Build 302: the name is the way to the artist's page (for an artist with songs).
-    if(a.entry && a.entry.tracks && a.entry.tracks.length){
+    if(a.entry){
       nm.classList.add('home-heading-link', 'mv-hero-link');
       nm.setAttribute('role', 'link'); nm.tabIndex = 0;
       nm.insertAdjacentHTML('beforeend', MV_CHEVRON);
@@ -42678,8 +42704,11 @@
   // each a full pass over every song. Both are kept until the library changes (a song added,
   // removed or retagged, a regroup, a hidden item, the artist stations reloaded).
   function libraryIndexSig(){
-    return libraryTracks.length + '|' + compilationVersion + '|' + blacklist.length + '|' + (artistStations || []).length;
+    return libraryTracks.length + '|' + compilationVersion + '|' + blacklist.length + '|' + (artistStations || []).length + '|' + mvSigPart();
   }
+  // Build 666: music video files are part of the artist index (an artist with videos but no
+  // songs is still an artist), so a change to them rebuilds it.
+  function mvSigPart(){ return musicVideos ? musicVideos.files.length + ':' + musicVideos.at : '0'; }
   var artistIndexCache = null, artistIndexCacheSig = '';
   function buildArtistIndex(){
     var sig = libraryIndexSig();
@@ -42689,7 +42718,33 @@
     }
     return artistIndexCache.slice();
   }
+  // Songs and artist stations only. The music video index matches videos against this (it
+  // can't use the full index, which is built from the video index).
+  var artistBaseCache = null, artistBaseSig = '';
+  function buildArtistIndexBase(){
+    var sig = libraryTracks.length + '|' + compilationVersion + '|' + blacklist.length + '|' + (artistStations || []).length;
+    if(!artistBaseCache || artistBaseSig !== sig){
+      artistBaseCache = buildArtistIndexBaseFresh();
+      artistBaseSig = sig;
+    }
+    return artistBaseCache;
+  }
+  // Build 666 (Mark): an artist with a music video in the library but no songs still gets an
+  // artist page (it was only reachable as a tile on Watch > Music Videos).
   function buildArtistIndexFresh(){
+    var list = buildArtistIndexBase().slice();
+    var have = {};
+    list.forEach(function(e){ have[e.key] = true; });
+    var only = musicVideoOnlyArtists(), added = false;
+    Object.keys(only).forEach(function(k){
+      if(have[k]) return;
+      list.push({ key: k, name: only[k], tracks: [], stations: [], videoOnly: true });
+      added = true;
+    });
+    if(added) list.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
+    return list;
+  }
+  function buildArtistIndexBaseFresh(){
     var map = {};
     function ensure(key, name){
       if(!map[key]) map[key] = { key: key, name: name, tracks: [], stations: [] };
@@ -42736,7 +42791,7 @@
   // The artists the Library lists.
   function libraryArtistIndex(){
     var all = buildArtistIndex();
-    return libArtistRadioOn() ? all : all.filter(function(e){ return e.tracks.length > 0; });
+    return libArtistRadioOn() ? all : all.filter(function(e){ return e.tracks.length > 0 || e.videoOnly; });
   }
   // Top Artists and the car menu look up many artists in one go; building the whole index
   // for each of them was most of a big library's start-up time. One index serves a burst.
@@ -42744,7 +42799,7 @@
   function findArtistEntry(key){
     // Anything that changes the index also changes one of these, so a burst never serves a
     // stale answer even within the same task.
-    var sig = libraryTracks.length + '|' + (artistStations || []).length + '|' + blacklist.length;
+    var sig = libraryTracks.length + '|' + (artistStations || []).length + '|' + blacklist.length + '|' + mvSigPart();
     if(!artistIndexBurst || sig !== artistIndexSig){
       var map = {};
       buildArtistIndex().forEach(function(e){ map[e.key] = e; });
@@ -46162,6 +46217,9 @@
     // (build 149; before, it started their first song).
     var radio = artistRadioFor(entry);
     var first = entry.stations[0] || radio || entry.tracks.slice().sort(byTrackOrder)[0] || null;
+    // Build 666: an artist with only music videos plays those.
+    var mvOnly = !first ? musicVideosFor(entry.key) : [];
+    if(!first && mvOnly.length) first = mvOnly[0];
     artistPlayBtn.style.display = first ? '' : 'none';
     // Anything of this artist's already playing (their station, or any of their songs) makes
     // the pill a Pause/Resume for it rather than a restart from the top.
@@ -46175,6 +46233,7 @@
       return Array.prototype.some.call(stationsGrid.children, function(el){ return el._ctxItem && favKey(el._ctxItem) === k; });
     } : null;
     artistPlayBtn.onclick = first ? function(){
+      if(mvOnly.length){ mvPlayList(mvOnly, false, entry.name + ' Videos'); return; }
       if(artistPillOwns(currentStation)){ togglePlayPause(); return; }
       // No station of their own: their Radio (build 150), or with fewer than three songs, all
       // of their songs shuffled (build 149).
