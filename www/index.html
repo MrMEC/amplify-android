@@ -4059,6 +4059,9 @@
   .epg-cat{ flex:none; display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-dim); font:inherit; font-size:12.5px; font-weight:600; white-space:nowrap; cursor:pointer; }
   .epg-cat.active{ background:var(--text); border-color:var(--text); color:var(--bg); }
   .epg-cat-star{ color:var(--accent); font-size:11px; }
+  .epg-cat.hr-lifted{ background:var(--panel-2); color:var(--text); border-color:var(--text-dim); }
+  .epg-cat.hr-lifted.active{ background:var(--text); color:var(--bg); }
+  .epg-cats.hr-active{ -webkit-user-select:none; user-select:none; }
   .ch-sheet-item .ch-sheet-svg{ width:20px; flex:none; color:var(--text-dim); }
   .ch-cat-opt .ch-cat-tick{ width:20px; flex:none; display:flex; justify-content:center; }
   .ch-cat-opt .ch-cat-tick i{ color:var(--accent); }
@@ -11488,7 +11491,7 @@
   var P = cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AmplifyPlayer;
   var native = !!(P && typeof P.kvSet === 'function' && typeof P.kvGetAll === 'function');
   var KEYS = ['radioPlayerFavorites', 'radioPlayerFavOrder', 'radioPlayerFavOrderManual', 'radioPlayerFavArtistOrder',
-    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort', 'radioPlayerLiveChannels', 'radioPlayerStarterPack', 'radioPlayerChannelCats', 'radioPlayerGuideCategory',
+    'radioPlayerVideoChannels', 'radioPlayerChannelOrder', 'radioPlayerChannelSort', 'radioPlayerLiveChannels', 'radioPlayerStarterPack', 'radioPlayerChannelCats', 'radioPlayerGuideCategory', 'radioPlayerGuideCatOrder',
     'radioPlayerChannelLayout', 'radioPlayerLiveChOrder', 'radioPlayerChannelMixOrder', 'radioPlayerChannelMix',
     'radioPlayerStationPlaylists', 'radioPlayerCustomSearches', 'radioPlayerBlacklist', 'radioPlayerGenreOrder',
     'radioPlayerPodcastSubs', 'radioPlayerPodcastCategories', 'radioPlayerContinueWatchingHidden',
@@ -28379,9 +28382,20 @@
     try{ localStorage.setItem(CH_CAT_KEY, JSON.stringify(chCatOverride)); }catch(e){}
   }
   function chCatRank(c){
+    if(c === 'My Channels') return -1;   // build 679 (Mark): right after Favorites
     var i = CH_CAT_ORDER.indexOf(c);
     if(i >= 0) return i;
-    return c === 'My Channels' ? 900 : c === 'Archive.org' ? 901 : c === 'Other' ? 902 : 500;
+    return c === 'Archive.org' ? 901 : c === 'Other' ? 902 : 500;
+  }
+  // Build 679 (Mark): the chips can be put in your own order (hold one, drag it). All stays first;
+  // a category you haven't placed yet goes after the ones you have, in the usual order.
+  var EPG_CAT_ORDER_KEY = 'radioPlayerGuideCatOrder';
+  var epgCatOrder = (function(){ try{ var a = JSON.parse(localStorage.getItem(EPG_CAT_ORDER_KEY) || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } })();
+  function saveEpgCatOrder(keys){
+    // keep the place of categories not in this list (they may come back), after the ones shown
+    var rest = epgCatOrder.filter(function(k){ return keys.indexOf(k) < 0; });
+    epgCatOrder = keys.concat(rest);
+    try{ localStorage.setItem(EPG_CAT_ORDER_KEY, JSON.stringify(epgCatOrder)); }catch(e){}
   }
   function chCatSort(a, b){ var d = chCatRank(a) - chCatRank(b); return d || a.localeCompare(b); }
   // The chips for a list: All, Favorites (when any), then each category the list has.
@@ -28393,9 +28407,20 @@
       if(!fav && isFavorite(channelToStation(ch))) fav = true;
     });
     cats.sort(chCatSort);
-    var out = [{ key: 'all', label: 'All' }];
+    var out = [];
     if(fav) out.push({ key: 'fav', label: 'Favorites', fav: true });
     cats.forEach(function(c){ out.push({ key: 'cat:' + c, label: c }); });
+    if(epgCatOrder.length){
+      var pos = {};
+      epgCatOrder.forEach(function(k, i){ pos[k] = i; });
+      var at = {};
+      out.forEach(function(c, i){ at[c.key] = i; });
+      out.sort(function(a, b){
+        var pa = a.key in pos ? pos[a.key] : 1e6, pb = b.key in pos ? pos[b.key] : 1e6;
+        return pa - pb || at[a.key] - at[b.key];
+      });
+    }
+    out.unshift({ key: 'all', label: 'All' });
     return out;
   }
   function epgCatFilter(list, key){
@@ -28403,10 +28428,26 @@
     if(key.indexOf('cat:') === 0){ var c = key.slice(4); return list.filter(function(ch){ return chCategory(ch) === c; }); }
     return list;
   }
-  function buildEpgCats(wrap, chips, active){
-    var row = document.createElement('div');
-    row.className = 'epg-cats';
-    row.setAttribute('role', 'tablist');
+  // One chip row per guide (the Watch page's, the one under the video), kept and filled again on
+  // every rebuild, so the hold-to-drag is set up once for each (it listens on the whole page).
+  var epgCatRows = {};
+  function buildEpgCats(wrap, chips, active, which){
+    var row = epgCatRows[which];
+    if(!row){
+      row = epgCatRows[which] = document.createElement('div');
+      row.className = 'epg-cats';
+      row.setAttribute('role', 'tablist');
+      attachHoldReorder(row, { item: '.epg-cat', min: 3, touchOnly: false,
+        accept: function(el){ return el.dataset.cat !== 'all'; },
+        keyOf: function(el){ return el.dataset.cat; },
+        canSwap: null,
+        onDrop: function(keys){
+          saveEpgCatOrder(keys.filter(function(k){ return k !== 'all'; }));
+          rebuildEpgGridsInPlace();
+        } });
+    }
+    if(row.parentNode) row.parentNode.removeChild(row);
+    row.innerHTML = '';
     chips.forEach(function(c){
       var b = document.createElement('button');
       b.type = 'button';
@@ -28511,7 +28552,7 @@
     var active = chips.some(function(c){ return c.key === epgCat; }) ? epgCat : 'all';
     if(chips.length > 2){
       head.classList.add('has-cats');
-      head.appendChild(buildEpgCats(wrap, chips, active));
+      head.appendChild(buildEpgCats(wrap, chips, active, opts.np ? 'np' : 'main'));
       channels = epgCatFilter(channels, active);
     }
     var corner = document.createElement('button');
