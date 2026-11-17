@@ -2562,8 +2562,9 @@
       position:relative; top:auto; padding:0 20px 0;
       /* vh fallback, then dvh (tracks the currently-visible viewport, address bar and all)
          for anything that supports it -- see the note on the desktop rule above. */
-      margin-top:calc(50vh - 100vw);
-      margin-top:calc(50dvh - 100vw);
+      /* Build 673 (Mark): the name now sits just under the blurred bottom of the cover, not at
+         the screen's vertical centre -- everything below it moves up with it. */
+      margin-top:0;
     }
   }
 
