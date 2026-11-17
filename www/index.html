@@ -1855,8 +1855,8 @@
        bottom of the picture dissolves into the page instead, so the join cannot be located.
        Masking rather than painting a colour over it means the fade always matches, whatever
        colour the photograph turns out to be. */
-    -webkit-mask-image:linear-gradient(to bottom, #000 56%, rgba(0,0,0,.55) 79%, transparent 99%);
-    mask-image:linear-gradient(to bottom, #000 56%, rgba(0,0,0,.55) 79%, transparent 99%);
+    -webkit-mask-image:linear-gradient(to bottom, #000 55%, rgba(0,0,0,.88) 66%, rgba(0,0,0,.65) 77%, rgba(0,0,0,.32) 89%, transparent 100%);
+    mask-image:linear-gradient(to bottom, #000 55%, rgba(0,0,0,.88) 66%, rgba(0,0,0,.65) 77%, rgba(0,0,0,.32) 89%, transparent 100%);
     /* Scroll progress (0 at the top of the page, 1 once the portrait has scrolled most of the
        way past) is written to --hero-scroll by updateArtistHeroScroll(). The crisp copy blurs
        and fades as it climbs, so what is left is the blurred twin behind it settling into the
@@ -1872,6 +1872,7 @@
     will-change:filter, opacity, transform;
   }
   .artist-hero-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .artist-hero-blur{ display:none; }
   .artist-hero-art-wrap .np-art-edit{ opacity:0; transform:translateY(-4px); transition:opacity .15s ease, transform .15s ease; }
   .artist-hero-art-wrap:hover .np-art-edit, .artist-hero-art-wrap .np-art-edit:focus-visible{ opacity:1; transform:translateY(0); }
   /* Anchored by its TOP to the vertical middle of the viewport -- same reasoning as Now
@@ -1891,22 +1892,7 @@
     padding:0 20px 26px;
     isolation:isolate;
   }
-  /* A seat for the text, identical to Now Playing's .np-hero-foot::before. Before the title
-     was re-anchored to the screen's vertical centre it always landed in the lower stretch of
-     the artwork, where .artist-hero-art's own mask-image has already faded the picture most
-     of the way to the page tint -- so the text-shadow above was contrast enough on its own.
-     Centred, it can now land anywhere in the photo, including the brightest, least-faded
-     part (a stage light, a pale shirt), where that shadow alone reads as barely-there grey
-     text on a hot colour instead of white on dark -- reported directly against a red-lit
-     tour photo. This ellipse gives the name its own patch of shade wherever it ends up,
-     independent of what the artwork happens to look like at the midpoint. */
-  .artist-hero-overlay::before{
-    content:''; position:absolute; z-index:-1;
-    top:-30px; bottom:-20px; left:-12%; right:-12%;
-    background:radial-gradient(ellipse 62% 54% at 50% 48%,
-      rgba(0,0,0,.42) 0, rgba(0,0,0,.26) 46%, rgba(0,0,0,0) 76%);
-    pointer-events:none;
-  }
+  /* Build 668 (Mark): the dark radial behind the name is gone. */
   /* No eyebrow over the name: the page is reached by tapping an artist, so a label reading
      "Artist" tells you only what you already knew. */
   .artist-hero-name{
@@ -2499,6 +2485,28 @@
        siblings. */
     .artist-hero-art-wrap{ height:auto; }
     .artist-hero-art{ height:auto; aspect-ratio:1/1; }
+    /* Build 668 (Mark, Apple Music's artist page): the cover itself blurs out toward its
+       bottom edge and dissolves into the page, instead of cross-fading to a blurred twin.
+       Each layer blurs everything under it (the portrait, already faded by its own mask) and
+       is itself masked to a lower band, so the blur strengthens smoothly down the picture
+       (3, then about 10, 24 and 50 px once they have stacked). The wrap is a backdrop root
+       (clip-path), so only the portrait is blurred, never the page behind it. The twin is not
+       needed any more. */
+    .artist-hero-art-bleed{ display:none; }
+    .artist-hero-blur{
+      display:block; position:absolute; top:0; left:0; right:0; z-index:1;
+      /* 20% taller than the picture: past its bottom edge the blur samples empty space, not a
+         mirrored copy of the faded edge (which left a visible seam there). */
+      height:auto; aspect-ratio:1/1.2; pointer-events:none;
+      -webkit-backdrop-filter:blur(var(--hb)); backdrop-filter:blur(var(--hb));
+      -webkit-mask-image:linear-gradient(to bottom, transparent var(--ha), #000 var(--hz));
+      mask-image:linear-gradient(to bottom, transparent var(--ha), #000 var(--hz));
+      transform:translateY(calc(var(--hero-parallax, 0) * 1px));
+    }
+    .artist-hero-blur.b1{ --hb:3px;  --ha:33%; --hz:47%; }
+    .artist-hero-blur.b2{ --hb:7px;  --ha:42%; --hz:57%; }
+    .artist-hero-blur.b3{ --hb:14px; --ha:48%; --hz:65%; }
+    .artist-hero-blur.b4{ --hb:26px; --ha:55%; --hz:75%; }
     /* .artist-hero-art-bleed is `inset:0` -- pinned to all four edges of the wrap -- which
        was exactly the square the crisp art above it occupied back when the wrap WAS that
        square. Now the wrap is taller (square art + the overlay stacked below it), so
@@ -8325,7 +8333,7 @@
     /* the column doesn't scroll, so the upright page's fade-on-scroll is off here */
     body.phone-land.artist-open .artist-hero-art-wrap{ --hero-scroll:0 !important; --hero-parallax:0 !important; }
     body.phone-land.artist-open .artist-hero-art{ filter:none !important; opacity:1 !important; }
-    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
+    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-blur, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
     body.phone-land.artist-open .artist-hero-overlay{
       position:relative !important; top:auto !important; left:auto; right:auto; margin:0 !important; padding:0 !important;
       flex:1 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; }
@@ -8914,6 +8922,13 @@
         <div class="artist-hero-art-wrap" id="artistHeroArtWrap">
           <div class="artist-hero-art-bleed" id="artistHeroArtBleed" aria-hidden="true"></div>
           <div class="artist-hero-art" id="artistHeroArt"></div>
+          <!-- Build 668: the progressive blur. Four layers over the portrait, each blurring what is
+               behind it a little more and only toward the bottom, so the picture itself softens
+               as it goes down and then fades into the page (phones only; see the CSS). -->
+          <div class="artist-hero-blur b1" aria-hidden="true"></div>
+          <div class="artist-hero-blur b2" aria-hidden="true"></div>
+          <div class="artist-hero-blur b3" aria-hidden="true"></div>
+          <div class="artist-hero-blur b4" aria-hidden="true"></div>
           <!-- The pencil used to float in this corner. With the picture full-bleed that
                corner is where the menu button floats, so the two sat on top of each other
                and the pencil could not be reached at all. It moved into the overflow menu
