@@ -29408,7 +29408,7 @@
   }
 
   // ---- the Add Channels page
-  var addChannelsTab = 'mine'; // build 280: your shows and movies first
+  var addChannelsTab = 'all'; // build 674 (Mark): opens on All; tab order is All, Recommended, My Shows & Movies
   var addChannelsState = { q: '', country: '', cat: '', shown: 60, linkUrl: '', linkList: null };
   // Each list names countries its own way (iptv-org: "US"; Free-TV: "USA"), so each tab keeps
   // its own country choice, starting from the phone's region.
@@ -29548,7 +29548,7 @@
       // Short labels. Plex only while signed in to Plex.
       if(addChannelsTab === 'plex' && !plexSignedIn()) addChannelsTab = 'recommended';
       if((addChannelsTab === 'pluto' || addChannelsTab === 'archive') && !sourceOn(addChannelsTab)) addChannelsTab = 'recommended';   // build 351
-      var tabList = [['mine', 'My Shows & Movies'], ['recommended', 'Recommended'], ['all', 'All']];
+      var tabList = [['all', 'All'], ['recommended', 'Recommended'], ['mine', 'My Shows & Movies']];
       if(sourceOn('pluto')) tabList.push(['pluto', 'Pluto']);
       if(sourceOn('archive')) tabList.push(['archive', 'Archive.org']);
       if(plexSignedIn()) tabList.push(['plex', 'Plex']);
