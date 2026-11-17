@@ -1855,8 +1855,8 @@
        bottom of the picture dissolves into the page instead, so the join cannot be located.
        Masking rather than painting a colour over it means the fade always matches, whatever
        colour the photograph turns out to be. */
-    -webkit-mask-image:linear-gradient(to bottom, #000 55%, rgba(0,0,0,.88) 66%, rgba(0,0,0,.65) 77%, rgba(0,0,0,.32) 89%, transparent 100%);
-    mask-image:linear-gradient(to bottom, #000 55%, rgba(0,0,0,.88) 66%, rgba(0,0,0,.65) 77%, rgba(0,0,0,.32) 89%, transparent 100%);
+    -webkit-mask-image:linear-gradient(to bottom, #000 52%, rgba(0,0,0,.55) 76%, transparent 99%);
+    mask-image:linear-gradient(to bottom, #000 52%, rgba(0,0,0,.55) 76%, transparent 99%);
     /* Scroll progress (0 at the top of the page, 1 once the portrait has scrolled most of the
        way past) is written to --hero-scroll by updateArtistHeroScroll(). The crisp copy blurs
        and fades as it climbs, so what is left is the blurred twin behind it settling into the
@@ -1872,8 +1872,6 @@
     will-change:filter, opacity, transform;
   }
   .artist-hero-art img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .artist-hero-blur{ display:none; }
-  .artist-hero-stack{ display:contents; }   /* desktop and sideways phone: no box of its own, as before */
   .artist-hero-art-wrap .np-art-edit{ opacity:0; transform:translateY(-4px); transition:opacity .15s ease, transform .15s ease; }
   .artist-hero-art-wrap:hover .np-art-edit, .artist-hero-art-wrap .np-art-edit:focus-visible{ opacity:1; transform:translateY(0); }
   /* Anchored by its TOP to the vertical middle of the viewport -- same reasoning as Now
@@ -1893,7 +1891,7 @@
     padding:0 20px 26px;
     isolation:isolate;
   }
-  /* Build 668 (Mark): the dark radial behind the name is gone. */
+  /* Build 671 (Mark): no dark radial behind the name. */
   /* No eyebrow over the name: the page is reached by tapping an artist, so a label reading
      "Artist" tells you only what you already knew. */
   .artist-hero-name{
@@ -2379,6 +2377,30 @@
      (applyPageBackdrop) called from the same place each of their own colour reads happen, and
      is set the instant a picture is chosen -- it does not wait on whether the colour read
      later succeeds or fails. */
+  .artist-wash{ display:none; }
+  @media (max-width: 900px){
+    /* Same layers, same numbers as .np-backdrop-img and .np-backdrop-scrim. Fixed behind the
+       page (z-index:-1), so it holds still while the page scrolls over it, as Now Playing's
+       sticky one does. */
+    body.artist-open:not(.phone-land) .artist-wash{
+      display:block; position:fixed; top:0; left:0; right:0; height:100vh; z-index:-1;
+      overflow:hidden; pointer-events:none;
+    }
+    .artist-wash-img{
+      position:absolute; inset:-30%;
+      background-size:100% auto; background-position:center top; background-repeat:repeat;
+      filter:blur(90px) saturate(1.9) brightness(.62);
+      transition:opacity .3s ease;
+    }
+    .artist-wash-scrim{
+      position:absolute; inset:0;
+      background:linear-gradient(to bottom,
+        rgba(0,0,0,.24) 0,
+        rgba(0,0,0,0) 20%,
+        rgba(0,0,0,0) 52%,
+        rgba(0,0,0,.30) 100%);
+    }
+  }
   .page-backdrop{
     display:none; position:fixed; inset:-30%; pointer-events:none;
     /* cover/no-repeat, not the "100% auto" + repeat a tall portrait can get away with: a
@@ -2486,32 +2508,6 @@
        siblings. */
     .artist-hero-art-wrap{ height:auto; }
     .artist-hero-art{ height:auto; aspect-ratio:1/1; }
-    /* Build 669 (Mark, Apple Music's artist page): the cover itself blurs out toward its bottom
-       edge and dissolves into the page. The portrait and four blur layers sit in one box
-       (.artist-hero-stack) whose mask fades the finished picture to nothing, so it always ends
-       fully transparent -- a layer can't leave a hard edge. The portrait is left unmasked so
-       the blur layers see a solid picture (blurring a picture that was already fading left a
-       darker band at the bottom). The picture stays whole to 80% and fades over the last fifth. The blur builds from about 55% down: a little on the
-       way, then 3, 7, 14 and 26 px layers that stack. */
-    .artist-hero-art-bleed{ display:none; }
-    body:not(.phone-land) .artist-hero-stack{
-      display:block; position:relative; width:100%;
-      -webkit-mask-image:linear-gradient(to bottom, #000 80%, rgba(0,0,0,.976) 82%, rgba(0,0,0,.905) 84%, rgba(0,0,0,.794) 86%, rgba(0,0,0,.654) 88%, rgba(0,0,0,.5) 90%, rgba(0,0,0,.345) 92%, rgba(0,0,0,.206) 94%, rgba(0,0,0,.095) 96%, rgba(0,0,0,.025) 98%, transparent 100%);
-      mask-image:linear-gradient(to bottom, #000 80%, rgba(0,0,0,.976) 82%, rgba(0,0,0,.905) 84%, rgba(0,0,0,.794) 86%, rgba(0,0,0,.654) 88%, rgba(0,0,0,.5) 90%, rgba(0,0,0,.345) 92%, rgba(0,0,0,.206) 94%, rgba(0,0,0,.095) 96%, rgba(0,0,0,.025) 98%, transparent 100%);
-    }
-    body:not(.phone-land) .artist-hero-stack .artist-hero-art{ -webkit-mask-image:none; mask-image:none; }
-    .artist-hero-blur{
-      display:block; position:absolute; inset:0; z-index:1; pointer-events:none;
-      -webkit-backdrop-filter:blur(var(--hb)); backdrop-filter:blur(var(--hb));
-      -webkit-mask-image:linear-gradient(to bottom, transparent var(--ha), #000 var(--hz));
-      mask-image:linear-gradient(to bottom, transparent var(--ha), #000 var(--hz));
-      transform:translateY(calc(var(--hero-parallax, 0) * 1px));
-    }
-    body.phone-land .artist-hero-blur{ display:none; }
-    .artist-hero-blur.b1{ --hb:3px;  --ha:52%; --hz:66%; }
-    .artist-hero-blur.b2{ --hb:7px;  --ha:58%; --hz:74%; }
-    .artist-hero-blur.b3{ --hb:14px; --ha:64%; --hz:82%; }
-    .artist-hero-blur.b4{ --hb:26px; --ha:70%; --hz:92%; }
     /* .artist-hero-art-bleed is `inset:0` -- pinned to all four edges of the wrap -- which
        was exactly the square the crisp art above it occupied back when the wrap WAS that
        square. Now the wrap is taller (square art + the overlay stacked below it), so
@@ -8338,7 +8334,7 @@
     /* the column doesn't scroll, so the upright page's fade-on-scroll is off here */
     body.phone-land.artist-open .artist-hero-art-wrap{ --hero-scroll:0 !important; --hero-parallax:0 !important; }
     body.phone-land.artist-open .artist-hero-art{ filter:none !important; opacity:1 !important; }
-    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-blur, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
+    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
     body.phone-land.artist-open .artist-hero-overlay{
       position:relative !important; top:auto !important; left:auto; right:auto; margin:0 !important; padding:0 !important;
       flex:1 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; }
@@ -8478,6 +8474,9 @@
      one call all three pages' colour-sync functions make, so this is never a second picture
      tuned to look like the first, it is the first. -->
 <div class="page-backdrop" id="pageBackdrop" aria-hidden="true"></div>
+<!-- Build 671 (Mark): the artist page's background is Now Playing's, copied exactly: the artwork
+     blown up and blurred across the whole screen (.np-backdrop), with the same scrim. -->
+<div class="artist-wash" id="artistWash" aria-hidden="true"><div class="artist-wash-img" id="artistWashImg"></div><div class="artist-wash-scrim"></div></div>
 <!-- The glow. A blurred copy of the same picture, shaped and positioned like the hero itself
      and sitting at body level rather than inside the page -- which is the whole point of it:
      each page already has a blurred twin behind its artwork, but those live inside the
@@ -8926,16 +8925,7 @@
       <div class="artist-hero" id="artistHero" style="display:none;">
         <div class="artist-hero-art-wrap" id="artistHeroArtWrap">
           <div class="artist-hero-art-bleed" id="artistHeroArtBleed" aria-hidden="true"></div>
-          <div class="artist-hero-stack">
           <div class="artist-hero-art" id="artistHeroArt"></div>
-          <!-- Build 668: the progressive blur. Four layers over the portrait, each blurring what is
-               behind it a little more and only toward the bottom, so the picture itself softens
-               as it goes down and then fades into the page (phones only; see the CSS). -->
-          <div class="artist-hero-blur b1" aria-hidden="true"></div>
-          <div class="artist-hero-blur b2" aria-hidden="true"></div>
-          <div class="artist-hero-blur b3" aria-hidden="true"></div>
-          <div class="artist-hero-blur b4" aria-hidden="true"></div>
-          </div>
           <!-- The pencil used to float in this corner. With the picture full-bleed that
                corner is where the menu button floats, so the two sat on top of each other
                and the pencil could not be reached at all. It moved into the overflow menu
@@ -17445,38 +17435,6 @@
   var PAGE_TINT_OPTS = { minS: 0.18, maxS: 0.42, minL: 0.20, maxL: 0.32, scaleL: 0.70 };
   var PAGE_TINT_FALLBACK = '#242730';
   var pageTintCache = {};
-  // Build 669 (Mark): the artist page's colour is the dominant colour along the picture's
-  // bottom edge (the part that fades into the page), pixels counted by area, so the page is the
-  // colour the picture ends in rather than the most vivid colour anywhere in it (a red lip on
-  // a black photo gave a red page). Kept dark enough for the white text.
-  function bottomToneFrom(img){
-    var w = img.naturalWidth, h = img.naturalHeight;
-    if(!w || !h) return null;
-    // The square object-fit:cover shows, then its bottom 40%.
-    var side = Math.min(w, h), sx = (w - side) / 2, sy = (h - side) / 2;
-    var cw = 24, ch = 10;
-    var canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
-    var ctx = canvas.getContext('2d');
-    if(!ctx) return null;
-    try{
-      ctx.drawImage(img, sx, sy + side * 0.6, side, side * 0.4, 0, 0, cw, ch);
-      var data = ctx.getImageData(0, 0, cw, ch).data;
-    }catch(e){ return null; }
-    var bins = {}, bestKey = null, bestN = 0;
-    for(var i = 0; i < data.length; i += 4){
-      if(data[i + 3] < 128) continue;
-      var k = (data[i] >> 5) * 64 + (data[i + 1] >> 5) * 8 + (data[i + 2] >> 5);
-      var b = bins[k] || (bins[k] = { n: 0, r: 0, g: 0, b: 0 });
-      b.n++; b.r += data[i]; b.g += data[i + 1]; b.b += data[i + 2];
-      if(b.n > bestN){ bestN = b.n; bestKey = k; }
-    }
-    if(bestKey === null) return null;
-    var bb = bins[bestKey];
-    var hsl = rgbToHsl(bb.r / bb.n, bb.g / bb.n, bb.b / bb.n);
-    var l = Math.min(0.30, Math.max(0.03, hsl[2]));
-    var sat = Math.min(0.55, hsl[1]);
-    return 'hsl(' + Math.round(hsl[0]) + ',' + Math.round(sat * 100) + '%,' + Math.round(l * 100) + '%)';
-  }
 
   function applyPageTint(colour){
     document.body.style.setProperty('--page-tint', colour || PAGE_TINT_FALLBACK);
@@ -17495,18 +17453,20 @@
     // The glow is set in the same breath, from the same string: two layers of one effect,
     // never two effects that have to be kept in step.
     if(pageGlow) pageGlow.style.backgroundImage = value;
+    var wash = document.getElementById('artistWashImg');
+    if(wash) wash.style.backgroundImage = value;
   }
   // The cover is a local file, so unlike a station logo its pixels really can be read. If
   // that ever fails the fallback is a neutral dark surface, never the theme's own panel
   // colour: everything on this page is drawn light.
-  function syncPageTint(container, bottomTone){
+  function syncPageTint(container, npTint){
     var img = container.querySelector('img');
     if(!img){ applyPageTint(null); applyPageBackdrop(null); return; }
     var src = img.currentSrc || img.src;
     // Set unconditionally, ahead of the colour read below and regardless of whether that read
     // ever succeeds: the backdrop only needs the picture, not its pixels.
     applyPageBackdrop(src);
-    var ck = bottomTone ? src + '|bottom' : src;
+    var ck = npTint ? src + '|np' : src;
     if(pageTintCache[ck] !== undefined){ applyPageTint(pageTintCache[ck]); return; }
     function current(){
       var now = container.querySelector('img');
@@ -17514,7 +17474,7 @@
     }
     function read(){
       if(!img.naturalWidth) return;
-      var colour = bottomTone ? (bottomToneFrom(img) || dominantColorFrom(img, PAGE_TINT_OPTS)) : dominantColorFrom(img, PAGE_TINT_OPTS);
+      var colour = dominantColorFrom(img, npTint ? undefined : PAGE_TINT_OPTS);
       pageTintCache[ck] = colour;
       if(current()) applyPageTint(colour);
     }
@@ -17525,11 +17485,11 @@
   // network -- so the image is often not there on the tick the page is built. Watching the
   // box is what makes the colour arrive with the picture instead of a frame too early.
   var pageTintObserver = null;
-  function watchPageTint(container, bottomTone){
+  function watchPageTint(container, npTint){
     if(pageTintObserver) pageTintObserver.disconnect();
-    syncPageTint(container, bottomTone);
+    syncPageTint(container, npTint);
     if(typeof MutationObserver !== 'function') return;
-    pageTintObserver = new MutationObserver(function(){ syncPageTint(container, bottomTone); });
+    pageTintObserver = new MutationObserver(function(){ syncPageTint(container, npTint); });
     pageTintObserver.observe(container, { childList: true });
   }
   function stopPageTint(){
@@ -46266,7 +46226,7 @@
     if(artistHeroThumb) renderArtistArt(artistHeroThumb, entry);
     // The page is built on a colour read out of the portrait, exactly as an album page is
     // built on a colour read out of its cover.
-    watchPageTint(artistHeroArt, true);
+    watchPageTint(artistHeroArt, true);   // build 671: Now Playing's colour, not the album page's
     artistHeroName.textContent = entry.name;
 
     // No tally here: the section labels below already count what this page lists, and the
