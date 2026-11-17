@@ -52877,6 +52877,50 @@
       });
   }
 
+  // Build 662: the "Loading more…" line under Search's Archive.org and Audiobooks results.
+  function searchMoreLine(group){
+    var st = searchState, line = null;
+    function append(){
+      if(searchState !== st || st.tab !== group.id || !stationsGrid.isConnected) return;
+      var have = stationsGrid.querySelectorAll(':scope > .archive-result-row').length;
+      var items = searchGroupItems(group.id);
+      items.slice(have).forEach(function(it){
+        stationsGrid.appendChild(group.id === 'archive' ? buildArchiveResultRow(it) : buildAudiobookRow(it));
+      });
+      var tab = searchTabs.querySelector('[data-group="' + group.id + '"]');
+      if(tab) tab.textContent = group.label + (items.length ? ' (' + items.length + ')' : '');
+      setResultCount(items.length, group.noun);
+      searchMoreLine(group);
+    }
+    if(group.id === 'archive' && archiveHasMore(st.archiveTotal || 0, st.archivePage || 1)){
+      line = archiveMoreButton(function(){
+        var next = (st.archivePage || 1) + 1;
+        var pq = parseSearchQuery(st.q || '');
+        return archiveSearchItems(st.archiveRemoteQ || plainSearchText(st.q || ''), null, next).then(function(more){
+          var have = {};
+          (st.archive || []).forEach(function(it){ have[it.id] = true; });
+          var add = more.filter(function(it){
+            return !have[it.id] && (!pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases }));
+          });
+          st.archive = (st.archive || []).concat(add);
+          st.archivePage = more.page || next;
+          st.archiveTotal = more.total || st.archiveTotal;
+          append();
+        });
+      });
+    } else if(group.id === 'audiobooks' && st.abPager && st.abPager.hasMore()){
+      var saq = parseSearchQuery(st.q || '');
+      line = archiveMoreButton(function(){
+        return st.abPager.next(abSearchLate(st, saq)).then(function(more){
+          st.audiobooksLate = !!more.pending;
+          st.audiobooks = (st.audiobooks || []).concat(more.filter(abPhraseOk(saq)));
+          if(st.audiobooksLate){ if(searchState === st && st.tab === group.id){ var y = window.scrollY; applySearchResults(); window.scrollTo(0, y); } return; }
+          append();
+        });
+      });
+    }
+    if(line) stationsGrid.appendChild(line);
+  }
   function applySearchResults(){
     if(!searchState) return;
     if(searchState === lastSearch) saveLastSearch();
@@ -53060,44 +53104,13 @@
 
     if(group.id === 'musicVideos') searchMusicVideoStills(items);
     if(group.id === 'channels' && !iptvIndex) stationsGrid.appendChild(buildSearchAllChannelsRow());
-    // Build 385: the next 30 from archive.org, as many times as there are more.
-    if(group.id === 'archive' && archiveHasMore(searchState.archiveTotal || 0, searchState.archivePage || 1)){
-      var st = searchState;
-      stationsGrid.appendChild(archiveMoreButton(function(){
-        var next = (st.archivePage || 1) + 1;
-        var pq = parseSearchQuery(st.q || '');
-        return archiveSearchItems(st.archiveRemoteQ || plainSearchText(st.q || ''), null, next).then(function(more){
-          var have = {};
-          (st.archive || []).forEach(function(it){ have[it.id] = true; });
-          var add = more.filter(function(it){
-            return !have[it.id] && (!pq.phrases.length || matchesQuery([it.title, it.creator], { terms: [], phrases: pq.phrases }));
-          });
-          st.archive = (st.archive || []).concat(add);
-          st.archivePage = more.page || next;
-          st.archiveTotal = more.total || st.archiveTotal;
-          if(searchState !== st) return;
-          var y = window.scrollY;
-          applySearchResults();
-          window.scrollTo(0, y);
-        });
-      }));
-    }
+    // Build 385: the next 30 from archive.org, as many times as there are more. Build 662 (Mark): they
+    // load as the end of the list comes into view and go in under the rows already there (no redraw,
+    // so the list never moves while you scroll).
     if(group.id === 'audiobooks' && searchState.audiobooksLate){
       var late = abSpinner(); late.classList.add('ab-late'); late.style.gridColumn = '1 / -1';
       stationsGrid.appendChild(late);
-    } else if(group.id === 'audiobooks' && searchState.abPager && searchState.abPager.hasMore()){
-      var sa = searchState, saq = parseSearchQuery(sa.q || '');
-      stationsGrid.appendChild(archiveMoreButton(function(){
-        return sa.abPager.next(abSearchLate(sa, saq)).then(function(more){
-          sa.audiobooksLate = !!more.pending;
-          sa.audiobooks = (sa.audiobooks || []).concat(more.filter(abPhraseOk(saq)));
-          if(searchState !== sa) return;
-          var y = window.scrollY;
-          applySearchResults();
-          window.scrollTo(0, y);
-        });
-      }));
-    }
+    } else searchMoreLine(group);
     // Still counting up while the directory answers, so no total is claimed yet.
     if(group.id === 'stations' && searchState.pending) setResultCount(null);
     else if(group.id === 'podcasts' && searchState.podcastsPending) setResultCount(null);
