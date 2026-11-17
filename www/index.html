@@ -6929,6 +6929,18 @@
   .ch-sheet-item{ display:flex; align-items:center; gap:16px; width:100%; padding:13px 22px; border:0; background:none; color:var(--text); font:inherit; font-size:15px; text-align:left; cursor:pointer; }
   .ch-sheet-item i{ width:20px; text-align:center; color:var(--text-dim); }
   .ch-sheet-item.danger, .ch-sheet-item.danger i{ color:#e5484d; }
+  /* Build 664: Add Channels > Archive.org rows and their sheet (option A). */
+  .ia-item .ch-sub{ white-space:nowrap; }
+  .ia-kind-tag{ display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.06em; line-height:1.45; color:var(--text-dim); border:1px solid var(--border); border-radius:4px; padding:0 4px; margin-right:6px; vertical-align:1px; }
+  .ch-sheet-item:disabled{ opacity:.6; cursor:default; }
+  .ch-sheet-item .ia-sheet-svg{ width:20px; flex:none; color:var(--text-dim); }
+  .ia-sheet .ch-sheet-head{ align-items:center; gap:14px; padding-bottom:12px; }
+  .ia-sheet .ch-sheet-head .ch-logo{ width:84px; height:84px; border-radius:10px; }
+  .ia-sheet .ch-sheet-head .ch-name{ white-space:normal; font-size:16.5px; font-weight:700; line-height:1.3; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; }
+  .ia-sheet .ch-sheet-head .ch-sub{ white-space:normal; margin-top:4px; }
+  .ia-sheet-desc{ padding:10px 20px 2px; font-size:13px; line-height:1.5; color:var(--text-dim); display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .ia-sheet-primary{ display:flex; align-items:center; justify-content:center; gap:9px; width:calc(100% - 40px); margin:12px 20px 6px; height:46px; border:0; border-radius:var(--r-pill, 999px); background:var(--accent); color:var(--accent-text); font:inherit; font-size:15px; font-weight:700; cursor:pointer; }
+  .ia-sheet-primary.added{ background:var(--panel-2); color:var(--text); cursor:default; }
   .ch-sheet-item:active{ background:var(--panel-2); }
   /* ---------- Build 294 (Mark): Now Playing's progress bar, Samsung-style wave ----------
      A soft glow of flowing waves in the cover's colour rides on the played part of the bar,
@@ -29586,6 +29598,11 @@
   }
   function archiveCount(n){ return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0); }
   // One archive.org item as a row: tap to play it, + to make it a channel.
+  // Build 664 (Mark, option A of the redesign mockups): one button per row, + (Add to Live TV).
+  // The title takes two lines; under it a kind tag (AUDIO / VIDEO) and the rest on one line. A
+  // download in progress or done shows as a small status beside the + (like Search's rows). Tapping
+  // the row opens a sheet: the item, its description, Add to Live TV, Preview, Add to a Custom
+  // Channel, Download to Library (and Remove from Live TV once added, asking first).
   function archiveItemRow(it, rank, list){
     var row = document.createElement('div');
     row.className = 'ch-row ch-mine ia-item';
@@ -29596,40 +29613,93 @@
     var text = document.createElement('div');
     text.className = 'ch-text';
     var n = document.createElement('div'); n.className = 'ch-name'; n.textContent = (rank ? rank + '. ' : '') + it.title; text.appendChild(n);
-    var sub = [it.video ? 'Video' : 'Audio', it.year, it.creator, it.downloads ? archiveCount(it.downloads) + ' downloads' : ''].filter(Boolean).join(' · ');
-    var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = sub; text.appendChild(sb);
+    var sb = document.createElement('div'); sb.className = 'ch-sub';
+    var tag = document.createElement('span'); tag.className = 'ia-kind-tag'; tag.textContent = it.video ? 'VIDEO' : 'AUDIO';
+    sb.appendChild(tag);
+    sb.appendChild(document.createTextNode([it.year, it.creator, it.downloads ? archiveCount(it.downloads) + ' downloads' : ''].filter(Boolean).join(' · ')));
+    text.appendChild(sb);
     row.appendChild(text);
     var ch = archiveItemChannel(it);
-    var combine = document.createElement('button');
-    combine.type = 'button';
-    combine.className = 'ch-add ia-combine';
-    combine.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h11M4 12h8M4 17h8M18 12v6M15 15h6"/></svg>';
-    combine.title = 'Add to a custom channel';
-    combine.setAttribute('aria-label', 'Add to a custom channel');
-    combine.addEventListener('click', function(ev){
-      ev.stopPropagation();
-      openArchivePicker(it, function(){ if(!(addChannelsState.archiveQ || '').trim() && onAddChannelsView && addChannelsTab === 'archive') renderAddChannels(true); });
-    });
-    row.appendChild(combine);
-    row.appendChild(archiveDlButton(it));
+    var badge = archiveDlButton(it, 'ia-dl-badge');
+    badge.tabIndex = -1;
+    badge.setAttribute('aria-hidden', 'true');
+    row.appendChild(badge);
     var add = document.createElement('button');
     add.type = 'button';
     function paint(){
       var on = !!findVideoChannel(ch.url);
       add.className = 'ch-add' + (on ? ' added' : '');
       add.innerHTML = on ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-plus"></i>';
-      add.title = on ? 'In My Channels (tap to remove)' : 'Add to My Channels';
+      add.title = on ? 'On Live TV (tap to remove)' : 'Add to Live TV';
       add.setAttribute('aria-label', add.title);
     }
     paint();
+    row._iaPaint = paint;
     add.addEventListener('click', function(ev){
       ev.stopPropagation();
       if(findVideoChannel(ch.url)) removeVideoChannel(ch.url); else addVideoChannel(ch);
       paint();
     });
     row.appendChild(add);
-    row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: archiveSearchAll() && !!(addChannelsState.archiveQ || '').trim(), list: list || [it] }); });
+    row.addEventListener('click', function(){ openArchiveItemSheet(it, row, list || [it]); });
     return row;
+  }
+  function openArchiveItemSheet(it, row, list){
+    var ch = archiveItemChannel(it);
+    function repaint(){ if(row && row._iaPaint) row._iaPaint(); }
+    chSheetOverlay.classList.add('ia-sheet');
+    var logo = document.getElementById('chSheetLogo');
+    logo.innerHTML = ''; logo.style.background = '';
+    logo.appendChild(vImg(archiveArtUrl(it.id)));
+    document.getElementById('chSheetName').textContent = it.title;
+    document.getElementById('chSheetSub').textContent = [it.video ? 'Video' : 'Audio', it.year, it.creator, it.downloads ? archiveCount(it.downloads) + ' downloads' : ''].filter(Boolean).join(' · ');
+    var box = document.getElementById('chSheetItems');
+    box.innerHTML = '';
+    var desc = document.createElement('div');
+    desc.className = 'ia-sheet-desc';
+    desc.hidden = true;
+    box.appendChild(desc);
+    extJson('https://archive.org/metadata/' + encodeURIComponent(it.id) + '/metadata', { 'Accept': 'application/json' }).then(function(d){
+      var v = d && d.result && d.result.description;
+      if(Array.isArray(v)) v = v.join(' ');
+      if(!v) return;
+      var tmp = document.createElement('div'); tmp.innerHTML = String(v).replace(/<br\s*\/?>/gi, ' ');
+      var t = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+      if(!t) return;
+      desc.textContent = t; desc.hidden = false;
+    }, function(){});
+    var on = !!findVideoChannel(ch.url);
+    var prim = document.createElement('button');
+    prim.type = 'button';
+    prim.className = 'ia-sheet-primary' + (on ? ' added' : '');
+    prim.innerHTML = on ? '<i class="fa-solid fa-check" aria-hidden="true"></i><span>On Live TV</span>' : '<i class="fa-solid fa-plus" aria-hidden="true"></i><span>Add to Live TV</span>';
+    if(on) prim.disabled = true;
+    else prim.addEventListener('click', function(){ closeChSheet(); addVideoChannel(ch); repaint(); });
+    box.appendChild(prim);
+    function item(icon, label, fn, cls){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ch-sheet-item' + (cls ? ' ' + cls : '');
+      b.innerHTML = icon.charAt(0) === '<' ? icon + '<span></span>' : '<i class="' + icon + '" aria-hidden="true"></i><span></span>';
+      b.lastChild.textContent = label;
+      b.addEventListener('click', function(){ closeChSheet(); fn(); });
+      box.appendChild(b);
+      return b;
+    }
+    item('fa-solid fa-play', 'Preview', function(){ playArchiveItem(it, row, { noHistory: archiveSearchAll() && !!(addChannelsState.archiveQ || '').trim(), list: list }); });
+    item('<svg class="ia-sheet-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h11M4 12h8M4 17h8M18 12v6M15 15h6"/></svg>', 'Add to a Custom Channel', function(){
+      openArchivePicker(it, function(){ if(!(addChannelsState.archiveQ || '').trim() && onAddChannelsView && addChannelsTab === 'archive') renderAddChannels(true); });
+    });
+    if(archiveDlPlugin()){
+      var st = archiveDl[it.id];
+      var lbl = st && st.state === 'working' ? 'Downloading (' + (st.pct || 0) + '%)' : st && st.state === 'done' ? 'Downloaded to Library' : 'Download to Library';
+      var db = item(ARCHIVE_DL_ICON.replace('<svg ', '<svg class="ia-sheet-svg" '), lbl, function(){ downloadArchiveItem(it); });
+      if(st && (st.state === 'working' || st.state === 'done')) db.disabled = true;
+    }
+    if(on) item('fa-solid fa-trash', 'Remove from Live TV', function(){
+      confirmThen({ title: 'Remove ' + quoteName(it.title) + ' from Live TV?', message: '', ok: 'Remove' }, function(){ removeVideoChannel(ch.url); repaint(); });
+    }, 'danger');
+    chSheetOverlay.classList.add('open');
   }
   function renderArchiveTab(body){
     var q = (addChannelsState.archiveQ || '').trim();
@@ -30104,6 +30174,7 @@
     var fromNp = !!opts.np;
     function leaveNp(){ if(fromNp && nowPlayingScreen.style.display === 'flex'){ try{ closeNowPlaying(false, false); }catch(e){} } }
     function npRefresh(){ if(fromNp){ try{ refreshChannelGrids(); }catch(e){} } }
+    chSheetOverlay.classList.remove('ia-sheet');   // build 664
     var mine = isLiveChUrl(ch.url);
     var def = mine ? liveChDefById(ch.url.slice('amplify-live:'.length)) : null;
     var st = mine ? liveChStationOf(ch) : channelToStation(ch);
