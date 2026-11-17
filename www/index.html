@@ -29407,6 +29407,43 @@
     });
   }
 
+  // ---- Recommended (build 675, Mark: every channel source, the most popular of each)
+  // Free-TV's curated playlist (the iptv-org family, by country) plus the top of each other source:
+  //  - Pluto TV: the first RECOMMEND_PER_SOURCE channels in Pluto's own guide order (its channel
+  //    numbers; Pluto publishes no viewing figures, so its own ordering is the best signal there is).
+  //  - Plex: the first RECOMMEND_PER_SOURCE in Plex's lineup order (same reasoning), when signed in.
+  //  - archive.org: the most downloaded videos (shown above the list, see recommendedArchive).
+  // Pluto and Plex are not tied to a country, so they stay in whichever country is picked. A source
+  // that is off in Settings > Sources, or a Plex that is signed out, adds nothing.
+  var RECOMMEND_PER_SOURCE = 20;
+  function topRanked(list, key){
+    return list.filter(function(c){ return c && c[key] > 0; })
+      .sort(function(a, b){ return a[key] - b[key]; })
+      .slice(0, RECOMMEND_PER_SOURCE)
+      .map(function(c){ var o = {}; for(var k in c) o[k] = c[k]; o.global = true; return o; });
+  }
+  function loadRecommended(){
+    var freeErr = null;
+    var jobs = [loadFreeTv().then(null, function(e){ freeErr = e; return []; }),
+      sourceOn('pluto') ? loadPluto().then(function(l){ return topRanked(l, 'number'); }, function(){ return []; }) : Promise.resolve([]),
+      plexSignedIn() ? loadPlexLive().then(function(l){ return topRanked(l, 'rank'); }, function(){ return []; }) : Promise.resolve([])];
+    return Promise.all(jobs).then(function(r){
+      // Interleaved, so each source's best channels sit together at the top.
+      var top = [], n = Math.max(r[1].length, r[2].length);
+      for(var i = 0; i < n; i++){ if(r[1][i]) top.push(r[1][i]); if(r[2][i]) top.push(r[2][i]); }
+      if(!top.length && !r[0].length && freeErr) throw freeErr;   // nothing at all: show the usual error
+      return top.concat(r[0]);
+    });
+  }
+  var recArchiveItems = null;
+  function recommendedArchive(){
+    if(recArchiveItems) return Promise.resolve(recArchiveItems);
+    var q = 'mediatype:(movies) AND collection:(moviesandfilms OR classic_tv OR feature_films OR classic_cartoons OR silent_films OR SciFi_Horror OR Comedy_Films OR Film_Noir)';
+    return extJson(archiveQueryUrl(q, 24, 1), { 'Accept': 'application/json' }).then(function(d){
+      return archiveOnlyPlayable(archiveDocs(d));
+    }).then(function(items){ recArchiveItems = items.slice(0, RECOMMEND_PER_SOURCE); return recArchiveItems; });
+  }
+
   // ---- the Add Channels page
   var addChannelsTab = 'all'; // build 674 (Mark): opens on All; tab order is All, Recommended, My Shows & Movies
   var addChannelsState = { q: '', country: '', cat: '', shown: 60, linkUrl: '', linkList: null };
@@ -29510,7 +29547,7 @@
     var words = addChannelsState.q.toLowerCase().split(/\s+/).filter(Boolean);
     return list.filter(function(e){
       if(!channelVisible(e)) return false;
-      if(useCountry && addChannelsState.country && e.country !== addChannelsState.country) return false;
+      if(useCountry && addChannelsState.country && !e.global && e.country !== addChannelsState.country) return false;
       if(addChannelsState.cat && (e.cats || []).indexOf(addChannelsState.cat) === -1) return false;
       if(!words.length) return true;
       var n = e.name.toLowerCase();
@@ -29589,7 +29626,7 @@
     if(addChannelsTab === 'archive'){ renderArchiveTab(body); return; }
     body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     var loader = addChannelsTab === 'all' ? loadIptvIndex().then(function(i){ return i.list; })
-      : addChannelsTab === 'plex' ? loadPlexLive() : addChannelsTab === 'pluto' ? loadPluto() : loadFreeTv();
+      : addChannelsTab === 'plex' ? loadPlexLive() : addChannelsTab === 'pluto' ? loadPluto() : loadRecommended();
     var tab = addChannelsTab;
     loader.then(function(list){
       if(!onAddChannelsView || addChannelsTab !== tab) return;
@@ -29605,6 +29642,18 @@
         return;
       }
       renderChannelList(host, entries);
+      if(tab === 'recommended' && sourceOn('archive') && !addChannelsState.q.trim()){
+        recommendedArchive().then(function(items){
+          if(!items || !items.length || !onAddChannelsView || addChannelsTab !== 'recommended' || !host.parentNode) return;
+          var first = host.querySelector('.ch-list');
+          var sec = document.createElement('div');
+          sec.className = 'ch-list';
+          var lab = document.createElement('div'); lab.className = 'ch-sub'; lab.style.cssText = 'font-weight:700;font-size:1.05rem;margin:14px 0 4px;'; lab.textContent = 'Most downloaded on archive.org';
+          sec.appendChild(lab);
+          items.forEach(function(it, i){ sec.appendChild(archiveItemRow(it, i + 1, items)); });
+          host.insertBefore(sec, first);
+        }, function(){});
+      }
     }, function(err){
       if(!onAddChannelsView || addChannelsTab !== tab) return;
       body.innerHTML = tab === 'plex'
@@ -31446,7 +31495,7 @@
       seen[id] = true;
       list.push({ id: 'plexlive:' + id, name: name, url: url, logo: c.thumb || c.logo || '',
         cats: genres, catNames: genres.slice(), country: '', src: 'plex',
-        gridKey: c.gridKey || c.slug || '', callSign: c.callSign || '' });
+        gridKey: c.gridKey || c.slug || '', callSign: c.callSign || '', rank: list.length + 1 });   // build 675: Plex's own lineup order
     });
     list.sort(function(a, b){ return alphaCompare(alphaSortKey(a.name), alphaSortKey(b.name)); });
     return list;
