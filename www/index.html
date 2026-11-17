@@ -29412,7 +29412,7 @@
   //  - Pluto TV: the first RECOMMEND_PER_SOURCE channels in Pluto's own guide order (its channel
   //    numbers; Pluto publishes no viewing figures, so its own ordering is the best signal there is).
   //  - Plex: the first RECOMMEND_PER_SOURCE in Plex's lineup order (same reasoning), when signed in.
-  //  - archive.org: the most downloaded videos (shown above the list, see recommendedArchive).
+  //  - archive.org: the most downloaded videos (shown last, below the list, see recommendedArchive).
   // Pluto and Plex are not tied to a country, so they stay in whichever country is picked. A source
   // that is off in Settings > Sources, or a Plex that is signed out, adds nothing.
   var RECOMMEND_PER_SOURCE = 20;
@@ -29428,9 +29428,8 @@
       sourceOn('pluto') ? loadPluto().then(function(l){ return topRanked(l, 'number'); }, function(){ return []; }) : Promise.resolve([]),
       plexSignedIn() ? loadPlexLive().then(function(l){ return topRanked(l, 'rank'); }, function(){ return []; }) : Promise.resolve([])];
     return Promise.all(jobs).then(function(r){
-      // Interleaved, so each source's best channels sit together at the top.
-      var top = [], n = Math.max(r[1].length, r[2].length);
-      for(var i = 0; i < n; i++){ if(r[1][i]) top.push(r[1][i]); if(r[2][i]) top.push(r[2][i]); }
+      // Build 676 (Mark): Plex first, then Pluto TV, then Free-TV; archive.org comes last (below the list).
+      var top = r[2].concat(r[1]);
       if(!top.length && !r[0].length && freeErr) throw freeErr;   // nothing at all: show the usual error
       return top.concat(r[0]);
     });
@@ -29645,13 +29644,12 @@
       if(tab === 'recommended' && sourceOn('archive') && !addChannelsState.q.trim()){
         recommendedArchive().then(function(items){
           if(!items || !items.length || !onAddChannelsView || addChannelsTab !== 'recommended' || !host.parentNode) return;
-          var first = host.querySelector('.ch-list');
           var sec = document.createElement('div');
           sec.className = 'ch-list';
           var lab = document.createElement('div'); lab.className = 'ch-sub'; lab.style.cssText = 'font-weight:700;font-size:1.05rem;margin:14px 0 4px;'; lab.textContent = 'Most downloaded on archive.org';
           sec.appendChild(lab);
           items.forEach(function(it, i){ sec.appendChild(archiveItemRow(it, i + 1, items)); });
-          host.insertBefore(sec, first);
+          host.appendChild(sec);
         }, function(){});
       }
     }, function(err){
