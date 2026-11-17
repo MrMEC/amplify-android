@@ -7291,6 +7291,7 @@
   .ia-dl-badge.working, .ia-dl-badge.done{ display:inline-flex; align-items:center; }
   /* Build 385: More Results under archive.org results. */
   .ia-more-wrap{ grid-column:1/-1; display:flex; justify-content:center; padding:18px 0 8px; }
+  .ia-more-wrap.lc-more-sentinel{ padding:0; align-items:center; }
   .ia-more.clear-search-btn{ display:inline-flex; align-items:center; justify-content:center; text-align:center; gap:0; min-width:180px; height:auto; padding:12px 28px; border-radius:var(--r-pill, 999px); text-transform:none; letter-spacing:0; font-size:14.5px; font-weight:700;
     background:var(--panel); border:1px solid var(--border); color:var(--text); }
   .ia-more.clear-search-btn:active{ background:var(--panel-2); }
@@ -27924,7 +27925,7 @@
           if('IntersectionObserver' in window){
             liveChIaObs = new IntersectionObserver(function(es){ if(es.some(function(e){ return e.isIntersecting; })) more(); }, { rootMargin: '900px 0px' });
             liveChIaObs.observe(sent);
-          } else { sent.textContent = 'More Results'; sent.style.cursor = 'pointer'; sent.addEventListener('click', more); }
+          } else { sent.textContent = 'More'; sent.style.cursor = 'pointer'; sent.addEventListener('click', more); }
         }
       }
     } else if(!added.length){
@@ -35855,7 +35856,6 @@
         });
       });
       btn.classList.add('ab-more');
-      btn.style.gridColumn = '1 / -1';
       stationsGrid.appendChild(btn);
     }
     addRows(items);
@@ -51661,24 +51661,34 @@
     return sent;
   }
   function archiveMoreButton(onMore){
+    // Build 662 (Mark): no More Results buttons anywhere. This is now a "Loading more…" line that
+    // asks for the next page by itself when it comes near the screen (like lazyLoadMore); the caller
+    // still swaps it for the new rows (or redraws). A failed load retries a few seconds later.
     var wrap = document.createElement('div');
-    wrap.className = 'ia-more-wrap';
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'clear-search-btn ia-more';
-    b.textContent = 'More Results';
-    b.addEventListener('click', function(){
-      if(b.disabled) return;
-      b.disabled = true;
-      b.classList.add('loading');
-      b.textContent = 'Loading\u2026';
-      onMore().then(null, function(){
-        b.disabled = false;
-        b.classList.remove('loading');
-        b.textContent = 'Couldn\u2019t load more. Try again';
+    wrap.className = 'lc-more-sentinel ia-more-wrap';
+    wrap.textContent = 'Loading more\u2026';
+    var busy = false, obs = null;
+    function again(){ if(obs && wrap.isConnected){ obs.unobserve(wrap); obs.observe(wrap); } }
+    function go(){
+      if(busy) return;
+      if(!wrap.isConnected){ if(obs) obs.disconnect(); return; }
+      busy = true;
+      wrap.textContent = 'Loading more\u2026';
+      Promise.resolve().then(onMore).then(function(){
+        busy = false;
+        if(obs){ obs.disconnect(); obs = null; }
+        if(wrap.parentNode) wrap.remove();
+      }, function(){
+        busy = false;
+        wrap.textContent = 'Couldn\u2019t load more. Trying again\u2026';
+        setTimeout(again, 4000);
       });
-    });
-    wrap.appendChild(b);
+    }
+    if('IntersectionObserver' in window){
+      obs = new IntersectionObserver(function(es){ if(es.some(function(e){ return e.isIntersecting; })) go(); }, { rootMargin: '900px 0px' });
+      // observe once it's in the page (callers append it after this returns)
+      requestAnimationFrame(function(){ if(obs) obs.observe(wrap); });
+    } else { wrap.textContent = 'More'; wrap.style.cursor = 'pointer'; wrap.addEventListener('click', go); }
     return wrap;
   }
   // ---------- Build 339 (Mark): Add Channels > Archive.org ----------
