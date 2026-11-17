@@ -2491,13 +2491,13 @@
        (.artist-hero-stack) whose mask fades the finished picture to nothing, so it always ends
        fully transparent -- a layer can't leave a hard edge. The portrait is left unmasked so
        the blur layers see a solid picture (blurring a picture that was already fading left a
-       darker band at the bottom). The blur builds from about 55% down: a little on the
+       darker band at the bottom). The picture stays whole to 80% and fades over the last fifth. The blur builds from about 55% down: a little on the
        way, then 3, 7, 14 and 26 px layers that stack. */
     .artist-hero-art-bleed{ display:none; }
     body:not(.phone-land) .artist-hero-stack{
       display:block; position:relative; width:100%;
-      -webkit-mask-image:linear-gradient(to bottom, #000 55%, rgba(0,0,0,.97) 60%, rgba(0,0,0,.88) 65%, rgba(0,0,0,.75) 70%, rgba(0,0,0,.59) 75%, rgba(0,0,0,.41) 80%, rgba(0,0,0,.25) 85%, rgba(0,0,0,.12) 90%, rgba(0,0,0,.03) 95%, transparent 100%);
-      mask-image:linear-gradient(to bottom, #000 55%, rgba(0,0,0,.97) 60%, rgba(0,0,0,.88) 65%, rgba(0,0,0,.75) 70%, rgba(0,0,0,.59) 75%, rgba(0,0,0,.41) 80%, rgba(0,0,0,.25) 85%, rgba(0,0,0,.12) 90%, rgba(0,0,0,.03) 95%, transparent 100%);
+      -webkit-mask-image:linear-gradient(to bottom, #000 80%, rgba(0,0,0,.976) 82%, rgba(0,0,0,.905) 84%, rgba(0,0,0,.794) 86%, rgba(0,0,0,.654) 88%, rgba(0,0,0,.5) 90%, rgba(0,0,0,.345) 92%, rgba(0,0,0,.206) 94%, rgba(0,0,0,.095) 96%, rgba(0,0,0,.025) 98%, transparent 100%);
+      mask-image:linear-gradient(to bottom, #000 80%, rgba(0,0,0,.976) 82%, rgba(0,0,0,.905) 84%, rgba(0,0,0,.794) 86%, rgba(0,0,0,.654) 88%, rgba(0,0,0,.5) 90%, rgba(0,0,0,.345) 92%, rgba(0,0,0,.206) 94%, rgba(0,0,0,.095) 96%, rgba(0,0,0,.025) 98%, transparent 100%);
     }
     body:not(.phone-land) .artist-hero-stack .artist-hero-art{ -webkit-mask-image:none; mask-image:none; }
     .artist-hero-blur{
