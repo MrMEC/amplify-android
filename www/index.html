@@ -28336,7 +28336,9 @@
     ['Shopping', /\bshop|\bqvc\b|\bhsn\b/],
     ['Entertainment', /entertain|celebr|\btmz\b|game show|pop culture|variety/]
   ];
-  var CH_CAT_ORDER = CH_CAT_RULES.map(function(r){ return r[0]; });
+  // The chips' order (the rules above are in matching order, which is different).
+  var CH_CAT_ORDER = ['Sports', 'News', 'Classic TV', 'Movies', 'Comedy', 'Drama', 'Crime & Mystery', 'Entertainment', 'Reality', 'Music',
+    'Live Cams', 'Nature & Science', 'Kids & Family', 'Lifestyle', 'Gaming & Anime', 'Español', 'Faith', 'Shopping'];
   var CH_CAT_GENERIC = { 'archive.org': 1, 'general': 1, 'undefined': 1, 'other': 1, 'others': 1, 'all': 1, '': 1 };
   function chCatMatch(text){
     text = String(text || '').toLowerCase();
