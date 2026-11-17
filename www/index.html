@@ -6934,10 +6934,10 @@
   .ia-kind-tag{ display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.06em; line-height:1.45; color:var(--text-dim); border:1px solid var(--border); border-radius:4px; padding:0 4px; margin-right:6px; vertical-align:1px; }
   .ch-sheet-item:disabled{ opacity:.6; cursor:default; }
   .ch-sheet-item .ia-sheet-svg{ width:20px; flex:none; color:var(--text-dim); }
-  .ia-sheet .ch-sheet-head{ align-items:center; gap:14px; padding-bottom:12px; }
-  .ia-sheet .ch-sheet-head .ch-logo{ width:84px; height:84px; border-radius:10px; }
-  .ia-sheet .ch-sheet-head .ch-name{ white-space:normal; font-size:16.5px; font-weight:700; line-height:1.3; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; }
-  .ia-sheet .ch-sheet-head .ch-sub{ white-space:normal; margin-top:4px; }
+  .ia-item-sheet .ch-sheet-head{ align-items:center; gap:14px; padding-bottom:12px; }
+  .ia-item-sheet .ch-sheet-head .ch-logo{ width:84px; height:84px; border-radius:10px; }
+  .ia-item-sheet .ch-sheet-head .ch-name{ white-space:normal; font-size:16.5px; font-weight:700; line-height:1.3; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; }
+  .ia-item-sheet .ch-sheet-head .ch-sub{ white-space:normal; margin-top:4px; }
   .ia-sheet-desc{ padding:10px 20px 2px; font-size:13px; line-height:1.5; color:var(--text-dim); display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   .ia-sheet-primary{ display:flex; align-items:center; justify-content:center; gap:9px; width:calc(100% - 40px); margin:12px 20px 6px; height:46px; border:0; border-radius:var(--r-pill, 999px); background:var(--accent); color:var(--accent-text); font:inherit; font-size:15px; font-weight:700; cursor:pointer; }
   .ia-sheet-primary.added{ background:var(--panel-2); color:var(--text); cursor:default; }
@@ -29647,7 +29647,7 @@
   function openArchiveItemSheet(it, row, list){
     var ch = archiveItemChannel(it);
     function repaint(){ if(row && row._iaPaint) row._iaPaint(); }
-    chSheetOverlay.classList.add('ia-sheet');
+    chSheetOverlay.classList.add('ia-item-sheet');
     var logo = document.getElementById('chSheetLogo');
     logo.innerHTML = ''; logo.style.background = '';
     logo.appendChild(vImg(archiveArtUrl(it.id)));
@@ -30174,7 +30174,7 @@
     var fromNp = !!opts.np;
     function leaveNp(){ if(fromNp && nowPlayingScreen.style.display === 'flex'){ try{ closeNowPlaying(false, false); }catch(e){} } }
     function npRefresh(){ if(fromNp){ try{ refreshChannelGrids(); }catch(e){} } }
-    chSheetOverlay.classList.remove('ia-sheet');   // build 664
+    chSheetOverlay.classList.remove('ia-item-sheet');   // build 664
     var mine = isLiveChUrl(ch.url);
     var def = mine ? liveChDefById(ch.url.slice('amplify-live:'.length)) : null;
     var st = mine ? liveChStationOf(ch) : channelToStation(ch);
