@@ -4704,7 +4704,7 @@
   .lc-bar .lc-note{ flex:1; min-width:0; margin:0; font-size:12.5px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; }
   .tile-grid > .lc-panel .lc-bar .lc-actions{ padding:0; margin:0; flex:none; gap:8px; }
   .lc-bar .art-url-save-btn{ min-width:96px; }
-  .lc-more-sentinel{ height:56px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); font-size:13px; }
+  .lc-more-sentinel{ grid-column:1 / -1; height:56px; display:flex; align-items:center; justify-content:center; color:var(--text-dim); font-size:13px; }
   .lc-where{ margin-bottom:8px; }
   .lc-where[hidden]{ display:none; }
   .lc-ia-head{ padding:8px 8px 2px; font-size:.78rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); }
@@ -29431,13 +29431,15 @@
     var shown = entries.slice(0, addChannelsState.shown);
     shown.forEach(function(e){ list.appendChild(channelRow(e)); });
     host.appendChild(list);
+    // Build 661 (Mark): no Show More button; the next channels are added under the list as its end
+    // comes into view (like archive.org results), so nothing is redrawn and the place is kept.
     if(entries.length > shown.length){
-      var more = document.createElement('button');
-      more.type = 'button';
-      more.className = 'settings-select ch-more';
-      more.textContent = 'Show more (' + (entries.length - shown.length) + ')';
-      more.addEventListener('click', function(){ addChannelsState.shown += 120; renderAddChannels(true); });
-      host.appendChild(more);
+      lazyLoadMore(host, function(){
+        var from = list.children.length;
+        addChannelsState.shown = from + 120;
+        entries.slice(from, from + 120).forEach(function(e){ list.appendChild(channelRow(e)); });
+        return list.children.length < entries.length;
+      });
     }
     setResultCount(entries.length, 'channel');
   }
@@ -29648,25 +29650,21 @@
         var shown = items.slice(), page = items.page || 1, total = items.total;
         items.forEach(function(it){ body.appendChild(archiveItemRow(it, null, shown)); });
         setResultCount(shown.length, 'item');
-        // Build 385: More Results, for as long as archive.org has more.
-        function more(){
-          if(!archiveHasMore(total, page)) return;
-          var btn = archiveMoreButton(function(){
+        // Build 661 (Mark): more results load as the end of the list comes into view (was a More Results button).
+        if(archiveHasMore(total, page)){
+          var sent = lazyLoadMore(body, function(){
             return archiveSearchItems(q, all, page + 1).then(function(next){
-              if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q) return;
+              if(!onAddChannelsView || addChannelsTab !== 'archive' || (addChannelsState.archiveQ || '').trim() !== q) return false;
               page = next.page || page + 1;
               total = next.total || total;
               var have = {};
               shown.forEach(function(it){ have[it.id] = true; });
-              btn.remove();
-              next.forEach(function(it){ if(have[it.id]) return; shown.push(it); body.appendChild(archiveItemRow(it, null, shown)); });
+              next.forEach(function(it){ if(have[it.id]) return; shown.push(it); body.insertBefore(archiveItemRow(it, null, shown), sent); });
               setResultCount(shown.length, 'item');
-              more();
+              return next.length > 0 && archiveHasMore(total, page);
             });
           });
-          body.appendChild(btn);
         }
-        more();
       }, function(){
         if(!onAddChannelsView || addChannelsTab !== 'archive') return;
         body.innerHTML = '<div class="empty-state">Couldn’t reach archive.org. Check your connection and try again.</div>';
@@ -51629,6 +51627,39 @@
   }
   function archiveHasMore(total, page){ return total > page * ARCHIVE_PAGE_SIZE; }
   // The More Results button under a list of archive.org results.
+  // Build 661: continuous scroll. A "Loading more…" line at the end of host; when it comes near the
+  // screen, load() runs (returns true / a promise of true while there's more). Rows go in above it.
+  // A failed load says so and tries again a few seconds later if the line is still near the screen.
+  function lazyLoadMore(host, load){
+    var sent = document.createElement('div');
+    sent.className = 'lc-more-sentinel';
+    sent.textContent = 'Loading more\u2026';
+    host.appendChild(sent);
+    var busy = false, obs = null;
+    function stop(){ if(obs){ obs.disconnect(); obs = null; } if(sent.parentNode) sent.remove(); }
+    function again(){ if(obs && sent.isConnected){ obs.unobserve(sent); obs.observe(sent); } }
+    function go(){
+      if(busy) return;
+      if(!sent.isConnected){ stop(); return; }
+      busy = true;
+      sent.textContent = 'Loading more\u2026';
+      Promise.resolve().then(load).then(function(more){
+        busy = false;
+        if(!more || !sent.isConnected){ stop(); return; }
+        host.appendChild(sent);   // stays last
+        again();                  // still in view: asks again
+      }, function(){
+        busy = false;
+        sent.textContent = 'Couldn\u2019t load more. Trying again\u2026';
+        setTimeout(again, 4000);
+      });
+    }
+    if('IntersectionObserver' in window){
+      obs = new IntersectionObserver(function(es){ if(es.some(function(e){ return e.isIntersecting; })) go(); }, { rootMargin: '900px 0px' });
+      obs.observe(sent);
+    } else { sent.textContent = 'More'; sent.style.cursor = 'pointer'; sent.addEventListener('click', go); }
+    return sent;
+  }
   function archiveMoreButton(onMore){
     var wrap = document.createElement('div');
     wrap.className = 'ia-more-wrap';
