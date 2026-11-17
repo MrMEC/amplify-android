@@ -1872,6 +1872,13 @@
     will-change:filter, opacity, transform;
   }
   .artist-hero-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  /* Build 672 (Mark): a light blur over the bottom quarter of the cover, phones only (see the
+     phone block below). A second copy of the picture, blurred a few px, shown only where this
+     mask lets it through. The mask is the blur's own ramp (none above 74% of the height, full by
+     92%) multiplied by the cover's own fade (.artist-hero-art's mask), so it sits UNDER that
+     gradient: it can never show where the picture has already dissolved, and no new edge
+     appears. */
+  .artist-hero-art-soft{ display:none; }
   .artist-hero-art-wrap .np-art-edit{ opacity:0; transform:translateY(-4px); transition:opacity .15s ease, transform .15s ease; }
   .artist-hero-art-wrap:hover .np-art-edit, .artist-hero-art-wrap .np-art-edit:focus-visible{ opacity:1; transform:translateY(0); }
   /* Anchored by its TOP to the vertical middle of the viewport -- same reasoning as Now
@@ -2519,6 +2526,22 @@
        (top/left/right, height by the same aspect-ratio, no bottom) leaves the overlay
        sitting on the plain page tint behind it instead, same as every other page here. */
     .artist-hero-art-bleed{ bottom:auto; height:auto; aspect-ratio:1/1; }
+    /* Same fade as before (52% solid, .55 at 76%, clear by 99%), but in the bottom quarter the
+       sharp picture hands over to the blurred copy below (.artist-hero-art-soft) -- the two add
+       back up to the original fade, so no more of the image is consumed. */
+    .artist-hero-art{
+      -webkit-mask-image:linear-gradient(to bottom, #000 52%, rgba(0,0,0,.59) 74%, rgba(0,0,0,.5) 76%, rgba(0,0,0,.32) 80%, rgba(0,0,0,.19) 84%, rgba(0,0,0,.09) 88%, rgba(0,0,0,.03) 92%, rgba(0,0,0,.01) 96%, transparent 99%);
+      mask-image:linear-gradient(to bottom, #000 52%, rgba(0,0,0,.59) 74%, rgba(0,0,0,.5) 76%, rgba(0,0,0,.32) 80%, rgba(0,0,0,.19) 84%, rgba(0,0,0,.09) 88%, rgba(0,0,0,.03) 92%, rgba(0,0,0,.01) 96%, transparent 99%);
+    }
+    .artist-hero-art-soft{
+      display:block; position:absolute; top:0; left:0; right:0; aspect-ratio:1/1; z-index:1;
+      pointer-events:none; background-size:cover; background-position:center;
+      filter:blur(7px);
+      transform:translateY(calc(var(--hero-parallax, 0) * 1px));
+      opacity:calc(1 - var(--hero-scroll, 0) * .92);
+      -webkit-mask-image:linear-gradient(to bottom, transparent 74%, rgba(0,0,0,.06) 76%, rgba(0,0,0,.15) 80%, rgba(0,0,0,.2) 84%, rgba(0,0,0,.21) 88%, rgba(0,0,0,.17) 92%, rgba(0,0,0,.07) 96%, transparent 99%);
+      mask-image:linear-gradient(to bottom, transparent 74%, rgba(0,0,0,.06) 76%, rgba(0,0,0,.15) 80%, rgba(0,0,0,.2) 84%, rgba(0,0,0,.21) 88%, rgba(0,0,0,.17) 92%, rgba(0,0,0,.07) 96%, transparent 99%);
+    }
     /* Same vertical-centre anchor as Now Playing's mobile .np-hero-foot rule, reached the
        same way: the square art is exactly 100vw tall, so pulling this block up (or down) by
        the gap between that and 50vh lands .artist-hero-name's first line on the screen's
@@ -8334,7 +8357,7 @@
     /* the column doesn't scroll, so the upright page's fade-on-scroll is off here */
     body.phone-land.artist-open .artist-hero-art-wrap{ --hero-scroll:0 !important; --hero-parallax:0 !important; }
     body.phone-land.artist-open .artist-hero-art{ filter:none !important; opacity:1 !important; }
-    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
+    body.phone-land.artist-open :is(.artist-hero-art-bleed, .artist-hero-art-soft, .artist-hero-thumb, .artist-hero-bio){ display:none !important; }
     body.phone-land.artist-open .artist-hero-overlay{
       position:relative !important; top:auto !important; left:auto; right:auto; margin:0 !important; padding:0 !important;
       flex:1 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; }
@@ -8926,6 +8949,7 @@
         <div class="artist-hero-art-wrap" id="artistHeroArtWrap">
           <div class="artist-hero-art-bleed" id="artistHeroArtBleed" aria-hidden="true"></div>
           <div class="artist-hero-art" id="artistHeroArt"></div>
+          <div class="artist-hero-art-soft" id="artistHeroArtSoft" aria-hidden="true"></div>
           <!-- The pencil used to float in this corner. With the picture full-bleed that
                corner is where the menu button floats, so the two sat on top of each other
                and the pencil could not be reached at all. It moved into the overflow menu
@@ -11907,6 +11931,7 @@
   var artistHero = document.getElementById('artistHero');
   var artistHeroArtWrap = document.getElementById('artistHeroArtWrap');
   var artistHeroArtBleed = document.getElementById('artistHeroArtBleed');
+  var artistHeroArtSoft = document.getElementById('artistHeroArtSoft');
   var artistHeroArt = document.getElementById('artistHeroArt');
   var artistHeroName = document.getElementById('artistHeroName');
   var artistHeroSub = document.getElementById('artistHeroSub');
@@ -17699,6 +17724,10 @@
     src = secureUrl(src);
     artistHeroArtBleed.style.backgroundImage = src ? 'url("' + src.replace(/"/g, '\\"') + '")' : '';
     artistHeroArtBleed.style.opacity = src ? '' : '0';
+    if(artistHeroArtSoft){
+      artistHeroArtSoft.style.backgroundImage = artistHeroArtBleed.style.backgroundImage;
+      artistHeroArtSoft.style.visibility = src ? '' : 'hidden';
+    }
   }
   if(window.MutationObserver && artistHeroArt){
     new MutationObserver(function(){ syncArtistHeroBleed(); })
