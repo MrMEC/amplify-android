@@ -4040,7 +4040,8 @@
   /* Build 286 (Mark): roomier rows (5 on a phone instead of 6). */
   .epg-row{ position:relative; height:62px; margin-top:4px; }
   .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:62px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--epg-ch-text); }
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--epg-ch-text);
+    -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
   .epg-ch::before{ content:''; position:absolute; inset:0 4px 0 4px; background:var(--epg-ch-cell); border-radius:5px; z-index:-1; }
   .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
   /* Build 315: the gap above each channel cell covered too, so the now line never shows through the column. */
@@ -9481,13 +9482,13 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="3.5" height="16" rx="1"/><rect x="9" y="4" width="3.5" height="16" rx="1"/><path d="m15.2 5.3 3.3-1 3 15.1-3.3 1z"/></svg>
     <span>Library</span>
   </button>
-  <button type="button" class="mobile-nav-btn" data-nav="podcasts" aria-label="Podcasts">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v4"/><path d="M8.5 21.5h7"/></svg>
-    <span>Podcasts</span>
-  </button>
   <button type="button" class="mobile-nav-btn" data-nav="video" aria-label="Watch">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M10 8.7v6.6a.7.7 0 0 0 1.06.6l5.3-3.3a.7.7 0 0 0 0-1.2l-5.3-3.3a.7.7 0 0 0-1.06.6z"/></svg>
     <span>Watch</span>
+  </button>
+  <button type="button" class="mobile-nav-btn" data-nav="podcasts" aria-label="Podcasts">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v4"/><path d="M8.5 21.5h7"/></svg>
+    <span>Podcasts</span>
   </button>
   <button type="button" class="mobile-nav-btn" data-nav="search" aria-label="Search" aria-expanded="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
@@ -28526,7 +28527,14 @@
     CH_CAT_ORDER.forEach(function(c){ names[c] = 1; });
     try{ epgAllChannels(visibleVideoChannels()).forEach(function(c){ names[chCategory(c)] = 1; }); }catch(e){}
     Object.keys(chCatOverride).forEach(function(u){ names[chCatOverride[u]] = 1; });
-    list = Object.keys(names).sort(chCatSort);
+    // Build 683 (Mark): the same order as the category chips on the grid (the order you set by
+    // holding and dragging them); categories you haven't placed follow in the usual order.
+    var catPos = {};
+    epgCatOrder.forEach(function(k, i){ if(String(k).indexOf('cat:') === 0) catPos[k] = i; });
+    list = Object.keys(names).sort(function(a, b){
+      var pa = ('cat:' + a) in catPos ? catPos['cat:' + a] : 1e6, pb = ('cat:' + b) in catPos ? catPos['cat:' + b] : 1e6;
+      return pa - pb || chCatSort(a, b);
+    });
     list.forEach(function(c){ opt(c, c); });
     var nb = document.createElement('button');
     nb.type = 'button';
@@ -28809,6 +28817,7 @@
     if(line) line.style.left = Math.round(EPG_CH_W + x - 1) + 'px';
     if(mark) mark.style.left = Math.round(x) + 'px';
   }
+  var epgChEatUntil = 0;
   function buildEpgRow(ch, t0, t1){
     var row = document.createElement('div');
     row.className = 'epg-row';
@@ -28855,9 +28864,11 @@
     }
     // Build 280 (Mark): on the Live TV page the logo opens the channel's options (Watch Now, Edit,
     // Favorite, Move, Remove); under a playing channel it still just plays it.
+    // Build 683 (Mark): a tap plays the channel (Watch Now); holding the button opens its menu.
+    cell._ch = ch;
     cell.addEventListener('click', function(){
-      if(cell.closest('#stationsGrid') && onVideoView) openChSheet(ch);
-      else if(cell.closest('#npCollection')) openChSheet(ch, { np: true });   // build 584 (Mark): a logo opens its menu
+      if(Date.now() < epgChEatUntil) return;   // the release of a long press
+      if(cell.closest('#npCollection')) playChannel(ch, { still: true });
       else playChannel(ch);
     });
     row.appendChild(cell);
@@ -30602,6 +30613,55 @@
     }, 'danger');
     chSheetOverlay.classList.add('open');
   }
+
+  // Build 683 (Mark): holding a channel button in the guide (Live TV page, or under the playing
+  // video) opens its menu; a tap plays the channel. Same hold as the other long presses (450 ms,
+  // a finger that moves is scrolling, the phone's own long-press menu counts once).
+  (function(){
+    var HOLD_MS = 450, SLOP = 10, press = null;
+    var native = null;
+    try{ native = (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins) ? Capacitor.Plugins.AmplifyPlayer : null; }catch(e){}
+    function tellNative(on){ try{ if(native && native.holdTouch) native.holdTouch({ on: !!on }).catch(function(){}); }catch(e){} }
+    function cellOf(el){
+      var c = el && el.closest ? el.closest('.epg-ch') : null;
+      if(!c || !c._ch) return null;
+      return (c.closest('#npCollection') || (c.closest('#stationsGrid') && onVideoView)) ? c : null;
+    }
+    function cancel(){ if(press){ clearTimeout(press.timer); press = null; tellNative(false); } }
+    function fire(c){
+      epgChEatUntil = Date.now() + 800;
+      try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}
+      if(c.closest('#npCollection')) openChSheet(c._ch, { np: true });
+      else openChSheet(c._ch);
+    }
+    document.addEventListener('touchstart', function(e){
+      var c = cellOf(e.target);
+      if(!c || e.touches.length !== 1) return;
+      var p = e.touches[0];
+      cancel();
+      press = { x: p.clientX, y: p.clientY, timer: setTimeout(function(){ press = null; tellNative(false); fire(c); }, HOLD_MS) };
+      tellNative(true);
+    }, { passive: true, capture: true });
+    document.addEventListener('touchmove', function(e){
+      if(!press) return;
+      var p = e.touches[0];
+      if(Math.abs(p.clientX - press.x) > SLOP || Math.abs(p.clientY - press.y) > SLOP) cancel();
+    }, { passive: true, capture: true });
+    document.addEventListener('touchend', cancel, true);
+    document.addEventListener('touchcancel', cancel, true);
+    document.addEventListener('contextmenu', function(e){
+      var c = cellOf(e.target);
+      if(!c) return;
+      e.preventDefault();
+      if(Date.now() < epgChEatUntil) return;
+      cancel(); fire(c);
+    }, true);
+    // the release of a long press doesn't also play the channel, or tap whatever the menu now has
+    // under the finger (the menu opens while the finger is still down)
+    document.addEventListener('click', function(e){
+      if(Date.now() < epgChEatUntil){ e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  })();
 
   // ---------- Build 280: the guide's ⋯ menu (replaces Edit) ----------
   // Arrange Channels (drag them into order), the layout, and the order. Arranging is the old Edit
