@@ -29175,7 +29175,9 @@
       // Build 652 (Mark): a video picked from a custom channel's guide brings the rest of that channel with it:
       // "More from <channel>" below, the arrow to hide the details, the description kept to a few lines.
       var chList = ch ? archiveListForChannel(ch, own.archive) : [];
-      playArchiveItem(own.archive, null, chList.length ? { list: chList, label: ch.name || '' } : undefined);
+      // build 681: the custom channel goes along, so a video that's gone can be taken out of it
+      var chUrl = ch && isLiveChUrl(ch.url) ? ch.url : '';
+      playArchiveItem(own.archive, null, chList.length ? { list: chList, label: ch.name || '', chUrl: chUrl } : (chUrl ? { chUrl: chUrl, label: ch.name || '' } : undefined));
       return;
     }
     if(ch) playChannel(ch);
@@ -52633,7 +52635,7 @@
       var n = document.createElement('div'); n.className = 'vep-title'; n.textContent = it.title; text.appendChild(n);
       var sb = document.createElement('div'); sb.className = 'vep-sub'; sb.textContent = [it.year, it.creator].filter(Boolean).join(' \u00b7 ') || 'Video'; text.appendChild(sb);
       row.appendChild(text);
-      row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: ctx.noHistory, list: ctx.items, label: ctx.label }); });
+      row.addEventListener('click', function(){ playArchiveItem(it, row, { noHistory: ctx.noHistory, list: ctx.items, label: ctx.label, chUrl: ctx.chUrl }); });
       npCollectionGrid.appendChild(row);
     });
   }
@@ -52651,13 +52653,47 @@
     if(!k.length) return 'It has no audio or video files, only ' + (files.length === 1 ? 'one file' : files.length + ' other files') + ' (pictures, text or the like).';
     return 'Its files are in ' + (k.length > 1 ? 'formats' : 'a format') + ' phones can\u2019t play (' + k.slice(0, 4).join(', ') + ').';
   }
-  function archiveNothingNotice(meta, item){
+  // Build 681 (Mark): played from a custom channel (chUrl) and gone from archive.org (taken down,
+  // or no longer there at all), the dialog offers to take it out of that channel (asking first).
+  function archiveItemGone(meta){
+    return !meta || meta.is_dark || !Object.keys(meta).length || (!meta.metadata && !(meta.files || []).length);
+  }
+  function archiveNothingNotice(meta, item, chUrl){
+    var def = null;
+    if(chUrl && isLiveChUrl(chUrl) && archiveItemGone(meta)){
+      def = liveChDefById(chUrl.slice('amplify-live:'.length));
+      if(!(def && def.src && (def.src.archive || []).some(function(a){ return a && a.id === item.id; }))) def = null;
+    }
+    var actions = [{ label: 'OK' }];
+    if(def){
+      var chName = def.name || liveChAutoName(def, liveChSources(def, vlib()));
+      actions.push({ label: 'Remove from Channel', primary: true, run: function(){
+        setTimeout(function(){
+          confirmThen({ title: 'Remove \u201c' + item.title + '\u201d from ' + chName + '?', message: 'It won\u2019t play on this channel any more.', ok: 'Remove' }, function(){
+            liveChRemoveArchive(def.id, item.id);
+          });
+        }, 0);
+      } });
+    } else {
+      actions.push({ label: 'Open on archive.org', primary: true, run: function(){ try{ window.open('https://archive.org/details/' + encodeURIComponent(item.id), '_blank'); }catch(e){} } });
+    }
+    var why = !meta || !Object.keys(meta).length ? 'archive.org doesn\u2019t have it any more.' : archiveWhyNothing(meta, item);
     showNotice({ kind: 'error', title: 'Nothing to play', autoClose: false,
-      message: '\u201c' + item.title + '\u201d can\u2019t be played in Amplify. ' + archiveWhyNothing(meta, item),
-      actions: [{ label: 'OK' }, { label: 'Open on archive.org', primary: true, run: function(){ try{ window.open('https://archive.org/details/' + encodeURIComponent(item.id), '_blank'); }catch(e){} } }] });
+      message: '\u201c' + item.title + '\u201d can\u2019t be played in Amplify. ' + why, actions: actions });
+  }
+  function liveChRemoveArchive(defId, itemId){
+    var def = liveChDefById(defId);
+    if(!def || !def.src) return;
+    def.src.archive = (def.src.archive || []).filter(function(a){ return !(a && a.id === itemId); });
+    saveLiveChDefs();
+    liveChCache = null;
+    // the video playing next in "More from" no longer lists it
+    if(archiveNpResults && archiveNpResults.items) archiveNpResults.items = archiveNpResults.items.filter(function(it){ return it.id !== itemId; });
+    try{ refreshChannelGrids(); }catch(e){}
+    try{ archiveRedraw(); }catch(e){}
   }
   function playArchiveItem(item, row, opts){
-    if(opts && opts.list) archiveNpResults = { items: opts.list.slice(), noHistory: !!opts.noHistory, label: opts.label || '' };
+    if(opts && opts.list) archiveNpResults = { items: opts.list.slice(), noHistory: !!opts.noHistory, label: opts.label || '', chUrl: opts.chUrl || '' };
     else archiveNpResults = null;
     if(row) row.classList.add('loading');
     extJson('https://archive.org/metadata/' + encodeURIComponent(item.id), { 'Accept': 'application/json' }).then(function(meta){
@@ -52666,7 +52702,7 @@
       // Build 345 (Mark): a result found with Search everything on leaves no trace (Continue
       // Listening, Continue Watching, its place in it).
       if(opts && opts.noHistory) list.forEach(function(t){ t.iaNoHistory = true; });
-      if(!list.length){ archiveNothingNotice(meta, item); return; }
+      if(!list.length){ archiveNothingNotice(meta, item, opts && opts.chUrl); return; }
       if(list.length > 1) setQueue(list, list[0], item.title); else clearQueue();
       playStation(list[0]);
       openNowPlaying(list[0], true);
