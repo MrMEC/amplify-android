@@ -3938,6 +3938,8 @@
   .cs-video{ display:inline-flex; align-items:center; flex:none; color:var(--text-dim); line-height:0; }
   /* ---------- Video: channels ---------- */
   .tile .ch-dead, .epg-prog .epg-s.ch-dead{ color:#e5534b; }
+  /* Build 683: off the air for now (it played before): calm, not an error */
+  .tile .ch-off, .epg-prog .epg-s.ch-off{ color:var(--text-dim); }
   /* My Channels' category headings: clear of the row under them (and of the ring round a
      playing tile), with a row's worth of air above each. */
   .tile-grid > .grid-section-label.ch-row-label{ margin:10px 0 -28px; }
@@ -26469,11 +26471,30 @@
     if(onVideoView) renderVideoHome();
   }
   // Called from the playback outcome: a channel that failed is marked, one that played is cleared.
+  // Build 683 (Mark): a channel that played before and is down now is most likely off the air between
+  // broadcasts (a station's newscast stream), so it reads "Off air" in a calm colour, not the red
+  // "Not working". It keeps that for two weeks after it last played; a channel that never played, or
+  // hasn't for longer, is "Not working". ch.lastOk is the last time it played.
+  var CH_OFFAIR_MS = 14 * 24 * 3600 * 1000;
+  function chOffAir(ch){ return !!(ch && ch.dead && ch.lastOk && Date.now() - ch.lastOk < CH_OFFAIR_MS); }
+  function chDeadText(ch){ return !ch || !ch.dead ? '' : (chOffAir(ch) ? 'Off air' : 'Not working'); }
+  function chDeadClass(ch){ return chOffAir(ch) ? 'ch-off' : 'ch-dead'; }
+  function chAgoText(t){
+    var m = Math.max(1, Math.round((Date.now() - t) / 60000));
+    if(m < 60) return m + ' min ago';
+    var h = Math.round(m / 60);
+    if(h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+    var d = Math.round(h / 24);
+    return d + (d === 1 ? ' day ago' : ' days ago');
+  }
   function markChannelWorking(station, ok){
     if(!station || !station.urlToResolve || isLiveChUrl(station.urlToResolve)) return;
     var ch = findVideoChannel(station.urlToResolve);
-    if(!ch || !!ch.dead === !ok) return;
+    if(!ch) return;
+    if(ok && (!ch.lastOk || Date.now() - ch.lastOk > 3600 * 1000)){ ch.lastOk = Date.now(); if(!ch.dead) saveVideoChannels(); }
+    if(!!ch.dead === !ok) return;
     ch.dead = !ok;
+    if(ok) ch.lastOk = Date.now();
     saveVideoChannels();
     // its row in a grid on Now Playing too
     try{ document.querySelectorAll('.epg-row').forEach(function(row){
@@ -26814,13 +26835,13 @@
     var st = channelToStation(ch);
     var tile = buildEntityTile({
       key: favKey(st), entity: 'channel', name: ch.name, row: true,
-      sub: ch.dead ? 'Not working' : '', artFrom: st,
+      sub: chDeadText(ch), artFrom: st,
       onClick: function(){ playChannel(ch); }
     });
     tile.classList.add('ch-item');
     if(isOnAirItem(st)) tile.classList.add('playing');
     var sub = tile.querySelector('.tile-sub');
-    if(sub && ch.dead) sub.classList.add('ch-dead');
+    if(sub && ch.dead) sub.classList.add(chDeadClass(ch));
     // Build 240: what's on now and next, for a channel that publishes a schedule.
     var gsrc = guideSource(ch);
     if(gsrc && !ch.dead){
@@ -28888,7 +28909,7 @@
     var now = Date.now();
     if(!blocks.length){
       // No schedule (or not yet): the channel as one block across.
-      row.appendChild(epgBlock(ch, t0, t1, mvCh ? 'Music Videos' : (ch.name || 'Channel'), ch.dead ? 'Not working' : '', true, true));
+      row.appendChild(epgBlock(ch, t0, t1, mvCh ? 'Music Videos' : (ch.name || 'Channel'), chDeadText(ch), true, true));
     } else {
       blocks.forEach(function(b){
         row.appendChild(epgBlock(ch, b.s, b.e, b.it.t || b.it.sub || '', b.it.sub && b.it.sub !== b.it.t ? b.it.sub : '', b.s <= now && now < b.e, false, t0, b.it));
@@ -28942,7 +28963,7 @@
     b.appendChild(t);
     if(sub){
       var su = document.createElement('span');
-      su.className = 'epg-s' + (whole && ch.dead ? ' ch-dead' : '');
+      su.className = 'epg-s' + (whole && ch.dead ? ' ' + chDeadClass(ch) : '');
       su.textContent = sub;
       b.appendChild(su);
     }
@@ -56608,6 +56629,13 @@
     markChannelWorking(station, false);
     setPlayingUI(false);
     playPauseBtn.disabled = true;
+    // Build 683 (Mark): a channel that played before is off the air for now, not broken.
+    var offCh = null;
+    try{ offCh = station && station.urlToResolve ? findVideoChannel(station.urlToResolve) : null; }catch(e){}
+    if(offCh && chOffAir(offCh)){
+      updatePlayerMeta(station, 'Off air right now. It last played ' + chAgoText(offCh.lastOk) + '; try again later.', false);
+      return;
+    }
     var reason = (err && err.message && err.name !== 'AbortError') ? err.message : 'no playable audio found';
     var noun = isPodcastTrack(station) ? 'this episode' : 'this stream';
     updatePlayerMeta(station, 'Could not play ' + noun + ' (' + reason + '). Tried: ' + urlTried, true);
