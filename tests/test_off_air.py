@@ -167,9 +167,22 @@ async def run(p, theme):
     sub = await pg.evaluate("document.getElementById('playerSub') ? document.getElementById('playerSub').textContent : ''")
     check(sub.startswith('Off air right now') and 'try again later' in sub, f'{T} the player says it is off air {sub!r}')
     await pg.screenshot(path=f'{SHOTS}/b683_offair_player_{theme}.png')
+    card = await pg.evaluate("(function(){ var e=document.getElementById('npOffAir'); var r=e.getBoundingClientRect(); var cs=getComputedStyle(e); return { hidden: e.hidden, disp: cs.display, w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), sub: document.getElementById('npOffAirSub').textContent, title: e.querySelector('.oa-title').textContent, btn: document.getElementById('npOffAirRetry').getBoundingClientRect().height }; })()")
+    check(not card['hidden'] and card['disp'] == 'block' and card['w'] > 300 and card['h'] > 150, f'{T} the off-air test card shows over the picture {card}')
+    check(card['title'] == 'OFF-AIR' and card['sub'].startswith('Last on air ') and card['sub'].endswith(' ago'), f'{T} card text {card["sub"]!r}')
+    await pg.screenshot(path=f'{SHOTS}/b685_card_{theme}.png')
+    # Check again retries (still failing: the card stays) and a good play hides it
+    await pg.evaluate("document.getElementById('npOffAirRetry').click()"); await pg.wait_for_timeout(1500)
+    check(not await pg.evaluate("document.getElementById('npOffAir').hidden"), f'{T} Check again with the stream still down keeps the card')
+    await pg.evaluate("window.__failLoad = false")
+    await pg.evaluate("document.getElementById('npOffAirRetry').click()"); await pg.wait_for_timeout(2000)
+    check(await pg.evaluate("document.getElementById('npOffAir').hidden"), f'{T} Check again once the stream is back hides the card')
+    await pg.evaluate("window.__failLoad = true")
+    await pg.evaluate("(url)=>{ var r=Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(function(x){ return x.dataset.chUrl===url; }); r.querySelector('.epg-ch').click(); }", CH[0]['url']); await pg.wait_for_timeout(1500)
     await pg.evaluate("(url)=>{ var r=Array.from(document.querySelectorAll('#stationsGrid .epg-row')).find(function(x){ return x.dataset.chUrl===url; }); r.querySelector('.epg-ch').click(); }", CH[1]['url'])
     await pg.wait_for_timeout(1800)
     sub = await pg.evaluate("document.getElementById('playerSub').textContent")
+    check(await pg.evaluate("document.getElementById('npOffAir').hidden"), f'{T} a channel that never played shows no off-air card')
     check(sub.startswith('Could not play'), f'{T} a channel that never played still shows the error {sub[:60]!r}')
 
     # a channel that plays again is cleared and remembered
