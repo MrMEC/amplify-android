@@ -52659,12 +52659,17 @@
     return !meta || meta.is_dark || !Object.keys(meta).length || (!meta.metadata && !(meta.files || []).length);
   }
   function archiveNothingNotice(meta, item, chUrl){
-    var def = null;
-    if(chUrl && isLiveChUrl(chUrl) && archiveItemGone(meta)){
+    // Build 682 (Mark): not only when it's gone: archive.org can also answer for a taken-down video
+    // as "restricted" (files locked to its own site), so any video of a custom channel that can't
+    // play in Amplify can be taken out of the channel from here.
+    var def = null, gone = archiveItemGone(meta);
+    if(chUrl && isLiveChUrl(chUrl)){
       def = liveChDefById(chUrl.slice('amplify-live:'.length));
       if(!(def && def.src && (def.src.archive || []).some(function(a){ return a && a.id === item.id; }))) def = null;
     }
     var actions = [{ label: 'OK' }];
+    var openIa = { label: 'Open on archive.org', run: function(){ try{ window.open('https://archive.org/details/' + encodeURIComponent(item.id), '_blank'); }catch(e){} } };
+    if(def && !gone) actions.push(openIa);
     if(def){
       var chName = def.name || liveChAutoName(def, liveChSources(def, vlib()));
       actions.push({ label: 'Remove from Channel', primary: true, run: function(){
@@ -52678,8 +52683,8 @@
       actions.push({ label: 'Open on archive.org', primary: true, run: function(){ try{ window.open('https://archive.org/details/' + encodeURIComponent(item.id), '_blank'); }catch(e){} } });
     }
     var why = !meta || !Object.keys(meta).length ? 'archive.org doesn\u2019t have it any more.' : archiveWhyNothing(meta, item);
-    showNotice({ kind: 'error', title: 'Nothing to play', autoClose: false,
-      message: '\u201c' + item.title + '\u201d can\u2019t be played in Amplify. ' + why, actions: actions });
+    showNotice({ kind: 'error', title: 'Nothing to play', autoClose: false, stack: actions.length > 2,
+      message: '\u201c' + item.title + '\u201d can\u2019t be played in Amplify. ' + why, actions: actions.length > 2 ? actions.slice().reverse() : actions });
   }
   function liveChRemoveArchive(defId, itemId){
     var def = liveChDefById(defId);
