@@ -3755,6 +3755,18 @@
   .np-video-toggle svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   /* The video takes the artwork's place: full width near the top of the hero, over the
      artwork's blurred wash (the crisp cover is hidden while it plays). */
+  /* Build 685 (Mark): the off-air test card. Sits exactly where the channel's picture would be. */
+  .np-offair{ display:none; position:absolute; left:0; right:0; z-index:2; container-type:size; overflow:hidden; background:#000; font-family:inherit; }
+  .now-playing-screen.np-channel .np-offair:not([hidden]){ display:block; top:calc(env(safe-area-inset-top, 0px) + 72px); height:min(56.25vw, 52vh); }
+  body.ltv-dock:not(.ltv-land):not(.np-video-full) .now-playing-screen.np-channel .np-offair:not([hidden]){ top:var(--ltv-tabs-h); }
+  body.ltv-land:not(.np-video-full) .now-playing-screen.np-channel .np-offair:not([hidden]){ top:0; height:100%; }
+  .np-offair .oa-bars, .np-offair .oa-strip, .np-offair .oa-low{ display:flex; position:absolute; left:0; right:0; }
+  .np-offair .oa-bars{ top:0; height:66%; } .np-offair .oa-strip{ top:66%; height:8%; } .np-offair .oa-low{ top:74%; bottom:0; }
+  .np-offair i{ flex:1; display:block; } .np-offair .oa-low b{ flex:4; display:block; background:#000; }
+  .np-offair .oa-box{ position:absolute; left:10%; right:10%; top:17%; height:32%; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; }
+  .np-offair .oa-title{ font-size:9cqw; font-weight:700; letter-spacing:.02em; line-height:1.1; }
+  .np-offair .oa-sub{ font-size:3.3cqw; font-weight:500; color:#d4d8de; line-height:1.3; }
+  .np-offair .oa-btn{ position:absolute; right:3%; bottom:3.5%; height:8.5cqw; min-height:28px; padding:0 4.5cqw; border:0; border-radius:999px; background:#fff; color:#0a0a0a; font:600 3.6cqw/1 inherit; font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .np-video-wrap{ position:absolute; left:0; right:0; top:calc(env(safe-area-inset-top, 0px) + 72px); z-index:2; }
   .np-video-wrap[hidden]{ display:none; }
   .np-video{ display:block; width:100%; aspect-ratio:16/9; max-height:52vh; object-fit:contain; background:#000; }
@@ -9147,6 +9159,14 @@
           <!-- A podcast episode's video, in the artwork's place while video is on. -->
           <div class="np-video-wrap" id="npVideoWrap" hidden>
             <video class="np-video" id="npVideo" playsinline preload="none"></video>
+          </div>
+          <!-- Build 685 (Mark): a channel that is off air shows a test card where the picture would be. -->
+          <div class="np-offair" id="npOffAir" role="group" aria-label="Off air" hidden>
+            <div class="oa-bars"><i style="background:#ffffff"></i><i style="background:#f5e61b"></i><i style="background:#22c8f0"></i><i style="background:#12c23a"></i><i style="background:#f01ec8"></i><i style="background:#f01414"></i><i style="background:#1428e6"></i></div>
+            <div class="oa-strip"><i style="background:#1428e6"></i><i style="background:#000"></i><i style="background:#f01ec8"></i><i style="background:#000"></i><i style="background:#a8f0ec"></i><i style="background:#000"></i><i style="background:#b4b4b4"></i></div>
+            <div class="oa-low"><i style="background:#0a1480"></i><i style="background:#fff"></i><i style="background:#2a0a78"></i><b></b></div>
+            <div class="oa-box"><span class="oa-title">OFF-AIR</span><span class="oa-sub" id="npOffAirSub"></span></div>
+            <button type="button" class="oa-btn" id="npOffAirRetry">Check again</button>
           </div>
           <!-- Build 181: the video player's controls, over the picture (or the channel's logo while
                there is no picture). Play/Pause in the middle; the progress bar (or LIVE) and full
@@ -56270,6 +56290,7 @@
   // so a stream keeps the directory click-ping and the .m3u/.pls fallback below while a
   // local file takes the object-URL path -- and nothing that calls playStation had to change.
   function playStation(track){
+    try{ offAirCard(false); }catch(e){}
     if(!miniAutoAdvance && miniHidden){ miniHidden = false; try{ applyMiniBar(); }catch(e){} }   // build 571: playing brings the mini player back
     if(track && (track.liveCh || track.videoChannel)) ltvRememberChannel(track.liveCh || track.urlToResolve || (track.channel && track.channel.url));
     if(ltvMutedByUs && track && !(track.liveCh || track.archiveCh || track.videoChannel || isLocalVideo(track))){ try{ ltvLeaveSound(); }catch(e){} }   // build 573: the muted channel's sound doesn't follow you to a radio station
@@ -56625,6 +56646,19 @@
     return bits.join(' · ') || 'Local file';
   }
 
+  // Build 685 (Mark): the off-air test card over the channel's picture. Shown when a channel that
+  // played before is down; "Check again" tries it once more. Any new play hides it.
+  var offAirStation = null;
+  function offAirCard(on, station, ch){
+    var el = document.getElementById('npOffAir'); if(!el) return;
+    offAirStation = on ? station : null;
+    if(on){ var sub = document.getElementById('npOffAirSub'); if(sub) sub.textContent = ch && ch.lastOk ? 'Last on air ' + chAgoText(ch.lastOk) : 'Try again later'; }
+    el.hidden = !on;
+  }
+  (function(){
+    var b = document.getElementById('npOffAirRetry');
+    if(b) b.addEventListener('click', function(){ var st = offAirStation; offAirCard(false); if(st) playStation(st); });
+  })();
   function showPlaybackFailure(station, urlTried, err){
     markChannelWorking(station, false);
     setPlayingUI(false);
@@ -56634,8 +56668,10 @@
     try{ offCh = station && station.urlToResolve ? findVideoChannel(station.urlToResolve) : null; }catch(e){}
     if(offCh && chOffAir(offCh)){
       updatePlayerMeta(station, 'Off air right now. It last played ' + chAgoText(offCh.lastOk) + '; try again later.', false);
+      offAirCard(true, station, offCh);
       return;
     }
+    offAirCard(false);
     var reason = (err && err.message && err.name !== 'AbortError') ? err.message : 'no playable audio found';
     var noun = isPodcastTrack(station) ? 'this episode' : 'this stream';
     updatePlayerMeta(station, 'Could not play ' + noun + ' (' + reason + '). Tried: ' + urlTried, true);
