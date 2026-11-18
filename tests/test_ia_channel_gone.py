@@ -1,4 +1,4 @@
-"""Build 681 (Mark): a custom channel's archive.org video that's gone (taken down, or no longer on
+"""Builds 681-682 (Mark): a custom channel's archive.org video that's gone (taken down, or no longer on
 archive.org) shows Nothing to play with Remove from Channel; it asks first, then the video is out of
 the channel. A video that just can't play (restricted) keeps Open on archive.org. Played the way
 Mark gets there: the guide's program info > Watch Now, and the More from list under the video.
@@ -67,8 +67,12 @@ async def run(B, theme):
     # 3) restricted (still exists): no Remove, Open on archive.org as before
     await watch_now(2)
     n = await pg.evaluate("[document.getElementById('noticeMsg').textContent, %s]" % acts)
-    check('restricted' in n[0] and n[1] == ['OK', 'Open on archive.org'], '%s restricted but there: Open on archive.org as before %s' % (T, n))
-    await pg.evaluate("document.getElementById('noticeOverlay').classList.remove('open')")
+    check('restricted' in n[0] and n[1] == ['Remove from Channel', 'Open on archive.org', 'OK'], '%s restricted (how archive.org can answer for a taken-down video): Remove from Channel and Open on archive.org %s' % (T, n))
+    await pg.screenshot(path=SHOTS + '/iagone-%s-restricted.png' % theme)
+    await pg.evaluate("Array.from(document.querySelectorAll('#noticeActions button')).find(function(b){ return b.textContent === 'Remove from Channel'; }).click()"); await pg.wait_for_timeout(400)
+    await pg.evaluate("document.getElementById('confirmOk').click()"); await pg.wait_for_timeout(500)
+    ids = await pg.evaluate("__t.ev('liveChDefById(\"pogomix\").src.archive.map(function(a){ return a.id; })')")
+    check('locked1' not in ids, '%s the restricted one can be removed too %s' % (T, ids))
     # 4) not from a channel (Search / Add Channels): no Remove
     await pg.evaluate("__t.ev(%s)" % json.dumps('playArchiveItem({ id: "dark1", title: "Pogo We Have Met The Enemy", video: true }, null); 1')); await pg.wait_for_timeout(1500)
     n = await pg.evaluate(acts)
