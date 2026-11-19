@@ -28486,6 +28486,8 @@
     list.forEach(function(ch){
       var c = chCategory(ch);
       if(!seen[c]){ seen[c] = 1; cats.push(c); }
+      // Build 695 (Mark): My Channels is every channel you made, whatever category it's also in.
+      if(!seen['My Channels'] && isLiveChUrl(ch.url)){ seen['My Channels'] = 1; cats.push('My Channels'); }
       if(!fav && isFavorite(channelToStation(ch))) fav = true;
     });
     cats.sort(chCatSort);
@@ -28507,6 +28509,7 @@
   }
   function epgCatFilter(list, key){
     if(key === 'fav') return list.filter(function(ch){ return isFavorite(channelToStation(ch)); });
+    if(key === 'cat:My Channels') return list.filter(function(ch){ return isLiveChUrl(ch.url) || chCategory(ch) === 'My Channels'; });
     if(key.indexOf('cat:') === 0){ var c = key.slice(4); return list.filter(function(ch){ return chCategory(ch) === c; }); }
     return list;
   }
