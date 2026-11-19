@@ -4017,16 +4017,20 @@
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
   /* ---------- Build 243: the Live TV guide grid (Mark's mockups) ---------- */
   /* Build 285 (Mark): in dark mode the channel and show blocks are solid black on the grid's own grey. */
-  :root{ --epg-bg:#1b1c20; --epg-cell:#0b0b0d; --epg-cell-now:#16171b; --epg-line:var(--accent); --epg-ch-cell:transparent; --epg-ch-text:var(--text); }
+  :root{ --epg-bg:#1b1c20; --epg-cell:#111215; --epg-cell-now:#202127; --epg-gap:#000000; --epg-line:var(--accent); --epg-ch-cell:transparent; --epg-ch-text:var(--text);
+    --epg-hl:color-mix(in srgb, var(--accent) 32%, #202127); }
+  /* Build 688 (Mark): what's on now is the lightest (later listings darker, so they don't draw the
+     eye), the gaps between rows and listings black for contrast, and the playing channel's row (logo
+     and what's on) tinted with the theme's accent. */
   /* Build 315 (Mark): the channel column is the dark grey channel logos sit on elsewhere in light
      mode too, so white logos show. */
-  html[data-theme="light"]{ --epg-bg:#e3e5ea; --epg-cell:#f7f8fa; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; }
-  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#e3e5ea; --epg-cell:#f7f8fa; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; } }
+  html[data-theme="light"]{ --epg-bg:#e3e5ea; --epg-cell:#eff0f3; --epg-cell-now:#ffffff; --epg-gap:#c3c7cf; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; --epg-hl:color-mix(in srgb, var(--accent) 22%, #ffffff); }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#e3e5ea; --epg-cell:#eff0f3; --epg-cell-now:#ffffff; --epg-gap:#c3c7cf; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; --epg-hl:color-mix(in srgb, var(--accent) 22%, #ffffff); } }
   .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1) 0 0; }   /* build 406: starts on the page margin */
   body:not(.watch-land) .tile-grid > .epg{ margin-left:calc(var(--main-pad) * -1); }   /* build 687 (Mark): edge to edge */
   .epg{ background:var(--epg-bg); min-width:0; }
   .epg.epg-np{ margin:0 calc(var(--main-pad) * -1); }
-  .epg-scroll{ overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .epg-scroll{ background:var(--epg-gap); overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   .epg-scroll::-webkit-scrollbar{ display:none; }
   .epg-inner{ position:relative; padding-bottom:4px; }
   /* Build 244: denser (Mark: more on screen, like his mockup), and the times stick to the top. */
@@ -4065,8 +4069,8 @@
   .epg-ch::before{ content:''; position:absolute; inset:0 -7px 0 0; background:var(--epg-cell-now); border-radius:0; z-index:-1; }
   .epg-ch{ gap:6px !important; }
   /* Build 315: the gap above each channel cell covered too, so the now line never shows through the column. */
-  .epg-ch{ box-shadow:0 -4px 0 0 var(--epg-bg); }
-  .epg-ch.playing .epg-logo{ box-shadow:0 0 0 2px var(--accent); }
+  .epg-ch{ box-shadow:0 -4px 0 0 var(--epg-gap); }
+  .epg-row.playing > .epg-ch::before, .epg-row.playing > .epg-prog.now{ background:var(--epg-hl); }
   .epg-logo{ display:flex; align-items:center; justify-content:center; width:66px; height:44px; border-radius:8px; background:var(--epg-ch-cell); padding:0 3px; box-sizing:border-box; }
   .epg-logo img{ max-width:60px; max-height:36px; object-fit:contain; display:block; }
   /* Build 629 (Mark): a channel set to Fill Logo (its menu) has its logo cover the whole cell. */
@@ -28909,6 +28913,7 @@
     var cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'epg-ch' + (playing ? ' playing' : '') + (ch.dead ? ' dead' : '') + (chLogoFilled(ch.url) ? ' logo-fill' : '');
+    if(playing) row.classList.add('playing');   // build 688: the row is tinted (logo and what's on)
     cell.setAttribute('aria-label', (ch.name || 'Channel') + (playing ? ', playing' : ''));
     var logo = document.createElement('span');
     logo.className = 'epg-logo';
