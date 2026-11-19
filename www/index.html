@@ -4053,8 +4053,11 @@
   /* Build 309 (Mark): TV channels (the guide's corner) and your own videos (the arrow beside the
      list's heading) share one shown / hidden setting. */
   /* Build 347: only while there's a list under them (with the arrow to bring them back). */
+  /* Build 691 (Mark: the grid jumped at the end of collapsing): the Live TV page's own padding
+     (body.ltv-dock ... padding 10px) is more specific, so it kept 20px after the animation had
+     reached 0; collapsed always wins now. */
   body:not(.rotate-lock) .now-playing-screen.np-channel.np-foot-collapsed:not(.np-coll-empty) .np-hero-foot{
-    height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
+    height:0 !important; padding-top:0 !important; padding-bottom:0 !important; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
   .epg-head-times{ position:relative; height:48px; }
