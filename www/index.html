@@ -20145,7 +20145,7 @@
     var coverHint = coverHintFor(station);
     applyPlaceholderArt(container, key, coverHint);
     // A channel's logo sits on a plain dark gray rather than a generated colour wash.
-    var isCh = isChannelEntry(station);
+    var isCh = isChannelEntry(station) || !!(station && (station.videoChannel || station.liveCh));   // build 693: your own channels too
     if(container.classList) container.classList.toggle('channel-art', isCh);
     if(isCh) channelLogoBg(container);
 
