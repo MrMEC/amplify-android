@@ -4082,6 +4082,10 @@
   .epg-heart{ color:var(--accent); font-size:11px; }
   /* Build 677: category chips on top of the times bar. */
   .epg-head.has-cats{ flex-wrap:wrap; height:auto; }
+  /* Build 690 (Mark): the chips' row has no panel colour: solid black (dark) / white (light). */
+  .epg-cats{ background:#000000; }
+  html[data-theme="light"] .epg-cats{ background:#ffffff; }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) .epg-cats{ background:#ffffff; } }
   .epg-cats{ flex:0 0 100%; display:flex; gap:7px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; padding:8px 4px 6px; box-sizing:border-box; }
   .epg-cats::-webkit-scrollbar{ display:none; }
   .epg-cat{ flex:none; display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-dim); font:inherit; font-size:12.5px; font-weight:600; white-space:nowrap; cursor:pointer; }
