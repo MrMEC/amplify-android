@@ -4103,6 +4103,8 @@
   .ch-cat-opt .ch-cat-tick i{ color:var(--accent); }
   .ch-sheet{ max-height:88vh; overflow-y:auto; overscroll-behavior:contain; }
   .ch-cat-opt small{ display:inline; margin-left:8px; font-size:12.5px; color:var(--text-dim); }
+  .ch-cat-done{ justify-content:center; font-weight:700; color:var(--accent) !important; }
+  .lc-cat-new{ display:inline-flex; align-items:center; gap:5px; }
   .ch-cat-input{ width:100%; height:44px; box-sizing:border-box; border-radius:12px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font:inherit; font-size:15px; padding:0 14px; margin-top:6px; }
   .epg-prog{ position:absolute; top:0; height:82px; border-radius:6px; background:var(--epg-cell); border:0; margin:0; padding:0 14px;
     display:flex; flex-direction:column; justify-content:center; gap:4px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:visible; }
@@ -10408,6 +10410,10 @@
       <div class="cs-field">
         <label id="liveChOrderLabel">Order</label>
         <div class="lc-opts lc-one-row" id="liveChOrder" role="radiogroup" aria-labelledby="liveChOrderLabel"></div>
+      </div>
+      <div class="cs-field" id="liveChCatsField">
+        <label id="liveChCatsLabel">Categories</label>
+        <div class="lc-opts lc-one-row" id="liveChCats" role="group" aria-labelledby="liveChCatsLabel"></div>
       </div>
       <div class="cs-field" id="liveChAdsField">
         <label id="liveChAdsLabel">Commercials</label>
@@ -27928,6 +27934,7 @@
       dsel.value = String(src.decade || '');
     }
     lcPills(lcEl('liveChOrder'), [['sequence', 'In Order'], ['shuffle', 'Shuffle'], ['daily', 'Daily Shuffle']], ed.order, function(v){ ed.order = v; renderLiveChEditor(); });
+    lcCatChips(ed);
     // Build 342 (Mark): commercial breaks after each show (not for music video channels).
     lcEl('liveChAdsField').hidden = src.kind === 'mv';
     lcPills(lcEl('liveChAds'), [['0', 'Off'], ['30', '30-Minute Slots'], ['60', '1-Hour Slots']], String(ed.ads || 0), function(v){ ed.ads = parseInt(v, 10) || 0; renderLiveChEditor(); });
@@ -28235,9 +28242,55 @@
       e.stopImmediatePropagation(); closeLiveChEditor(false);
     }
   }, true);
+  // Build 695 (Mark): Categories on the channel page: tap to put the channel in (or take it out of)
+  // as many as you like; untouched, it stays automatic (My Channels plus what its content suggests).
+  function lcEdCats(ed){
+    if(ed.cats) return ed.cats;
+    var url = 'amplify-live:' + ed.id, ch = liveChannelByUrl(url);
+    return ch ? chCategories(ch) : (chOverrideList(url) || ['My Channels']);
+  }
+  function lcCatChips(ed){
+    var box = lcEl('liveChCats');
+    if(!box) return;
+    var sl = box.scrollLeft, cur = lcEdCats(ed);
+    box.innerHTML = '';
+    var names = chAllCategoryNames();
+    cur.forEach(function(c){ if(names.indexOf(c) < 0) names.push(c); });
+    // the ones it's in first, so they're seen without scrolling
+    names = names.filter(function(c){ return cur.indexOf(c) >= 0; }).concat(names.filter(function(c){ return cur.indexOf(c) < 0; }));
+    names.forEach(function(c){
+      var on = cur.indexOf(c) >= 0;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'home-tab' + (on ? ' active' : '');
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.textContent = c;
+      b.addEventListener('click', function(){
+        var next = lcEdCats(ed).slice(), i = next.indexOf(c);
+        if(i >= 0){ if(next.length === 1) return; next.splice(i, 1); } else next.push(c);   // always at least one
+        ed.cats = next;
+        lcCatChips(ed);
+      });
+      box.appendChild(b);
+    });
+    var nb = document.createElement('button');
+    nb.type = 'button';
+    nb.className = 'home-tab lc-cat-new';
+    nb.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i> New';
+    nb.addEventListener('click', function(){
+      askNewCategory(function(v){ var next = lcEdCats(ed).slice(); if(next.indexOf(v) < 0) next.push(v); ed.cats = next; lcCatChips(ed); });
+    });
+    box.appendChild(nb);
+    box.scrollLeft = sl;
+  }
   lcEl('liveChSaveBtn').addEventListener('click', function(){
     if(!liveChEd || lcEl('liveChSaveBtn').disabled) return;
     var d = liveChEdDef(), cur = liveChDefById(d.id);
+    if(liveChEd.cats){
+      var url = 'amplify-live:' + d.id, chx = liveChannelByUrl(url);
+      var auto = chx ? chAutoCategories(chx) : null;
+      setChCategories(url, auto && chCatSame(liveChEd.cats, auto) ? null : liveChEd.cats);
+    }
     if(cur){ cur.name = d.name; cur.src = d.src; cur.order = d.order; cur.ads = d.ads || 0; cur.gridDesc = d.gridDesc || ''; }
     else liveChDefs().push(d);
     saveLiveChDefs();
@@ -28458,7 +28511,26 @@
     chCatMemo[key] = out;
     return out;
   }
-  function chCategory(ch){ return (ch && chCatOverride[ch.url]) || chAutoCategory(ch); }
+  // Build 695 (Mark): a channel you made can be in several categories. On its own it's in My
+  // Channels plus the category its content suggests; one you set (a list) replaces that.
+  // Other channels keep one category each (stored as a string, as before).
+  function chOverrideList(url){ var v = chCatOverride[url]; return !v ? null : Array.isArray(v) ? v.slice() : [v]; }
+  function chAutoCategories(ch){
+    var a = chAutoCategory(ch);
+    if(ch && isLiveChUrl(ch.url)) return a === 'My Channels' ? ['My Channels'] : ['My Channels', a];
+    return [a];
+  }
+  function chCategories(ch){
+    if(!ch) return ['Other'];
+    var o = chOverrideList(ch.url);
+    return o && o.length ? o : chAutoCategories(ch);
+  }
+  function chCategory(ch){ return chCategories(ch)[0]; }
+  function chCatSame(a, b){ return a.length === b.length && a.every(function(x){ return b.indexOf(x) >= 0; }); }
+  function setChCategories(url, list){
+    if(list && list.length) chCatOverride[url] = list.slice(); else delete chCatOverride[url];
+    try{ localStorage.setItem(CH_CAT_KEY, JSON.stringify(chCatOverride)); }catch(e){}
+  }
   function setChCategory(url, cat){
     if(cat) chCatOverride[url] = cat; else delete chCatOverride[url];
     try{ localStorage.setItem(CH_CAT_KEY, JSON.stringify(chCatOverride)); }catch(e){}
@@ -28484,10 +28556,7 @@
   function epgCatChips(list){
     var seen = {}, cats = [], fav = false;
     list.forEach(function(ch){
-      var c = chCategory(ch);
-      if(!seen[c]){ seen[c] = 1; cats.push(c); }
-      // Build 695 (Mark): My Channels is every channel you made, whatever category it's also in.
-      if(!seen['My Channels'] && isLiveChUrl(ch.url)){ seen['My Channels'] = 1; cats.push('My Channels'); }
+      chCategories(ch).forEach(function(c){ if(!seen[c]){ seen[c] = 1; cats.push(c); } });
       if(!fav && isFavorite(channelToStation(ch))) fav = true;
     });
     cats.sort(chCatSort);
@@ -28509,8 +28578,7 @@
   }
   function epgCatFilter(list, key){
     if(key === 'fav') return list.filter(function(ch){ return isFavorite(channelToStation(ch)); });
-    if(key === 'cat:My Channels') return list.filter(function(ch){ return isLiveChUrl(ch.url) || chCategory(ch) === 'My Channels'; });
-    if(key.indexOf('cat:') === 0){ var c = key.slice(4); return list.filter(function(ch){ return chCategory(ch) === c; }); }
+    if(key.indexOf('cat:') === 0){ var c = key.slice(4); return list.filter(function(ch){ return chCategories(ch).indexOf(c) >= 0; }); }
     return list;
   }
   // One chip row per guide (the Watch page's, the one under the video), kept and filled again on
@@ -28590,7 +28658,85 @@
   }
   // The channel's sheet > Category: Automatic (what it would be), the categories in use and the
   // usual ones, and New Category.
+  function chAllCategoryNames(){
+    var names = {};
+    CH_CAT_ORDER.forEach(function(c){ names[c] = 1; });
+    names['My Channels'] = 1;
+    try{ epgAllChannels(visibleVideoChannels()).forEach(function(c){ chCategories(c).forEach(function(n){ names[n] = 1; }); }); }catch(e){}
+    Object.keys(chCatOverride).forEach(function(u){ (chOverrideList(u) || []).forEach(function(n){ names[n] = 1; }); });
+    var catPos = {};
+    epgCatOrder.forEach(function(k, i){ if(String(k).indexOf('cat:') === 0) catPos[k] = i; });
+    return Object.keys(names).sort(function(a, b){
+      var pa = ('cat:' + a) in catPos ? catPos['cat:' + a] : 1e6, pb = ('cat:' + b) in catPos ? catPos['cat:' + b] : 1e6;
+      return pa - pb || chCatSort(a, b);
+    });
+  }
+  // New Category: a modal with a text box; onSave gets the name.
+  function askNewCategory(onSave){
+    var wrap = document.createElement('div');
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'ch-cat-input'; inp.placeholder = 'Category name'; inp.maxLength = 30;
+    wrap.appendChild(inp);
+    function save(){ var v = chCatTitle(inp.value); if(v) onSave(v); }
+    showNotice({ title: 'New Category', message: wrap, sticky: true, autoClose: false,
+      actions: [{ label: 'Cancel' }, { label: 'Save', primary: true, run: save }] });
+    inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); closeNotice(); save(); } });
+  }
+  // A channel you made: several categories, ticked on and off in the sheet (it stays open).
+  function openChCategoriesSheet(ch){
+    var auto = chAutoCategories(ch);
+    document.getElementById('chSheetSub').textContent = 'Categories';
+    var box = document.getElementById('chSheetItems');
+    box.innerHTML = '';
+    var over = chOverrideList(ch.url), cur = over || auto;
+    function tick(on){ return '<span class="ch-cat-tick">' + (on ? '<i class="fa-solid fa-check" aria-hidden="true"></i>' : '') + '</span><span></span>'; }
+    function apply(list){ setChCategories(ch.url, list && !chCatSame(list, auto) ? list : null); rebuildEpgGridsInPlace(); openChCategoriesSheet(ch); }
+    var a = document.createElement('button');
+    a.type = 'button';
+    a.className = 'ch-sheet-item ch-cat-opt' + (!over ? ' on' : '');
+    a.innerHTML = tick(!over);
+    a.lastChild.textContent = 'Automatic';
+    var as = document.createElement('small'); as.textContent = auto.join(', '); a.lastChild.appendChild(as);
+    a.addEventListener('click', function(){ apply(null); });
+    box.appendChild(a);
+    chAllCategoryNames().forEach(function(c){
+      var on = cur.indexOf(c) >= 0;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ch-sheet-item ch-cat-opt' + (on ? ' on' : '');
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.innerHTML = tick(on);
+      b.lastChild.textContent = c;
+      b.addEventListener('click', function(){
+        var next = cur.slice(), i = next.indexOf(c);
+        if(i >= 0) next.splice(i, 1); else next.push(c);
+        apply(next.length ? next : null);
+      });
+      box.appendChild(b);
+    });
+    var nb = document.createElement('button');
+    nb.type = 'button';
+    nb.className = 'ch-sheet-item';
+    nb.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i><span>New Category</span>';
+    nb.addEventListener('click', function(){
+      closeChSheet();
+      askNewCategory(function(v){ var next = cur.slice(); if(next.indexOf(v) < 0) next.push(v); setChCategories(ch.url, next); rebuildEpgGridsInPlace(); });
+    });
+    box.appendChild(nb);
+    var done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'ch-sheet-item ch-cat-done';
+    done.innerHTML = '<span>Done</span>';
+    done.addEventListener('click', function(){ closeChSheet(); });
+    box.appendChild(done);
+    if(!chSheetOverlay.classList.contains('open')){
+      chSheetOverlay.classList.add('open');
+      var sheet = document.getElementById('chSheet');
+      if(sheet) sheet.scrollTop = 0;
+    }
+  }
   function openChCategorySheet(ch){
+    if(ch && isLiveChUrl(ch.url)){ openChCategoriesSheet(ch); return; }
     var cur = chCatOverride[ch.url] || '', auto = chAutoCategory(ch);
     document.getElementById('chSheetSub').textContent = 'Category';
     var box = document.getElementById('chSheetItems');
@@ -28609,7 +28755,7 @@
     opt('Automatic', '', auto);
     var names = {}, list = [];
     CH_CAT_ORDER.forEach(function(c){ names[c] = 1; });
-    try{ epgAllChannels(visibleVideoChannels()).forEach(function(c){ names[chCategory(c)] = 1; }); }catch(e){}
+    try{ epgAllChannels(visibleVideoChannels()).forEach(function(c){ chCategories(c).forEach(function(n){ names[n] = 1; }); }); }catch(e){}
     Object.keys(chCatOverride).forEach(function(u){ names[chCatOverride[u]] = 1; });
     // Build 683 (Mark): the same order as the category chips on the grid (the order you set by
     // holding and dragging them); categories you haven't placed follow in the usual order.
@@ -30699,7 +30845,7 @@
     catB.type = 'button';
     catB.className = 'ch-sheet-item';
     catB.innerHTML = '<svg class="ch-sheet-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.4"/></svg><span></span>';
-    catB.lastChild.textContent = 'Category: ' + chCategory(ch);
+    catB.lastChild.textContent = isLiveChUrl(ch.url) ? 'Categories: ' + chCategories(ch).join(', ') : 'Category: ' + chCategory(ch);
     catB.addEventListener('click', function(){ openChCategorySheet(ch); });
     box.appendChild(catB);
     item('fa-solid fa-grip-vertical', 'Move', function(){ leaveNp(); setChannelsArranging(true); });
