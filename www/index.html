@@ -28486,8 +28486,28 @@
   }
   function chCatTitle(t){ return String(t || '').replace(/[-_+]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, function(c){ return c.toUpperCase(); }); }
   var chCatMemo = {};
+  // Build 697: a channel you made from shows and movies takes the category of their most common
+  // Plex genre (Seinfeld -> Comedy); the answer is kept until the library changes.
+  var chCatMemoLib = null;
+  function liveChGenreCategory(def){
+    try{
+      var so = liveChSources(def, vlib()), items = (so.shows || []).concat(so.movies || []).slice(0, 80), n = {}, first = {}, k = 0;
+      items.forEach(function(x){
+        (x.genres || []).forEach(function(g, gi){
+          var c = chCatMatch(g);
+          if(!c) return;
+          n[c] = (n[c] || 0) + (gi === 0 ? 2 : 1);   // a title's first genre counts most
+          if(!(c in first)) first[c] = k++;
+        });
+      });
+      var best = '';
+      Object.keys(n).forEach(function(c){ if(!best || n[c] > n[best] || (n[c] === n[best] && first[c] < first[best])) best = c; });
+      return best;
+    }catch(e){ return ''; }
+  }
   function chAutoCategory(ch){
     if(!ch) return 'Other';
+    try{ var vl = vlib(); if(vl !== chCatMemoLib){ chCatMemoLib = vl; chCatMemo = {}; } }catch(e){}
     var key = ch.url + '|' + (ch.name || '');
     if(chCatMemo[key]) return chCatMemo[key];
     var own = [], i, m, out = '';
@@ -28497,6 +28517,7 @@
       if(src.kind === 'mv') out = 'Music';
       else if(src.kind === 'movies') out = 'Movies';
       else if(src.kind === 'genre' && src.genre) own.push(src.genre);
+      else if(def && (src.kind === 'pick' || src.kind === 'decade')) out = liveChGenreCategory(def);
     }
     if(!out && isArchiveChUrl(ch.url)){
       m = /^amplify-archive:c:(.+)$/.exec(ch.url);
