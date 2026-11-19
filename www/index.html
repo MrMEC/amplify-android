@@ -28514,7 +28514,16 @@
   // Build 695 (Mark): a channel you made can be in several categories. On its own it's in My
   // Channels plus the category its content suggests; one you set (a list) replaces that.
   // Other channels keep one category each (stored as a string, as before).
-  function chOverrideList(url){ var v = chCatOverride[url]; return !v ? null : Array.isArray(v) ? v.slice() : [v]; }
+  // Build 697 (Mark: his AEW channel showed only Wrestling): a channel you made that was given one
+  // category before build 696 (a single name) keeps it and is in My Channels as well; a list
+  // chosen since is taken exactly as chosen.
+  function chOverrideList(url){
+    var v = chCatOverride[url];
+    if(!v) return null;
+    if(Array.isArray(v)) return v.slice();
+    if(isLiveChUrl(url) && v !== 'My Channels') return ['My Channels', v];
+    return [v];
+  }
   function chAutoCategories(ch){
     var a = chAutoCategory(ch);
     if(ch && isLiveChUrl(ch.url)) return a === 'My Channels' ? ['My Channels'] : ['My Channels', a];
