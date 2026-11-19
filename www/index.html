@@ -20098,6 +20098,14 @@
     lazyArtIO.observe(container);
     return true;
   }
+  function liveTrackChannelStation(t){
+    if(!t || !t.liveCh || t.videoChannel) return null;
+    try{
+      var ch = findVideoChannel(t.liveCh);
+      if(!ch) return null;
+      return isLiveChUrl(ch.url) ? liveChStationOf(ch) : channelToStation(ch);
+    }catch(e){ return null; }
+  }
   function renderStationArt(container, station){
     if(station && station.type === 'zen'){
       container.innerHTML = '';
@@ -20105,6 +20113,11 @@
       zenPaint(container, zpp);
       return;
     }
+    // Build 693 (Mark): a TV channel wears the channel's own picture (yours, else its logo), never
+    // the program on air or a generated placeholder: a show playing on one of your channels is
+    // painted as that channel.
+    var asCh = liveTrackChannelStation(station);
+    if(asCh) station = asCh;
     if(deferArt(container, function(){ renderStationArt(container, station); })) return;
     if(container && container._lazyArt){ container._lazyArt = null; if(lazyArtIO) lazyArtIO.unobserve(container); }
     // Build 416: a re-render while the same song cover is already showing must not blank the
@@ -20171,13 +20184,14 @@
     // Build 421: the song on air wins over a cover set by hand for the station (Exclusively
     // stations carry one), on the player bar and Now Playing; the station's own cover returns
     // when no song is named.
-    if(container.closest && container.closest('.nph-slide')){
+    var tvCh = !!(station && (station.liveCh || station.videoChannel)) || isChannelEntry(station);
+    if(!tvCh && container.closest && container.closest('.nph-slide')){
       var lastCover = lastSongCoverFor(station);
       if(lastCover){ songPaint = true; paint(lastCover); songPaint = false; return; }
       var heroSlide = container.closest('.nph-slide');
       if(heroSlide && lastSongItem(station)) requestLastSongCover(station, heroSlide);
     }
-    if(container === playerIcon || container === npArt){
+    if(!tvCh && (container === playerIcon || container === npArt)){
       var songFirst = onAirArtFor(station);
       if(songFirst){ songPaint = true; paint(songFirst); songPaint = false; if(isArtistRadio(station)) container.classList.add('art-radio'); return; }
     }
