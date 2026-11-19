@@ -11045,6 +11045,10 @@
   var P = (Cap.Plugins && Cap.Plugins.AmplifyPlayer) || (typeof Cap.registerPlugin === 'function' ? Cap.registerPlugin('AmplifyPlayer') : null);
   if(!P){ console.error('Amplify: native player plugin missing; using the WebView player'); window.AmplifyNativeAudioMissing = true; return; }
   var seq = 0;
+  // Build 699 (Mark): an item's id is unique to this launch of the page. The phone's player lives
+  // on when the page reloads, and ids starting again at m1 could match what it was playing
+  // before, so that item's picture was taken as the station's (the video view for a radio station).
+  var seqRun = Date.now().toString(36);
   function now(){ return (window.performance && performance.now) ? performance.now() : Date.now(); }
   function mkErr(name, msg){ var e = new Error(msg || name); e.name = name; return e; }
 
@@ -11162,7 +11166,7 @@
     if(this._video) this.detachVideo(false);
     var self = this;
     this._settle(false, mkErr('AbortError', 'The play() request was interrupted by a new load request.'));
-    var id = 'm' + (++seq);
+    var id = 'm' + seqRun + '.' + (++seq);
     this._car = false; // the page is playing something itself again
     this._id = u ? id : null; this._src = u; this._sent = false;
     this._err = null; this._dur = NaN; this._ready = 0; this._time = 0; this._t0 = now();
@@ -16593,8 +16597,16 @@
   var streamVideoOffKey = null;    // the stream whose video was turned off by hand
   var videoLastSent = '', videoRaf = 0, videoViewReply = '', videoBlockedBy = '', videoViewLog = [];
 
+  // Build 699 (Mark): a radio station counts as having video only once a picture of real size has
+  // arrived -- a video track that never draws anything showed the video view (an empty black box)
+  // and a Turn On Video button on a normal station. TV channels and videos of your own put the box
+  // up straight away, as before.
+  function streamPicWait(st){
+    return !!(st && isLiveStream(st) && !st.videoChannel && !isLiveChUrl(st.url || '') && !isLocalVideo(st) && !isArchiveVideo(st));
+  }
+  function streamPicReady(st){ return streamVideo.has && ((streamVideo.w > 0 && streamVideo.h > 0) || !streamPicWait(st)); }
   function streamVideoCapable(st){
-    return !!(videoPlugin && streamVideo.has && st && (isLiveStream(st) || isLocalVideo(st) || isArchiveVideo(st)) && currentStation &&
+    return !!(videoPlugin && streamPicReady(st) && st && (isLiveStream(st) || isLocalVideo(st) || isArchiveVideo(st)) && currentStation &&
       favKey(st) === favKey(currentStation));
   }
   function setStreamVideoOn(on){
@@ -16752,8 +16764,9 @@
       if(!ev || ev.id !== audio._id) return;
       streamVideo.has = !!ev.hasVideo; streamVideo.w = ev.width || 0; streamVideo.h = ev.height || 0;
       var st = currentStation;
-      if(streamVideo.has) rememberVideoStation(st);
-      if(streamVideo.has && streamVideoCapable(st) && !npVideoOn && streamVideoOffKey !== favKey(st)){
+      var real = streamPicReady(st);
+      if(real) rememberVideoStation(st);
+      if(real && streamVideoCapable(st) && !npVideoOn && streamVideoOffKey !== favKey(st)){
         setStreamVideoOn(true);
       } else if(!streamVideo.has && npVideoStream){
         resetNpVideoUi();
@@ -17039,7 +17052,7 @@
   function pipWanted(){
     if(!currentStation || !audio || audio.paused) return false;
     if(npVideoOn) return true;
-    return !!(videoPlugin && streamVideo.has && (isLiveStream(currentStation) || isLocalVideo(currentStation)) && streamVideoOffKey !== favKey(currentStation));
+    return !!(videoPlugin && streamPicReady(currentStation) && (isLiveStream(currentStation) || isLocalVideo(currentStation)) && streamVideoOffKey !== favKey(currentStation));
   }
   function syncPip(){
     if(!pipPlugin || typeof pipPlugin.setPip !== 'function' || pipActive) return;
@@ -33486,8 +33499,15 @@
       var r = stationsHeading.getBoundingClientRect();
       if(!r.height) return;
       var cs = getComputedStyle(stationsHeading), st = hdrPageLabel.style;
+      // Build 699 (Mark): pull to refresh redraws the page while it is still pulled down, so the
+      // heading reads lower than it rests; the page's own shift is taken back out.
+      var dy = 0;
+      for(var el = stationsHeading.parentElement; el && el !== document.body; el = el.parentElement){
+        var tf = getComputedStyle(el).transform;
+        if(tf && tf !== 'none'){ try{ dy += new DOMMatrixReadOnly(tf).m42; }catch(e){} }
+      }
       st.left = Math.round(r.left) + 'px';
-      st.top = Math.round(r.top + window.scrollY) + 'px';   // where it rests when the page is at the top
+      st.top = Math.round(r.top - dy + window.scrollY) + 'px';   // where it rests when the page is at the top
       ['fontSize', 'fontWeight', 'fontFamily', 'letterSpacing', 'lineHeight', 'color', 'textTransform'].forEach(function(k){ st[k] = cs[k]; });
       hdrPageLabel.textContent = (stationsHeading.textContent || '').trim();
     }catch(e){}
