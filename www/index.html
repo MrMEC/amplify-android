@@ -4017,15 +4017,17 @@
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
   /* ---------- Build 243: the Live TV guide grid (Mark's mockups) ---------- */
   /* Build 285 (Mark): in dark mode the channel and show blocks are solid black on the grid's own grey. */
-  :root{ --epg-bg:#1b1c20; --epg-cell:#111215; --epg-cell-now:#202127; --epg-gap:#000000; --epg-line:var(--accent); --epg-ch-cell:transparent; --epg-ch-text:var(--text);
+  :root{ --epg-bg:#111215; --epg-cell:#202127; --epg-cell-now:#202127; --epg-gap:#000000; --epg-line:var(--accent); --epg-ch-cell:transparent; --epg-ch-text:var(--text);
     --epg-hl:color-mix(in srgb, var(--accent) 32%, #202127); }
-  /* Build 688 (Mark): what's on now is the lightest (later listings darker, so they don't draw the
+  /* Build 689 (Mark): later listings the same colour as what's on now; the time bar and the chips
+     above it take the shade later listings had (#111215 / #eff0f3).
+     Build 688 (Mark): what's on now is the lightest (later listings darker, so they don't draw the
      eye), the gaps between rows and listings black for contrast, and the playing channel's row (logo
      and what's on) tinted with the theme's accent. */
   /* Build 315 (Mark): the channel column is the dark grey channel logos sit on elsewhere in light
      mode too, so white logos show. */
-  html[data-theme="light"]{ --epg-bg:#e3e5ea; --epg-cell:#eff0f3; --epg-cell-now:#ffffff; --epg-gap:#c3c7cf; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; --epg-hl:color-mix(in srgb, var(--accent) 22%, #ffffff); }
-  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#e3e5ea; --epg-cell:#eff0f3; --epg-cell-now:#ffffff; --epg-gap:#c3c7cf; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; --epg-hl:color-mix(in srgb, var(--accent) 22%, #ffffff); } }
+  html[data-theme="light"]{ --epg-bg:#eff0f3; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-gap:#c3c7cf; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; --epg-hl:color-mix(in srgb, var(--accent) 22%, #ffffff); }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eff0f3; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-gap:#c3c7cf; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; --epg-hl:color-mix(in srgb, var(--accent) 22%, #ffffff); } }
   .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1) 0 0; }   /* build 406: starts on the page margin */
   body:not(.watch-land) .tile-grid > .epg{ margin-left:calc(var(--main-pad) * -1); }   /* build 687 (Mark): edge to edge */
   .epg{ background:var(--epg-bg); min-width:0; }
