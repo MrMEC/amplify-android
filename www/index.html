@@ -958,7 +958,7 @@
   }
   .sec-filter input{
     display:block; width:100%; box-sizing:border-box; height:46px; margin:0;
-    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    background:transparent; border:1px solid var(--border); color:var(--text);   /* build 687 (Mark): outline only */
     padding:0 44px 0 40px; border-radius:10px; font:inherit; font-size:15px; outline:none; min-width:0;
     -webkit-appearance:none; appearance:none;
   }
@@ -4017,28 +4017,31 @@
      playing channel (.np-related-heading: 13px, bold); build 190: the default grey, not accent. */
   /* ---------- Build 243: the Live TV guide grid (Mark's mockups) ---------- */
   /* Build 285 (Mark): in dark mode the channel and show blocks are solid black on the grid's own grey. */
-  :root{ --epg-bg:#1b1c20; --epg-cell:#000000; --epg-cell-now:#000000; --epg-line:var(--accent); --epg-ch-cell:#000000; --epg-ch-text:var(--text); }
+  :root{ --epg-bg:#1b1c20; --epg-cell:#0b0b0d; --epg-cell-now:#16171b; --epg-line:var(--accent); --epg-ch-cell:transparent; --epg-ch-text:var(--text); }
   /* Build 315 (Mark): the channel column is the dark grey channel logos sit on elsewhere in light
      mode too, so white logos show. */
-  html[data-theme="light"]{ --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; }
-  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#eceef2; --epg-cell:#ffffff; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; } }
+  html[data-theme="light"]{ --epg-bg:#e3e5ea; --epg-cell:#f7f8fa; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) { --epg-bg:#e3e5ea; --epg-cell:#f7f8fa; --epg-cell-now:#ffffff; --epg-ch-cell:#2b2c31; --epg-ch-text:#ffffff; } }
   .tile-grid > .epg{ grid-column:1/-1; margin:0 calc(var(--main-pad) * -1) 0 0; }   /* build 406: starts on the page margin */
+  body:not(.watch-land) .tile-grid > .epg{ margin-left:calc(var(--main-pad) * -1); }   /* build 687 (Mark): edge to edge */
   .epg{ background:var(--epg-bg); min-width:0; }
   .epg.epg-np{ margin:0 calc(var(--main-pad) * -1); }
   .epg-scroll{ overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   .epg-scroll::-webkit-scrollbar{ display:none; }
   .epg-inner{ position:relative; padding-bottom:4px; }
   /* Build 244: denser (Mark: more on screen, like his mockup), and the times stick to the top. */
-  .epg-head{ position:sticky; top:0; z-index:5; display:flex; height:34px; background:var(--epg-bg); }
+  .epg-head{ position:sticky; top:0; z-index:5; display:flex; height:48px; background:var(--epg-bg); }
   @media (max-width: 900px){
     .tile-grid > .epg > .epg-head{ top:60px; transition:top .28s cubic-bezier(.4,0,.2,1); }
     body.hdr-autohide.hdr-stuck .tile-grid > .epg > .epg-head{ top:0; }
   }
-  .epg-corner{ flex:none; width:80px; height:34px; display:flex; align-items:center; justify-content:center;
+  .epg-corner{ flex:none; width:86px; height:48px; padding-bottom:8px !important; box-sizing:border-box; display:flex; align-items:center; justify-content:center;
     background:var(--epg-bg); border:0; color:var(--text-dim); cursor:pointer; padding:0; }
   .epg-corner svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
   /* Build 252: greyed out while nothing is playing. */
-  .epg-corner.off{ visibility:hidden; pointer-events:none; }
+  .epg-corner.off{ pointer-events:none; }
+  /* Build 687 (Mark): with nothing playing the corner shows the date; the arrow takes its place while a channel plays. */
+  .epg-date{ font-size:11.5px; font-weight:700; letter-spacing:.04em; color:var(--text-dim); white-space:nowrap; }
   .epg-corner:not(:disabled){ color:var(--text); }
   /* The playing channel's details hidden (the corner's up arrow): none of its height left. */
   /* Build 309 (Mark): TV channels (the guide's corner) and your own videos (the arrow beside the
@@ -4048,22 +4051,26 @@
     height:0; padding-top:0; padding-bottom:0; overflow:hidden; opacity:0; visibility:hidden; }
   .epg-head-track{ flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
   .epg-head-track::-webkit-scrollbar{ display:none; }
-  .epg-head-times{ position:relative; height:34px; }
-  .epg-time{ position:absolute; top:0; height:34px; display:flex; align-items:center; padding-left:11px; font-size:13px; font-weight:600;
+  .epg-head-times{ position:relative; height:48px; }
+  .epg-time{ position:absolute; top:0; height:40px; display:flex; align-items:center; padding-left:14px; font-size:13px; font-weight:600;
     color:var(--text-dim); white-space:nowrap; }
   /* Build 286 (Mark): roomier rows (5 on a phone instead of 6). */
-  .epg-row{ position:relative; height:62px; margin-top:4px; }
-  .epg-ch{ position:sticky; left:0; z-index:3; width:80px; height:62px; padding:0 4px; margin:0; border:0; background:var(--epg-bg);
+  .epg-row{ position:relative; height:82px; margin-top:4px; }
+  .epg-ch{ position:sticky; left:0; z-index:3; width:86px; height:82px; padding:0; margin:0; border:0; background:transparent;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; color:var(--epg-ch-text);
     -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
-  .epg-ch::before{ content:''; position:absolute; inset:0 4px 0 4px; background:var(--epg-ch-cell); border-radius:5px; z-index:-1; }
-  .epg-ch.playing::before{ box-shadow:inset 0 0 0 2px var(--accent); }
+  /* Build 687 (Mark): the logo's cell runs straight into the listing beside it (same colour, no
+     gap, no corners between them); the gaps between listings stay. It reaches a few px past the
+     column to cover the gap and the listing's rounded corner as the grid scrolls under it. */
+  .epg-ch::before{ content:''; position:absolute; inset:0 -7px 0 0; background:var(--epg-cell-now); border-radius:0; z-index:-1; }
+  .epg-ch{ gap:6px !important; }
   /* Build 315: the gap above each channel cell covered too, so the now line never shows through the column. */
   .epg-ch{ box-shadow:0 -4px 0 0 var(--epg-bg); }
-  .epg-logo{ display:flex; align-items:center; justify-content:center; width:60px; height:28px; }
-  .epg-logo img{ max-width:60px; max-height:28px; object-fit:contain; display:block; }
+  .epg-ch.playing .epg-logo{ box-shadow:0 0 0 2px var(--accent); }
+  .epg-logo{ display:flex; align-items:center; justify-content:center; width:66px; height:44px; border-radius:8px; background:var(--epg-ch-cell); padding:0 3px; box-sizing:border-box; }
+  .epg-logo img{ max-width:60px; max-height:36px; object-fit:contain; display:block; }
   /* Build 629 (Mark): a channel set to Fill Logo (its menu) has its logo cover the whole cell. */
-  .epg-ch.logo-fill .epg-logo{ position:absolute; inset:0 4px; width:auto; height:auto; border-radius:5px; overflow:hidden; }
+  .epg-ch.logo-fill .epg-logo{ overflow:hidden; padding:0; }
   .epg-ch.logo-fill .epg-logo img{ width:100%; height:100%; max-width:none; max-height:none; object-fit:cover; }
   .epg-logo-name{ font-size:10.5px; font-weight:700; line-height:1.15; text-align:center; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow-wrap:normal; word-break:normal; hyphens:none; max-width:100%; }
   .epg-heart{ color:var(--accent); font-size:11px; }
@@ -4083,25 +4090,30 @@
   .ch-sheet{ max-height:88vh; overflow-y:auto; overscroll-behavior:contain; }
   .ch-cat-opt small{ display:inline; margin-left:8px; font-size:12.5px; color:var(--text-dim); }
   .ch-cat-input{ width:100%; height:44px; box-sizing:border-box; border-radius:12px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font:inherit; font-size:15px; padding:0 14px; margin-top:6px; }
-  .epg-prog{ position:absolute; top:0; height:62px; border-radius:5px; background:var(--epg-cell); border:0; margin:0; padding:0 9px;
-    display:flex; flex-direction:column; justify-content:center; gap:1px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:visible; }
+  .epg-prog{ position:absolute; top:0; height:82px; border-radius:6px; background:var(--epg-cell); border:0; margin:0; padding:0 14px;
+    display:flex; flex-direction:column; justify-content:center; gap:4px; text-align:left; color:var(--text); font:inherit; min-width:0; overflow:visible; }
   button.epg-prog{ cursor:pointer; }
   .epg-prog.now{ background:var(--epg-cell-now); }
-  .epg-t{ font-size:13px; font-weight:500; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .epg-s{ font-size:11.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .epg-prog.whole .epg-t{ font-weight:500; }
+  .epg-t{ font-size:14.5px; font-weight:700; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-s{ font-size:12.5px; line-height:1.25; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .epg-prog.whole .epg-t{ font-weight:700; }
   /* Build 637 (Mark): a Grid description stands in for the schedule: one block, the words wrapping
      (up to three lines) beside the logo instead of running off on one line. */
   .epg-prog.desc > .epg-t{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; font-size:12.5px; line-height:1.28;
-    max-width:min(calc(100vw - 80px - 11px - 24px), 520px); overflow:hidden; text-overflow:clip; }
+    max-width:min(calc(100vw - 86px - 14px - 24px), 520px); overflow:hidden; text-overflow:clip; }
   .lc-desc{ display:block; width:100%; min-height:62px; resize:none; font:inherit; line-height:1.35; box-sizing:border-box; }
   /* Build 245 (Mark): a block's words stay in view as the grid scrolls sideways (they ride along
      just right of the channel column until the block's own end pushes them off), so a channel
      without a schedule never turns into an empty bar, and a long program keeps its title showing. */
-  .epg-prog > .epg-t, .epg-prog > .epg-s{ position:sticky; left:calc(80px + 11px); width:fit-content; max-width:100%; }
+  .epg-prog > .epg-t, .epg-prog > .epg-s{ position:sticky; left:calc(86px + 14px); width:fit-content; max-width:100%; }
   /* Now: an accent line down the rows, its marker in the (sticky) time bar. */
-  .epg-now{ position:absolute; top:0; bottom:0; width:2px; background:var(--epg-line); z-index:2; pointer-events:none; opacity:.85; }
-  .epg-now-mark{ position:absolute; bottom:0; width:0; height:0; transform:translateX(-50%); border-left:7px solid transparent; border-right:7px solid transparent;
+  .epg-now{ display:none; }
+  /* Build 687 (Mark): instead of the line down the grid, a bar under the current half hour that
+     fills as it goes; that half hour's time is bold. */
+  .epg-now-bar{ position:absolute; top:40px; height:4px; border-radius:2px; background:var(--border); pointer-events:none; overflow:hidden; }
+  .epg-now-bar > i{ position:absolute; left:0; top:0; bottom:0; border-radius:2px; background:var(--epg-line); }
+  .epg-time.cur{ color:var(--text); font-weight:700; }
+  .epg-now-mark{ display:none !important; position:absolute; bottom:0; width:0; height:0; transform:translateX(-50%); border-left:7px solid transparent; border-right:7px solid transparent;
     border-top:9px solid var(--epg-line); pointer-events:none; }
   .epg-order-menu{ z-index:6000; }
   /* Build 248: a later program with details opens them. */
@@ -28232,7 +28244,7 @@
   // channel with no schedule is one block across. The accent line marks now. Tapping the block
   // that's on now plays the channel; other blocks do nothing.
   // Build 244 (Mark): denser, closer to his mockup: narrower half hours, a slimmer channel column, shorter rows.
-  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 124, EPG_CH_W = 80, EPG_ROW_H = 62, EPG_HEAD_H = 34, EPG_GAP = 4;
+  var EPG_SLOT_MS = 30 * 60 * 1000, EPG_SLOTS = 24, EPG_SLOT_W = 124, EPG_CH_W = 86, EPG_ROW_H = 82, EPG_HEAD_H = 48, EPG_GAP = 4;   // build 687: roomier, merged logo column
   function epgStart(now){ return Math.floor(now / EPG_SLOT_MS) * EPG_SLOT_MS; }
   function epgChannelOrder(list){
     var split = splitFavChannels(list);
@@ -28638,6 +28650,11 @@
       tl.textContent = guideTime(t0 + i * EPG_SLOT_MS);
       times.appendChild(tl);
     }
+    var bar = document.createElement('span');
+    bar.className = 'epg-now-bar';
+    bar.setAttribute('aria-hidden', 'true');
+    bar.appendChild(document.createElement('i'));
+    times.appendChild(bar);
     var mark = document.createElement('span');
     mark.className = 'epg-now-mark';
     mark.setAttribute('aria-hidden', 'true');
@@ -28697,12 +28714,21 @@
     if(!on && b.closest && b.closest('#npCollection') && nowPlayingScreen.classList.contains('np-channel')) on = true;
     b.disabled = !on;
     b.classList.toggle('off', !on);
-    var want = npFootCollapsed ? 'down' : 'up';
-    if(b.dataset.arrow !== want){ b.dataset.arrow = want; b.innerHTML = npFootCollapsed ? EPG_ARROW_DOWN : EPG_ARROW_UP; }
+    // Build 687 (Mark): in the guide, the date stands in the corner until a channel plays.
+    var isCorner = !b.classList.contains('np-foot-toggle');
+    var want = !on && isCorner ? 'date:' + epgCornerDate() : npFootCollapsed ? 'down' : 'up';
+    if(b.dataset.arrow !== want){
+      b.dataset.arrow = want;
+      b.innerHTML = want.indexOf('date:') === 0 ? '<span class="epg-date">' + want.slice(5) + '</span>' : npFootCollapsed ? EPG_ARROW_DOWN : EPG_ARROW_UP;
+    }
     var label = b.classList.contains('np-foot-toggle') ? (npFootCollapsed ? 'Show details' : 'Hide details') : (npFootCollapsed ? 'Show channel details' : 'Hide channel details');
     b.setAttribute('aria-label', label);
     b.title = on ? label : 'Nothing playing';
     b.setAttribute('aria-expanded', npFootCollapsed ? 'false' : 'true');
+  }
+  function epgCornerDate(){
+    var d = new Date();
+    return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate();
   }
   function syncEpgFootBtns(){ document.querySelectorAll('.epg-corner').forEach(syncEpgFootBtn); }
   (function(){
@@ -28857,6 +28883,16 @@
     var x = (now - t0) / EPG_SLOT_MS * EPG_SLOT_W;
     if(line) line.style.left = Math.round(EPG_CH_W + x - 1) + 'px';
     if(mark) mark.style.left = Math.round(x) + 'px';
+    // Build 687: the bar under the half hour we're in, filled to now; that time bold.
+    var slot = Math.max(0, Math.floor(x / EPG_SLOT_W)), bar = wrap.querySelector('.epg-now-bar');
+    if(bar){
+      var bw = EPG_SLOT_W - 28;
+      bar.style.left = (slot * EPG_SLOT_W + 14) + 'px';
+      bar.style.width = bw + 'px';
+      bar.firstChild.style.width = Math.max(0, Math.min(100, (x - slot * EPG_SLOT_W) / EPG_SLOT_W * 100)) + '%';
+    }
+    var tl = wrap.querySelectorAll('.epg-time');
+    for(var i = 0; i < tl.length; i++) tl[i].classList.toggle('cur', i === slot);
   }
   var epgChEatUntil = 0;
   function buildEpgRow(ch, t0, t1){
