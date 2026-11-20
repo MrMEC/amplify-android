@@ -77,9 +77,13 @@ async def route(r):
         body = json.loads(r.request.post_data or '{}')
         def vid(i, n, secs): return {'playlistVideoRenderer': {'videoId': 'vid%07d' % i + 'abc'[:11 - 10], 'title': {'runs': [{'text': n}]}, 'shortBylineText': {'runs': [{'text': 'Test Creator'}]}, 'lengthSeconds': str(secs), 'isPlayable': True}}
         if body.get('browseId') == 'VLPLtest1234567890':
-            data = {'metadata': {'playlistMetadataRenderer': {'title': 'Classic Cartoons'}}, 'contents': {'x': {'contents': [vid(1, 'Cartoon One', 1500), vid(2, 'Cartoon Two', 1320), {'playlistVideoRenderer': {'videoId': 'privvid0000', 'title': {'simpleText': '[Private video]'}, 'isPlayable': False}}, {'continuationItemRenderer': {'continuationEndpoint': {'continuationCommand': {'token': 'TOKEN2'}}}}]}}}
+            data = {'metadata': {'playlistMetadataRenderer': {'title': 'Classic Cartoons'}}, 'contents': {'x': {'contents': [vid(1, 'Cartoon One', 1500), vid(2, 'Cartoon Two', 1320), {'playlistVideoRenderer': {'videoId': 'privvid0000', 'title': {'simpleText': '[Private video]'}, 'isPlayable': False}}, {'continuationItemViewModel': {'trigger': 'CONTINUATION_TRIGGER_ON_ITEM_SHOWN', 'continuationCommand': {'innertubeCommand': {'continuationCommand': {'token': 'TOKEN2', 'request': 'CONTINUATION_REQUEST_TYPE_BROWSE'}}}}}]}}}
         elif body.get('continuation') == 'TOKEN2':
-            data = {'onResponseReceivedActions': [{'appendContinuationItemsAction': {'continuationItems': [vid(3, 'Cartoon Three', 1680), vid(4, 'Cartoon Four', 900)]}}]}
+            # build 712: YouTube's current format (lockupViewModel, length only on the picture's badge)
+            def lock(i, n, dur): return {'lockupViewModel': {'contentId': 'vid%07da' % i, 'contentType': 'LOCKUP_CONTENT_TYPE_VIDEO',
+                'contentImage': {'thumbnailViewModel': {'overlays': [{'thumbnailBottomOverlayViewModel': {'badges': [{'thumbnailBadgeViewModel': {'text': dur}}]}}]}},
+                'metadata': {'lockupMetadataViewModel': {'title': {'content': n}, 'metadata': {'contentMetadataViewModel': {'metadataRows': [{'metadataParts': [{'text': {'content': 'Test Creator'}}]}, {'metadataParts': [{'text': {'content': '1K views'}}]}]}}}}}}
+            data = {'onResponseReceivedActions': [{'appendContinuationItemsAction': {'continuationItems': [lock(3, 'Cartoon Three', '28:00'), lock(5, 'Live Now', 'LIVE'), lock(4, 'Cartoon Four', '15:00')]}}]}
         else:
             return await r.fulfill(status=400, body='{}')
         return await r.fulfill(status=200, content_type='application/json', headers=cors, body=json.dumps(data))
