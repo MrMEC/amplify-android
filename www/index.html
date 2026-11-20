@@ -4563,6 +4563,7 @@
   /* Under a link box: Load / Find and Clear side by side. */
   .ch-tools-btns{ display:flex; gap:8px; }
   .ch-tools-btns > button{ flex:1 1 0; min-width:0; }
+  .lc-yt-btns{ margin-top:8px; }
   .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
   .ch-yt-note{ font-size:12.5px; color:var(--text-dim); margin:6px 0 2px; }
   .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
@@ -10585,6 +10586,12 @@
             <input type="search" class="cs-field-input" id="liveChIaSearch" placeholder="Search archive.org videos" autocomplete="off" aria-label="Search archive.org videos">
             <div class="artist-info-list lc-list" id="liveChIaList" role="listbox" aria-multiselectable="true" aria-label="Archive.org videos"></div>
           </div>
+        </div>
+        <!-- Build 711 (Mark): a channel from a YouTube playlist. -->
+        <div class="cs-field lc-pane" id="liveChPaneYt" hidden>
+          <input type="url" class="cs-field-input" id="liveChYtUrl" placeholder="A YouTube playlist link" aria-label="YouTube playlist link">
+          <div class="ch-tools-btns lc-yt-btns"><button type="button" class="settings-select" id="liveChYtLoad">Load Playlist</button></div>
+          <p class="lc-note" id="liveChYtNote"></p>
         </div>
         <div class="cs-field lc-pane" id="liveChPaneMovies">
           <div class="lc-opts lc-one-row" id="liveChFrom" role="radiogroup" aria-label="Movies from"></div>
@@ -26703,14 +26710,16 @@
   function ytLiveUrl(y){ return y.ch ? 'https://www.youtube.com/channel/' + y.ch + '/live' : 'https://www.youtube.com/watch?v=' + y.v; }
   function ytLiveOf(st){
     if(!st) return null;
+    if(st.ytVideo) return { v: st.ytVideo, live: false };   // build 711: a playlist channel's video
     var u = st.urlToResolve || st.url || (st.channel && st.channel.url) || '';
     var y = ytLiveParse(u);
     return y && (y.v || y.ch) ? y : null;
   }
-  function isYouTubeChannel(st){ return !!(st && (st.videoChannel || st.channel || st.src === 'youtube') && ytLiveOf(st)); }
+  function isYouTubeChannel(st){ return !!(st && (st.ytVideo || st.videoChannel || st.channel || st.src === 'youtube') && ytLiveOf(st)); }
   function ytLiveSameStream(a, b){ var x = ytLiveOf(a), y = ytLiveOf(b); return !!(x && y && x.v === y.v && x.ch === y.ch); }
   function ytLiveEmbed(y){
     var q = 'autoplay=1&playsinline=1&rel=0&fs=0&modestbranding=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+    if(y.start >= 1) q += '&start=' + Math.floor(y.start);   // build 711: a playlist channel joins the video part-way
     return y.ch ? 'https://www.youtube.com/embed/live_stream?channel=' + y.ch + '&' + q : 'https://www.youtube.com/embed/' + y.v + '?' + q;
   }
   // What a pasted link is: its name and picture (YouTube's oEmbed for a video; the channel's own
@@ -26734,12 +26743,97 @@
       return entry({ ch: id }, metaOf(html, 'og:title') || (y.handle || '').replace(/^@/, ''), metaOf(html, 'og:image'));
     });
   }
+  // ---------- Build 711 (Mark): a custom channel from a YouTube playlist ----------
+  // The playlist's videos (id, title, channel, length) are read once from YouTube (its own web API,
+  // page by page, up to 500) and kept with the channel, so the guide works like any channel of
+  // your own: the videos one after another (or shuffled) on the same clock, and tuning in plays
+  // the one that's on from where it is. A Refresh in the channel's editor reads the playlist again.
+  var YT_PL_MAX = 500;
+  function ytThumb(v){ return 'https://i.ytimg.com/vi/' + v + '/hqdefault.jpg'; }
+  function ytPlId(u){
+    var m = /[?&]list=([\w-]{10,})/.exec(String(u || ''));
+    if(!m || !/(youtube\.com|youtu\.be)\//i.test(u)) return '';
+    // A mix (RD...) is made up as you watch: it isn't a list that can be read.
+    return /^RD/.test(m[1]) ? '' : m[1];
+  }
+  function ytPlItems(src){
+    return (src.items || []).filter(function(x){ return x && x.v && x.d > 0; }).map(function(x){
+      return { id: 'yt:' + x.v, ytItem: true, v: x.v, duration: x.d, title: x.t || '', author: x.a || '' };
+    });
+  }
+  function ytPost(url, body){
+    var C = window.Capacitor, H = C && C.Plugins && C.Plugins.CapacitorHttp;
+    var native = !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform());
+    var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    var job = native && H && typeof H.request === 'function'
+      ? Promise.resolve(H.request({ url: url, method: 'POST', headers: headers, data: body, responseType: 'text', connectTimeout: 15000, readTimeout: 20000 }))
+          .then(function(r){ return { status: (r && r.status) || 0, data: r ? r.data : null }; })
+      : fetchWithTimeout(url, { method: 'POST', headers: headers, body: JSON.stringify(body) }, 20000).then(function(res){ return res.text().then(function(t){ return { status: res.status, data: t }; }); });
+    return job.then(function(r){
+      if(r.status < 200 || r.status >= 300) throw new Error('HTTP ' + r.status);
+      return typeof r.data === 'string' ? JSON.parse(r.data || '{}') : (r.data || {});
+    });
+  }
+  // Every playlistVideoRenderer (a video with a length), the next page's token, and the title.
+  function ytPlWalk(o, out){
+    if(!o || typeof o !== 'object') return;
+    if(Array.isArray(o)){ o.forEach(function(x){ ytPlWalk(x, out); }); return; }
+    if(o.playlistVideoRenderer){
+      var r = o.playlistVideoRenderer, t = r.title || {};
+      var title = t.simpleText || (t.runs && t.runs.map(function(x){ return x.text; }).join('')) || '';
+      var by = r.shortBylineText && r.shortBylineText.runs && r.shortBylineText.runs[0] ? r.shortBylineText.runs[0].text : '';
+      var d = parseInt(r.lengthSeconds, 10) || 0;
+      if(r.videoId && d > 0 && r.isPlayable !== false) out.items.push({ v: r.videoId, t: title, a: by, d: d });
+      return;
+    }
+    if(o.continuationCommand && o.continuationCommand.token && !out.next) out.next = o.continuationCommand.token;
+    if(o.playlistMetadataRenderer && o.playlistMetadataRenderer.title && !out.title) out.title = o.playlistMetadataRenderer.title;
+    if(o.playlistHeaderRenderer && o.playlistHeaderRenderer.title && !out.title) out.title = o.playlistHeaderRenderer.title.simpleText || '';
+    for(var k in o) if(Object.prototype.hasOwnProperty.call(o, k) && o[k] && typeof o[k] === 'object') ytPlWalk(o[k], out);
+  }
+  var YT_CTX = { client: { clientName: 'WEB', clientVersion: '2.20241120.01.00', hl: 'en', gl: 'US' } };
+  // Resolves to { list, title, items:[{ v, t, a, d }] } or rejects with a message.
+  function ytPlaylistFetch(list){
+    var api = 'https://www.youtube.com/youtubei/v1/browse?prettyPrint=false';
+    var all = [], title = '', seen = {};
+    function page(body, n){
+      return ytPost(api, body).then(function(j){
+        var out = { items: [], next: '', title: '' };
+        ytPlWalk(j, out);
+        if(out.title && !title) title = out.title;
+        out.items.forEach(function(x){ if(!seen[x.v]){ seen[x.v] = 1; all.push(x); } });
+        if(out.next && all.length < YT_PL_MAX && n < 12) return page({ context: YT_CTX, continuation: out.next }, n + 1);
+      });
+    }
+    return page({ context: YT_CTX, browseId: 'VL' + list }, 0).then(function(){
+      if(!all.length) throw new Error('No videos could be read from that playlist. It may be private, or hold only live streams.');
+      return { list: list, title: title || 'YouTube Playlist', items: all.slice(0, YT_PL_MAX), at: Date.now() };
+    }, function(err){
+      if(all.length) return { list: list, title: title || 'YouTube Playlist', items: all, at: Date.now() };
+      throw new Error('Couldn\u2019t read that playlist from YouTube.');
+    });
+  }
+  // A new channel of your own from a playlist (Add Channels, YouTube tab).
+  function ytPlaylistChannel(pl){
+    var d = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', src: { kind: 'yt', list: pl.list, title: pl.title, items: pl.items, at: pl.at },
+      order: 'sequence', ads: 0, gridDesc: '' };
+    liveChDefs().push(d);
+    saveLiveChDefs();
+    try{ refreshChannelGrids(); }catch(e){}
+    return d;
+  }
+  function ytPlaylistDefOf(list){
+    var defs = liveChDefs();
+    for(var i = 0; i < defs.length; i++) if(defs[i].src && defs[i].src.kind === 'yt' && defs[i].src.list === list) return defs[i];
+    return null;
+  }
   var ytLive = null;   // { st, frame, playing } while a YouTube channel is on
   var npYtBox = document.getElementById('npYtBox');
   function ytLiveCmd(func){
     if(!ytLive || !ytLive.frame || !ytLive.frame.contentWindow) return;
     try{ ytLive.frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: [] }), '*'); }catch(e){}
   }
+  var ytPlFails = 0;
   function playYouTubeChannel(st){
     if(reconnectState) cancelReconnect();
     if(!isQueueCurrent(st)) clearQueue();
@@ -26751,6 +26845,7 @@
     document.querySelectorAll('.tile, .row-item').forEach(function(el){ el.classList.toggle('playing', isOnAirKey(el.dataset.key, st)); });
     scheduleHomeFavActive();
     var y = ytLiveOf(st);
+    if(st.ytVideo) y.start = liveOffsetSec(st);   // build 711: where the guide says it is now
     npYtBox.innerHTML = '';
     var f = document.createElement('iframe');
     f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
@@ -26830,6 +26925,14 @@
     var d; try{ d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; }catch(err){ return; }
     if(!d) return;
     var state = d.event === 'onStateChange' ? d.info : (d.event === 'infoDelivery' && d.info ? d.info.playerState : undefined);
+    if(state === 1 && currentStation === ytLive.st) ytPlFails = 0;
+    // Build 711: a playlist channel's video ended (or can't be played): the channel goes on to the next.
+    if((state === 0 || d.event === 'onError') && currentStation === ytLive.st && ytLive.st.liveCh && ytLive.st.ytVideo){
+      var cur = ytLive.st;
+      if(d.event === 'onError' && ++ytPlFails > 5){ updatePlayerMeta(cur, 'These videos can\u2019t be played outside YouTube', true); setPlayingUI(false); return; }
+      setTimeout(function(){ if(currentStation === cur) tuneLiveChannel(cur.liveCh, { after: cur.id, breakDone: true, follow: true }); }, d.event === 'onError' ? 1200 : 300);
+      return;
+    }
     if(state === 1 && !uiIsPlaying && currentStation === ytLive.st){ ytLive.playing = true; setPlayingUI(true); playerSub.textContent = barSubFor(currentStation); }
     else if(state === 2 && uiIsPlaying && currentStation === ytLive.st){ ytLive.playing = false; setPlayingUI(false); playerSub.textContent = 'Paused'; }
     else if(d.event === 'onError' && currentStation === ytLive.st){
@@ -27345,7 +27448,7 @@
   }
   function liveChValidDef(d){
     if(!d || typeof d !== 'object' || !d.id || !d.src || typeof d.src !== 'object') return false;
-    return ['pick', 'movies', 'genre', 'decade', 'mv'].indexOf(d.src.kind) !== -1;
+    return ['pick', 'movies', 'genre', 'decade', 'mv', 'yt'].indexOf(d.src.kind) !== -1;   // build 711: 'yt' = a YouTube playlist
   }
   function liveChDefs(){
     if(liveChStore) return liveChStore;
@@ -27476,6 +27579,7 @@
   function liveChSources(def, lib){
     var src = def.src || {}, shows = [], movies = [], archive = [];
     if(src.kind === 'mv') return { shows: [], movies: [], mvs: liveChMvList(src), archive: [] };
+    if(src.kind === 'yt') return { shows: [], movies: [], mvs: [], archive: [], yts: ytPlItems(src) };   // build 711
     if(src.kind === 'pick'){
       var seen = {};
       (src.shows || []).forEach(function(n){ var s = liveChShow(lib, n); if(s && !seen[s.key]){ seen[s.key] = 1; shows.push(s); } });
@@ -27509,7 +27613,7 @@
   // video only a hair over a slot's end (two minutes or less) keeps that slot's end as it is.
   function liveChSlotMs(def, v){
     var d = Math.round(v.duration * 1000), g = (def && def.ads ? def.ads : 0) * 60000;
-    if(!g || v.mvItem) return d;
+    if(!g || v.mvItem || v.ytItem) return d;
     var k = Math.max(1, Math.ceil((d - 120000) / g));
     return Math.max(d, k * g);
   }
@@ -27542,7 +27646,10 @@
     var key = def.id + '|' + (day || '');
     if(st.lineups[key]) return st.lineups[key];
     var lib = st.lib, set = liveChSources(def, lib), items = [];
-    if(def.order === 'shuffle' || def.order === 'daily'){
+    if((set.yts || []).length){
+      // Build 711: a YouTube playlist -- in the playlist's order, or shuffled.
+      items = (def.order === 'shuffle' || def.order === 'daily') ? liveChShuffled(set.yts, def.id + (def.order === 'daily' ? '|' + day : '')) : set.yts.slice();
+    } else if(def.order === 'shuffle' || def.order === 'daily'){
       set.shows.forEach(function(s){ items = items.concat(liveChEpisodes(s)); });
       var seed = def.id + (def.order === 'daily' ? '|' + day : '');
       // Build 650: movies and archive.org videos are spread through the day, not left to chance among hundreds of episodes.
@@ -27570,6 +27677,7 @@
     if(src.kind === 'movies') return 'Movies';
     if(src.kind === 'genre') return String(src.genre || 'Genre');
     if(src.kind === 'decade') return (parseInt(src.decade, 10) || 0) + 's';
+    if(src.kind === 'yt') return src.title || 'YouTube Playlist';   // build 711
     if(src.kind === 'mv'){
       if(src.all) return 'Music Videos';
       var an = [];
@@ -27600,7 +27708,7 @@
     if(!art){
       try{
         var i0 = lu.items[0];
-        art = lu.show ? showPosterUrl(lu.show) : (i0 ? (i0.archItem ? archiveArtUrl(i0.stubId) : i0.mvItem ? (i0.still ? capUrl(i0.still) : '') : videoPosterUrl(i0)) : '');
+        art = lu.show ? showPosterUrl(lu.show) : (i0 ? (i0.ytItem ? ytThumb(i0.v) : i0.archItem ? archiveArtUrl(i0.stubId) : i0.mvItem ? (i0.still ? capUrl(i0.still) : '') : videoPosterUrl(i0)) : '');
       }catch(e){}
     }
     if(def.src && def.src.kind === 'mv') liveChProbeMusicVideos();
@@ -27669,6 +27777,11 @@
       var still = v.still ? capUrl(v.still) : '';
       return { s: slot.s, e: slot.e, t: v.name || '', sub: v.artist || '', code: '', d: '', r: '', im: still, sq: still, raw: true, vid: v.id };
     }
+    // Build 711: a YouTube video from a playlist: its title, the channel under it, its picture.
+    if(v.ytItem){
+      var yth = ytThumb(v.v);
+      return { s: slot.s, e: slot.e, t: v.title || '', sub: v.author || '', code: '', d: '', r: '', im: yth, sq: yth, raw: true, vid: v.id };
+    }
     // Build 617: an archive.org video: its title, the year and creator under it, its picture.
     if(v.archItem){
       var apic = archiveArtUrl(v.stubId);
@@ -27700,7 +27813,7 @@
   function liveTrackText(t){
     if(!t) return '';
     if(t.videoKind === 'episode') return (t.liveShow ? t.liveShow + ' \u00b7 ' : '') + subtitleForVideo(t);
-    if(t.videoKind === 'music') return [t.liveTitle, t.liveArtist].filter(Boolean).join(' · ');
+    if(t.videoKind === 'music' || t.videoKind === 'youtube') return [t.liveTitle, t.liveArtist].filter(Boolean).join(' · ');
     return [t.liveTitle, t.year].filter(Boolean).join(' · ');
   }
   // ---------- Build 342 (Mark): commercial breaks ----------
@@ -27810,7 +27923,13 @@
       return true;
     }
     var t;
-    if(slot.v.archItem){
+    if(slot.v.ytItem){
+      // Build 711 (Mark): a YouTube playlist channel -- the video that's on now, in YouTube's player,
+      // from where the guide says it is.
+      var yv = slot.v;
+      t = { type: 'ytvideo', videoKind: 'youtube', id: yv.id, ytVideo: yv.v, favicon: ytThumb(yv.v), duration: yv.duration, liveTitle: yv.title || '', liveArtist: yv.author || '',
+        videoChannel: true };
+    } else if(slot.v.archItem){
       // Build 617: an archive.org video on a channel of your own.
       var av = slot.v;
       t = { type: 'video', id: av.id, uri: av.uri, videoKind: 'archive', archive: true, favicon: archiveArtUrl(av.stubId), duration: av.duration,
@@ -27826,7 +27945,7 @@
     t.liveCh = ch.url;
     t.urlToResolve = ch.url;
     t.name = ch.name;
-    if(slot.v.mvItem || slot.v.archItem){ /* title (and artist) set above */ }
+    if(slot.v.mvItem || slot.v.archItem || slot.v.ytItem){ /* title (and artist) set above */ }
     else if(slot.v.kind !== 'episode') t.liveTitle = slot.v.title || '';
     else{ var llu = ldef ? liveChLineupAt(ldef, now) : null; if(llu && !llu.show) t.liveShow = slot.v.show || ''; }
     t._liveItemStart = slot.s;
@@ -27847,6 +27966,7 @@
     var src = def.src || {};
     var k = src.kind === 'movies' ? 'All movies' + ({ phone: ' on the phone', plex: ' on Plex', all: '' })[src.from || 'phone']
       : src.kind === 'genre' ? 'Genre: ' + (src.genre || '') : src.kind === 'decade' ? 'The ' + (parseInt(src.decade, 10) || 0) + 's'
+      : src.kind === 'yt' ? 'YouTube playlist · ' + (src.items || []).length + ((src.items || []).length === 1 ? ' video' : ' videos')
       : src.kind === 'mv' ? (src.all ? 'All music videos' : 'Music videos · ' + (src.artists || []).length + ((src.artists || []).length === 1 ? ' artist' : ' artists'))
       : (src.archive || []).length ? ((src.shows || []).length || (src.movies || []).length ? 'Shows, movies & archive.org' : 'Archive.org videos') : 'Shows & movies';
     return k + ' · ' + ({ sequence: 'In order', shuffle: 'Shuffled', daily: 'Daily shuffle' })[def.order || 'sequence'];
@@ -28250,13 +28370,16 @@
     else if(src.kind === 'genre') out.genre = src.genre || '';
     else if(src.kind === 'decade') out.decade = parseInt(src.decade, 10) || 0;
     else if(src.kind === 'mv'){ if(src.all) out.all = true; else out.artists = (src.artists || []).slice(); }
+    else if(src.kind === 'yt'){ out.list = src.list || ''; out.title = src.title || ''; out.items = src.items || []; out.at = src.at || 0; }   // build 711
     return { id: liveChEd.id, name: String(lcEl('liveChName').value || '').trim(), src: out, order: liveChEd.order, ads: src.kind === 'mv' ? 0 : (liveChEd.ads || 0), gridDesc: String(lcEl('liveChDesc').value || '').replace(/\s+/g, ' ').trim().slice(0, 140) };
   }
   function renderLiveChEditor(){
     var ed = liveChEd, lib = vlib(), src = ed.src;
-    lcPills(lcEl('liveChKind'), [['pick', 'Shows & Movies'], ['mv', 'Music Videos'], ['movies', 'All Movies'], ['genre', 'Genre'], ['decade', 'Decade']], src.kind, function(k){
+    var kinds = [['pick', 'Shows & Movies'], ['mv', 'Music Videos'], ['movies', 'All Movies'], ['genre', 'Genre'], ['decade', 'Decade']];
+    if(sourceOn('youtube') || src.kind === 'yt') kinds.push(['yt', 'YouTube Playlist']);   // build 711
+    lcPills(lcEl('liveChKind'), kinds, src.kind, function(k){
       if(k === src.kind) return;
-      ed.src = k === 'pick' ? { kind: 'pick', shows: [], movies: [] } : k === 'movies' ? { kind: 'movies', from: 'phone' }
+      ed.src = k === 'yt' ? { kind: 'yt', list: '', title: '', items: [] } : k === 'pick' ? { kind: 'pick', shows: [], movies: [] } : k === 'movies' ? { kind: 'movies', from: 'phone' }
         : k === 'mv' ? { kind: 'mv', all: true, artists: [] }
         : k === 'genre' ? { kind: 'genre', genre: lcGenres(vlib())[0] || '' } : { kind: 'decade', decade: lcDecades(vlib())[0] || 1990 };
       if(k === 'mv' && ed.order === 'sequence') ed.order = 'shuffle';
@@ -28274,6 +28397,13 @@
       lcEl('liveChMvPick').hidden = !!src.all;
       if(!src.all) renderLiveChMvList();
       liveChProbeMusicVideos();
+    }
+    lcEl('liveChPaneYt').hidden = src.kind !== 'yt';
+    if(src.kind === 'yt'){
+      var yu = lcEl('liveChYtUrl');
+      if(src.list && !yu.value) yu.value = 'https://www.youtube.com/playlist?list=' + src.list;
+      lcEl('liveChYtLoad').textContent = src.list ? 'Refresh Playlist' : 'Load Playlist';
+      lcEl('liveChYtNote').textContent = src.list ? (src.title || 'Playlist') + ' \u00b7 ' + (src.items || []).length + ' videos' + (src.at ? ' \u00b7 read ' + new Date(src.at).toLocaleDateString() : '') : 'Paste a link to a YouTube playlist. Its videos play one after another on the guide\u2019s clock, in YouTube\u2019s player.';
     }
     lcEl('liveChPanePick').hidden = src.kind !== 'pick';
     lcEl('liveChPaneMovies').hidden = src.kind !== 'movies';
@@ -28300,7 +28430,7 @@
     lcPills(lcEl('liveChOrder'), [['sequence', 'In Order'], ['shuffle', 'Shuffle'], ['daily', 'Daily Shuffle']], ed.order, function(v){ ed.order = v; renderLiveChEditor(); });
     lcCatChips(ed);
     // Build 342 (Mark): commercial breaks after each show (not for music video channels).
-    lcEl('liveChAdsField').hidden = src.kind === 'mv';
+    lcEl('liveChAdsField').hidden = src.kind === 'mv' || src.kind === 'yt';
     lcPills(lcEl('liveChAds'), [['0', 'Off'], ['30', '30-Minute Slots'], ['60', '1-Hour Slots']], String(ed.ads || 0), function(v){ ed.ads = parseInt(v, 10) || 0; renderLiveChEditor(); });
     syncLiveChEditorBits();
   }
@@ -28313,6 +28443,8 @@
     set.shows.forEach(function(s){ liveChEpisodes(s).forEach(function(e){ secs += e.duration || 0; }); });
     set.movies.forEach(function(m){ secs += m.duration || 0; });
     mvs.forEach(function(v){ secs += v.duration || 0; });
+    var yts = set.yts || [];
+    yts.forEach(function(v){ secs += v.duration || 0; });   // build 711
     var arch = set.archive || [], nArch = {};
     arch.forEach(function(a){ secs += a.duration || 0; nArch[a.stubId] = 1; });
     nArch = Object.keys(nArch).length;
@@ -28321,9 +28453,10 @@
     if(nMovies) bits.push(nMovies + (nMovies === 1 ? ' movie' : ' movies'));
     if(nArch) bits.push(nArch + (nArch === 1 ? ' archive.org video' : ' archive.org videos'));
     if(mvs.length) bits.push(mvs.length + (mvs.length === 1 ? ' music video' : ' music videos'));
+    if(yts.length) bits.push(yts.length + (yts.length === 1 ? ' YouTube video' : ' YouTube videos'));
     var hrs = Math.round(secs / 3600);
     // Build 305 (Mark): nothing said while nothing is picked.
-    var picking = d.src.kind === 'pick' || (d.src.kind === 'mv' && !d.src.all);
+    var picking = d.src.kind === 'pick' || d.src.kind === 'yt' || (d.src.kind === 'mv' && !d.src.all);
     var waiting = (d.src.archive || []).some(function(a){ return !archiveUnits(a.id); });   // build 617: lengths still being asked for
     lcEl('liveChSummary').textContent = !secs
       ? (waiting ? 'Getting the archive.org videos\u2026' : picking ? '' : 'Nothing in your library fits this yet.')
@@ -28332,7 +28465,8 @@
     // The picture: the one chosen, else the first show's or movie's poster.
     var thumb = lcEl('liveChArtBtn'), url = getCustomArtUrl('livech:amplify-live:' + ed.id) || '';
     if(!url){ try{ url = set.shows[0] ? showPosterUrl(set.shows[0]) : (set.movies[0] ? videoPosterUrl(set.movies[0]) : (mvs[0] && mvs[0].still ? capUrl(mvs[0].still) : '')); }catch(e){ url = ''; }
-      if(!url && arch[0]) url = archiveArtUrl(arch[0].stubId); }
+      if(!url && arch[0]) url = archiveArtUrl(arch[0].stubId);
+      if(!url && yts[0]) url = ytThumb(yts[0].v); }
     if(thumb.dataset.src !== url){
       thumb.dataset.src = url;
       thumb.innerHTML = '';
@@ -28647,6 +28781,20 @@
     box.appendChild(nb);
     box.scrollLeft = sl;
   }
+  // Build 711: Load / Refresh Playlist reads the playlist from YouTube into the channel being edited.
+  lcEl('liveChYtLoad').addEventListener('click', function(){
+    if(!liveChEd || liveChEd.src.kind !== 'yt') return;
+    var u = String(lcEl('liveChYtUrl').value || '').trim(), id = ytPlId(/^https?:/i.test(u) ? u : 'https://' + u) || (/^(PL|UU|OL|FL)[\w-]{10,}$/.test(u) ? u : '');
+    if(!id){ lcEl('liveChYtNote').textContent = 'That isn\u2019t a YouTube playlist link (it has \u201clist=\u201d in it).'; return; }
+    var btn = lcEl('liveChYtLoad'), ed = liveChEd;
+    btn.disabled = true; lcEl('liveChYtNote').textContent = 'Reading the playlist\u2026';
+    ytPlaylistFetch(id).then(function(pl){
+      btn.disabled = false;
+      if(liveChEd !== ed) return;
+      ed.src = { kind: 'yt', list: pl.list, title: pl.title, items: pl.items, at: pl.at };
+      renderLiveChEditor();
+    }, function(err){ btn.disabled = false; if(liveChEd === ed) lcEl('liveChYtNote').textContent = err.message; });
+  });
   lcEl('liveChSaveBtn').addEventListener('click', function(){
     if(!liveChEd || lcEl('liveChSaveBtn').disabled) return;
     var d = liveChEdDef(), cur = liveChDefById(d.id);
@@ -28880,6 +29028,7 @@
     if(isLiveChUrl(ch.url)){
       var def = liveChDefById(ch.url.slice('amplify-live:'.length)), src = def && def.src || {};
       if(src.kind === 'mv') out = 'Music';
+      else if(src.kind === 'yt') out = 'YouTube';   // build 711: a YouTube playlist channel
       else if(src.kind === 'movies') out = 'Movies';
       else if(src.kind === 'genre' && src.genre) own.push(src.genre);
       else if(def && (src.kind === 'pick' || src.kind === 'decade')) out = liveChGenreCategory(def);
@@ -31538,6 +31687,7 @@
       addChannelsState.linkUrl = u;
       addChannelsState.linkList = 'loading';
       renderAddChannels(true);
+      if(ytPlId(u) && sourceOn('youtube')){ addChannelsState.linkList = null; addChannelsTab = 'youtube'; renderAddChannels(); ytTabLoad(u); return; }   // build 711
       if(ytLiveParse(u)){   // build 706: a YouTube link is a YouTube channel
         ytLiveResolve(u).then(function(e){ addChannelsState.linkList = [e]; renderAddChannels(true); },
           function(err){ addChannelsState.linkList = null; renderAddChannels(true); setStatus(err.message, true); });
@@ -31591,7 +31741,7 @@
     var input = document.createElement('input');
     input.type = 'url';
     input.className = 'cs-field-input';
-    input.placeholder = 'youtube.com/@channel or a live video link';
+    input.placeholder = 'A live video, channel or playlist link';
     input.value = addChannelsState.ytUrl || '';
     input.setAttribute('aria-label', 'YouTube link');
     var go = document.createElement('button');
@@ -31601,12 +31751,8 @@
     function load(){
       var u = input.value.trim();
       if(u && !/^https?:\/\//i.test(u)) u = 'https://' + u.replace(/^\/+/, '');
-      if(!ytLiveParse(u)){ setStatus('Paste a YouTube link: a live video, a channel or an @handle.', true); return; }
-      addChannelsState.ytUrl = u;
-      addChannelsState.ytList = 'loading';
-      renderAddChannels(true);
-      ytLiveResolve(u).then(function(e){ addChannelsState.ytList = [e]; renderAddChannels(true); },
-        function(err){ addChannelsState.ytList = { error: err && err.message || 'Couldn\u2019t read that link.' }; renderAddChannels(true); });
+      if(!ytPlId(u) && !ytLiveParse(u)){ setStatus('Paste a YouTube link: a live video, a channel, an @handle or a playlist.', true); return; }
+      ytTabLoad(u);
     }
     go.addEventListener('click', load);
     input.addEventListener('keydown', function(e){ if(e.key === 'Enter') load(); });
@@ -31619,8 +31765,54 @@
     }));
     var note = document.createElement('div');
     note.className = 'ch-yt-note';
-    note.textContent = 'Plays in YouTube\u2019s player. A channel link shows whatever that channel has live.';
+    note.textContent = 'Plays in YouTube\u2019s player. A channel link shows whatever that channel has live; a playlist link makes a channel that plays the playlist on the guide\u2019s clock.';
     tools.appendChild(note);
+  }
+  // Build 711: a playlist link makes a channel of your own from the playlist (on the guide's clock);
+  // any other YouTube link is a live channel (build 706).
+  function ytTabLoad(u){
+    addChannelsState.ytUrl = u;
+    addChannelsState.ytList = 'loading';
+    renderAddChannels(true);
+    var pl = ytPlId(u);
+    (pl ? ytPlaylistFetch(pl).then(function(p){ return [{ plist: p }]; }) : ytLiveResolve(u).then(function(e){ return [e]; })).then(function(l){
+      addChannelsState.ytList = l; renderAddChannels(true);
+    }, function(err){ addChannelsState.ytList = { error: err && err.message || 'Couldn\u2019t read that link.' }; renderAddChannels(true); });
+  }
+  function ytPlaylistRow(pl){
+    var row = document.createElement('div');
+    row.className = 'ch-row';
+    var logo = document.createElement('div');
+    logo.className = 'ch-logo';
+    var im = document.createElement('img'); im.alt = ''; im.src = ytThumb(pl.items[0].v); im.onerror = function(){ im.remove(); };
+    logo.appendChild(im);
+    var text = document.createElement('div');
+    text.className = 'ch-text';
+    var nm = document.createElement('div'); nm.className = 'ch-name'; nm.textContent = pl.title;
+    var secs = 0; pl.items.forEach(function(x){ secs += x.d || 0; });
+    var hrs = Math.round(secs / 3600);
+    var sub = document.createElement('div'); sub.className = 'ch-sub';
+    sub.textContent = 'YouTube playlist \u00b7 ' + pl.items.length + (pl.items.length === 1 ? ' video' : ' videos') + ' \u00b7 ' + (hrs >= 1 ? 'about ' + hrs + (hrs === 1 ? ' hour' : ' hours') : 'under an hour');
+    text.appendChild(nm); text.appendChild(sub);
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'ch-add';
+    function paint(){
+      var on = !!ytPlaylistDefOf(pl.list);
+      add.classList.toggle('added', on);
+      add.innerHTML = on ? '<i class="fa-solid fa-check" aria-hidden="true"></i>' : '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
+      add.setAttribute('aria-label', on ? 'Remove ' + pl.title + ' from My Channels' : 'Add ' + pl.title + ' to My Channels');
+    }
+    paint();
+    add.addEventListener('click', function(e){
+      e.stopPropagation();
+      var d = ytPlaylistDefOf(pl.list);
+      if(d){ deleteLiveChannel(d.id); paint(); return; }
+      ytPlaylistChannel(pl); paint();
+      setStatus(quoteName(pl.title) + ' is in My Channels.');
+    });
+    row.appendChild(logo); row.appendChild(text); row.appendChild(add);
+    return row;
   }
   function renderYtLiveResults(body){
     var l = addChannelsState.ytList;
@@ -31631,14 +31823,22 @@
     host.style.display = 'contents';
     stationsGrid.appendChild(host);
     if(l && l.error){ var er = document.createElement('div'); er.className = 'empty-state'; er.textContent = l.error; host.appendChild(er); }
+    else if(l && l.length && l[0].plist){ var pls = document.createElement('div'); pls.className = 'ch-list'; pls.appendChild(ytPlaylistRow(l[0].plist)); host.appendChild(pls); }
     else if(l && l.length) renderChannelList(host, l);
+    var mineLists = liveChDefs().filter(function(d){ return d.src && d.src.kind === 'yt'; });
+    if(mineLists.length){
+      var hp = document.createElement('div'); hp.className = 'grid-section-label'; hp.textContent = 'Your YouTube playlist channels'; host.appendChild(hp);
+      var lp = document.createElement('div'); lp.className = 'ch-list';
+      mineLists.forEach(function(d){ if(d.src.items && d.src.items.length) lp.appendChild(ytPlaylistRow({ list: d.src.list, title: d.name || d.src.title, items: d.src.items })); });
+      host.appendChild(lp);
+    }
     if(mine.length){
       var h = document.createElement('div'); h.className = 'grid-section-label'; h.textContent = 'Your YouTube channels'; host.appendChild(h);
       var list = document.createElement('div'); list.className = 'ch-list';
       mine.forEach(function(c){ list.appendChild(channelRow(c)); });
       host.appendChild(list);
     }
-    if(!(l && l.length) && !mine.length && !(l && l.error)) setResultCount(null);
+    if(!(l && l.length) && !mine.length && !mineLists.length && !(l && l.error)) setResultCount(null);
   }
   function singleStreamEntry(u){
     var name = u;
