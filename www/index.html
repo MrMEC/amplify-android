@@ -1687,6 +1687,21 @@
   /* A channel's logo stays whole on top; the blurred copies under it fill the card (cover), so
      the foot of the card is the logo's colours blurred, not a dark backing. */
   .nph-bg.channel-art img, .nph-mid.channel-art img{ object-fit:cover; }
+  /* Build 700 (Mark: "the repeating logo looks messy"): in Slides a Live TV logo shows once, whole,
+     on a calm backdrop in its own colour (--nph-logo-c, read from the logo) that deepens toward the
+     words -- no blurred, stretched copies of it behind. */
+  .home-hero:not(.nph-flow):not(.nph-card):not(.nph-edit) .nph-slide.nph-logo .nph-media{
+    background:
+      radial-gradient(70% 46% at 50% 31%, color-mix(in srgb, var(--nph-logo-c, #8a8d96) 16%, #fff 84%) 0%, color-mix(in srgb, var(--nph-logo-c, #8a8d96) 30%, #fff 70%) 34%, transparent 100%),
+      linear-gradient(to bottom, color-mix(in srgb, var(--nph-logo-c, #3b3e47) 70%, #2a2b30) 0%, color-mix(in srgb, var(--nph-logo-c, #2c2e35) 45%, #0b0c0f) 100%); }
+  .home-hero:not(.nph-flow):not(.nph-card):not(.nph-edit) .nph-slide.nph-logo.nph-logo-pale .nph-media{
+    background:linear-gradient(to bottom, color-mix(in srgb, var(--nph-logo-c, #3b3e47) 70%, #2a2b30) 0%, color-mix(in srgb, var(--nph-logo-c, #2c2e35) 45%, #0b0c0f) 100%); }
+  .home-hero:not(.nph-flow):not(.nph-card):not(.nph-edit) .nph-slide.nph-logo .nph-bg,
+  .home-hero:not(.nph-flow):not(.nph-card):not(.nph-edit) .nph-slide.nph-logo .nph-refl{ display:none; }
+  .home-hero:not(.nph-flow):not(.nph-card):not(.nph-edit) .nph-slide.nph-logo .nph-art{
+    inset:9% 13% auto; height:47%; overflow:visible; background:none !important; -webkit-mask-image:none; mask-image:none; }
+  .home-hero:not(.nph-flow):not(.nph-card):not(.nph-edit) .nph-slide.nph-logo .nph-art img{
+    object-fit:contain; object-position:center; filter:drop-shadow(0 4px 10px rgba(0,0,0,.16)); }
   .nph-body{ position:relative; z-index:2; margin:0; padding:0 18px 18px;
     display:flex; align-items:flex-end; gap:14px; }
   .nph-text{ flex:1; min-width:0; text-shadow:0 1px 2px rgba(0,0,0,.35), 0 2px 14px rgba(0,0,0,.35); }
@@ -12962,7 +12977,15 @@
     s.bg[o.theme] = o.bg || { mode: 'default' };
     return s;
   }
+  // Build 700 (Mark): the app's own default look -- his saved "Amplify" theme. It leads the presets
+  // so anyone can come back to it, and a fresh install starts with it (see thFirstRun below).
+  var THEME_DEFAULT = { theme: 'system', amoled: true, accent: { dark: '#4aa8ff', light: '#d10003' },
+    bg: { light: { mode: 'solid', color: '#ffffff', grad: { style: 'radial', pos: 't', intensity: 35, size: 70, c1: 'accent', c2: 'base' } } },
+    font: { body: 'poppins', head: 'poppins', size: 100, weight: 0 },
+    shape: { radius: 'soft', density: 'roomy', artist: 'circle', play: 'rounded' },
+    carousel: { mode: 'slides', size: 's', tilt: 66, reflect: true, textPos: 'below', heading: true, cardSize: 's' } };
   var THEME_PRESETS = [
+    { id: 'amplify', name: 'Amplify (Default)', dot: ['#d10003', '#4aa8ff'], s: THEME_DEFAULT },
     { id: 'neon', name: 'Midnight Neon', dot: ['#00e5ff', '#7c3aed'], s: thMake({ theme: 'dark', amoled: true, accent: '#00e5ff', bg: thG('radial', 't', 35, 70, '#7c3aed', 'base'), body: 'inter', radius: 'round', play: 'circle', car: ['flow','l',60,true] }) },
     { id: 'noir', name: 'Gilded Noir', dot: ['#d4af37', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#d4af37', bg: thS('#000000'), head: 'serif', radius: 'square', artist: 'square', play: 'square', car: ['edit','m',66,true,'above',true] }) },
     { id: 'paper', name: 'Paper & Ink', dot: ['#1f2937', '#f6f4ef'], s: thMake({ theme: 'light', accent: '#1f2937', bg: thS('#f6f4ef'), body: 'serif', head: 'serif', radius: 'square', artist: 'square', play: 'square', car: ['none'] }) },
@@ -13391,6 +13414,14 @@
   }
   var themePref, currentTheme;
   applyTheme(getInitialThemePref());
+  // Build 700: a fresh install (no look settings of any kind yet) starts on the default theme.
+  (function thFirstRun(){
+    var keys = ['radioPlayerTheme', 'radioPlayerAmoled', 'radioPlayerCustomAccent', 'radioPlayerBackground', 'radioPlayerFont', 'radioPlayerShape', 'radioPlayerCarousel', 'radioPlayerCustomThemes'];
+    try{ if(keys.some(function(k){ return localStorage.getItem(k) !== null; })) return; }catch(e){ return; }
+    // the carousel is set up further down and reads its setting from storage
+    try{ localStorage.setItem('radioPlayerCarousel', JSON.stringify(THEME_DEFAULT.carousel)); }catch(e){}
+    try{ thApply(JSON.parse(JSON.stringify(THEME_DEFAULT))); }catch(e){ console.error('Amplify: default theme', e); }
+  })();
   Array.prototype.forEach.call(themeSwitch.querySelectorAll('.theme-opt'), function(btn){
     btn.addEventListener('click', function(){ setTheme(btn.dataset.themeOpt); });
   });
@@ -57615,6 +57646,8 @@
     var entry = heroArtistEntry(item);
     slide._item = item; slide._entry = entry;
     slide.classList.add('nph-tap');
+    slide.classList.toggle('nph-logo', !!(item && item.type !== 'zen' && isChannelEntry(item)));
+    slide.style.removeProperty('--nph-logo-c'); slide.classList.remove('nph-logo-pale');
     var o = heroTextFor(item, entry);
     slide.querySelector('.nph-kicker').textContent = o.kicker;
     var titleEl = slide.querySelector('.nph-title');
@@ -57681,6 +57714,7 @@
     }
     renderStationArt(slide.querySelector('.nph-art'), item);
     // Flow shows the cover (and its reflection, drawn in .nph-mid); the blurred backdrop is Slides' only.
+    if(slide.classList.contains('nph-logo')) heroLogoTint(slide);
     if(carouselCfg.mode === 'slides') renderStationArt(slide.querySelector('.nph-bg'), item);
     if(carouselCfg.mode === 'slides' || (heroFlowOn() && carouselCfg.reflect)) renderStationArt(slide.querySelector('.nph-mid'), item);
     if(carouselCfg.mode === 'card'){
@@ -57696,6 +57730,47 @@
         if(slide._item === item) slide.querySelector('.nph-desc').textContent = heroArtistBio(entry);
       })['catch'](function(){});
     }
+  }
+  // How light a logo's own (opaque) pixels are, 0-1, or null if they can't be read. A white logo
+  // (made for dark screens) gets no light glow behind it.
+  function heroLogoLightness(img){
+    try{
+      var n = 24, cv = document.createElement('canvas'); cv.width = n; cv.height = n;
+      var x = cv.getContext('2d'); x.drawImage(img, 0, 0, n, n);
+      var d = x.getImageData(0, 0, n, n).data, sum = 0, w = 0;
+      for(var i = 0; i < d.length; i += 4){ var a = d[i + 3] / 255; if(a < 0.5) continue; sum += a * (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; w += a; }
+      return w ? sum / w : null;
+    }catch(e){ return null; }
+  }
+  // Build 700: the colour of a Live TV slide's backdrop, read from its logo (a logo whose pixels
+  // can't be read, or that has no colour of its own, keeps the neutral grey).
+  function heroLogoTint(slide){
+    var item = slide._item;
+    function read(img){
+      if(slide._item !== item) return;
+      var c = null;
+      try{ c = dominantColorFrom(img, { minS: 0.3, maxS: 0.72, minL: 0.24, maxL: 0.36, scaleL: 0.62 }); }catch(e){}
+      var lt = heroLogoLightness(img);
+      if(lt !== null) slide.classList.toggle('nph-logo-pale', lt > 0.72);
+      if(c){ slide.style.setProperty('--nph-logo-c', c); return; }
+      var src = img.getAttribute('src') ? img.src : img.currentSrc;
+      if(!/^https?:/i.test(src || '')) return;
+      readableImageCopy(src).then(function(cp){
+        if(!cp) return;
+        var c2 = null; try{ c2 = dominantColorFrom(cp.img, { minS: 0.3, maxS: 0.72, minL: 0.24, maxL: 0.36, scaleL: 0.62 }); }catch(e){}
+        var lt2 = heroLogoLightness(cp.img);
+        cp.done();
+        if(lt2 !== null && slide._item === item) slide.classList.toggle('nph-logo-pale', lt2 > 0.72);
+        if(c2 && slide._item === item) slide.style.setProperty('--nph-logo-c', c2);
+      });
+    }
+    var tries = 0;
+    (function look(){
+      var img = slide.querySelector('.nph-art img');
+      if(img && img.complete && img.naturalWidth) return read(img);
+      if(img && !img.complete){ img.addEventListener('load', function(){ read(img); }, { once: true }); return; }
+      if(++tries < 20) setTimeout(look, 150);
+    })();
   }
   function repaintHeroSlideArt(slide){
     if(!slide || !slide._item || slide._item.type === 'zen') return;
