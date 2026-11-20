@@ -9787,6 +9787,15 @@
     </section>
 
     <section class="set-page" data-set-page="appearance-theme" data-set-title="Theme Settings" data-set-parent="appearance" hidden>
+      <!-- Build 703 (Mark): Light / Dark / System first, above the presets. -->
+      <div class="settings-row settings-row--stack">
+        <span class="settings-label" id="themeLabel">Theme</span>
+        <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
+          <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
+          <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
+          <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
+        </div>
+      </div>
       <div class="settings-row settings-row--stack">
         <span class="settings-label" id="themePresetLabel">Theme presets</span>
         <div class="preset-grid th-grid" id="themePresetGrid" role="group" aria-labelledby="themePresetLabel"></div>
@@ -9795,14 +9804,6 @@
         <span class="settings-label">Your themes</span>
         <div class="th-list" id="themeCustomList" hidden></div>
         <button type="button" class="settings-data-btn" id="themeSaveBtn">Save current settings as a theme</button>
-      </div>
-      <div class="settings-row settings-row--stack">
-        <span class="settings-label" id="themeLabel">Theme</span>
-        <div class="theme-switch" id="themeSwitch" role="group" aria-labelledby="themeLabel">
-          <button class="theme-opt" data-theme-opt="light"><i class="fa-solid fa-sun"></i><span>Light</span></button>
-          <button class="theme-opt" data-theme-opt="dark"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
-          <button class="theme-opt" data-theme-opt="system"><i class="fa-solid fa-desktop"></i><span>System</span></button>
-        </div>
       </div>
       <div class="settings-row">
         <div class="set-text"><span class="settings-label" id="amoledLabel">AMOLED black</span><span class="set-desc">Pure black backgrounds in dark mode</span></div>
@@ -10196,7 +10197,7 @@
         </div>
         <div class="settings-row settings-row--stack car-tilt-row">
           <span class="settings-label" id="flowTiltLabel">Cover Flow tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
-          <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
+          <input type="range" class="font-range" id="flowTiltRange" min="0" max="90" step="2" value="66" aria-labelledby="flowTiltLabel">
         </div>
         <div class="settings-row">
           <div class="set-text"><span class="settings-label" id="flowReflectLabel">Cover Flow reflection</span><span class="set-desc">A soft mirror image under the covers</span></div>
@@ -13088,7 +13089,11 @@
     { id: 'boulevard', name: 'Sunset Boulevard', dot: ['#ff8a3d', '#ff5e62'], s: thMake({ theme: 'dark', accent: '#ff8a3d', bg: thG('vertical', 't', 40, 85, '#ff5e62', '#ff9966'), radius: 'soft', play: 'rounded', car: ['card','m',45,false,'below',true,'l'] }) },
     { id: 'candy', name: 'Cotton Candy', dot: ['#d6336c', '#fbeff1'], s: thMake({ theme: 'light', accent: '#d6336c', bg: thS('#fbeff1'), body: 'nunito', radius: 'round', density: 'roomy', car: ['card','s',66,true,'below',true,'s'] }) },
     { id: 'terminal', name: 'Terminal', dot: ['#39ff14', '#000000'], s: thMake({ theme: 'dark', amoled: true, accent: '#39ff14', bg: thS('#000000'), body: 'mono', head: 'mono', radius: 'square', density: 'compact', artist: 'square', play: 'square', car: ['none'] }) },
-    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded', car: ['edit','m',55,false,'below',true,'m'] }) }
+    { id: 'haze', name: 'Lavender Haze', dot: ['#6d3fd6', '#f2effa'], s: thMake({ theme: 'light', accent: '#6d3fd6', bg: thG('radial', 'tr', 40, 75, '#a78bfa', 'base'), body: 'nunitosans', radius: 'soft', artist: 'rounded', car: ['edit','m',55,false,'below',true,'m'] }) },
+    // Build 703 (Mark): a new preset -- warm amber on dark brown, serif headings, Editorial framed cards.
+    { id: 'vinyl', name: 'Vinyl Lounge', dot: ['#e0a458', '#2a1a10'], s: (function(){
+      var t = thMake({ theme: 'dark', accent: '#e0a458', bg: thG('radial', 't', 40, 80, '#8a4b1f', 'base'), head: 'serif', radius: 'soft', density: 'roomy', artist: 'rounded', play: 'circle', car: ['edit','m',66,true,'above',true,'m'] });
+      t.carousel.frame = true; return t; })() }
   ];
   function thLoadCustom(){ try{ var a = JSON.parse(localStorage.getItem(THEMES_KEY) || '[]'); return Array.isArray(a) ? a.filter(function(t){ return t && t.name && t.s; }) : []; }catch(e){ return []; } }
   function thSaveCustom(a){ try{ localStorage.setItem(THEMES_KEY, JSON.stringify(a)); }catch(e){} }
@@ -23051,7 +23056,7 @@
     // Where album i sits for the current pos.
     function place(el, i){
       var d = i - pos, ad = Math.abs(d);
-      var g = coverFlowGeom(d, S, flowCfg().tilt || ROT), x = g.x, z = g.z, r = g.r;
+      var g = coverFlowGeom(d, S, typeof flowCfg().tilt === 'number' ? flowCfg().tilt : ROT), x = g.x, z = g.z, r = g.r;
       el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,' + z.toFixed(1) + 'px) rotateY(' + r.toFixed(2) + 'deg)';
       // Stacking only changes when a cover passes the halfway point, so it is written then
       // and not on every frame (a z-index change restacks every layer).
@@ -57549,7 +57554,7 @@
         if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize;
         if(v.heading === true) d.heading = true;
         if(CAROUSEL_SIZES[v.size]) d.size = v.size;
-        if(typeof v.tilt === 'number' && v.tilt >= 30 && v.tilt <= 80) d.tilt = v.tilt;
+        if(typeof v.tilt === 'number' && v.tilt >= 0 && v.tilt <= 90) d.tilt = v.tilt;   // build 703: 0-90 (was 30-80)
         if(typeof v.reflect === 'boolean') d.reflect = v.reflect;
       }
     }catch(e){}
@@ -58381,7 +58386,7 @@
     });
     if(sizeSel) sizeSel.addEventListener('change', function(){ if(CAROUSEL_SIZES[sizeSel.value]){ carouselCfg.size = sizeSel.value; save(); applyCarousel(); } });
     if(tilt) tilt.addEventListener('input', function(){
-      carouselCfg.tilt = Math.max(30, Math.min(80, parseInt(tilt.value, 10) || 66));
+      var tv = parseInt(tilt.value, 10); carouselCfg.tilt = Math.max(0, Math.min(90, isNaN(tv) ? 66 : tv));
       if(tiltVal) tiltVal.textContent = carouselCfg.tilt + '\u00b0';
       save(); layoutHeroFlow(false);
     });
@@ -58415,7 +58420,7 @@
       carouselCfg.flowInfo = c.flowInfo !== false;
       if(typeof c.heading === 'boolean') carouselCfg.heading = c.heading;
       if(CAROUSEL_SIZES[c.size]) carouselCfg.size = c.size;
-      if(typeof c.tilt === 'number') carouselCfg.tilt = Math.max(30, Math.min(80, c.tilt));
+      if(typeof c.tilt === 'number') carouselCfg.tilt = Math.max(0, Math.min(90, c.tilt));
       if(typeof c.reflect === 'boolean') carouselCfg.reflect = c.reflect;
       save(); show(); applyCarousel(prev);
     };
@@ -58455,24 +58460,50 @@
     // shows at once, and goes back to Home when the page closes. Shrunk to fit a third of the screen.
     var host = document.getElementById('carPreview'), inEl = document.getElementById('carPreviewIn'), empty = document.getElementById('carPreviewEmpty');
     var mark = null, active = false, ro = null, curSc = 1;
+    var fitting = false;
     function fit(){
-      if(!active) return;
+      if(!active || fitting) return;
+      fitting = true;
+      try{ fitNow(); } finally { fitting = false; }
+    }
+    function fitNow(){
       var off = carouselCfg.mode === 'none' || !heroSlides.length;
       npHero.classList.toggle('car-prev-off', off);
       empty.hidden = !off;
       empty.textContent = carouselCfg.mode === 'none' ? 'No carousel on Home' : 'Play something and the carousel shows here';
       if(off){ host.style.height = ''; inEl.style.transform = ''; inEl.style.width = ''; curSc = 1; return; }
-      var W = host.clientWidth, h = Math.max(npHero.offsetHeight, npHero.scrollHeight);
-      // Editorial's words can hang below the strip: the preview is as tall as the lowest of them.
-      var top = npHero.getBoundingClientRect().top;
-      Array.prototype.forEach.call(npHero.querySelectorAll('.nph-slide, .nph-body, .nph-text, .nph-flow-info'), function(el){
-        var r = el.getBoundingClientRect(); if(r.height) h = Math.max(h, Math.ceil((r.bottom - top) / curSc));
-      });
-      if(!W || !h) return;
+      // Build 703 (Mark): the preview runs the full width of the screen. It is laid out wider than the
+      // screen (W / scale) and scaled down to fit, so shrinking it never leaves gaps at the sides; the
+      // scale is settled in a few passes because the height can depend on the width.
+      var W = host.clientWidth;
+      if(!W) return;
       var maxH = Math.max(140, Math.round((window.innerHeight || 700) * 0.33));
-      var sc = Math.min(1, maxH / h);
-      inEl.style.width = W + 'px';
-      inEl.style.transform = 'translateX(' + Math.round(W * (1 - sc) / 2) + 'px) scale(' + sc.toFixed(3) + ')'; curSc = +sc.toFixed(3);
+      function natural(){
+        var h = Math.max(npHero.offsetHeight, npHero.scrollHeight), top = npHero.getBoundingClientRect().top;
+        Array.prototype.forEach.call(npHero.querySelectorAll('.nph-slide, .nph-body, .nph-text, .nph-flow-info'), function(el){
+          var r = el.getBoundingClientRect(); if(r.height) h = Math.max(h, Math.ceil((r.bottom - top) / curSc));
+        });
+        return h;
+      }
+      var sc = curSc || 1, h = 0;
+      for(var pass = 0; pass < 5; pass++){
+        inEl.style.width = Math.round(W / sc) + 'px';
+        inEl.style.transform = 'scale(' + sc.toFixed(3) + ')'; curSc = +sc.toFixed(3);
+        h = natural();
+        if(!h) return;
+        var next = Math.max(0.55, Math.min(1, maxH / h));
+        if(Math.abs(next - sc) < 0.01) break;
+        sc = next;
+      }
+      // Cards and slides that grow with the width (Large cards, Slides) can't be made shorter that
+      // way: they show at the screen's own width, up to a little over half the screen's height.
+      if(h * sc > maxH + 6){
+        sc = 1; inEl.style.width = W + 'px'; inEl.style.transform = 'none'; curSc = 1;
+        h = natural();
+        var cap = Math.round((window.innerHeight || 700) * 0.56);
+        if(h > cap){ sc = cap / h; inEl.style.transform = 'translateX(' + Math.round(W * (1 - sc) / 2) + 'px) scale(' + sc.toFixed(3) + ')'; curSc = +sc.toFixed(3); }
+      }
+      if(heroFlowOn() && typeof layoutHeroFlow === 'function') layoutHeroFlow(false);
       var cs = getComputedStyle(host), pad = cs.boxSizing === 'border-box' ? (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth)) : 0;
       host.style.height = Math.ceil(h * sc + pad) + 'px';
     }
