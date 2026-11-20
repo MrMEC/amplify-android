@@ -1792,6 +1792,7 @@
     border-radius:var(--r-card, 14px); opacity:var(--flow-shade, 0); background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.92)); }
   .nph-flow .nph-slide.flow-left::after{ background:linear-gradient(90deg, rgba(0,0,0,.92), rgba(0,0,0,.55)); }
   .nph-flow-info{ display:none; }
+  .home-hero.nph-flow.nph-noinfo .nph-flow-info{ display:none !important; }   /* build 702: covers only */
   /* Build 553 (Mark): the Flow section is one fixed height whatever the title, so the tabs under it
      never move: room for the kind, a two-line title (fitHeroTitle keeps every title to two lines)
      and the song line, and nothing more. */
@@ -6217,6 +6218,7 @@
   .cf-cap-title{ color:#fff; font-weight:700; font-size:18px; line-height:23px; }
   .cf-cap-artist{ color:rgba(255,255,255,.6); font-size:14px; line-height:19px; margin-top:2px; }
   .cf.cf-norefl .cf-refl{ display:none; }
+  .cf.cf-nocap .cf-caption{ display:none; }
   .cf-empty{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     color:rgba(255,255,255,.55); font-size:14px; pointer-events:none; }
   /* The back of the centre cover: its tracklist. */
@@ -7715,6 +7717,43 @@
   #settingsPanel .set-subcats .set-cat:last-child{ border-bottom:none; }
   /* Build 565: on Home the Carousel settings come first; a line sets them apart from Favorites. */
   #settingsPanel [data-set-page="home-carousel"] #carouselResetBtn{ margin-top:6px; }
+  /* ---------- Build 702 (Mark): Carousel settings -- a live preview stuck at the top, and the settings
+     under it made compact for the room that leaves. ---------- */
+  .car-prev{ position:sticky; top:56px; z-index:2; overflow:hidden;
+    margin:0 calc(-1 * max(var(--set-pad), calc((100vw - 640px) / 2))) 4px; padding:6px 0 10px;
+    background:var(--main-fill, var(--main-bg, var(--bg))); border-bottom:1px solid var(--border);
+    box-shadow:0 8px 14px -12px rgba(0,0,0,.35); }
+  .car-prev-in{ transform-origin:0 0; pointer-events:auto; box-sizing:border-box; padding:0 var(--main-pad); }
+  /* Laid out exactly as on Home: inside Home's side margins, Flow running edge to edge. */
+  .car-prev-in > .home-hero{ display:block !important; margin-top:0 !important; }
+  .car-prev-in > .home-hero.car-prev-off{ display:none !important; }
+  .car-prev-empty{ display:flex; align-items:center; justify-content:center; height:92px; margin:0 var(--set-pad, 18px);
+    border:1.5px dashed var(--border); border-radius:12px; color:var(--text-dim); font-size:13px; text-align:center; padding:0 14px; }
+  .car-prev-empty[hidden]{ display:none; }
+  [data-set-page="home-carousel"] .settings-row{ padding:9px 0 !important; row-gap:6px !important; }
+  #settingsPanel [data-set-page="home-carousel"] .set-desc{ display:none !important; }
+  #settingsPanel [data-set-page="home-carousel"] .settings-row:not(.settings-row--stack){ flex-wrap:nowrap; }
+  #settingsPanel [data-set-page="home-carousel"] .settings-row > .set-text{ flex:1 1 auto; min-width:0; }
+  [data-set-page="home-carousel"] .car-tilt-row #flowTiltLabel{ white-space:nowrap; flex:none; }
+  [data-set-page="home-carousel"] .settings-label{ font-size:14px; }
+  [data-set-page="home-carousel"] .set-sub{ margin:12px 0 0 !important; }
+  /* The five looks in one row: a small picture over each name. */
+  #settingsPanel [data-set-page="home-carousel"] #carouselSwitch{ display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; }
+  #settingsPanel [data-set-page="home-carousel"] #carouselSwitch .theme-opt{ flex-direction:column-reverse; justify-content:center; gap:4px; min-height:0; padding:7px 2px 6px;
+    border-radius:10px; font-size:11px; line-height:1.1; text-align:center; }
+  #settingsPanel [data-set-page="home-carousel"] #carouselSwitch .theme-opt svg.co-prev{ width:40px; height:24px; }
+  #settingsPanel [data-set-page="home-carousel"] #carouselSwitch .theme-opt > span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  [data-set-page="home-carousel"] #carouselLabel{ display:none; }
+  /* Choices with a few words become segmented buttons (carSeg). */
+  .car-seg{ display:inline-flex; flex:0 0 auto; padding:2px; border-radius:var(--r-btn, 10px); background:var(--panel-2); border:1px solid var(--border); }
+  .car-seg button{ border:0; background:none; color:var(--text-dim); font:inherit; font-size:12.5px; font-weight:600; padding:6px 10px; border-radius:calc(var(--r-btn, 10px) - 2px); cursor:pointer; white-space:nowrap; }
+  .car-seg button[aria-pressed="true"]{ background:var(--accent); color:var(--accent-text, #fff); }
+  #settingsPanel [data-set-page="home-carousel"] select.car-seg-src{ display:none !important; }
+  /* Tilt: name, value and slider on one line. */
+  [data-set-page="home-carousel"] .settings-row--stack.car-tilt-row{ flex-direction:row !important; align-items:center !important; }
+  [data-set-page="home-carousel"] .car-tilt-row #flowTiltRange{ flex:1 1 auto; min-width:0; }
+  [data-set-page="home-carousel"] .car-reset-row{ flex-direction:row !important; align-items:center !important; justify-content:space-between; }
+  [data-set-page="home-carousel"] .car-reset-row #carouselResetBtn{ margin:0 !important; width:auto; padding:8px 14px; font-size:13px; }
   .shape-preview{ display:flex; align-items:flex-end; gap:16px; padding:16px; margin:6px 0 0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-card); }
   .shape-preview .sp-tile{ display:flex; flex-direction:column; gap:6px; width:72px; }
   .shape-preview .sp-art{ display:block; width:72px; height:72px; background:linear-gradient(135deg,var(--accent),var(--panel-2)); border-radius:var(--r-tile); }
@@ -10097,6 +10136,9 @@
       </div>
     </section>
     <section class="set-page" data-set-page="home-carousel" data-set-title="Carousel" data-set-parent="home" hidden>
+      <!-- Build 702 (Mark): a live preview of Home's carousel, stuck at the top while the settings
+           under it scroll. The real carousel is moved in here while the page is open (carPreview*). -->
+      <div class="car-prev" id="carPreview" aria-hidden="true"><div class="car-prev-in" id="carPreviewIn"></div><div class="car-prev-empty" id="carPreviewEmpty" hidden></div></div>
       <!-- Build 565 (Mark): moved here from Theme & color, above Favorites. Build 551: Home's carousel as Slides (as it was) or Flow (cover flow); Flow's own settings show only while it is chosen. -->
       <div class="settings-row settings-row--stack">
         <span class="settings-label" id="carouselLabel">Select a carousel</span>
@@ -10141,10 +10183,6 @@
           <option value="on">On</option>
         </select>
       </div>
-      <div class="settings-row settings-row--stack">
-        <span class="set-desc" id="carouselResetDesc">Clears every slide so the carousel starts fresh from what you play next.</span>
-        <button type="button" class="settings-data-btn" id="carouselResetBtn">Reset Slides</button>
-      </div>
       <div id="carouselFlowOpts" hidden>
         <h3 class="set-sub">Cover Flow</h3>
         <div class="set-desc set-desc-block">Used by the Flow carousel on Home, and by Albums when you turn your phone sideways.</div>
@@ -10156,7 +10194,7 @@
             <option value="l">Large</option>
           </select>
         </div>
-        <div class="settings-row settings-row--stack">
+        <div class="settings-row settings-row--stack car-tilt-row">
           <span class="settings-label" id="flowTiltLabel">Cover Flow tilt <span class="font-size-val" id="flowTiltVal">66&deg;</span></span>
           <input type="range" class="font-range" id="flowTiltRange" min="30" max="80" step="2" value="66" aria-labelledby="flowTiltLabel">
         </div>
@@ -10167,6 +10205,27 @@
             <option value="on">On</option>
           </select>
         </div>
+        <!-- Build 702 (Mark): covers only -- the words under the middle cover can be hidden, for Home's Flow
+             carousel and for Cover Flow on Albums / Artists separately. -->
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="flowInfoLabel">Details on Home</span><span class="set-desc">Title and details under the cover in the Flow carousel</span></div>
+          <select class="settings-select" id="flowInfoSelect" aria-labelledby="flowInfoLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="cfInfoLabel">Details in Albums</span><span class="set-desc">Album and artist under the cover in Cover Flow from Albums and Artists</span></div>
+          <select class="settings-select" id="cfInfoSelect" aria-labelledby="cfInfoLabel">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-row settings-row--stack car-reset-row">
+        <span class="settings-label car-reset-label">Start fresh</span>
+        <span class="set-desc" id="carouselResetDesc">Clears every slide so the carousel starts fresh from what you play next.</span>
+        <button type="button" class="settings-data-btn" id="carouselResetBtn">Reset Slides</button>
       </div>
 </section>
     <section class="set-page" data-set-page="home-favorites" data-set-title="Favorites" data-set-parent="home" hidden>
@@ -13043,13 +13102,13 @@
       shape: { radius: shapePrefs.radius, density: shapePrefs.density, artist: shapePrefs.artist, play: shapePrefs.play }, carousel: thCarouselNow() };
   }
   function thCarouselNow(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm', frame: false };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm', frame: false, flowInfo: true };
     try{ var v = JSON.parse(localStorage.getItem('radioPlayerCarousel') || 'null');
-      if(v && typeof v === 'object'){ if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize; if(v.textPos === 'above') d.textPos = 'above'; if(v.frame === true) d.frame = true; if(v.heading === true) d.heading = true; if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode; if(v.size === 's' || v.size === 'm' || v.size === 'l') d.size = v.size;
+      if(v && typeof v === 'object'){ if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize; if(v.textPos === 'above') d.textPos = 'above'; if(v.frame === true) d.frame = true; if(v.flowInfo === false) d.flowInfo = false; if(v.heading === true) d.heading = true; if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode; if(v.size === 's' || v.size === 'm' || v.size === 'l') d.size = v.size;
         if(typeof v.tilt === 'number') d.tilt = v.tilt; if(typeof v.reflect === 'boolean') d.reflect = v.reflect; } }catch(e){}
     return d;
   }
-  function thCarSig(c){ return c.mode === 'none' ? 'none' : (c.mode === 'flow' ? ['flow', c.size, c.tilt, !!c.reflect].join(',') : c.mode === 'card' ? 'card,' + c.cardSize : c.mode === 'edit' ? 'edit,' + c.cardSize + ',' + (c.textPos === 'above' ? 'above' : 'below') + (c.frame ? ',framed' : '') : 'slides,' + c.size) + ',' + (c.heading ? 'h' : ''); }
+  function thCarSig(c){ return c.mode === 'none' ? 'none' : (c.mode === 'flow' ? ['flow', c.size, c.tilt, !!c.reflect].join(',') + (c.flowInfo === false ? ',noinfo' : '') : c.mode === 'card' ? 'card,' + c.cardSize : c.mode === 'edit' ? 'edit,' + c.cardSize + ',' + (c.textPos === 'above' ? 'above' : 'below') + (c.frame ? ',framed' : '') : 'slides,' + c.size) + ',' + (c.heading ? 'h' : ''); }
   function thBgSig(p){
     p = p || {};
     if(p.mode === 'solid' && p.color) return 's:' + p.color;
@@ -13722,6 +13781,7 @@
     if(cat === 'cleanup' && cleanupState) renderCleanupCats();
     settingsPanelEl.scrollTop = 0;
     fitSettingsTitle();
+    if(window.carPreviewSync) window.carPreviewSync(cat);   // build 702: Carousel's live preview
   }
   // A heading never shows an ellipsis: it shrinks to fit instead.
   function fitSettingsTitle(){
@@ -13749,6 +13809,7 @@
     if(settingsOverlay.classList.contains('open') && typeof noteOverlayLeaving === 'function') noteOverlayLeaving();
     settingsOverlay.classList.remove('open');
     document.body.classList.remove('settings-open');
+    if(window.carPreviewSync) window.carPreviewSync('');
   }
   // Back: from a page inside a category to the category (build 356), from a category to the
   // list, from the list out of Settings.
@@ -22960,7 +23021,10 @@
       // one block -- the same spacing as Home's (room = size x 0.42 - 60 with the reflection).
       var cfg = flowCfg();
       root.classList.toggle('cf-norefl', !cfg.reflect);
-      var CAP_H = 44;
+      // Build 702 (Mark): Details in Albums off -- covers only, no album and artist under the middle one.
+      var capOff = cfg.cfInfo === false;
+      root.classList.toggle('cf-nocap', capOff);
+      var CAP_H = capOff ? 0 : 44;
       var roomFor = function(sz){ return cfg.reflect ? Math.max(8, Math.round(sz * 0.42) - 60) : 8; };
       S = CAROUSEL_SIZES[cfg.size] || 200;
       S = Math.round(Math.max(60, Math.min(S, W * 0.42)));
@@ -57473,10 +57537,12 @@
   var CAROUSEL_KEY = 'radioPlayerCarousel';
   var CAROUSEL_SIZES = { s: 170, m: 200, l: 230 };
   function carouselLoad(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm', frame: false };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm', frame: false, flowInfo: true, cfInfo: true };
     try{
       var v = JSON.parse(localStorage.getItem(CAROUSEL_KEY) || 'null');
       if(v && v.frame === true) d.frame = true;   // build 701: Editorial's Framed card style
+      if(v && v.flowInfo === false) d.flowInfo = false;   // build 702: Flow carousel, covers only
+      if(v && v.cfInfo === false) d.cfInfo = false;       // build 702: Cover Flow (Albums), covers only
       if(v && typeof v === 'object'){
         if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode;   // build 562: None, no carousel at all; build 643: Card, Editorial
         if(v.textPos === 'above') d.textPos = 'above';
@@ -58246,6 +58312,7 @@
     npHero.classList.toggle('nph-sm', carouselCfg.cardSize !== 'l');
     npHero.setAttribute('data-card-size', carouselCfg.cardSize);
     npHero.classList.toggle('nph-above', carouselCfg.mode === 'edit' && carouselCfg.textPos === 'above');
+    npHero.classList.toggle('nph-noinfo', carouselCfg.flowInfo === false);   // build 702: Flow, covers only
     var frameWas = npHero.classList.contains('nph-framed');
     npHero.classList.toggle('nph-framed', carouselCfg.mode === 'edit' && !!carouselCfg.frame);
     if(frameWas !== npHero.classList.contains('nph-framed')) heroSlides.forEach(function(sl){ sl._artDone = false; });
@@ -58298,6 +58365,8 @@
       if(editOpts) editOpts.hidden = carouselCfg.mode !== 'edit';
       if(posSel) posSel.value = carouselCfg.textPos;
       if(frameSel) frameSel.value = carouselCfg.frame ? 'framed' : 'plain';
+      if(flowInfoSel) flowInfoSel.value = carouselCfg.flowInfo === false ? 'off' : 'on';
+      if(cfInfoSel) cfInfoSel.value = carouselCfg.cfInfo === false ? 'off' : 'on';
       if(headSel) headSel.value = carouselCfg.heading ? 'on' : 'off';
       paintReset();
     }
@@ -58329,6 +58398,9 @@
     if(refl) refl.addEventListener('change', function(){ carouselCfg.reflect = refl.value === 'on'; save(); applyCarousel(); });
     if(cardSizeSel) cardSizeSel.addEventListener('change', function(){ if(/^[sml]$/.test(cardSizeSel.value)){ carouselCfg.cardSize = cardSizeSel.value; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); } });
     var frameSel = document.getElementById('carouselFrameSelect');
+    var flowInfoSel = document.getElementById('flowInfoSelect'), cfInfoSel = document.getElementById('cfInfoSelect');
+    if(flowInfoSel) flowInfoSel.addEventListener('change', function(){ carouselCfg.flowInfo = flowInfoSel.value !== 'off'; save(); applyCarousel(); });
+    if(cfInfoSel) cfInfoSel.addEventListener('change', function(){ carouselCfg.cfInfo = cfInfoSel.value !== 'off'; save(); if(typeof coverFlow !== 'undefined' && coverFlow && coverFlow.relayout) coverFlow.relayout(); });
     if(frameSel) frameSel.addEventListener('change', function(){ carouselCfg.frame = frameSel.value === 'framed'; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); });
     if(posSel) posSel.addEventListener('change', function(){ carouselCfg.textPos = posSel.value === 'above' ? 'above' : 'below'; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); });
     if(headSel) headSel.addEventListener('change', function(){ carouselCfg.heading = headSel.value === 'on'; save(); applyCarousel(); });
@@ -58340,6 +58412,7 @@
       if(c.cardSize === 's' || c.cardSize === 'm' || c.cardSize === 'l') carouselCfg.cardSize = c.cardSize;
       if(c.textPos) carouselCfg.textPos = c.textPos === 'above' ? 'above' : 'below';
       carouselCfg.frame = c.frame === true;
+      carouselCfg.flowInfo = c.flowInfo !== false;
       if(typeof c.heading === 'boolean') carouselCfg.heading = c.heading;
       if(CAROUSEL_SIZES[c.size]) carouselCfg.size = c.size;
       if(typeof c.tilt === 'number') carouselCfg.tilt = Math.max(30, Math.min(80, c.tilt));
@@ -58348,6 +58421,83 @@
     };
     show();
     applyCarousel('slides');
+  })();
+  // ---------- Build 702 (Mark): the Carousel settings page -- segmented choices and a live preview ----------
+  (function(){
+    var page = document.querySelector('[data-set-page="home-carousel"]');
+    if(!page) return;
+    // Short names, so a label and its choices fit on one line.
+    var SHORT = { carouselCardSizeSelect: ['Card size', { s: 'S', m: 'M', l: 'L' }], flowSizeSelect: ['Cover size', { s: 'S', m: 'M', l: 'L' }],
+      carouselTextPosSelect: ['Text', { below: 'Below', above: 'Above' }], carouselFrameSelect: ['Style', { plain: 'Plain', framed: 'Framed' }] };
+    var desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    Object.keys(SHORT).forEach(function(id){
+      var sel = document.getElementById(id); if(!sel || !desc) return;
+      var lab = sel.getAttribute('aria-labelledby') && document.getElementById(sel.getAttribute('aria-labelledby'));
+      if(lab) lab.textContent = SHORT[id][0];
+      var seg = document.createElement('div'); seg.className = 'car-seg'; seg.setAttribute('role', 'group');
+      if(lab) seg.setAttribute('aria-labelledby', lab.id);
+      Array.prototype.forEach.call(sel.options, function(o){
+        var b = document.createElement('button'); b.type = 'button'; b.dataset.v = o.value;
+        b.textContent = SHORT[id][1][o.value] || o.textContent; b.setAttribute('aria-label', o.textContent);
+        b.addEventListener('click', function(){ if(desc.get.call(sel) === o.value) return; sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); });
+        seg.appendChild(b);
+      });
+      function paint(){ var v = desc.get.call(sel); Array.prototype.forEach.call(seg.children, function(b){ b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'); }); }
+      Object.defineProperty(sel, 'value', { configurable: true, get: function(){ return desc.get.call(sel); }, set: function(v){ desc.set.call(sel, v); paint(); } });
+      sel.addEventListener('change', paint);
+      sel.classList.add('car-seg-src'); sel.parentNode.insertBefore(seg, sel.nextSibling); paint();
+    });
+    [['flowTiltLabel', 'Tilt'], ['flowReflectLabel', 'Reflection']].forEach(function(x){
+      var el = document.getElementById(x[0]); if(!el) return;
+      var val = el.querySelector('.font-size-val'); el.textContent = x[1] + ' '; if(val) el.appendChild(val);
+    });
+    // The live preview: the real carousel moves up here while the page is open, so every change
+    // shows at once, and goes back to Home when the page closes. Shrunk to fit a third of the screen.
+    var host = document.getElementById('carPreview'), inEl = document.getElementById('carPreviewIn'), empty = document.getElementById('carPreviewEmpty');
+    var mark = null, active = false, ro = null, curSc = 1;
+    function fit(){
+      if(!active) return;
+      var off = carouselCfg.mode === 'none' || !heroSlides.length;
+      npHero.classList.toggle('car-prev-off', off);
+      empty.hidden = !off;
+      empty.textContent = carouselCfg.mode === 'none' ? 'No carousel on Home' : 'Play something and the carousel shows here';
+      if(off){ host.style.height = ''; inEl.style.transform = ''; inEl.style.width = ''; curSc = 1; return; }
+      var W = host.clientWidth, h = Math.max(npHero.offsetHeight, npHero.scrollHeight);
+      // Editorial's words can hang below the strip: the preview is as tall as the lowest of them.
+      var top = npHero.getBoundingClientRect().top;
+      Array.prototype.forEach.call(npHero.querySelectorAll('.nph-slide, .nph-body, .nph-text, .nph-flow-info'), function(el){
+        var r = el.getBoundingClientRect(); if(r.height) h = Math.max(h, Math.ceil((r.bottom - top) / curSc));
+      });
+      if(!W || !h) return;
+      var maxH = Math.max(140, Math.round((window.innerHeight || 700) * 0.33));
+      var sc = Math.min(1, maxH / h);
+      inEl.style.width = W + 'px';
+      inEl.style.transform = 'translateX(' + Math.round(W * (1 - sc) / 2) + 'px) scale(' + sc.toFixed(3) + ')'; curSc = +sc.toFixed(3);
+      var cs = getComputedStyle(host), pad = cs.boxSizing === 'border-box' ? (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth)) : 0;
+      host.style.height = Math.ceil(h * sc + pad) + 'px';
+    }
+    function settle(){ requestAnimationFrame(function(){ fitHeroTitles(); heroPaintAround(); if(heroFlowOn()) layoutHeroFlow(true); fit(); }); }
+    function enter(){
+      if(active || !npHero || !npHero.parentNode) return;
+      mark = document.createComment('npHero'); npHero.parentNode.insertBefore(mark, npHero);
+      inEl.appendChild(npHero); active = true;
+      if(window.ResizeObserver){ ro = new ResizeObserver(fit); ro.observe(npHero); }
+      fit(); settle();
+    }
+    function leave(){
+      if(!active) return;
+      active = false; if(ro){ ro.disconnect(); ro = null; }
+      npHero.classList.remove('car-prev-off');
+      if(mark && mark.parentNode){ mark.parentNode.insertBefore(npHero, mark); mark.parentNode.removeChild(mark); }
+      mark = null; host.style.height = ''; inEl.style.transform = ''; inEl.style.width = ''; curSc = 1;
+      syncNpHeroShown(); settle();
+    }
+    // A tap in the preview never plays anything; swiping still moves through it.
+    inEl.addEventListener('click', function(e){ e.stopPropagation(); e.preventDefault(); }, true);
+    ['change', 'click', 'input'].forEach(function(ev){ page.addEventListener(ev, function(){ setTimeout(fit, 30); setTimeout(fit, 350); }); });
+    window.addEventListener('resize', fit);
+    window.carPreviewSync = function(cat){ if(cat === 'home-carousel') enter(); else leave(); };
+    window.carPreviewFit = fit;
   })();
   // Build 226: a tap in the space under the slides (the progress bar and the gap down to the
   // next heading) goes back to the first slide.
