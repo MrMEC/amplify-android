@@ -3818,6 +3818,12 @@
   .np-video-wrap[hidden]{ display:none; }
   .np-video{ display:block; width:100%; aspect-ratio:16/9; max-height:52vh; object-fit:contain; background:#000; }
   .now-playing-screen.np-video-on #npArt{ visibility:hidden; }
+  /* Build 706 (Mark): a YouTube channel -- YouTube's player in the video box, with its own controls. */
+  .np-yt-box{ display:none; }
+  .now-playing-screen.np-yt .np-video{ display:none; }
+  .now-playing-screen.np-yt .np-yt-box{ display:block; position:relative; width:100%; aspect-ratio:16/9; max-height:52vh; background:#000; }
+  .np-yt-box iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
+  .now-playing-screen.np-yt .vctl, .now-playing-screen.np-yt #npVideoToggle, .now-playing-screen.np-yt #npOffAir{ display:none !important; }
   body.in-pip .vctl{ display:none !important; }
   /* Full screen: the video alone on black, edge to edge; the app's own chrome is hidden
      (the system bars are hidden natively). The button moves to the top right to exit. */
@@ -4539,6 +4545,7 @@
   .ch-tools-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .ch-tools-row .cs-field-input{ flex:1 1 220px; width:auto; }
   .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
+  .ch-yt-note{ font-size:12.5px; color:var(--text-dim); margin:6px 0 2px; }
   .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
   .ch-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; min-width:0; }
   .ch-logo{ width:52px; height:52px; flex:none; border-radius:6px; overflow:hidden; background:#2b2c31;
@@ -9276,6 +9283,8 @@
           <!-- A podcast episode's video, in the artwork's place while video is on. -->
           <div class="np-video-wrap" id="npVideoWrap" hidden>
             <video class="np-video" id="npVideo" playsinline preload="none"></video>
+            <!-- Build 706 (Mark): a YouTube channel plays in YouTube's own player, here in the video's place. -->
+            <div class="np-yt-box" id="npYtBox"></div>
           </div>
           <!-- Build 685 (Mark): a channel that is off air shows a test card where the picture would be. -->
           <div class="np-offair" id="npOffAir" role="group" aria-label="Off air" hidden>
@@ -16621,6 +16630,7 @@
     if(currentStation) syncNpVideoToggle(currentStation);
     syncVideoMini();
     vctlSync();
+    if(typeof ytLiveSync === 'function') ytLiveSync();   // build 706: a YouTube channel keeps its box
   }
   function setNpVideo(on){
     if(on) setNpImmersive(false); // video has its own full-screen view
@@ -18056,6 +18066,7 @@
     syncNpVideoToggle(st);
     npYouTubeBtn.hidden = !isChartSong(st) || !sourceOn('youtube');
     vctlSync();
+    if(typeof ytLiveSync === 'function') ytLiveSync();   // build 706
     updateNowPlayingFavState();
     updateNpPlayBtn();
     syncSeekBar();
@@ -26627,6 +26638,7 @@
       channel: { id: ch.id || '', name: ch.name || '', url: ch.url, logo: chLogo(ch),
         country: ch.country || '', cats: ch.cats || [], src: ch.src || 'link' }
     };
+    if(ch.src === 'youtube' || ytLiveParse(ch.url)) st.src = 'youtube';   // build 706
     // Build 262: one of your own channels (its poster as its picture; playing it tunes in).
     if(isLiveChUrl(ch.url)){
       var lc = liveChannelByUrl(ch.url);
@@ -26648,6 +26660,127 @@
     playStation(st);
     openNowPlaying(st, !opts.still);
   }
+  // ---------- Build 706 (Mark): YouTube channels on Live TV ----------
+  // A YouTube link (a live video, a channel, a handle) becomes a channel in My Channels. It plays
+  // in YouTube's own player in the video's place (the stream can't be played by the app's player),
+  // and goes under the YouTube category on Live TV. A channel link plays whatever that channel has
+  // live now (YouTube's live_stream embed), so it keeps working when the stream's video changes.
+  function ytLiveParse(u){
+    u = String(u || '').trim();
+    if(!/^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtu\.be|youtube-nocookie\.com)\//i.test(u)) return null;
+    var m;
+    if((m = /youtube(?:-nocookie)?\.com\/embed\/live_stream\?(?:[^#]*&)?channel=(UC[\w-]{22})/i.exec(u))) return { ch: m[1] };
+    if((m = /youtube\.com\/live\/([\w-]{11})/i.exec(u))) return { v: m[1] };
+    var v = youTubeVideoId(u); if(v) return { v: v };
+    if((m = /youtube\.com\/channel\/(UC[\w-]{22})/i.exec(u))) return { ch: m[1] };
+    if((m = /youtube\.com\/(@[\w.\-%]+)/i.exec(u))) return { handle: decodeURIComponent(m[1]) };
+    if((m = /youtube\.com\/(?:c|user)\/([\w.\-%]+)/i.exec(u))) return { path: m[0].replace(/^youtube\.com/i, '') };
+    return null;
+  }
+  // The address a YouTube channel is kept under: one form per stream, so the same one isn't added twice.
+  function ytLiveUrl(y){ return y.ch ? 'https://www.youtube.com/channel/' + y.ch + '/live' : 'https://www.youtube.com/watch?v=' + y.v; }
+  function ytLiveOf(st){
+    if(!st) return null;
+    var u = st.urlToResolve || st.url || (st.channel && st.channel.url) || '';
+    var y = ytLiveParse(u);
+    return y && (y.v || y.ch) ? y : null;
+  }
+  function isYouTubeChannel(st){ return !!(st && (st.videoChannel || st.channel || st.src === 'youtube') && ytLiveOf(st)); }
+  function ytLiveSameStream(a, b){ var x = ytLiveOf(a), y = ytLiveOf(b); return !!(x && y && x.v === y.v && x.ch === y.ch); }
+  function ytLiveEmbed(y){
+    var q = 'autoplay=1&playsinline=1&rel=0&fs=0&modestbranding=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+    return y.ch ? 'https://www.youtube.com/embed/live_stream?channel=' + y.ch + '&' + q : 'https://www.youtube.com/embed/' + y.v + '?' + q;
+  }
+  // What a pasted link is: its name and picture (YouTube's oEmbed for a video; the channel's own
+  // page for a channel or @handle). Resolves to a channel entry, or rejects with a message.
+  function ytLiveResolve(u){
+    var y = ytLiveParse(u);
+    if(!y) return Promise.reject(new Error('That isn\u2019t a YouTube link.'));
+    function metaOf(html, prop){ var m = new RegExp('<meta[^>]+(?:property|name)="' + prop + '"[^>]+content="([^"]*)"', 'i').exec(html || ''); return m ? m[1].replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"') : ''; }
+    function entry(yy, name, logo){ return { id: 'yt:' + (yy.ch || yy.v), name: name || 'YouTube Live', url: ytLiveUrl(yy), logo: logo || '', src: 'youtube', country: '', cats: [] }; }
+    if(y.v){
+      return ytFetchText('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + y.v)).then(function(t){
+        var j = null; try{ j = JSON.parse(t || 'null'); }catch(e){}
+        return entry(y, j && (j.author_name || j.title), 'https://i.ytimg.com/vi/' + y.v + '/hqdefault.jpg');
+      });
+    }
+    var page = y.ch ? 'https://www.youtube.com/channel/' + y.ch : 'https://www.youtube.com/' + (y.handle ? y.handle : y.path.replace(/^\//, ''));
+    return ytFetchText(page).then(function(html){
+      var id = y.ch;
+      if(!id && html){ var m = /"(?:externalId|channelId)":"(UC[\w-]{22})"/.exec(html) || /channel\/(UC[\w-]{22})/.exec(html); if(m) id = m[1]; }
+      if(!id) throw new Error('Couldn\u2019t find that YouTube channel. Try its /channel/UC\u2026 link or a link to the live video.');
+      return entry({ ch: id }, metaOf(html, 'og:title') || (y.handle || '').replace(/^@/, ''), metaOf(html, 'og:image'));
+    });
+  }
+  var ytLive = null;   // { st, frame, playing } while a YouTube channel is on
+  var npYtBox = document.getElementById('npYtBox');
+  function ytLiveCmd(func){
+    if(!ytLive || !ytLive.frame || !ytLive.frame.contentWindow) return;
+    try{ ytLive.frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: [] }), '*'); }catch(e){}
+  }
+  function playYouTubeChannel(st){
+    if(reconnectState) cancelReconnect();
+    if(!isQueueCurrent(st)) clearQueue();
+    // The app's own player stops: the picture and the sound come from YouTube's player.
+    try{ audio.pause(); audio.removeAttribute('src'); audio.load(); }catch(e){}
+    if(ytLive && ytLiveSameStream(st, ytLive.st)){ ytLive.st = st; currentStation = st; ytLivePlay(true); ytLiveSync(); onPlaybackSuccess(st); return; }
+    currentStation = st;
+    attemptInProgress = false;
+    document.querySelectorAll('.tile, .row-item').forEach(function(el){ el.classList.toggle('playing', isOnAirKey(el.dataset.key, st)); });
+    scheduleHomeFavActive();
+    var y = ytLiveOf(st);
+    npYtBox.innerHTML = '';
+    var f = document.createElement('iframe');
+    f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+    f.setAttribute('title', st.name || 'YouTube');
+    f.src = ytLiveEmbed(y);
+    f.addEventListener('load', function(){
+      try{ f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'ytlive', channel: 'widget' }), '*'); }catch(e){}
+    });
+    npYtBox.appendChild(f);
+    ytLive = { st: st, frame: f, playing: true };
+    ytLiveSync();
+    onPlaybackSuccess(st);
+  }
+  function ytLivePlay(on){
+    if(!ytLive) return;
+    ytLive.playing = !!on;
+    ytLiveCmd(on ? 'playVideo' : 'pauseVideo');
+    setPlayingUI(!!on);
+    playerSub.textContent = on ? barSubFor(currentStation) : 'Paused';
+    playerSub.classList.remove('err');
+  }
+  function ytLiveStop(){
+    if(!ytLive) return;
+    ytLive = null;
+    npYtBox.innerHTML = '';
+    ytLiveSync();
+  }
+  // The box shows while Now Playing is on the YouTube channel that's playing.
+  function ytLiveSync(){
+    var t = (typeof npTarget === 'function') ? npTarget() : null;
+    var on = !!(ytLive && t && (t === ytLive.st || ytLiveSameStream(t, ytLive.st)));
+    var was = nowPlayingScreen.classList.contains('np-yt');
+    nowPlayingScreen.classList.toggle('np-yt', on);
+    if(on){ nowPlayingScreen.classList.add('np-video-on'); npVideoWrap.hidden = false; }
+    else if(was && !npVideoOn){ nowPlayingScreen.classList.remove('np-video-on'); npVideoWrap.hidden = true; }
+  }
+  // YouTube's player reports playing / paused / errors (enablejsapi).
+  window.addEventListener('message', function(e){
+    if(!ytLive || !ytLive.frame || e.source !== ytLive.frame.contentWindow) return;
+    var d; try{ d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; }catch(err){ return; }
+    if(!d) return;
+    var state = d.event === 'onStateChange' ? d.info : (d.event === 'infoDelivery' && d.info ? d.info.playerState : undefined);
+    if(state === 1 && !uiIsPlaying && currentStation === ytLive.st){ ytLive.playing = true; setPlayingUI(true); playerSub.textContent = barSubFor(currentStation); }
+    else if(state === 2 && uiIsPlaying && currentStation === ytLive.st){ ytLive.playing = false; setPlayingUI(false); playerSub.textContent = 'Paused'; }
+    else if(d.event === 'onError' && currentStation === ytLive.st){
+      // 101/150: the owner doesn't allow it outside YouTube; 100: gone or not live.
+      var c = d.info;
+      updatePlayerMeta(currentStation, c === 101 || c === 150 ? 'This stream can\u2019t be played outside YouTube' : 'This YouTube stream isn\u2019t live right now', true);
+      setPlayingUI(false);
+    }
+  });
   function addVideoChannel(ch){
     if(!ch || !ch.url || findVideoChannel(ch.url)) return false;
     videoChannels.push({ id: ch.id || ('link:' + ch.url), name: ch.name || 'Channel', url: ch.url, logo: ch.logo || '',
@@ -28648,7 +28781,7 @@
     ['Entertainment', /entertain|celebr|\btmz\b|game show|pop culture|variety/]
   ];
   // The chips' order (the rules above are in matching order, which is different).
-  var CH_CAT_ORDER = ['Sports', 'News', 'Classic TV', 'Movies', 'Comedy', 'Drama', 'Crime & Mystery', 'Entertainment', 'Reality', 'Music',
+  var CH_CAT_ORDER = ['YouTube', 'Sports', 'News', 'Classic TV', 'Movies', 'Comedy', 'Drama', 'Crime & Mystery', 'Entertainment', 'Reality', 'Music',
     'Live Cams', 'Nature & Science', 'Kids & Family', 'Lifestyle', 'Gaming & Anime', 'Español', 'Faith', 'Shopping'];
   var CH_CAT_GENERIC = { 'archive.org': 1, 'general': 1, 'undefined': 1, 'other': 1, 'others': 1, 'all': 1, '': 1 };
   function chCatMatch(text){
@@ -28680,6 +28813,7 @@
   }
   function chAutoCategory(ch){
     if(!ch) return 'Other';
+    if(ch.src === 'youtube' || ytLiveParse(ch.url)) return 'YouTube';   // build 706
     try{ var vl = vlib(); if(vl !== chCatMemoLib){ chCatMemoLib = vl; chCatMemo = {}; } }catch(e){}
     var key = ch.url + '|' + (ch.name || '');
     if(chCatMemo[key]) return chCatMemo[key];
@@ -28716,11 +28850,14 @@
     if(!v) return null;
     if(Array.isArray(v)) return v.slice();
     if(isLiveChUrl(url) && v !== 'My Channels') return ['My Channels', v];
+    if(ytLiveParse(url) && v !== 'YouTube') return ['YouTube', v];   // build 706
     return [v];
   }
   function chAutoCategories(ch){
     var a = chAutoCategory(ch);
     if(ch && isLiveChUrl(ch.url)) return a === 'My Channels' ? ['My Channels'] : ['My Channels', a];
+    // Build 706: a YouTube channel is under YouTube, and also where its name puts it (a news channel: News).
+    if(a === 'YouTube'){ var also = chCatMatch(ch.name || ''); return also && also !== 'YouTube' ? ['YouTube', also] : ['YouTube']; }
     return [a];
   }
   function chCategories(ch){
@@ -28939,7 +29076,7 @@
     }
   }
   function openChCategorySheet(ch){
-    if(ch && isLiveChUrl(ch.url)){ openChCategoriesSheet(ch); return; }
+    if(ch && (isLiveChUrl(ch.url) || ch.src === 'youtube' || ytLiveParse(ch.url))){ openChCategoriesSheet(ch); return; }
     var cur = chCatOverride[ch.url] || '', auto = chAutoCategory(ch);
     document.getElementById('chSheetSub').textContent = 'Category';
     var box = document.getElementById('chSheetItems');
@@ -30205,7 +30342,8 @@
     enterLibraryChrome();
     // Build 345 (Mark): with Search everything on, an archive.org search isn't kept for next time.
     if(typeof archiveSearchAll === 'function' && archiveSearchAll()) addChannelsState.archiveQ = '';
-    if(addChannelsTab !== 'link'){
+    if(addChannelsTab === 'youtube' && !sourceOn('youtube')) addChannelsTab = 'all';
+    if(addChannelsTab !== 'link' && addChannelsTab !== 'youtube'){
       addChannelsState.country = countryByTab[addChannelsTab] == null ? '' : countryByTab[addChannelsTab];
       addChannelsState.pickDefault = addChannelsTab === 'recommended' && countryByTab.recommended == null;
     }
@@ -30238,6 +30376,7 @@
     var subBits = [];
     if(e.country) subBits.push((iptvIndex && iptvIndex.countries[e.country]) || e.country);
     if(e.src === 'plex') subBits.push(['Plex'].concat((e.cats || []).slice(0, 2)).join(' · '));
+    else if(e.src === 'youtube') subBits.push('YouTube');
     else if(e.src === 'pluto') subBits.push(['Pluto TV'].concat((e.cats || []).slice(0, 2)).join(' · '));
     else if(e.cats && e.cats.length && iptvIndex) subBits.push(e.cats.map(function(c){ return iptvIndex.cats[c] || c; }).join(', '));
     if(subBits.length){ var sb = document.createElement('div'); sb.className = 'ch-sub'; sb.textContent = subBits.join(' · '); text.appendChild(sb); }
@@ -30330,6 +30469,7 @@
       // of a tab, unless "No thanks" put it away (until Plex is signed in from Settings).
       else if(!plexAddChHidden()) tabList.push(['plexsignin', 'Plex']);
       tabList.push(['link', 'Link']);
+      if(sourceOn('youtube')) tabList.push(['youtube', 'YouTube']);   // build 706
       tabList.forEach(function(t){
         var b = document.createElement('button');
         b.type = 'button';
@@ -30338,10 +30478,10 @@
         if(t[0] === 'plexsignin') b.id = 'addChPlexBtn';
         b.addEventListener('click', function(){
           if(t[0] === 'plexsignin'){ openPlexAddChDialog(); return; }
-          if(addChannelsTab !== 'link') countryByTab[addChannelsTab] = addChannelsState.country;
+          if(addChannelsTab !== 'link' && addChannelsTab !== 'youtube') countryByTab[addChannelsTab] = addChannelsState.country;
           if(addChannelsTab === 'archive' && t[0] !== 'archive' && archiveSearchAll()) addChannelsState.archiveQ = '';   // build 345
           addChannelsTab = t[0]; addChannelsState.shown = 60; addChannelsState.cat = '';
-          if(t[0] !== 'link') addChannelsState.country = countryByTab[t[0]] == null ? '' : countryByTab[t[0]];
+          if(t[0] !== 'link' && t[0] !== 'youtube') addChannelsState.country = countryByTab[t[0]] == null ? '' : countryByTab[t[0]];
           addChannelsState.pickDefault = t[0] === 'recommended' && countryByTab.recommended == null;
           renderAddChannels();
         });
@@ -30351,6 +30491,7 @@
       stationsGrid.appendChild(tools);
       revealActiveTab(tabs);
       if(addChannelsTab === 'link') buildLinkTools(tools);
+      else if(addChannelsTab === 'youtube') buildYtLiveTools(tools);
       else if(addChannelsTab === 'mine') buildMineTools(tools);
       else if(addChannelsTab === 'archive') buildArchiveTools(tools);
       else buildBrowseTools(tools);
@@ -30359,6 +30500,7 @@
     body.className = 'ch-list';
     stationsGrid.appendChild(body);
     if(addChannelsTab === 'link'){ renderLinkResults(body); return; }
+    if(addChannelsTab === 'youtube'){ renderYtLiveResults(body); return; }
     if(addChannelsTab === 'mine'){ renderMineChannels(body); return; }
     if(addChannelsTab === 'archive'){ renderArchiveTab(body); return; }
     body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
@@ -31338,6 +31480,11 @@
       addChannelsState.linkUrl = u;
       addChannelsState.linkList = 'loading';
       renderAddChannels(true);
+      if(ytLiveParse(u)){   // build 706: a YouTube link is a YouTube channel
+        ytLiveResolve(u).then(function(e){ addChannelsState.linkList = [e]; renderAddChannels(true); },
+          function(err){ addChannelsState.linkList = null; renderAddChannels(true); setStatus(err.message, true); });
+        return;
+      }
       fetchTextAny(u).then(function(t){
         var list = /#EXTINF/i.test(t) ? parseM3uChannels(t, u) : null;
         if(list){
@@ -31360,6 +31507,58 @@
     row.appendChild(input);
     row.appendChild(go);
     tools.appendChild(row);
+  }
+  // Build 706 (Mark): Add Channels > YouTube -- paste a YouTube live video, channel or @handle link.
+  function buildYtLiveTools(tools){
+    var row = document.createElement('div');
+    row.className = 'ch-tools-row';
+    var input = document.createElement('input');
+    input.type = 'url';
+    input.className = 'cs-field-input';
+    input.placeholder = 'youtube.com/@channel or a live video link';
+    input.value = addChannelsState.ytUrl || '';
+    input.setAttribute('aria-label', 'YouTube link');
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'settings-select';
+    go.textContent = 'Find';
+    function load(){
+      var u = input.value.trim();
+      if(u && !/^https?:\/\//i.test(u)) u = 'https://' + u.replace(/^\/+/, '');
+      if(!ytLiveParse(u)){ setStatus('Paste a YouTube link: a live video, a channel or an @handle.', true); return; }
+      addChannelsState.ytUrl = u;
+      addChannelsState.ytList = 'loading';
+      renderAddChannels(true);
+      ytLiveResolve(u).then(function(e){ addChannelsState.ytList = [e]; renderAddChannels(true); },
+        function(err){ addChannelsState.ytList = { error: err && err.message || 'Couldn\u2019t read that link.' }; renderAddChannels(true); });
+    }
+    go.addEventListener('click', load);
+    input.addEventListener('keydown', function(e){ if(e.key === 'Enter') load(); });
+    row.appendChild(input);
+    row.appendChild(go);
+    tools.appendChild(row);
+    var note = document.createElement('div');
+    note.className = 'ch-yt-note';
+    note.textContent = 'Plays in YouTube\u2019s player. A channel link shows whatever that channel has live.';
+    tools.appendChild(note);
+  }
+  function renderYtLiveResults(body){
+    var l = addChannelsState.ytList;
+    var mine = videoChannels.filter(function(c){ return c.src === 'youtube' || ytLiveParse(c.url); });
+    if(l === 'loading'){ body.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>'; return; }
+    body.remove();
+    var host = document.createElement('div');
+    host.style.display = 'contents';
+    stationsGrid.appendChild(host);
+    if(l && l.error){ var er = document.createElement('div'); er.className = 'empty-state'; er.textContent = l.error; host.appendChild(er); }
+    else if(l && l.length) renderChannelList(host, l);
+    if(mine.length){
+      var h = document.createElement('div'); h.className = 'grid-section-label'; h.textContent = 'Your YouTube channels'; host.appendChild(h);
+      var list = document.createElement('div'); list.className = 'ch-list';
+      mine.forEach(function(c){ list.appendChild(channelRow(c)); });
+      host.appendChild(list);
+    }
+    if(!(l && l.length) && !mine.length && !(l && l.error)) setResultCount(null);
   }
   function singleStreamEntry(u){
     var name = u;
@@ -56734,6 +56933,9 @@
     if(track && track.liveCh && !track._liveTuned) return tuneLiveChannel(track.liveCh);
     // Build 339: an Archive.org channel (a favourite, Continue Watching, the guide) tunes in.
     if(track && isArchiveChUrl(track.urlToResolve) && !track.liveCh) return tuneLiveChannel(track.urlToResolve);
+    // Build 706 (Mark): a YouTube channel plays in YouTube's player; anything else ends it first.
+    if(ytLive && !(track && isYouTubeChannel(track) && ytLiveSameStream(track, ytLive.st))) ytLiveStop();
+    if(track && isYouTubeChannel(track)) return playYouTubeChannel(track);
     if(isArtistRadio(track)) return playArtistRadio(track);
     if(isPlaylistRadio(track)) return playPlaylistRadio(track);
     if(isCustomStation(track)) return playCustomStation(track);
@@ -58690,6 +58892,8 @@
   }
 
   function togglePlayPause(){
+    // Build 706: a YouTube channel is paused and played in YouTube's player.
+    if(ytLive && currentStation === ytLive.st){ ytLivePlay(!uiIsPlaying); return; }
     if(currentStation && isLiveStream(currentStation)){
       // Pausing while a reconnect is pending stops the retries -- the listener has said so.
       if(reconnectState && uiIsPlaying){
@@ -58739,6 +58943,7 @@
   // to "nothing playing", and two things still call it: the Stop action on the OS media
   // controls, and deleting the station that happens to be on air.
   function stopPlayback(){
+    if(ytLive) ytLiveStop();   // build 706
     cancelReconnect();
     saveCurrentPodcastProgress();
     audio.pause();
