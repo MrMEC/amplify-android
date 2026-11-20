@@ -4553,6 +4553,13 @@
   .ch-tools .home-tabs{ margin:0 0 4px; }
   .ch-tools-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .ch-tools-row .cs-field-input{ flex:1 1 220px; width:auto; }
+  /* Build 709 (Mark): a text box never runs past the right margin -- with larger text a link box's
+     own minimum width (about 20 characters) pushed it out; it now shrinks to the row. */
+  .cs-field-input{ min-width:0; max-width:100%; }
+  .ch-tools-row .cs-field-input{ flex-basis:100%; }
+  /* Under a link box: Load / Find and Clear side by side. */
+  .ch-tools-btns{ display:flex; gap:8px; }
+  .ch-tools-btns > button{ flex:1 1 0; min-width:0; }
   .ch-tools-row .settings-select{ flex:1 1 140px; min-width:0; max-width:100%; }
   .ch-yt-note{ font-size:12.5px; color:var(--text-dim); margin:6px 0 2px; }
   .ch-list{ grid-column:1/-1; display:flex; flex-direction:column; }
@@ -31533,8 +31540,26 @@
     go.addEventListener('click', load);
     input.addEventListener('keydown', function(e){ if(e.key === 'Enter') load(); });
     row.appendChild(input);
-    row.appendChild(go);
     tools.appendChild(row);
+    tools.appendChild(chToolsButtons(go, function(){
+      addChannelsState.linkUrl = ''; addChannelsState.linkList = null; input.value = '';
+      renderAddChannels(true);
+      try{ input.focus(); }catch(e){}
+    }));
+  }
+  // Build 709 (Mark): Load / Find and a Clear button under a link box; Clear empties the box and
+  // what it found, ready for the next link.
+  function chToolsButtons(go, clear){
+    var btns = document.createElement('div');
+    btns.className = 'ch-tools-btns';
+    var c = document.createElement('button');
+    c.type = 'button';
+    c.className = 'settings-select ch-clear-btn';
+    c.textContent = 'Clear';
+    c.addEventListener('click', clear);
+    btns.appendChild(go);
+    btns.appendChild(c);
+    return btns;
   }
   // Build 706 (Mark): Add Channels > YouTube -- paste a YouTube live video, channel or @handle link.
   function buildYtLiveTools(tools){
@@ -31563,8 +31588,12 @@
     go.addEventListener('click', load);
     input.addEventListener('keydown', function(e){ if(e.key === 'Enter') load(); });
     row.appendChild(input);
-    row.appendChild(go);
     tools.appendChild(row);
+    tools.appendChild(chToolsButtons(go, function(){
+      addChannelsState.ytUrl = ''; addChannelsState.ytList = null; input.value = '';
+      renderAddChannels(true);
+      try{ input.focus(); }catch(e){}
+    }));
     var note = document.createElement('div');
     note.className = 'ch-yt-note';
     note.textContent = 'Plays in YouTube\u2019s player. A channel link shows whatever that channel has live.';
