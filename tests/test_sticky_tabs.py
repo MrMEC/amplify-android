@@ -112,7 +112,7 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
     up = await pg.evaluate(MEASURE, sel2)
     await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-up.png')
     print(T, name, 'start', top0, '\n   down', down, '\n   up', up)
-    want = 0 if name.startswith('watch') else 8   # build 705: Watch's tabs at the very top
+    want = 0   # builds 705-707: every tab row at the very top once the header is away
     check(down and down['hidden'] and abs(down['top'] - want) <= 1 and down['stuck'], f'{T} {name}: scrolled down, header away -> tabs {want}px from the top of the screen, with their backdrop ({down and down["top"]}, {down and down["stuck"]})')
     check(not top0['stuck'], f'{T} {name}: at rest no backdrop (the heading above stays visible)')
     check(top0['lab']['op'] == '0', f'{T} {name}: at rest the header label is hidden (the heading itself shows) {top0["lab"]["op"]}')
