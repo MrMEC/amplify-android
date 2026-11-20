@@ -3826,7 +3826,10 @@
   /* Build 708: full screen -- the app's own (YouTube's button can't leave the page), top right of the picture. */
   .np-yt-full{ display:none; }
   .now-playing-screen.np-yt .np-yt-full{ display:flex; align-items:center; justify-content:center; position:absolute; top:8px; right:8px; z-index:4;
-    width:36px; height:36px; padding:0; border:0; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    width:36px; height:36px; padding:0; border:0; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; cursor:pointer; -webkit-tap-highlight-color:transparent;
+    opacity:0; pointer-events:none; transition:opacity .25s ease; }
+  /* Build 710 (Mark): it shows on a tap on the picture and fades out again after 3 seconds. */
+  .now-playing-screen.np-yt .np-yt-full.show{ opacity:1; pointer-events:auto; }
   .np-yt-full svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
   .np-yt-full .when-full, body.np-video-full .np-yt-full .when-small{ display:none; }
   body.np-video-full .np-yt-full .when-full{ display:block; }
@@ -26760,6 +26763,7 @@
     npYtBox.appendChild(f);
     ytLive = { st: st, frame: f, playing: true };
     ytLiveSync();
+    ytFullShow();
     onPlaybackSuccess(st);
   }
   function ytLivePlay(on){
@@ -26784,7 +26788,26 @@
       document.getElementById('npYtFull').setAttribute('aria-label', 'Full screen');
     }
   }
-  document.getElementById('npYtFull').addEventListener('click', function(e){ e.stopPropagation(); ytLiveFull(!npVideoFull); });
+  document.getElementById('npYtFull').addEventListener('click', function(e){ e.stopPropagation(); ytLiveFull(!npVideoFull); ytFullShow(); });
+  // Build 710 (Mark): the button shows when the picture is tapped and fades after 3 seconds. A tap on
+  // YouTube's player never reaches the page, but it moves the focus into the player, which the page
+  // does see (the window loses focus): that counts as the tap, and the focus is handed back so the
+  // next tap is seen too.
+  var ytFullTimer = 0;
+  function ytFullShow(){
+    var b = document.getElementById('npYtFull');
+    b.classList.add('show');
+    clearTimeout(ytFullTimer);
+    ytFullTimer = setTimeout(function(){ b.classList.remove('show'); }, 3000);
+  }
+  window.addEventListener('blur', function(){
+    setTimeout(function(){
+      if(!ytLive || !ytLive.frame || document.activeElement !== ytLive.frame) return;
+      ytFullShow();
+      setTimeout(function(){ try{ if(document.activeElement === ytLive.frame){ ytLive.frame.blur(); window.focus(); } }catch(e){} }, 400);
+    }, 0);
+  });
+  npVideoWrap.addEventListener('pointerdown', function(){ if(nowPlayingScreen.classList.contains('np-yt')) ytFullShow(); });
   function ytLiveStop(){
     if(!ytLive) return;
     if(npVideoFull && nowPlayingScreen.classList.contains('np-yt')) exitVideoFull();
