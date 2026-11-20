@@ -31435,7 +31435,7 @@
     }
     if(!ch.empty) item('fa-solid fa-play', 'Watch Now', function(){ playChannel(ch, fromNp ? { still: true } : undefined); });
     if(mine && def) item('fa-solid fa-pen', 'Edit Channel', function(){ leaveNp(); openLiveChEditor(def.id); });
-    if(mine && def && def.src && def.src.kind === 'yt') item('fa-solid fa-i-cursor', 'Rename', function(){ promptRenameLiveChannel(def.id); });   // build 713
+    if(mine && def && def.src && def.src.kind === 'yt') item('<svg class="ch-sheet-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h6M18 7h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2M14 4v16M12 4h4M12 20h4"/></svg>', 'Rename', function(){ promptRenameLiveChannel(def.id); });   // build 713
     else if(!mine) item('fa-solid fa-pen', 'Edit Channel', function(){ var c = findVideoChannel(ch.url); if(c) openAddedChEditor(c, npRefresh); });
     if(!ch.empty){
       var fav = isFavorite(st);
