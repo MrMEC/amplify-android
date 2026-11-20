@@ -1661,6 +1661,33 @@
   .nph-edit.nph-sm .nph-line, .nph-edit.nph-sm .nph-line2{ font-size:11.5px; }
   .nph-edit.nph-above .nph-body{ order:1; flex:1 1 auto; padding:0 2px 10px; min-height:0; align-items:flex-end; }
   .nph-edit.nph-above .nph-media{ order:2; }
+  /* Build 701 (Mark, option A): above the cover, every slide's words take the same height (the tallest
+     slide's, --edit-body-h, set by heroEditAlign) and start at the top, so labels, titles and covers
+     line up across the row and there is no empty gap over a short title. */
+  .home-hero.nph-edit.nph-above .nph-body{ flex:none; align-items:flex-start; height:var(--edit-body-h, auto); }
+  .home-hero.nph-edit.nph-above .nph-track{ align-items:flex-start; }
+  /* A channel's logo in Editorial: whole and centred on a tile in its own colours (as in Slides, build
+     700) instead of a grey letterbox; a logo that is a solid picture of its own fills the tile. */
+  .home-hero.nph-edit .nph-slide.nph-logo .nph-media{
+    background:
+      radial-gradient(75% 60% at 50% 46%, color-mix(in srgb, var(--nph-logo-c, #8a8d96) 16%, #fff 84%) 0%, color-mix(in srgb, var(--nph-logo-c, #8a8d96) 30%, #fff 70%) 38%, transparent 100%),
+      linear-gradient(to bottom, color-mix(in srgb, var(--nph-logo-c, #3b3e47) 70%, #2a2b30) 0%, color-mix(in srgb, var(--nph-logo-c, #2c2e35) 45%, #0b0c0f) 100%); }
+  .home-hero.nph-edit .nph-slide.nph-logo.nph-logo-pale .nph-media{
+    background:linear-gradient(to bottom, color-mix(in srgb, var(--nph-logo-c, #3b3e47) 70%, #2a2b30) 0%, color-mix(in srgb, var(--nph-logo-c, #2c2e35) 45%, #0b0c0f) 100%); }
+  .home-hero.nph-edit .nph-slide.nph-logo .nph-art{ inset:12% 14%; background:none !important; }
+  .home-hero.nph-edit .nph-slide.nph-logo .nph-art img{ object-fit:contain; object-position:center; filter:drop-shadow(0 3px 8px rgba(0,0,0,.16)); }
+  .home-hero.nph-edit .nph-slide.nph-logo.nph-logo-solid .nph-art{ inset:0; }
+  .home-hero.nph-edit .nph-slide.nph-logo.nph-logo-solid .nph-art img{ object-fit:cover; filter:none; }
+  /* Build 701 (Mark, option C): Editorial's Framed card style -- words and cover on one card in the
+     cover's colour (--nph-logo-c, read from the picture), white words, the cover inset in it. */
+  .home-hero.nph-edit.nph-framed .nph-slide{ background:color-mix(in srgb, var(--nph-logo-c, #3a3c44) 62%, #0d0e11); border-radius:var(--r-card, 14px) !important;
+    overflow:hidden; padding:10px; box-shadow:var(--shadow); transition:background-color .25s; }
+  .home-hero.nph-edit.nph-framed .nph-media{ box-shadow:none; border-radius:calc(var(--r-card, 14px) - 5px) !important; }
+  .home-hero.nph-edit.nph-framed .nph-body{ padding:9px 4px 2px; }
+  .home-hero.nph-edit.nph-framed.nph-above .nph-body{ padding:4px 4px 10px; }
+  .home-hero.nph-edit.nph-framed .nph-kicker{ color:rgba(255,255,255,.74); }
+  .home-hero.nph-edit.nph-framed .nph-title{ color:#fff; }
+  .home-hero.nph-edit.nph-framed .nph-line, .home-hero.nph-edit.nph-framed .nph-line2{ color:rgba(255,255,255,.8); }
   /* Build 223: a thin progress bar in place of the dots, in the same 78 x 6px they took
      (seven 6px dots, six 6px gaps): how far through the slides you are, no knob. */
   .nph-progress{ position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:3; width:78px; height:6px; margin:0; border-radius:3px; overflow:hidden; pointer-events:none;
@@ -10098,6 +10125,13 @@
             <option value="above">Above the cover</option>
           </select>
         </div>
+        <div class="settings-row">
+          <div class="set-text"><span class="settings-label" id="carouselFrameLabel">Style</span><span class="set-desc">Framed puts the details and cover on one card in the cover&rsquo;s colour</span></div>
+          <select class="settings-select" id="carouselFrameSelect" aria-labelledby="carouselFrameLabel">
+            <option value="plain">Plain</option>
+            <option value="framed">Framed card</option>
+          </select>
+        </div>
       </div>
       </div>
       <div class="settings-row">
@@ -13009,13 +13043,13 @@
       shape: { radius: shapePrefs.radius, density: shapePrefs.density, artist: shapePrefs.artist, play: shapePrefs.play }, carousel: thCarouselNow() };
   }
   function thCarouselNow(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm' };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm', frame: false };
     try{ var v = JSON.parse(localStorage.getItem('radioPlayerCarousel') || 'null');
-      if(v && typeof v === 'object'){ if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize; if(v.textPos === 'above') d.textPos = 'above'; if(v.heading === true) d.heading = true; if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode; if(v.size === 's' || v.size === 'm' || v.size === 'l') d.size = v.size;
+      if(v && typeof v === 'object'){ if(v.cardSize === 's' || v.cardSize === 'm' || v.cardSize === 'l') d.cardSize = v.cardSize; if(v.textPos === 'above') d.textPos = 'above'; if(v.frame === true) d.frame = true; if(v.heading === true) d.heading = true; if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode; if(v.size === 's' || v.size === 'm' || v.size === 'l') d.size = v.size;
         if(typeof v.tilt === 'number') d.tilt = v.tilt; if(typeof v.reflect === 'boolean') d.reflect = v.reflect; } }catch(e){}
     return d;
   }
-  function thCarSig(c){ return c.mode === 'none' ? 'none' : (c.mode === 'flow' ? ['flow', c.size, c.tilt, !!c.reflect].join(',') : c.mode === 'card' ? 'card,' + c.cardSize : c.mode === 'edit' ? 'edit,' + c.cardSize + ',' + (c.textPos === 'above' ? 'above' : 'below') : 'slides,' + c.size) + ',' + (c.heading ? 'h' : ''); }
+  function thCarSig(c){ return c.mode === 'none' ? 'none' : (c.mode === 'flow' ? ['flow', c.size, c.tilt, !!c.reflect].join(',') : c.mode === 'card' ? 'card,' + c.cardSize : c.mode === 'edit' ? 'edit,' + c.cardSize + ',' + (c.textPos === 'above' ? 'above' : 'below') + (c.frame ? ',framed' : '') : 'slides,' + c.size) + ',' + (c.heading ? 'h' : ''); }
   function thBgSig(p){
     p = p || {};
     if(p.mode === 'solid' && p.color) return 's:' + p.color;
@@ -57439,9 +57473,10 @@
   var CAROUSEL_KEY = 'radioPlayerCarousel';
   var CAROUSEL_SIZES = { s: 170, m: 200, l: 230 };
   function carouselLoad(){
-    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm' };
+    var d = { mode: 'slides', size: 'm', tilt: 66, reflect: true, textPos: 'below', heading: false, cardSize: 'm', frame: false };
     try{
       var v = JSON.parse(localStorage.getItem(CAROUSEL_KEY) || 'null');
+      if(v && v.frame === true) d.frame = true;   // build 701: Editorial's Framed card style
       if(v && typeof v === 'object'){
         if(v.mode === 'flow' || v.mode === 'none' || v.mode === 'card' || v.mode === 'edit') d.mode = v.mode;   // build 562: None, no carousel at all; build 643: Card, Editorial
         if(v.textPos === 'above') d.textPos = 'above';
@@ -57647,7 +57682,7 @@
     slide._item = item; slide._entry = entry;
     slide.classList.add('nph-tap');
     slide.classList.toggle('nph-logo', !!(item && item.type !== 'zen' && isChannelEntry(item)));
-    slide.style.removeProperty('--nph-logo-c'); slide.classList.remove('nph-logo-pale');
+    slide.style.removeProperty('--nph-logo-c'); slide.classList.remove('nph-logo-pale', 'nph-logo-solid');
     var o = heroTextFor(item, entry);
     slide.querySelector('.nph-kicker').textContent = o.kicker;
     var titleEl = slide.querySelector('.nph-title');
@@ -57694,8 +57729,25 @@
       el.style.fontSize = size + 'px';
     }
     el.classList.remove('nph-measure');
+    if(slide && slide._item && carouselCfg.mode === 'edit') heroEditAlign();
+  }
+  // Build 701 (option A): Editorial with the words above the cover -- every slide's words get the
+  // height of the tallest, so the row lines up. Measured after titles are fitted.
+  var heroEditAlignQ = 0;
+  function heroEditAlign(){
+    if(heroEditAlignQ) return;
+    heroEditAlignQ = requestAnimationFrame(function(){
+      heroEditAlignQ = 0;
+      if(!npHero) return;
+      if(!npHero.classList.contains('nph-edit') || !npHero.classList.contains('nph-above')){ npHero.style.removeProperty('--edit-body-h'); return; }
+      npHero.style.setProperty('--edit-body-h', 'auto');
+      var h = 0;
+      heroSlides.forEach(function(sl){ var b = sl.querySelector('.nph-body'); if(b && b.offsetHeight > h) h = b.offsetHeight; });
+      if(h > 0) npHero.style.setProperty('--edit-body-h', h + 'px');
+    });
   }
   function fitHeroTitles(){
+    heroEditAlign();
     heroSlides.forEach(function(sl){ sl._fitKey = ''; fitHeroTitle(sl); });
     if(typeof npHeroFlowInfo !== 'undefined' && npHeroFlowInfo){ npHeroFlowInfo._fitKey = ''; fitHeroTitle(npHeroFlowInfo); }
   }
@@ -57714,7 +57766,7 @@
     }
     renderStationArt(slide.querySelector('.nph-art'), item);
     // Flow shows the cover (and its reflection, drawn in .nph-mid); the blurred backdrop is Slides' only.
-    if(slide.classList.contains('nph-logo')) heroLogoTint(slide);
+    if(slide.classList.contains('nph-logo') || (carouselCfg.mode === 'edit' && carouselCfg.frame)) heroLogoTint(slide);
     if(carouselCfg.mode === 'slides') renderStationArt(slide.querySelector('.nph-bg'), item);
     if(carouselCfg.mode === 'slides' || (heroFlowOn() && carouselCfg.reflect)) renderStationArt(slide.querySelector('.nph-mid'), item);
     if(carouselCfg.mode === 'card'){
@@ -57739,6 +57791,10 @@
       var x = cv.getContext('2d'); x.drawImage(img, 0, 0, n, n);
       var d = x.getImageData(0, 0, n, n).data, sum = 0, w = 0;
       for(var i = 0; i < d.length; i += 4){ var a = d[i + 3] / 255; if(a < 0.5) continue; sum += a * (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; w += a; }
+      // Build 701: a logo with no see-through corners is a picture of its own (a white box with the
+      // logo on it); Editorial fills its tile with it rather than framing a box inside a box.
+      var corners = [0, (n - 1) * 4, (n * (n - 1)) * 4, (n * n - 1) * 4];
+      img._ampSolid = corners.every(function(k){ return d[k + 3] > 235; });
       return w ? sum / w : null;
     }catch(e){ return null; }
   }
@@ -57751,7 +57807,7 @@
       var c = null;
       try{ c = dominantColorFrom(img, { minS: 0.3, maxS: 0.72, minL: 0.24, maxL: 0.36, scaleL: 0.62 }); }catch(e){}
       var lt = heroLogoLightness(img);
-      if(lt !== null) slide.classList.toggle('nph-logo-pale', lt > 0.72);
+      if(lt !== null){ slide.classList.toggle('nph-logo-pale', lt > 0.72); slide.classList.toggle('nph-logo-solid', !!img._ampSolid); }
       if(c){ slide.style.setProperty('--nph-logo-c', c); return; }
       var src = img.getAttribute('src') ? img.src : img.currentSrc;
       if(!/^https?:/i.test(src || '')) return;
@@ -57760,7 +57816,7 @@
         var c2 = null; try{ c2 = dominantColorFrom(cp.img, { minS: 0.3, maxS: 0.72, minL: 0.24, maxL: 0.36, scaleL: 0.62 }); }catch(e){}
         var lt2 = heroLogoLightness(cp.img);
         cp.done();
-        if(lt2 !== null && slide._item === item) slide.classList.toggle('nph-logo-pale', lt2 > 0.72);
+        if(lt2 !== null && slide._item === item){ slide.classList.toggle('nph-logo-pale', lt2 > 0.72); slide.classList.toggle('nph-logo-solid', !!cp.img._ampSolid); }
         if(c2 && slide._item === item) slide.style.setProperty('--nph-logo-c', c2);
       });
     }
@@ -58190,6 +58246,9 @@
     npHero.classList.toggle('nph-sm', carouselCfg.cardSize !== 'l');
     npHero.setAttribute('data-card-size', carouselCfg.cardSize);
     npHero.classList.toggle('nph-above', carouselCfg.mode === 'edit' && carouselCfg.textPos === 'above');
+    var frameWas = npHero.classList.contains('nph-framed');
+    npHero.classList.toggle('nph-framed', carouselCfg.mode === 'edit' && !!carouselCfg.frame);
+    if(frameWas !== npHero.classList.contains('nph-framed')) heroSlides.forEach(function(sl){ sl._artDone = false; });
     var size = CAROUSEL_SIZES[carouselCfg.size] || 200;
     var reflWas = npHero.classList.contains('nph-reflect');
     npHero.classList.toggle('nph-flow', flow);
@@ -58238,6 +58297,7 @@
       if(cardSizeSel) cardSizeSel.value = carouselCfg.cardSize;
       if(editOpts) editOpts.hidden = carouselCfg.mode !== 'edit';
       if(posSel) posSel.value = carouselCfg.textPos;
+      if(frameSel) frameSel.value = carouselCfg.frame ? 'framed' : 'plain';
       if(headSel) headSel.value = carouselCfg.heading ? 'on' : 'off';
       paintReset();
     }
@@ -58268,6 +58328,8 @@
     });
     if(refl) refl.addEventListener('change', function(){ carouselCfg.reflect = refl.value === 'on'; save(); applyCarousel(); });
     if(cardSizeSel) cardSizeSel.addEventListener('change', function(){ if(/^[sml]$/.test(cardSizeSel.value)){ carouselCfg.cardSize = cardSizeSel.value; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); } });
+    var frameSel = document.getElementById('carouselFrameSelect');
+    if(frameSel) frameSel.addEventListener('change', function(){ carouselCfg.frame = frameSel.value === 'framed'; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); });
     if(posSel) posSel.addEventListener('change', function(){ carouselCfg.textPos = posSel.value === 'above' ? 'above' : 'below'; save(); applyCarousel(); requestAnimationFrame(function(){ fitHeroTitles(); heroScrollTo(heroIndex(), false); }); });
     if(headSel) headSel.addEventListener('change', function(){ carouselCfg.heading = headSel.value === 'on'; save(); applyCarousel(); });
     // (Build 603: auto-advance removed.)
@@ -58277,6 +58339,7 @@
       carouselCfg.mode = c.mode === 'flow' || c.mode === 'none' || c.mode === 'card' || c.mode === 'edit' ? c.mode : 'slides';
       if(c.cardSize === 's' || c.cardSize === 'm' || c.cardSize === 'l') carouselCfg.cardSize = c.cardSize;
       if(c.textPos) carouselCfg.textPos = c.textPos === 'above' ? 'above' : 'below';
+      carouselCfg.frame = c.frame === true;
       if(typeof c.heading === 'boolean') carouselCfg.heading = c.heading;
       if(CAROUSEL_SIZES[c.size]) carouselCfg.size = c.size;
       if(typeof c.tilt === 'number') carouselCfg.tilt = Math.max(30, Math.min(80, c.tilt));
