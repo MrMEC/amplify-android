@@ -3835,6 +3835,9 @@
   body.np-video-full .np-yt-full .when-full{ display:block; }
   body.np-video-full .now-playing-screen.np-yt .np-yt-box{ width:100%; height:100%; max-height:none; aspect-ratio:auto; }
   body.np-video-full .now-playing-screen.np-yt .np-yt-full{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
+  /* Build 715 (Mark): Stop, top left of the picture; it shows and fades with the full screen button. */
+  .now-playing-screen.np-yt .np-yt-full.np-yt-stop{ right:auto; left:8px; }
+  body.np-video-full .now-playing-screen.np-yt .np-yt-full.np-yt-stop{ right:auto; left:calc(env(safe-area-inset-left, 0px) + 12px); }
   .now-playing-screen.np-yt .vctl, .now-playing-screen.np-yt #npVideoToggle, .now-playing-screen.np-yt #npOffAir{ display:none !important; }
   body.in-pip .vctl{ display:none !important; }
   /* Full screen: the video alone on black, edge to edge; the app's own chrome is hidden
@@ -4157,6 +4160,29 @@
   @media (prefers-color-scheme: light){ html:not([data-theme]) .epg-cats{ background:linear-gradient(to bottom, #ffffff, var(--epg-bg)); } }
   .epg-cats{ flex:0 0 100%; display:flex; gap:7px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; padding:8px 4px 6px; box-sizing:border-box; }
   .epg-cats::-webkit-scrollbar{ display:none; }
+  /* Build 715 (Mark): the chips' bar: a search button fixed on the left, the chips scrolling beside it,
+     and the filter box that slides out from the left over the chips. */
+  .epg-catbar{ flex:0 0 100%; position:relative; display:flex; align-items:stretch; min-width:0; overflow:hidden; background:linear-gradient(to bottom, #000000, var(--epg-bg)); }
+  html[data-theme="light"] .epg-catbar{ background:linear-gradient(to bottom, #ffffff, var(--epg-bg)); }
+  @media (prefers-color-scheme: light){ html:not([data-theme]) .epg-catbar{ background:linear-gradient(to bottom, #ffffff, var(--epg-bg)); } }
+  .epg-catbar .epg-cats-slot{ flex:1 1 auto; min-width:0; display:flex; transition:opacity .2s ease, visibility 0s linear 0s; }
+  .epg-catbar .epg-cats{ flex:1 1 auto; min-width:0; background:none; padding-left:7px; }
+  .epg-find-btn{ position:relative; z-index:2; flex:none; align-self:flex-start; display:inline-flex; align-items:center; justify-content:center; width:38px; height:30px; margin:8px 0 6px 4px; padding:0; border-radius:8px; border:1px solid var(--border); background:var(--epg-bg); color:var(--text-dim); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .epg-find-btn svg{ width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+  .epg-find-btn .ef-ico-close{ display:none; }
+  .epg-catbar.find-open .epg-find-btn{ background:var(--text); border-color:var(--text); color:var(--bg); }
+  .epg-catbar.find-open .epg-find-btn .ef-ico-find{ display:none; }
+  .epg-catbar.find-open .epg-find-btn .ef-ico-close{ display:block; }
+  .epg-find-clip{ position:absolute; left:42px; right:0; top:0; bottom:0; overflow:hidden; pointer-events:none; z-index:1; }
+  .epg-find{ position:absolute; left:7px; right:4px; top:8px; height:30px; transform:translateX(calc(-100% - 12px)); transition:transform .28s cubic-bezier(.2,.8,.2,1); }
+  .epg-catbar.find-open .epg-find{ transform:none; pointer-events:auto; }
+  .epg-catbar.find-open .epg-cats-slot{ opacity:0; visibility:hidden; transition:opacity .2s ease, visibility 0s linear .2s; }
+  .epg-find input{ width:100%; height:100%; box-sizing:border-box; border-radius:8px; border:1px solid var(--text-dim); background:var(--panel-2); color:var(--text); font:inherit; font-size:13.5px; padding:0 12px; outline:none; -webkit-appearance:none; appearance:none; }
+  .epg-find input::-webkit-search-cancel-button{ -webkit-appearance:none; display:none; }
+  .epg-find input::placeholder{ color:var(--text-dim); }
+  .epg-row.ef-hide{ display:none !important; }
+  .epg-find-none{ padding:18px 16px; color:var(--text-dim); font-size:14px; text-align:center; }
+  @media (prefers-reduced-motion: reduce){ .epg-find, .epg-catbar .epg-cats-slot{ transition:none !important; } }
   .epg-cat{ flex:none; display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-dim); font:inherit; font-size:12.5px; font-weight:600; white-space:nowrap; cursor:pointer; }
   .epg-cat.active{ background:var(--text); border-color:var(--text); color:var(--bg); }
   .epg-cat-star{ color:var(--accent); font-size:11px; }
@@ -9304,6 +9330,10 @@
             <!-- Build 706 (Mark): a YouTube channel plays in YouTube's own player, here in the video's place. -->
             <div class="np-yt-box" id="npYtBox"></div>
             <!-- Build 708 (Mark): full screen for a YouTube channel (YouTube's own button can't go full screen in the app). -->
+            <!-- Build 715 (Mark): Stop -- the YouTube channel stops and its player closes. -->
+            <button type="button" class="np-yt-full np-yt-stop" id="npYtStop" aria-label="Stop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor" stroke="none"></rect></svg>
+            </button>
             <button type="button" class="np-yt-full" id="npYtFull" aria-label="Full screen">
               <svg class="when-small" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path></svg>
               <svg class="when-full" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"></path></svg>
@@ -26932,11 +26962,12 @@
   // next tap is seen too.
   var ytFullTimer = 0;
   function ytFullShow(){
-    var b = document.getElementById('npYtFull');
-    b.classList.add('show');
+    var bs = [document.getElementById('npYtFull'), document.getElementById('npYtStop')];
+    bs.forEach(function(b){ b.classList.add('show'); });
     clearTimeout(ytFullTimer);
-    ytFullTimer = setTimeout(function(){ b.classList.remove('show'); }, 3000);
+    ytFullTimer = setTimeout(function(){ bs.forEach(function(b){ b.classList.remove('show'); }); }, 3000);
   }
+  document.getElementById('npYtStop').addEventListener('click', function(e){ e.stopPropagation(); if(ytLive) stopPlayback(); });
   window.addEventListener('blur', function(){
     setTimeout(function(){
       if(!ytLive || !ytLive.frame || document.activeElement !== ytLive.frame) return;
@@ -29223,6 +29254,104 @@
     });
     return row;
   }
+  // Build 715 (Mark): the guide's filter. A search button fixed at the left of the category bar
+  // (it stays put while the chips scroll); a tap slides the filter box out from the left over the
+  // chips (they hide), another slides it back in and clears it. Typing hides the channels whose
+  // name doesn't have every word typed. One bar per guide (Watch's, the one under the video),
+  // kept through the guide's redraws so the box keeps its text and the keyboard.
+  var epgCatBars = {};
+  var EPG_FIND_ICON = '<svg class="ef-ico-find" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5L20 20"></path></svg>'
+    + '<svg class="ef-ico-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>';
+  function epgFindNorm(s){
+    s = String(s || '').toLowerCase();
+    try{ s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }catch(e){}
+    return s;
+  }
+  function buildEpgCatBar(wrap, chips, active, which){
+    var o = epgCatBars[which];
+    if(!o){
+      o = epgCatBars[which] = { which: which, open: false };
+      var bar = o.bar = document.createElement('div');
+      bar.className = 'epg-catbar';
+      var btn = o.btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'epg-find-btn';
+      btn.innerHTML = EPG_FIND_ICON;
+      var clip = document.createElement('div');
+      clip.className = 'epg-find-clip';
+      var field = o.field = document.createElement('div');
+      field.className = 'epg-find';
+      field.setAttribute('role', 'search');
+      var input = o.input = document.createElement('input');
+      input.type = 'search';
+      input.placeholder = 'Filter channels';
+      input.setAttribute('aria-label', 'Filter channels');
+      input.autocomplete = 'off';
+      input.setAttribute('autocapitalize', 'off'); input.setAttribute('autocorrect', 'off'); input.spellcheck = false;
+      input.setAttribute('enterkeyhint', 'search');
+      input.tabIndex = -1;
+      field.appendChild(input);
+      clip.appendChild(field);
+      o.slot = document.createElement('div');
+      o.slot.className = 'epg-cats-slot';
+      bar.appendChild(btn); bar.appendChild(o.slot); bar.appendChild(clip);
+      var sync = function(){ document.querySelectorAll('.epg').forEach(function(w){ if(w._opts && (w._opts.np ? 'np' : 'main') === which) epgFindApply(w); }); };
+      input.addEventListener('input', sync);
+      input.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+        else if(e.key === 'Escape'){ e.preventDefault(); epgFindToggle(o, false); }
+      });
+      ['click', 'pointerdown', 'touchstart'].forEach(function(k){ field.addEventListener(k, function(e){ e.stopPropagation(); }, { passive: true }); });
+      btn.addEventListener('click', function(e){ e.stopPropagation(); epgFindToggle(o, !o.open); });
+      o.paint = function(){
+        bar.classList.toggle('find-open', o.open);
+        btn.setAttribute('aria-pressed', o.open ? 'true' : 'false');
+        btn.setAttribute('aria-label', o.open ? 'Close filter' : 'Filter channels');
+        btn.title = btn.getAttribute('aria-label');
+        input.tabIndex = o.open ? 0 : -1;
+      };
+      o.paint();
+    }
+    // keep the box's focus (and the phone's keyboard) through a redraw
+    var hadFocus = document.activeElement === o.input;
+    if(o.bar.parentNode) o.bar.parentNode.removeChild(o.bar);
+    o.slot.innerHTML = '';
+    if(chips){ o.slot.appendChild(buildEpgCats(wrap, chips, active, which)); o.bar.classList.remove('no-chips'); }
+    else o.bar.classList.add('no-chips');
+    if(hadFocus) requestAnimationFrame(function(){ try{ o.input.focus({ preventScroll: true }); }catch(e){} });
+    return o.bar;
+  }
+  function epgFindToggle(o, on){
+    o.open = !!on;
+    o.paint();
+    if(o.open) setTimeout(function(){ try{ o.input.focus({ preventScroll: true }); }catch(e){} }, 60);
+    else {
+      try{ o.input.blur(); }catch(e){}
+      if(o.input.value){ o.input.value = ''; o.input.dispatchEvent(new Event('input')); }
+    }
+  }
+  // Hides the guide's rows whose channel name doesn't have every word typed (any order, any case,
+  // accents ignored); a line says so when none do.
+  function epgFindApply(wrap){
+    var which = wrap._opts && wrap._opts.np ? 'np' : 'main', o = epgCatBars[which];
+    var toks = o ? epgFindNorm(o.input.value).split(/\s+/).filter(Boolean) : [];
+    var shown = 0, total = 0;
+    wrap.querySelectorAll('.epg-row').forEach(function(r){
+      var ok = true;
+      if(toks.length){
+        if(r._efText === undefined){ var ch = r.querySelector('.epg-ch'); r._efText = epgFindNorm(ch ? (ch.getAttribute('aria-label') || ch.textContent) : r.textContent); }
+        for(var i = 0; i < toks.length; i++){ if(r._efText.indexOf(toks[i]) < 0){ ok = false; break; } }
+      }
+      total++; if(ok) shown++;
+      r.classList.toggle('ef-hide', !ok);
+    });
+    var none = wrap.querySelector('.epg-find-none');
+    if(none){
+      none.hidden = !(toks.length && !shown);
+      if(!none.hidden) none.textContent = 'No channels match \u201c' + o.input.value.trim() + '\u201d.';
+    }
+    try{ placeEpgNow(wrap, Date.now()); }catch(e){}
+  }
   function setEpgCategory(key){
     if(key === epgCat) return;
     epgCat = key;
@@ -29396,11 +29525,11 @@
     // Build 677: the category chips, at the top of the sticky times bar (so under the video).
     var allChannels = channels, chips = epgCatChips(channels);
     var active = chips.some(function(c){ return c.key === epgCat; }) ? epgCat : 'all';
-    if(chips.length > 2){
-      head.classList.add('has-cats');
-      head.appendChild(buildEpgCats(wrap, chips, active, opts.np ? 'np' : 'main'));
-      channels = epgCatFilter(channels, active);
-    }
+    // Build 715 (Mark): the chips sit in a bar with a search button fixed on its left.
+    var which = opts.np ? 'np' : 'main';
+    head.classList.add('has-cats');
+    head.appendChild(buildEpgCatBar(wrap, chips.length > 2 ? chips : null, active, which));
+    if(chips.length > 2) channels = epgCatFilter(channels, active);
     var corner = document.createElement('button');
     corner.type = 'button';
     corner.className = 'epg-corner';
@@ -29451,12 +29580,17 @@
     track.addEventListener('scroll', function(){ if(syncing){ syncing = false; return; } if(scroller.scrollLeft !== track.scrollLeft){ syncing = true; scroller.scrollLeft = track.scrollLeft; } }, { passive: true });
     wrap._channels = allChannels;
     wrap._opts = opts;
+    var none = document.createElement('div');
+    none.className = 'epg-find-none';
+    none.hidden = true;
+    wrap.insertBefore(none, scroller);
+    epgFindApply(wrap);
     placeEpgNow(wrap, now);
     // The chips keep their sideways place through a redraw; a new row shows the chosen chip.
     if(head.classList.contains('has-cats')){
-      var cr = head.querySelector('.epg-cats'), sl = cr._sl;
-      if(sl != null) cr.scrollLeft = sl;
-      requestAnimationFrame(function(){ if(sl != null) cr.scrollLeft = sl; else epgRevealCat(cr); });
+      var cr = head.querySelector('.epg-cats'), sl = cr ? cr._sl : null;
+      if(cr && sl != null) cr.scrollLeft = sl;
+      if(cr) requestAnimationFrame(function(){ if(sl != null) cr.scrollLeft = sl; else epgRevealCat(cr); });
     }
     return wrap;
   }
@@ -60751,7 +60885,8 @@
       var cls = document.body.classList;
       if(typeof onVideoView !== 'undefined' && onVideoView){
         if(onVideoDetailView || onAddChannelsView || videoChannelsEditing) return null;
-        if(['channels', 'movies', 'shows', 'music'].indexOf(videoTab) < 0) return null;
+        // Build 715 (Mark): Live TV filters from the search button in the guide's category bar.
+        if(['movies', 'shows', 'music'].indexOf(videoTab) < 0) return null;
         var tabs = null;
         for(var i = 0; i < stationsGrid.children.length; i++){
           if(stationsGrid.children[i].classList.contains('watch-tabs')){ tabs = stationsGrid.children[i]; break; }
