@@ -29297,8 +29297,12 @@
       bar.appendChild(btn); bar.appendChild(o.slot); bar.appendChild(clip);
       var sync = function(){ document.querySelectorAll('.epg').forEach(function(w){ if(w._opts && (w._opts.np ? 'np' : 'main') === which) epgFindApply(w); }); };
       input.addEventListener('input', sync);
+      // A guide redraw takes the box off the page for a moment (and with it the focus): the box
+      // wants the focus back if it had it (o.typing), not if it was tapped away from.
+      input.addEventListener('focus', function(){ o.typing = true; });
+      input.addEventListener('blur', function(){ setTimeout(function(){ if(input.isConnected && document.activeElement !== input) o.typing = false; }, 0); });
       input.addEventListener('keydown', function(e){
-        if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+        if(e.key === 'Enter'){ e.preventDefault(); o.typing = false; input.blur(); }
         else if(e.key === 'Escape'){ e.preventDefault(); epgFindToggle(o, false); }
       });
       ['click', 'pointerdown', 'touchstart'].forEach(function(k){ field.addEventListener(k, function(e){ e.stopPropagation(); }, { passive: true }); });
@@ -29313,12 +29317,12 @@
       o.paint();
     }
     // keep the box's focus (and the phone's keyboard) through a redraw
-    var hadFocus = document.activeElement === o.input;
+    var hadFocus = o.open && (o.typing || document.activeElement === o.input);
     if(o.bar.parentNode) o.bar.parentNode.removeChild(o.bar);
     o.slot.innerHTML = '';
     if(chips){ o.slot.appendChild(buildEpgCats(wrap, chips, active, which)); o.bar.classList.remove('no-chips'); }
     else o.bar.classList.add('no-chips');
-    if(hadFocus) requestAnimationFrame(function(){ try{ o.input.focus({ preventScroll: true }); }catch(e){} });
+    if(hadFocus) requestAnimationFrame(function(){ if(o.open && o.input.isConnected && document.activeElement !== o.input){ try{ o.input.focus({ preventScroll: true }); }catch(e){} } });
     return o.bar;
   }
   function epgFindToggle(o, on){
@@ -29326,6 +29330,7 @@
     o.paint();
     if(o.open) setTimeout(function(){ try{ o.input.focus({ preventScroll: true }); }catch(e){} }, 60);
     else {
+      o.typing = false;
       try{ o.input.blur(); }catch(e){}
       if(o.input.value){ o.input.value = ''; o.input.dispatchEvent(new Event('input')); }
     }
@@ -53598,13 +53603,18 @@
     if(meta.items) return meta.items;
     return [{ id: meta.id, title: meta.title || meta.id, creator: meta.creator || '', year: meta.year || '', video: meta.video !== false }];
   }
-  var archivePrep = {};
+  var archivePrep = {}, archivePrepAt = {};
   // Gets a channel ready: its list of items (a category's top 20, kept half a day) and every
   // item's files. Done once per channel at a time; the guide and Now Playing redraw after.
   function archiveChPrepare(ch){
     if(archivePrep[ch.url]) return archivePrep[ch.url];
     var meta = archiveChannelMeta(ch.url);
     if(!meta) return Promise.resolve();
+    // Build 715: once a minute at most. With archive.org out of reach a channel never gets ready,
+    // and each redraw asked again at once -- the page redrew over and over (the guide's filter box
+    // lost every other letter typed).
+    if(archivePrepAt[ch.url] && Date.now() - archivePrepAt[ch.url] < 60000) return Promise.resolve();
+    archivePrepAt[ch.url] = Date.now();
     var itemsP = meta.collection ? archiveTopItems(meta.collection) : Promise.resolve(archiveChItemsNow(ch) || []);
     var p = itemsP.then(function(items){ return archiveProbe(items || []); }).then(function(){
       delete archivePrep[ch.url];
