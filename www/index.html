@@ -7149,6 +7149,9 @@
     }
     body.hdr-autohide.hdr-stuck #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs,
     body.hdr-autohide.hdr-stuck #podcastTabs{ top:8px; }
+    /* Build 705 (Mark): on Watch the tabs stick to the very top once the header is away -- no 8px gap
+       above them for the page to show through. */
+    body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs:not(.lib-tabs){ top:0; }   /* (Library's row carries .watch-tabs too) */
     /* Build 476 (Mark): while the tabs are stuck, the page's name fades in where its heading sits
        at the top of the page (same place, size and colour, copied from the heading by
        syncStickyTabs), filling the top left beside the menu button. It is part of the header, so
@@ -7164,6 +7167,7 @@
     body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
     body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(8px + var(--stab-h, 34px)); }   /* build 572: flush under the tabs (was 14px) */
+    body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs:not(.lib-tabs) ~ .epg > .epg-head{ top:var(--stab-h, 34px); }   /* build 705: under the tabs at the very top */
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
