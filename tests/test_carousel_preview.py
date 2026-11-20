@@ -34,6 +34,13 @@ async def run(b, scheme):
     print(T, st)
     check(st['inPrev'] and st['shown'] != 'none' and st['hBot'] <= st['pBot'] + 1, f'{T} the carousel shows in the preview, whole')
     check(st['ph'] <= 0.36 * 700 + 20, f'{T} the preview takes about a third of the screen ({st["ph"]}px)')
+    edge = await pg.evaluate("""()=>{ var p = document.getElementById('carPreview').getBoundingClientRect(), i = document.getElementById('carPreviewIn').getBoundingClientRect(); return [Math.round(p.left), Math.round(p.right), Math.round(i.left), Math.round(i.right)]; }""")
+    check(edge[0] == 0 and edge[1] == 327 and abs(edge[2]) <= 1 and abs(edge[3] - 327) <= 1, f'{T} the preview runs the full width, no side gaps (build 703) {edge}')
+    # build 703: tilt 0-90
+    await pg.evaluate("(()=>{ var r = document.getElementById('flowTiltRange'); r.value = '0'; r.dispatchEvent(new Event('input', { bubbles: true })); })()"); await pg.wait_for_timeout(300)
+    t0 = await pg.evaluate("[document.getElementById('flowTiltRange').min, document.getElementById('flowTiltRange').max, JSON.parse(localStorage.getItem('radioPlayerCarousel')).tilt]")
+    check(t0 == ['0', '90', 0], f'{T} tilt goes from 0 to 90 degrees, and 0 is kept {t0}')
+    await pg.evaluate("(()=>{ var r = document.getElementById('flowTiltRange'); r.value = '66'; r.dispatchEvent(new Event('input', { bubbles: true })); })()"); await pg.wait_for_timeout(300)
     # sticky while scrolling
     await pg.evaluate("document.getElementById('settingsPanel').scrollTop = 500"); await pg.wait_for_timeout(400)
     top = await pg.evaluate("Math.round(document.getElementById('carPreview').getBoundingClientRect().top)")

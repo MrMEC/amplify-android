@@ -29,8 +29,10 @@ async def main():
         await pg.goto(f'http://127.0.0.1:{PORT}/index.html'); await pg.wait_for_timeout(1800)
         await pg.evaluate("__t.set('appearance-theme')"); await pg.wait_for_timeout(500)
         print('title', await pg.evaluate("document.querySelector('[data-set-page=appearance-theme]').dataset.setTitle"))
+        first = await pg.evaluate("document.querySelector('[data-set-page=appearance-theme] .settings-row .settings-label').id")
+        check(first == 'themeLabel', f'Theme (light/dark/system) is the first setting, above the presets ({first})')  # build 703
         names = await pg.evaluate("Array.from(document.querySelectorAll('#themePresetGrid span:last-child')).map(s=>s.textContent)")
-        check(len(names)==11 and names[0]=='Amplify (Default)', f'Amplify (Default) + 10 presets {names}')  # build 700
+        check(len(names)==12 and names[0]=='Amplify (Default)' and names[-1]=='Vinyl Lounge', f'Amplify (Default) + 11 presets {names}')  # builds 700, 703
         await pg.screenshot(path=f'{SHOTS}/th-top.png')
         for i,n in [(2,'neon'),(4,'paper'),(10,'terminal'),(9,'candy')]:
             await pg.click(f'#themePresetGrid .th-chip:nth-child({i})'); await pg.wait_for_timeout(500)
