@@ -30,21 +30,21 @@ async def main():
         await pg.evaluate("__t.set('appearance-theme')"); await pg.wait_for_timeout(500)
         print('title', await pg.evaluate("document.querySelector('[data-set-page=appearance-theme]').dataset.setTitle"))
         names = await pg.evaluate("Array.from(document.querySelectorAll('#themePresetGrid span:last-child')).map(s=>s.textContent)")
-        check(len(names)==10, f'10 presets {names}')
+        check(len(names)==11 and names[0]=='Amplify (Default)', f'Amplify (Default) + 10 presets {names}')  # build 700
         await pg.screenshot(path=f'{SHOTS}/th-top.png')
-        for i,n in [(1,'neon'),(3,'paper'),(9,'terminal'),(8,'candy')]:
+        for i,n in [(2,'neon'),(4,'paper'),(10,'terminal'),(9,'candy')]:
             await pg.click(f'#themePresetGrid .th-chip:nth-child({i})'); await pg.wait_for_timeout(500)
             on = await pg.evaluate("Array.from(document.querySelectorAll('#themePresetGrid [aria-pressed=true] span:last-child')).map(s=>s.textContent)")
             check(len(on)==1, f'{n} marked {on}')
             await pg.screenshot(path=f'{SHOTS}/th-{n}.png')
         want = {1:'flow,l,60,true',2:'edit,m,above',3:'none',4:'card,m',5:'slides,l',6:'edit,m,below',7:'card,l',8:'card,s',9:'none',10:'edit,m,below'}
         for i,w in want.items():
-            await pg.click(f'#themePresetGrid .th-chip:nth-child({i})'); await pg.wait_for_timeout(400)
+            await pg.click(f'#themePresetGrid .th-chip:nth-child({i+1})'); await pg.wait_for_timeout(400)
             got = await pg.evaluate("(function(){var c=JSON.parse(localStorage.getItem('radioPlayerCarousel'));return c.mode=='none'?'none':c.mode=='flow'?['flow',c.size,c.tilt,c.reflect].join(','):c.mode=='card'?'card,'+c.cardSize:c.mode=='edit'?'edit,'+c.cardSize+','+c.textPos:'slides,'+c.size})()")
             vis = await pg.evaluate("getComputedStyle(document.getElementById('npHero')).display")
             check(got==w, f'preset {i} carousel {got} (hero display {vis})')
             check(await pg.evaluate("document.querySelectorAll('#themePresetGrid [aria-pressed=true]').length")==1, f'preset {i} marked')
-        await pg.click('#themePresetGrid .th-chip:nth-child(4)'); await pg.wait_for_timeout(300)
+        await pg.click('#themePresetGrid .th-chip:nth-child(5)'); await pg.wait_for_timeout(300)
         await pg.evaluate("__t.set('home-carousel')"); await pg.wait_for_timeout(300); await pg.evaluate("document.querySelector('[data-carousel-opt=none]').click()"); await pg.wait_for_timeout(300)
         check(await pg.evaluate("document.querySelectorAll('#themePresetGrid [aria-pressed=true]').length")==0, 'changing the carousel clears the mark')
         await pg.evaluate("__t.set('appearance-theme')"); await pg.wait_for_timeout(400)

@@ -234,7 +234,7 @@ async def run(theme, b):
     # follows playback: a channel
     await pg.evaluate(f"__h.fake({json.dumps(CHANNEL)})"); await pg.wait_for_timeout(1200)
     h = await pg.evaluate('__h.hero()'); print(h)
-    check(h['kicker'] == 'Live TV' and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and abs(h['imgW'] - (card['right'] - card['left'])) <= 1, f'[{theme}] a channel shows its logo, across the card, and name')
+    check(h['kicker'] == 'Live TV' and h['title'] == 'Ray TV News' and 'logo.png' in h['img'] and 0.6 * (card['right'] - card['left']) <= h['imgW'] <= 0.8 * (card['right'] - card['left']), f'[{theme}] a channel shows its logo once, inset on the card (build 700), and name')
     check(h['play'] == 'pause', f'[{theme}] its button follows playback')
     await pg.evaluate("window.scrollTo(0,0)"); await pg.wait_for_timeout(300)
     await pg.screenshot(path=f'{shots}/hero-channel-{theme}.png')
