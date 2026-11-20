@@ -26774,10 +26774,36 @@
       return typeof r.data === 'string' ? JSON.parse(r.data || '{}') : (r.data || {});
     });
   }
-  // Every playlistVideoRenderer (a video with a length), the next page's token, and the title.
+  // "23:22" or "1:02:03" -> seconds (0 for anything else, such as LIVE).
+  function ytPlDur(s){
+    var m = /^(?:(\d+):)?(\d{1,2}):(\d{2})$/.exec(String(s || '').trim());
+    return m ? (parseInt(m[1] || '0', 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10)) : 0;
+  }
+  // Every video with a length, the next page's token, and the title. Build 712 (Mark: none of his
+  // playlists worked): YouTube now sends each video as a lockupViewModel (id, title, channel, and
+  // the length only as the badge on its picture, e.g. "23:22"); the older playlistVideoRenderer is
+  // still read too.
   function ytPlWalk(o, out){
     if(!o || typeof o !== 'object') return;
     if(Array.isArray(o)){ o.forEach(function(x){ ytPlWalk(x, out); }); return; }
+    if(o.lockupViewModel){
+      var l = o.lockupViewModel;
+      if(l.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO' && l.contentId){
+        var md = (l.metadata && l.metadata.lockupMetadataViewModel) || {};
+        var rows = (md.metadata && md.metadata.contentMetadataViewModel && md.metadata.contentMetadataViewModel.metadataRows) || [];
+        var p0 = rows[0] && rows[0].metadataParts && rows[0].metadataParts[0];
+        var ld = 0;
+        try{
+          (l.contentImage.thumbnailViewModel.overlays || []).forEach(function(ov){
+            var bo = ov.thumbnailBottomOverlayViewModel;
+            ((bo && bo.badges) || []).forEach(function(b){ if(!ld && b.thumbnailBadgeViewModel) ld = ytPlDur(b.thumbnailBadgeViewModel.text); });
+          });
+        }catch(e){}
+        if(ld > 0) out.items.push({ v: l.contentId, t: (md.title && md.title.content) || '', a: (p0 && p0.text && p0.text.content) || '', d: ld });
+      }
+      return;
+    }
+    if(o.pageHeaderRenderer && o.pageHeaderRenderer.pageTitle && !out.title) out.title = o.pageHeaderRenderer.pageTitle;
     if(o.playlistVideoRenderer){
       var r = o.playlistVideoRenderer, t = r.title || {};
       var title = t.simpleText || (t.runs && t.runs.map(function(x){ return x.text; }).join('')) || '';
