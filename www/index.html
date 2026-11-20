@@ -4881,7 +4881,7 @@
     box-shadow:0 -30px 0 var(--main-bg), 0 -45px 0 var(--main-bg), 0 -60px 0 var(--main-bg), 0 8px 0 var(--main-bg); }
   @media (max-width: 900px){
     .tile-grid > .ch-edit-bar{ top:60px; transition:top .28s cubic-bezier(.4,0,.2,1); }
-    body.hdr-autohide.hdr-stuck .tile-grid > .ch-edit-bar{ top:8px; }
+    body.hdr-autohide.hdr-stuck .tile-grid > .ch-edit-bar{ top:0; }   /* build 707: no gap at the top */
   }
   @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px){
     .tile-grid > .ch-edit-bar, body.hdr-autohide.hdr-stuck .tile-grid > .ch-edit-bar{ top:0; }
@@ -7154,11 +7154,10 @@
     #stationsGrid > .lib-tabs.stab-stuck, #stationsGrid > .watch-tabs.stab-stuck, #podcastTabs.stab-stuck{
       box-shadow:0 -30px 0 var(--main-bg), 0 -45px 0 var(--main-bg), 0 -60px 0 var(--main-bg), 0 6px 0 var(--main-bg);
     }
+    /* Builds 705-707 (Mark): once the header is away, every tab row (Library, Podcasts, Watch) sticks to
+       the very top -- no 8px gap above it for the page to show through, whatever the theme or settings. */
     body.hdr-autohide.hdr-stuck #stationsGrid > .lib-tabs, body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs,
-    body.hdr-autohide.hdr-stuck #podcastTabs{ top:8px; }
-    /* Build 705 (Mark): on Watch the tabs stick to the very top once the header is away -- no 8px gap
-       above them for the page to show through. */
-    body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs:not(.lib-tabs){ top:0; }   /* (Library's row carries .watch-tabs too) */
+    body.hdr-autohide.hdr-stuck #podcastTabs{ top:0; }
     /* Build 476 (Mark): while the tabs are stuck, the page's name fades in where its heading sits
        at the top of the page (same place, size and colour, copied from the heading by
        syncStickyTabs), filling the top left beside the menu button. It is part of the header, so
@@ -7173,8 +7172,7 @@
     #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(60px + var(--stab-h, 34px)); }   /* build 572: flush under the tabs (was 66px: a 6px gap) */
     body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head,
     body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ #stationsGrid > .podcast-date-heading,
-    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:calc(8px + var(--stab-h, 34px)); }   /* build 572: flush under the tabs (was 14px) */
-    body.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs:not(.lib-tabs) ~ .epg > .epg-head{ top:var(--stab-h, 34px); }   /* build 705: under the tabs at the very top */
+    body.hdr-autohide.hdr-stuck #podcastTabs:not([style*="none"]) ~ * #stationsGrid > .podcast-date-heading{ top:var(--stab-h, 34px); }   /* build 707: flush under the tabs at the very top */
     /* Build 324 (Mark): with the A to Z rail (Artists, Albums, Songs) the column is already
        inset on the right, so the page's buttons sit the usual 10px from the menu button. */
     body.az-on:not(.album-open):not(.artist-open):not(.vdetail-open):not(.search-view) #sectionHeadingRow .section-heading-right{
@@ -8390,10 +8388,10 @@
     /* ---- Watch: one line -- the tabs on the left, the count and round buttons on the right ---- */
     body.watch-land #stationsHeading, body.watch-land #detailBackBtn{ display:none !important; }
     body.watch-land .browse-view{ padding-top:8px !important; }
-    body.watch-land #stationsGrid > .watch-tabs, body.watch-land.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs{ top:8px; }
+    body.watch-land #stationsGrid > .watch-tabs, body.watch-land.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs{ top:0; }   /* build 707: no gap */
     body.watch-land #sectionHeadingRow{ position:fixed; top:8px; right:var(--main-pad); left:auto; margin:0; min-height:0; height:34px; z-index:40; pointer-events:none; display:flex; align-items:center; }
     body.watch-land[data-vtab="channels"] #wlManageBtn{ display:inline-flex !important; }
-    body.watch-land #stationsGrid > .watch-tabs ~ .epg > .epg-head, body.watch-land.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head{ top:calc(8px + var(--stab-h, 34px)); }
+    body.watch-land #stationsGrid > .watch-tabs ~ .epg > .epg-head, body.watch-land.hdr-autohide.hdr-stuck #stationsGrid > .watch-tabs ~ .epg > .epg-head{ top:var(--stab-h, 34px); }   /* build 707 */
     body.watch-land #wlManageBtn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
     body.watch-land #sectionHeadingRow > *{ pointer-events:auto; }
     body.watch-land #stationsGrid > .watch-tabs{ grid-row:1; padding-right:calc(var(--wl-tb-w, 0px) + 8px); margin-bottom:0; }
