@@ -3736,6 +3736,10 @@
   }
   .np-coll-head{ display:flex; align-items:center; gap:6px; margin:0 0 16px; }
   .np-coll-head > .np-related-heading{ margin:0; flex:1; min-width:0; }
+  /* Build 704: "More Videos by ..." opens the artist's page. */
+  .np-related-heading.np-head-link{ cursor:pointer; display:flex; align-items:center; gap:6px; -webkit-tap-highlight-color:transparent; }
+  .np-related-heading.np-head-link .mv-chev{ flex:none; width:1.05em; height:1.05em; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; opacity:.8; }
+  .np-related-heading.np-head-link:active{ opacity:.7; }
   .np-coll-head > .np-foot-toggle{ display:none; }
   /* Build 601 (Mark): an archive.org video has the same show / hide details arrow as your own
      movies and episodes (build 347 had left it out). */
@@ -12090,6 +12094,24 @@
   var npRelatedGrid = document.getElementById('npRelatedGrid');
   var npCollection = document.getElementById('npCollection');
   var npCollectionHeading = document.getElementById('npCollectionHeading');
+  // Build 704: a heading made a link (More Videos by ...) goes to its page like the other links on
+  // Now Playing (closes it first). Any other heading text written over it is not a link.
+  (function(){
+    function live(){ return npCollectionHeading._go && npCollectionHeading.textContent === npCollectionHeading._goText ? npCollectionHeading._go : null; }
+    new MutationObserver(function(){ if(!live()){ npCollectionHeading._go = null; npCollectionHeading.classList.remove('np-head-link'); npCollectionHeading.removeAttribute('role'); npCollectionHeading.removeAttribute('tabindex'); } })
+      .observe(npCollectionHeading, { childList: true, characterData: true, subtree: true });
+    function go(e){
+      var fn = live(); if(!fn) return;
+      e.preventDefault(); e.stopPropagation();
+      var from = npTarget();
+      closeNowPlaying();
+      window.scrollTo(0, savedBrowseScrollY);
+      navFromNp = from;
+      try{ fn(); } finally { navFromNp = null; }
+    }
+    npCollectionHeading.addEventListener('click', go);
+    npCollectionHeading.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') go(e); });
+  })();
   var npCollectionGrid = document.getElementById('npCollectionGrid');
   var settingsFab = document.getElementById('settingsFab');
   var settingsOverlay = document.getElementById('settingsOverlay');
@@ -34935,6 +34957,16 @@
       }
       npCollection.style.display = '';
       npCollectionHeading.textContent = 'More Videos by ' + (t.artist || 'This Artist');
+      // Build 704 (Mark): the heading opens the artist's page (their library page, else their
+      // Music Videos page), with a chevron to show it goes somewhere.
+      var akey = t.artistKey;
+      var goArtist = (akey && findArtistEntry(akey)) ? function(){ openArtistPage(akey); }
+        : (akey && musicVideoIndex()[akey]) ? function(){ pushView(); openMusicVideoArtist(akey); } : null;
+      if(goArtist){
+        npCollectionHeading.insertAdjacentHTML('beforeend', MV_CHEVRON);
+        npCollectionHeading._go = goArtist; npCollectionHeading._goText = npCollectionHeading.textContent;
+        npCollectionHeading.classList.add('np-head-link'); npCollectionHeading.setAttribute('role', 'link'); npCollectionHeading.tabIndex = 0;
+      }
       others.forEach(function(v){ npCollectionGrid.appendChild(buildNpMusicVideoRow(v, mvs)); });
       return;
     }
