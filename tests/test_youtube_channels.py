@@ -135,6 +135,16 @@ async def run(p, theme, W=327, H=675):
     check(st['src'] and 'embed/live_stream?channel=UCabcdefghijklmnopqrstuv' in st['src'] and st['yt'] and st['wrap'] and st['w'] > 300 and abs(st['h'] - st['w'] * 9 / 16) < 3 and st['vid'] == 'none', '%s plays in YouTube’s player, in the 16:9 video box' % T)
     check(st['loads'] == loads0 and st['playing'], '%s the app’s own player isn’t asked to load it; it shows as playing' % T)
     await pg.screenshot(path=SHOTS + '/ytch-play-%s.png' % theme)
+    # build 708: full screen
+    fb = await pg.evaluate("() => { var b = document.getElementById('npYtFull'), r = b.getBoundingClientRect(), f = document.querySelector('#npYtBox iframe').getBoundingClientRect(); return [getComputedStyle(b).display, Math.round(r.right), Math.round(f.right), Math.round(r.top - f.top)]; }")
+    check(fb[0] == 'flex' and abs(fb[1] - fb[2] + 8) <= 1 and fb[3] == 8, '%s a full-screen button top right of YouTube’s picture %s' % (T, fb))
+    await pg.evaluate("() => document.getElementById('npYtFull').click()"); await pg.wait_for_timeout(500)
+    fs = await pg.evaluate("() => { var r = document.querySelector('#npYtBox iframe').getBoundingClientRect(); return [document.body.classList.contains('np-video-full'), Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), innerWidth, innerHeight, document.getElementById('npYtFull').getAttribute('aria-label')]; }")
+    check(fs[0] and fs[1] == 0 and fs[2] == 0 and fs[3] == fs[5] and fs[4] == fs[6] and fs[7] == 'Exit full screen', '%s full screen: the picture fills the screen %s' % (T, fs))
+    await pg.screenshot(path=SHOTS + '/ytch-full-%s.png' % theme)
+    await pg.evaluate("() => document.getElementById('npYtFull').click()"); await pg.wait_for_timeout(500)
+    fs2 = await pg.evaluate("() => { var r = document.querySelector('#npYtBox iframe').getBoundingClientRect(); return [document.body.classList.contains('np-video-full'), Math.round(r.width), Math.round(r.height)]; }")
+    check(not fs2[0] and abs(fs2[2] - fs2[1] * 9 / 16) < 3, '%s and back out to the 16:9 box %s' % (T, fs2))
     # pause / play through the mini player send commands to YouTube's player
     await pg.evaluate("() => { window.__ytmsgs = []; var f = document.querySelector('#npYtBox iframe'); var orig = f.contentWindow.postMessage.bind(f.contentWindow); }")
     await pg.evaluate(EV("togglePlayPause(); 1")); await pg.wait_for_timeout(200)
