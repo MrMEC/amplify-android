@@ -112,7 +112,8 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
     up = await pg.evaluate(MEASURE, sel2)
     await pg.screenshot(path=f'{shots}/sticky-{T[1:-1].replace(" ", "-")}-{name}-up.png')
     print(T, name, 'start', top0, '\n   down', down, '\n   up', up)
-    check(down and down['hidden'] and abs(down['top'] - 8) <= 1 and down['stuck'], f'{T} {name}: scrolled down, header away -> tabs 8px from the top of the screen, with their backdrop ({down and down["top"]}, {down and down["stuck"]})')
+    want = 0   # builds 705-707: every tab row at the very top once the header is away
+    check(down and down['hidden'] and abs(down['top'] - want) <= 1 and down['stuck'], f'{T} {name}: scrolled down, header away -> tabs {want}px from the top of the screen, with their backdrop ({down and down["top"]}, {down and down["stuck"]})')
     check(not top0['stuck'], f'{T} {name}: at rest no backdrop (the heading above stays visible)')
     check(top0['lab']['op'] == '0', f'{T} {name}: at rest the header label is hidden (the heading itself shows) {top0["lab"]["op"]}')
     check(down['lab']['bottom'] <= 0, f'{T} {name}: header away -> the label goes with it {down["lab"]["bottom"]}')
@@ -125,7 +126,8 @@ async def scroll_check(pg, T, name, sel2=None, need=900):
     check(up and up['bg'] not in ('rgba(0, 0, 0, 0)', 'transparent'), f'{T} {name}: tabs on the page colour so rows pass cleanly under ({up and up["bg"]})')
     check(up and up['left'] <= 0 and up['right'] >= up['vw'] and up['sw'] <= up['vw'], f'{T} {name}: edge to edge, no sideways scroll')
     if sel2:
-        check(down.get('second') and abs(down['second']['top'] - down['bottom'] - 6) <= 2, f'{T} {name}: {sel2} sticks right under the tabs (header away) {down.get("second")} vs {down["bottom"]}')
+        check(down.get('second') and abs(down['second']['top'] - down['bottom']) <= 2,   # build 572: flush under the tabs
+              f'{T} {name}: {sel2} sticks right under the tabs (header away) {down.get("second")} vs {down["bottom"]}')
         check(up.get('second') and abs(up['second']['top'] - up['bottom'] - 6) <= 2, f'{T} {name}: {sel2} sticks right under the tabs (header back) {up.get("second")} vs {up["bottom"]}')
     await pg.evaluate("window.scrollTo(0, 0)"); await pg.wait_for_timeout(400)
     back = await pg.evaluate(MEASURE, sel2)

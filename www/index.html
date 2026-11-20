@@ -26848,6 +26848,22 @@
     try{ refreshChannelGrids(); }catch(e){}
     return d;
   }
+  // Build 713 (Mark): rename a channel of your own (a YouTube playlist channel's name starts as the
+  // playlist's title). An empty name goes back to that automatic name.
+  function promptRenameLiveChannel(id){
+    var d = liveChDefById(id);
+    if(!d) return;
+    var auto = liveChAutoName(d, liveChSources(d, vlib()));
+    var t = window.prompt('Channel name', d.name || auto);
+    if(t == null) return;
+    t = String(t).replace(/\s+/g, ' ').trim().slice(0, 60);
+    if(t === auto) t = '';
+    if(t === (d.name || '')) return;
+    d.name = t;
+    saveLiveChDefs();
+    try{ refreshChannelGrids(); }catch(e){}
+    chRenameCopies('amplify-live:' + id, t || auto);
+  }
   function ytPlaylistDefOf(list){
     var defs = liveChDefs();
     for(var i = 0; i < defs.length; i++) if(defs[i].src && defs[i].src.kind === 'yt' && defs[i].src.list === list) return defs[i];
@@ -27003,6 +27019,11 @@
     if(!ch || !name || name === ch.name) return;
     ch.name = name;
     saveVideoChannels();
+    chRenameCopies(url, name);
+  }
+  // Build 713: the name goes to every copy of the channel (Favorites, Recent, playlists, Continue
+  // Watching, the player). Shared by added channels and channels of your own.
+  function chRenameCopies(url, name){
     function fix(x){
       if(!x || (x.urlToResolve || x.url) !== url) return;
       x.name = name;
@@ -28810,7 +28831,8 @@
   // Build 711: Load / Refresh Playlist reads the playlist from YouTube into the channel being edited.
   lcEl('liveChYtLoad').addEventListener('click', function(){
     if(!liveChEd || liveChEd.src.kind !== 'yt') return;
-    var u = String(lcEl('liveChYtUrl').value || '').trim(), id = ytPlId(/^https?:/i.test(u) ? u : 'https://' + u) || (/^(PL|UU|OL|FL)[\w-]{10,}$/.test(u) ? u : '');
+    lcEl('liveChYtUrl').value = String(lcEl('liveChYtUrl').value || '').replace(/\s+/g, '');
+    var u = String(lcEl('liveChYtUrl').value || '').replace(/\s+/g, ''), id = ytPlId(/^https?:/i.test(u) ? u : 'https://' + u) || (/^(PL|UU|OL|FL)[\w-]{10,}$/.test(u) ? u : '');
     if(!id){ lcEl('liveChYtNote').textContent = 'That isn\u2019t a YouTube playlist link (it has \u201clist=\u201d in it).'; return; }
     var btn = lcEl('liveChYtLoad'), ed = liveChEd;
     btn.disabled = true; lcEl('liveChYtNote').textContent = 'Reading the playlist\u2026';
@@ -31413,6 +31435,7 @@
     }
     if(!ch.empty) item('fa-solid fa-play', 'Watch Now', function(){ playChannel(ch, fromNp ? { still: true } : undefined); });
     if(mine && def) item('fa-solid fa-pen', 'Edit Channel', function(){ leaveNp(); openLiveChEditor(def.id); });
+    if(mine && def && def.src && def.src.kind === 'yt') item('fa-solid fa-i-cursor', 'Rename', function(){ promptRenameLiveChannel(def.id); });   // build 713
     else if(!mine) item('fa-solid fa-pen', 'Edit Channel', function(){ var c = findVideoChannel(ch.url); if(c) openAddedChEditor(c, npRefresh); });
     if(!ch.empty){
       var fav = isFavorite(st);
@@ -31708,7 +31731,8 @@
     go.className = 'settings-select';
     go.textContent = 'Load';
     function load(){
-      var u = input.value.trim();
+      var u = input.value.replace(/\s+/g, '');   // build 713: no spaces or line breaks in a link
+      input.value = u;
       if(!/^https?:\/\//i.test(u)){ setStatus('Enter a link starting with http:// or https://', true); return; }
       addChannelsState.linkUrl = u;
       addChannelsState.linkList = 'loading';
@@ -31775,7 +31799,8 @@
     go.className = 'settings-select';
     go.textContent = 'Find';
     function load(){
-      var u = input.value.trim();
+      var u = input.value.replace(/\s+/g, '');   // build 713: links pasted with spaces or line breaks in them
+      input.value = u;
       if(u && !/^https?:\/\//i.test(u)) u = 'https://' + u.replace(/^\/+/, '');
       if(!ytPlId(u) && !ytLiveParse(u)){ setStatus('Paste a YouTube link: a live video, a channel, an @handle or a playlist.', true); return; }
       ytTabLoad(u);
@@ -31823,8 +31848,21 @@
     var add = document.createElement('button');
     add.type = 'button';
     add.className = 'ch-add';
+    // Build 713: once it's a channel, the row shows the channel's name and a Rename button.
+    var rn = document.createElement('button');
+    rn.type = 'button';
+    rn.className = 'ch-add ch-rename';
+    rn.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
+    rn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var d = ytPlaylistDefOf(pl.list);
+      if(d){ promptRenameLiveChannel(d.id); paint(); }
+    });
     function paint(){
-      var on = !!ytPlaylistDefOf(pl.list);
+      var d = ytPlaylistDefOf(pl.list), on = !!d;
+      nm.textContent = d && d.name ? d.name : pl.title;
+      rn.style.display = on ? '' : 'none';
+      rn.setAttribute('aria-label', 'Rename ' + nm.textContent);
       add.classList.toggle('added', on);
       add.innerHTML = on ? '<i class="fa-solid fa-check" aria-hidden="true"></i>' : '<i class="fa-solid fa-plus" aria-hidden="true"></i>';
       add.setAttribute('aria-label', on ? 'Remove ' + pl.title + ' from My Channels' : 'Add ' + pl.title + ' to My Channels');
@@ -31837,7 +31875,7 @@
       ytPlaylistChannel(pl); paint();
       setStatus(quoteName(pl.title) + ' is in My Channels.');
     });
-    row.appendChild(logo); row.appendChild(text); row.appendChild(add);
+    row.appendChild(logo); row.appendChild(text); row.appendChild(rn); row.appendChild(add);
     return row;
   }
   function renderYtLiveResults(body){
