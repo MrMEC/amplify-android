@@ -3823,6 +3823,15 @@
   .now-playing-screen.np-yt .np-video{ display:none; }
   .now-playing-screen.np-yt .np-yt-box{ display:block; position:relative; width:100%; aspect-ratio:16/9; max-height:52vh; background:#000; }
   .np-yt-box iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
+  /* Build 708: full screen -- the app's own (YouTube's button can't leave the page), top right of the picture. */
+  .np-yt-full{ display:none; }
+  .now-playing-screen.np-yt .np-yt-full{ display:flex; align-items:center; justify-content:center; position:absolute; top:8px; right:8px; z-index:4;
+    width:36px; height:36px; padding:0; border:0; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .np-yt-full svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+  .np-yt-full .when-full, body.np-video-full .np-yt-full .when-small{ display:none; }
+  body.np-video-full .np-yt-full .when-full{ display:block; }
+  body.np-video-full .now-playing-screen.np-yt .np-yt-box{ width:100%; height:100%; max-height:none; aspect-ratio:auto; }
+  body.np-video-full .now-playing-screen.np-yt .np-yt-full{ top:calc(env(safe-area-inset-top, 0px) + 12px); right:calc(env(safe-area-inset-right, 0px) + 12px); }
   .now-playing-screen.np-yt .vctl, .now-playing-screen.np-yt #npVideoToggle, .now-playing-screen.np-yt #npOffAir{ display:none !important; }
   body.in-pip .vctl{ display:none !important; }
   /* Full screen: the video alone on black, edge to edge; the app's own chrome is hidden
@@ -9283,6 +9292,11 @@
             <video class="np-video" id="npVideo" playsinline preload="none"></video>
             <!-- Build 706 (Mark): a YouTube channel plays in YouTube's own player, here in the video's place. -->
             <div class="np-yt-box" id="npYtBox"></div>
+            <!-- Build 708 (Mark): full screen for a YouTube channel (YouTube's own button can't go full screen in the app). -->
+            <button type="button" class="np-yt-full" id="npYtFull" aria-label="Full screen">
+              <svg class="when-small" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path></svg>
+              <svg class="when-full" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"></path></svg>
+            </button>
           </div>
           <!-- Build 685 (Mark): a channel that is off air shows a test card where the picture would be. -->
           <div class="np-offair" id="npOffAir" role="group" aria-label="Off air" hidden>
@@ -26749,8 +26763,24 @@
     playerSub.textContent = on ? barSubFor(currentStation) : 'Paused';
     playerSub.classList.remove('err');
   }
+  // Build 708 (Mark): full screen for a YouTube channel -- the picture alone on black, sideways, as
+  // for any video (Back or the button comes out).
+  function ytLiveFull(on){
+    if(on){
+      if(npVideoFull || !ytLive) return;
+      npVideoFull = true; npVideoFullLocked = true;
+      document.body.classList.add('np-video-full');
+      nativeVideoUi({ fullscreen: true, landscape: true, awake: true });
+      document.getElementById('npYtFull').setAttribute('aria-label', 'Exit full screen');
+    } else if(npVideoFull){
+      exitVideoFull();
+      document.getElementById('npYtFull').setAttribute('aria-label', 'Full screen');
+    }
+  }
+  document.getElementById('npYtFull').addEventListener('click', function(e){ e.stopPropagation(); ytLiveFull(!npVideoFull); });
   function ytLiveStop(){
     if(!ytLive) return;
+    if(npVideoFull && nowPlayingScreen.classList.contains('np-yt')) exitVideoFull();
     ytLive = null;
     npYtBox.innerHTML = '';
     ytLiveSync();
