@@ -21527,6 +21527,9 @@
       ['musicbrainz', musicbrainzSongArt]
     ];
     if(item && item.skipLibrary) steps.shift();      // build 420: a song from your own library asking for its online cover
+    // Build 717 (Mark): a song a live station names looks online first (Deezer, Apple, MusicBrainz);
+    // your own library's cover is only the last fallback before the station's own cover.
+    else if(item && item.externalFirst) steps.push(steps.shift());
     return (function next(i){
       if(i >= steps.length) return Promise.resolve(hadError ? { error: true } : null);
       return Promise.resolve().then(function(){ return steps[i][1](item); }).then(function(url){
@@ -57935,7 +57938,7 @@
     var rt = r.t, ra = r.a;
     if(!ra){ var bp = splitTitleByArtist(rt); if(bp){ rt = bp.t; ra = bp.a; } }   // build 569: songs saved before the split
     if(!ra) return null;
-    return { artist: ra, name: rt, songKey: songKeyOf(ra, rt) };
+    return airSongItem(ra, rt);
   }
   function lastSongCoverFor(st){
     var it = lastSongItem(st);
@@ -57964,11 +57967,16 @@
     var e = st.artistKey ? findArtistEntry(st.artistKey) : null;
     return (e && e.name) || String(st.name || '').replace(/ Radio$/, '');
   }
+  // Build 717: a song named by a live station. Its own key ('air|') keeps it apart from the Top 100's
+  // lookups, which still try your library first; here the library is the last resort.
+  function airSongItem(artist, name){
+    return { artist: artist, name: name, songKey: 'air|' + songKeyOf(artist, name), externalFirst: true };
+  }
   function fetchOnAirArt(){
     var song = onAir, st = currentStation;
     var who = (song && st) ? onAirLookupArtist(song, st) : '';
     if(!song || !who || !st || !stationWeakLogo(st)) return;
-    requestSongArt({ artist: who, name: song.title }, function(url){
+    requestSongArt(airSongItem(who, song.title), function(url){
       if(!onAir || onAir.key !== song.key || onAir.title !== song.title || onAir.artist !== song.artist) return;
       songArtPending = false;
       onAirArt = { key: song.key, song: song.title + '\n' + song.artist, url: url };
